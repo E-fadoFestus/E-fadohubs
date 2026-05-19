@@ -1,0 +1,5 @@
+{
+  "name": "EFADO Hubs Connect",
+  "description": "Efado Hubs is a global, all-in-one digital financial ecosystem that connects people to opportunity across the world. One world. One ecosystem. Every opportunity.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

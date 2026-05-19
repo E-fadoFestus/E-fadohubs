@@ -1,0 +1,638 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user wallet balances and social profile information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID." },
+        "email": { "type": "string", "format": "email", "description": "User email." },
+        "displayName": { "type": "string", "description": "Social display name." },
+        "photoURL": { "type": "string", "description": "Profile picture URL." },
+        "bio": { "type": "string", "description": "User biography." },
+        "followers": { "type": "array", "items": { "type": "string" }, "description": "List of follower UIDs." },
+        "following": { "type": "array", "items": { "type": "string" }, "description": "List of following UIDs." },
+        "playerWallet": { "type": "number", "description": "Current balance available for playing." },
+        "depositWallet": { "type": "number", "description": "Total deposited funds." },
+        "cashOutWallet": { "type": "number", "description": "Funds ready for withdrawal." },
+        "miningWallet": { "type": "number", "description": "Tokens earned through mining." },
+        "miningProgress": { 
+          "type": "object", 
+          "properties": {
+            "stage": { "type": "string" },
+            "collectedInStage": { "type": "number" }
+          }
+        },
+        "role": { "type": "string", "enum": ["player", "admin"], "description": "User role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date." }
+      },
+      "required": ["uid", "email", "playerWallet", "depositWallet", "cashOutWallet", "role"]
+    },
+    "Transaction": {
+      "title": "Wallet Transaction",
+      "description": "Records all money movements (deposit, withdrawal, hub payments).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User who performed the transaction." },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "game_bet", "game_win", "payment", "payout"], "description": "Type of transaction." },
+        "amount": { "type": "number", "description": "Transaction amount." },
+        "hub": { "type": "string", "description": "The hub where the transaction occurred (e.g., 'ADVERTISING', 'MINING')." },
+        "purpose": { "type": "string", "description": "Description of the transaction purpose." },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"], "description": "Current status." },
+        "reference": { "type": "string", "description": "Unique transaction reference or ID." },
+        "metadata": { "type": "object", "description": "Additional context." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the transaction occurred." }
+      },
+      "required": ["userId", "type", "amount", "status", "timestamp", "reference"]
+    },
+    "AdminStats": {
+      "title": "Admin Statistics",
+      "description": "Tracks total house gain and admin wallet.",
+      "type": "object",
+      "properties": {
+        "adminWallet": { "type": "number", "description": "Total admin profit." },
+        "totalHouseGain": { "type": "number", "description": "Cumulative gain from game losses." },
+        "gameWallets": { 
+          "type": "object", 
+          "description": "Profit per game.",
+          "properties": {
+            "spinGame": { "type": "number" },
+            "moneyCard": { "type": "number" },
+            "tradingGame": { "type": "number" }
+          }
+        },
+        "lastUpdated": { "type": "string", "format": "date-time", "description": "Last update timestamp." }
+      },
+      "required": ["adminWallet", "totalHouseGain", "gameWallets", "lastUpdated"]
+    },
+    "Announcement": {
+      "title": "Site Announcement",
+      "description": "Global messages sent by the CEO.",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["message", "timestamp", "active"]
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "description": "Pending payouts for players.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
+        "accountDetails": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userEmail", "amount", "status", "timestamp"]
+    },
+    "Vendor": {
+      "title": "Vendor Profile",
+      "description": "Stores vendor registration information.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "vendorType": { "type": "string", "enum": ["Individual", "Company", "Organization"] },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "address": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "pickupMethod": { "type": "string", "enum": ["Pickup", "Delivery", "Both"] },
+        "termsAccepted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "vendorType", "email", "phone", "country", "city", "termsAccepted"]
+    },
+    "MarketProduct": {
+      "title": "Market Product",
+      "description": "Fairly used product listing.",
+      "type": "object",
+      "properties": {
+        "vendorId": { "type": "string" },
+        "title": { "type": "string" },
+        "categoryPath": {
+          "type": "object",
+          "properties": {
+            "level1": { "type": "string" },
+            "level2": { "type": "string" },
+            "level3": { "type": "string" }
+          }
+        },
+        "condition": { "type": "string", "enum": ["New", "Like New", "Good", "Fair", "Used"] },
+        "quantity": { "type": "number" },
+        "price": { "type": "number" },
+        "currency": { "type": "string" },
+        "description": { "type": "string" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "complianceConfirmed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["vendorId", "title", "categoryPath", "condition", "price", "photos", "complianceConfirmed"]
+    },
+    "SocialPost": {
+      "title": "Social Post",
+      "description": "User-generated content in the Gist Hub.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "comments": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "authorName", "content", "likes", "comments", "createdAt"]
+    },
+    "Reel": {
+      "title": "Video Reel",
+      "description": "Short-form video content.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "caption": { "type": "string" },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "shares": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "videoUrl", "likes", "shares", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Direct message between users.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "image", "video", "contact", "file", "sticker", "gif", "buzz"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "receiverId", "content", "type", "createdAt"]
+    },
+    "Advertisement": {
+      "title": "Advertisement",
+      "description": "Paid promotional content.",
+      "type": "object",
+      "properties": {
+        "advertiserId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "budget": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["advertiserId", "title", "description", "budget", "status", "createdAt"]
+    },
+    "ServiceProvider": {
+      "title": "Service Provider",
+      "description": "Professional service provider in the Service Corps.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "serviceFamily": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "scope": { "type": "string", "enum": ["Local", "International", "Both"] },
+        "bio": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewsCount": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessName", "serviceFamily", "subcategory", "location", "scope", "bio", "contactEmail", "contactPhone"]
+    },
+    "ServiceRequest": {
+      "title": "Service Request",
+      "description": "Client request for a service in the Service Corps.",
+      "type": "object",
+      "properties": {
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "providerId": { "type": "string" },
+        "serviceFamily": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "urgency": { "type": "string", "enum": ["Low", "Medium", "High", "Emergency"] },
+        "budget": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientId", "clientName", "serviceFamily", "subcategory", "description", "location", "urgency", "status"]
+    },
+    "CSCCGroup": {
+      "title": "CSCC Group",
+      "description": "A community saving group with a rotating payout cycle.",
+      "type": "object",
+      "properties": {
+        "adminId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "contributionAmount": { "type": "number" },
+        "currency": { "type": "string" },
+        "cycleDuration": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "maxMembers": { "type": "number" },
+        "payoutOrder": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["pending", "active", "completed"] },
+        "currentCycleIndex": { "type": "number" },
+        "nextPayoutDate": { "type": "string", "format": "date-time" },
+        "rules": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminId", "name", "contributionAmount", "cycleDuration", "maxMembers", "status", "createdAt"]
+    },
+    "CSCCMembership": {
+      "title": "CSCC Membership",
+      "description": "Tracks users who have joined a CSCC group.",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["groupId", "userId", "status", "joinedAt"]
+    },
+    "CSCCCycle": {
+      "title": "CSCC Cycle",
+      "description": "A single round of contributions and payout.",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "cycleIndex": { "type": "number" },
+        "payoutRecipientId": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "processing", "completed"] },
+        "totalContributed": { "type": "number" },
+        "payoutAmount": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["groupId", "cycleIndex", "payoutRecipientId", "status", "startDate"]
+    },
+    "CSCCContribution": {
+      "title": "CSCC Contribution",
+      "description": "A member's payment for a specific cycle.",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "cycleId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["groupId", "cycleId", "userId", "amount", "status", "timestamp"]
+    },
+    "Loan": {
+      "title": "Loan",
+      "description": "Active or closed loan record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "principal": { "type": "number" },
+        "interest": { "type": "number" },
+        "fees": { "type": "number" },
+        "totalRepayment": { "type": "number" },
+        "remainingAmount": { "type": "number" },
+        "tenor": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "overdue", "closed"] },
+        "nextDueDate": { "type": "string", "format": "date-time" },
+        "repaymentSchedule": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "principal", "interest", "totalRepayment", "remainingAmount", "status", "createdAt"]
+    },
+    "LoanApplication": {
+      "title": "Loan Application",
+      "description": "Request for a new loan.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "tenor": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string", "enum": ["submitted", "under_review", "approved", "disbursed", "rejected"] },
+        "kycStatus": { "type": "string", "enum": ["pending", "verified", "failed"] },
+        "eligibilitySignals": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "tenor", "status", "kycStatus", "createdAt"]
+    },
+    "LoanRepayment": {
+      "title": "Loan Repayment",
+      "description": "Payment record for a loan installment.",
+      "type": "object",
+      "properties": {
+        "loanId": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["wallet", "bank", "card"] },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["loanId", "userId", "amount", "method", "status", "timestamp"]
+    },
+    "LoanVendor": {
+      "title": "Loan Vendor",
+      "description": "Third-party lender on the HEPIHANDS platform.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "businessName": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "issuingAuthority": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "address": { "type": "string" },
+        "lendingParameters": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "verified", "suspended"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessName", "registrationNumber", "licenseNumber", "contactEmail", "status", "createdAt"]
+    },
+    "DomainSeller": {
+      "title": "Domain Seller",
+      "description": "A domain registrar or brand offering domains.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "integrationType": { "type": "string", "enum": ["reseller_api", "affiliate_redirect"] },
+        "commissionRate": { "type": "number" },
+        "supportedTlds": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "status", "integrationType", "commissionRate"]
+    },
+    "DomainCatalog": {
+      "title": "Domain Catalog",
+      "description": "Pricing and TLD info for a specific seller.",
+      "type": "object",
+      "properties": {
+        "sellerId": { "type": "string" },
+        "tld": { "type": "string" },
+        "pricing": {
+          "type": "object",
+          "properties": {
+            "registration": { "type": "number" },
+            "renewal": { "type": "number" },
+            "transfer": { "type": "number" }
+          }
+        },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sellerId", "tld", "pricing"]
+    },
+    "DomainOrder": {
+      "title": "Domain Order",
+      "description": "A domain purchase or registration order.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "domainName": { "type": "string" },
+        "tld": { "type": "string" },
+        "termYears": { "type": "number" },
+        "amountCharged": { "type": "number" },
+        "commissionAmount": { "type": "number" },
+        "sellerAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "fulfilled", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "sellerId", "domainName", "status", "createdAt"]
+    },
+    "RaffleCycle": {
+      "title": "Raffle Cycle",
+      "description": "A specific draw cycle within a Gist Hub category.",
+      "type": "object",
+      "properties": {
+        "categoryId": { "type": "string", "description": "The Gist Hub category ID." },
+        "cycleNumber": { "type": "number" },
+        "status": { "type": "string", "enum": ["collecting", "revealed", "paid_out"] },
+        "collectStartAt": { "type": "string", "format": "date-time" },
+        "collectCutoffAt": { "type": "string", "format": "date-time", "description": "Deadline to qualify for the draw." },
+        "drawAt": { "type": "string", "format": "date-time", "description": "When the selection happens." },
+        "potAmount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["categoryId", "cycleNumber", "status", "collectCutoffAt", "drawAt", "potAmount", "createdAt"]
+    },
+    "RaffleCycleMember": {
+      "title": "Raffle Cycle Member",
+      "description": "Tracks eligibility and turn ordering for a member in a cycle.",
+      "type": "object",
+      "properties": {
+        "cycleId": { "type": "string" },
+        "memberId": { "type": "string" },
+        "eligible": { "type": "boolean" },
+        "contributionAmount": { "type": "number" },
+        "contributionPaidAt": { "type": "string", "format": "date-time" },
+        "turnIndex": { "type": "integer", "description": "1..N, generated during reveal." },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cycleId", "memberId", "eligible", "addedAt"]
+    },
+    "RaffleDrawEvent": {
+      "title": "Raffle Draw Event",
+      "description": "The fairness backbone using commit-reveal logic.",
+      "type": "object",
+      "properties": {
+        "cycleId": { "type": "string" },
+        "status": { "type": "string", "enum": ["commit", "reveal", "complete"] },
+        "commitHash": { "type": "string", "description": "Hash of the server seed." },
+        "serverSeed": { "type": "string", "description": "Kept secret until reveal." },
+        "revealSeed": { "type": "string" },
+        "randomnessValue": { "type": "string", "description": "Derived from seeds." },
+        "winnerMemberId": { "type": "string" },
+        "winnerReference": { "type": "string", "description": "Public verification code." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cycleId", "status", "commitHash", "createdAt"]
+    },
+    "RaffleTurnCard": {
+      "title": "Raffle Turn Card",
+      "description": "User-facing display card for turn status.",
+      "type": "object",
+      "properties": {
+        "cycleId": { "type": "string" },
+        "memberId": { "type": "string" },
+        "turnIndex": { "type": "number" },
+        "totalParticipants": { "type": "number" },
+        "cardNumber": { "type": "string" },
+        "displayStatus": { "type": "string", "enum": ["waiting", "eligible", "not_eligible", "winner", "not_winner"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["cycleId", "memberId", "displayStatus", "updatedAt"]
+    },
+    "VendorApplication": {
+      "title": "Vendor Application",
+      "description": "Information provided by potential vendors/affiliates.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "industry": { "type": "string" },
+        "description": { "type": "string" },
+        "estimatedTraffic": { "type": "string" },
+        "plan": { "type": "string", "enum": ["STARTER", "PRO", "ENTERPRISE"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "businessName", "plan", "status", "createdAt"]
+    },
+    "CSCCMessage": {
+      "title": "CSCC Message",
+      "description": "Messages sent within a CSCC group chat.",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["text", "image", "file"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["groupId", "senderId", "content", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and wallet balances."
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "History of all wallet transactions."
+    },
+    "/adminStats/global": {
+      "schema": "AdminStats",
+      "description": "Global admin statistics and profit tracking."
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Global site announcements."
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "WithdrawalRequest",
+      "description": "Pending and completed withdrawal requests."
+    },
+    "/vendors/{vendorId}": {
+      "schema": "Vendor",
+      "description": "Vendor registration profiles."
+    },
+    "/vendor_applications/{applicationId}": {
+      "schema": "VendorApplication",
+      "description": "Pending vendor applications."
+    },
+    "/marketProducts/{productId}": {
+      "schema": "MarketProduct",
+      "description": "Fairly used product listings."
+    },
+    "/social_posts/{postId}": {
+      "schema": "SocialPost",
+      "description": "Gist Hub social posts."
+    },
+    "/reels/{reelId}": {
+      "schema": "Reel",
+      "description": "Gist Hub video reels."
+    },
+    "/chat_messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Direct messages between users."
+    },
+    "/cscc_messages/{messageId}": {
+      "schema": "CSCCMessage",
+      "description": "Messages in community groups."
+    },
+    "/ads/{adId}": {
+      "schema": "Advertisement",
+      "description": "Marketplace advertisements."
+    },
+    "/service_providers/{providerId}": {
+      "schema": "ServiceProvider",
+      "description": "Professional service providers."
+    },
+    "/service_requests/{requestId}": {
+      "schema": "ServiceRequest",
+      "description": "Client service requests."
+    },
+    "/cscc_groups/{groupId}": {
+      "schema": "CSCCGroup",
+      "description": "Community saving groups."
+    },
+    "/cscc_memberships/{membershipId}": {
+      "schema": "CSCCMembership",
+      "description": "Members of CSCC groups."
+    },
+    "/cscc_cycles/{cycleId}": {
+      "schema": "CSCCCycle",
+      "description": "Rounds of contributions and payouts."
+    },
+    "/cscc_contributions/{contributionId}": {
+      "schema": "CSCCContribution",
+      "description": "Individual member contributions."
+    },
+    "/loans/{loanId}": {
+      "schema": "Loan",
+      "description": "Active and closed loan records."
+    },
+    "/loan_applications/{applicationId}": {
+      "schema": "LoanApplication",
+      "description": "Loan application requests."
+    },
+    "/loan_repayments/{repaymentId}": {
+      "schema": "LoanRepayment",
+      "description": "History of loan repayments."
+    },
+    "/loan_vendors/{vendorId}": {
+      "schema": "LoanVendor",
+      "description": "Registered third-party lenders."
+    },
+    "/domain_sellers/{sellerId}": {
+      "schema": "DomainSeller",
+      "description": "Domain registrars and brands."
+    },
+    "/domain_catalog/{catalogId}": {
+      "schema": "DomainCatalog",
+      "description": "Pricing and TLD info for sellers."
+    },
+    "/domain_orders/{orderId}": {
+      "schema": "DomainOrder",
+      "description": "Domain purchase orders."
+    },
+    "/raffle_cycles/{cycleId}": {
+      "schema": "RaffleCycle",
+      "description": "Gist Hub raffle/turn cycles."
+    },
+    "/raffle_cycle_members/{memberEntryId}": {
+      "schema": "RaffleCycleMember",
+      "description": "Participation records for raffle cycles."
+    },
+    "/raffle_draw_events/{eventId}": {
+      "schema": "RaffleDrawEvent",
+      "description": "Commit-reveal draw fairness records."
+    },
+    "/raffle_turn_cards/{cardId}": {
+      "schema": "RaffleTurnCard",
+      "description": "User-facing raffle/turn cards."
+    }
+  }
+}

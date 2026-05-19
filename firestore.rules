@@ -1,0 +1,348 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required) - Unique user ID
+//   - email: string (required, email format) - User email
+//   - displayName: string (optional) - Social name
+//   - photoURL: string (optional) - Profile picture
+//   - bio: string (optional) - User bio
+//   - followers: list (optional) - List of follower UIDs
+//   - following: list (optional) - List of following UIDs
+//   - playerWallet: number (required) - Current balance for playing
+//   - depositWallet: number (required) - Total deposited funds
+//   - cashOutWallet: number (required) - Funds ready for withdrawal
+//   - role: string (required, enum: ["player", "admin"]) - User role
+//   - createdAt: timestamp (optional) - Account creation date
+//
+// Collection: transactions
+// Document ID: {transactionId}
+// Fields:
+//   - userId: string (required) - User ID
+//   - type: string (required, enum: ["deposit", "withdrawal", "game_bet", "game_win"]) - Type
+//   - amount: number (required) - Amount
+//   - status: string (required, enum: ["pending", "completed", "failed"]) - Status
+//   - timestamp: timestamp (required) - When it occurred
+//
+// Collection: admin
+// Document ID: stats
+// Fields:
+//   - adminWallet: number (required) - Total admin profit
+//   - totalHouseGain: number (required) - Cumulative gain
+//   - lastUpdated: timestamp (required) - Last update
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email in ["efado226@gmail.com", "efadofestus@gmail.com"] ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.diff({}).affectedKeys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'bio', 'followers', 'following', 'playerWallet', 'depositWallet', 'cashOutWallet', 'miningWallet', 'miningProgress', 'role', 'createdAt', 'fullName', 'phoneNumber', 'country', 'language', 'csccRegistered', 'updatedAt', 'vendorStatus', 'vendorPlan', 'vendorId', 'isDeveloper', 'termsAccepted', 'emailVerified', 'adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string &&
+             data.role in ['player', 'admin', 'user', 'vendor'];
+    }
+
+    function isValidSocialPost(data) {
+      return hasOnlyAllowedFields(['authorId', 'authorName', 'authorPhoto', 'content', 'media', 'likes', 'comments', 'createdAt', 'category']) &&
+             data.authorId is string &&
+             data.authorName is string &&
+             data.content is string && data.content.size() < 5000 &&
+             data.likes is list &&
+             data.comments is list &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidReel(data) {
+      return hasOnlyAllowedFields(['authorId', 'authorName', 'authorPhoto', 'videoUrl', 'caption', 'likes', 'shares', 'createdAt']) &&
+             data.authorId is string &&
+             data.videoUrl is string &&
+             data.likes is list &&
+             data.shares is number &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidAd(data) {
+      return hasOnlyAllowedFields(['advertiserId', 'advertiserName', 'title', 'description', 'imageUrl', 'link', 'budget', 'status', 'createdAt']) &&
+             data.advertiserId is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.description is string &&
+             data.budget is number && data.budget >= 0 &&
+             data.status in ['active', 'paused', 'completed'];
+    }
+
+    function isValidChatMessage(data) {
+      return hasOnlyAllowedFields(['senderId', 'receiverId', 'content', 'type', 'media', 'metadata', 'createdAt']) &&
+             data.senderId is string &&
+             data.receiverId is string &&
+             data.type in ['text', 'image', 'video', 'contact', 'file', 'sticker', 'gif', 'buzz'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidRaffleCycle(data) {
+      return hasOnlyAllowedFields(['categoryId', 'cycleNumber', 'status', 'collectStartAt', 'collectCutoffAt', 'drawAt', 'potAmount', 'createdAt']) &&
+             data.categoryId is string &&
+             data.cycleNumber is number &&
+             data.status in ['collecting', 'revealed', 'paid_out'] &&
+             data.collectCutoffAt is timestamp &&
+             data.drawAt is timestamp &&
+             data.potAmount is number &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidRaffleCycleMember(data) {
+      return hasOnlyAllowedFields(['cycleId', 'memberId', 'eligible', 'contributionAmount', 'contributionPaidAt', 'turnIndex', 'addedAt']) &&
+             data.cycleId is string &&
+             data.memberId is string &&
+             data.eligible is bool &&
+             data.addedAt is timestamp;
+    }
+
+    function isValidRaffleDrawEvent(data) {
+      return hasOnlyAllowedFields(['cycleId', 'status', 'commitHash', 'serverSeed', 'revealSeed', 'randomnessValue', 'winnerMemberId', 'winnerReference', 'createdAt']) &&
+             data.cycleId is string &&
+             data.status in ['commit', 'reveal', 'complete'] &&
+             data.commitHash is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidVendorApplication(data) {
+      return hasOnlyAllowedFields(['userId', 'userName', 'businessName', 'industry', 'description', 'estimatedTraffic', 'targetAudience', 'plan', 'status', 'paymentMethod', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.plan in ['STARTER', 'PRO', 'ENTERPRISE'] &&
+             data.status == 'pending';
+    }
+
+    function isValidCSCCMessage(data) {
+      return hasOnlyAllowedFields(['groupId', 'senderId', 'senderName', 'content', 'type', 'createdAt']) &&
+             data.senderId == request.auth.uid &&
+             data.type in ['text', 'image', 'file'];
+    }
+
+    function isValidRaffleTurnCard(data) {
+      return hasOnlyAllowedFields(['cycleId', 'memberId', 'turnIndex', 'totalParticipants', 'cardNumber', 'displayStatus', 'updatedAt']) &&
+             data.cycleId is string &&
+             data.memberId is string &&
+             data.displayStatus in ['waiting', 'eligible', 'not_eligible', 'winner', 'not_winner'] &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return hasOnlyAllowedFields(['userId', 'type', 'amount', 'status', 'timestamp', 'currency', 'paymentMethod', 'description', 'recipient']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.type in ['deposit', 'withdrawal', 'game_bet', 'game_win', 'payment'] &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['pending', 'completed', 'failed'] &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidAdminStats(data) {
+      return hasOnlyAllowedFields(['adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts']) &&
+             data.adminWallet is number &&
+             data.totalHouseGain is number &&
+             data.totalPlayers is number &&
+             data.pendingPayouts is number &&
+             data.gameWallets is map &&
+             data.lastUpdated is timestamp;
+    }
+
+    function isValidAnnouncement(data) {
+      return hasOnlyAllowedFields(['message', 'timestamp', 'active']) &&
+             data.message is string && data.message.size() > 0 &&
+             data.timestamp is timestamp &&
+             data.active is bool;
+    }
+
+    function isValidWithdrawal(data) {
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'amount', 'status', 'accountDetails', 'timestamp']) &&
+             data.userId is string && data.userEmail is string &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['pending', 'completed', 'failed'] &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidVendor(data) {
+      return hasOnlyAllowedFields(['fullName', 'businessName', 'vendorType', 'email', 'phone', 'country', 'city', 'address', 'registrationNumber', 'pickupMethod', 'termsAccepted', 'createdAt']) &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.vendorType in ['Individual', 'Company', 'Organization'] &&
+             data.email is string && isValidEmail(data.email) &&
+             data.phone is string &&
+             data.country is string &&
+             data.city is string &&
+             data.termsAccepted == true;
+    }
+
+    function isValidMarketProduct(data) {
+      return hasOnlyAllowedFields(['vendorId', 'title', 'categoryPath', 'condition', 'quantity', 'price', 'currency', 'description', 'photos', 'location', 'complianceConfirmed', 'createdAt']) &&
+             data.vendorId is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.categoryPath is map &&
+             data.condition in ['New', 'Like New', 'Good', 'Fair', 'Used'] &&
+             data.price is number && data.price > 0 &&
+             data.photos is list && data.photos.size() > 0 &&
+             data.complianceConfirmed == true;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data) && 
+                    (request.auth.uid == request.resource.data.userId || isAdmin());
+      allow update: if isAdmin();
+    }
+
+    match /adminStats/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true; // Public announcements
+      allow write: if isAdmin() && isValidAnnouncement(request.resource.data);
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && isValidWithdrawal(request.resource.data) && 
+                    (request.auth.uid == request.resource.data.userId);
+      allow update: if isAdmin();
+    }
+
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidVendor(request.resource.data);
+      allow update: if isAdmin();
+    }
+
+    match /marketProducts/{productId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidMarketProduct(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /social_posts/{postId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidSocialPost(request.resource.data) && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+
+    match /reels/{reelId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidReel(request.resource.data) && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+
+    match /ads/{adId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidAd(request.resource.data) && request.resource.data.advertiserId == request.auth.uid;
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.advertiserId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /chat_messages/{messageId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
+      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data) && request.resource.data.senderId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Raffle System Rules
+    // ===============================================================
+
+    match /raffle_cycles/{cycleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /raffle_cycle_members/{memberEntryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidRaffleCycleMember(request.resource.data) && 
+                    (request.resource.data.memberId == request.auth.uid || isAdmin());
+      allow update: if (isAdmin() || (isAuthenticated() && resource.data.memberId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contributionAmount', 'contributionPaidAt'])));
+    }
+
+    match /raffle_draw_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+    }
+
+    match /raffle_turn_cards/{cardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /vendor_applications/{applicationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidVendorApplication(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /cscc_messages/{messageId} {
+      allow read: if isAuthenticated(); 
+      allow create: if isAuthenticated() && isValidCSCCMessage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /cscc_groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /cscc_memberships/{membershipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+    }
+  }
+}
