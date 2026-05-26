@@ -70,7 +70,7 @@ import { StrategicReceipt } from './StrategicReceipt';
 import { PatronageTracker } from './PatronageTracker';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { monetizationService } from '../services/monetizationService';
-import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
+import ceoImage from '../assets/images/ceo_office_portrait_1779796713772.png';
 import { Landmark, ArrowRight, Eye, Sparkles } from 'lucide-react';
 
 interface CeoPortalProps {

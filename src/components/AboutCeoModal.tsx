@@ -15,7 +15,7 @@ import {
   Users
 } from 'lucide-react';
 import { PHONE_NUMBERS, SUPPORT_EMAILS } from '../constants/businessProfile';
-import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
+import ceoImage from '../assets/images/ceo_office_portrait_1779796713772.png';
 
 interface AboutCeoModalProps {
   isOpen: boolean;
