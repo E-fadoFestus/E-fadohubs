@@ -70,6 +70,7 @@ import { StrategicReceipt } from './StrategicReceipt';
 import { PatronageTracker } from './PatronageTracker';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { monetizationService } from '../services/monetizationService';
+import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
 import { Landmark, ArrowRight, Eye, Sparkles } from 'lucide-react';
 
 interface CeoPortalProps {
@@ -1005,7 +1006,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-48 -mt-48" />
                   <div className="relative w-32 h-32 shrink-0 z-10 rounded-2xl overflow-hidden border border-white/10 bg-slate-950">
                     <img 
-                      src="/src/assets/images/ceo_exact_attached_1779365508172.png" 
+                      src={ceoImage} 
                       alt="Okhawere Festus - CEO" 
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"

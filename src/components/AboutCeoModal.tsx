@@ -15,6 +15,7 @@ import {
   Users
 } from 'lucide-react';
 import { PHONE_NUMBERS, SUPPORT_EMAILS } from '../constants/businessProfile';
+import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
 
 interface AboutCeoModalProps {
   isOpen: boolean;
@@ -54,7 +55,7 @@ export const AboutCeoModal: React.FC<AboutCeoModalProps> = ({ isOpen, onClose })
                   {/* Portrait frame */}
                   <div className="relative w-48 h-48 mx-auto xl:w-56 xl:h-56 rounded-3xl overflow-hidden border border-white/10 bg-slate-950">
                     <img 
-                      src="/src/assets/images/ceo_exact_attached_1779365508172.png" 
+                      src={ceoImage} 
                       alt="Okhawere Festus - CEO" 
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
