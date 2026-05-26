@@ -31,45 +31,102 @@ import {
   ExternalLink,
   Globe,
   Hash,
-  Coins
+  Coins,
+  Trophy,
+  ArrowLeft,
+  Zap,
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
+import { db, doc, updateDoc } from '../firebase';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
 
 interface UserWalletProps {
   user: UserProfile;
-  onUpdateBalance: (amount: number, type: 'deposit' | 'withdrawal') => Promise<void>;
-  // onAddTransaction is no longer needed here as we use TransactionService
+  onUpdateBalance: (amount: number, type: 'deposit' | 'withdrawal', accountDetails?: any) => Promise<void>;
+  onClose?: () => void;
+  initialTab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings';
 }
 
-export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'deposit' | 'withdraw' | 'history' | 'settings'>('overview');
+export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [notifications, setNotifications] = useState<{id: string, message: string, type: 'info' | 'warning'}[]>([]);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<{type: 'deposit' | 'withdraw', amount: number} | null>(null);
+  
+  // Profile edit field states
+  const [profileDisplayName, setProfileDisplayName] = useState(user.displayName || '');
+  const [profileBio, setProfileBio] = useState(user.bio || '');
+  const [profileBankName, setProfileBankName] = useState(user.bankName || '');
+  const [profileAccountNumber, setProfileAccountNumber] = useState(user.accountNumber || '');
+  const [profileAccountName, setProfileAccountName] = useState(user.accountName || '');
+  const [profileExternalWallet, setProfileExternalWallet] = useState(user.externalWallet || '');
+  const [profileMobileMoneyNumber, setProfileMobileMoneyNumber] = useState(user.mobileMoneyNumber || '');
+  const [profileMobileMoneyProvider, setProfileMobileMoneyProvider] = useState(user.mobileMoneyProvider || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
   const [accountDetails, setAccountDetails] = useState({
-    accountNumber: '',
-    bankName: '',
-    accountName: '',
+    accountNumber: user.accountNumber || '',
+    bankName: user.bankName || '',
+    accountName: user.accountName || user.displayName || '',
     routingNumber: ''
   });
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
-  const [bankSearch, setBankSearch] = useState('');
+  const [bankSearch, setBankSearch] = useState(user.bankName || '');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [manualBankMode, setManualBankMode] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [withdrawSource, setWithdrawSource] = useState<'cashOutWallet' | 'playerWallet'>('playerWallet');
 
-  const nigerianBanks = [
-    // ... same banks
+  // Cyber Security Sentry & Anti-Fraud Suite states
+  const [shieldActive, setShieldActive] = useState<boolean>(() => {
+    const val = localStorage.getItem('efado_payment_shield');
+    return val === null ? true : val === 'true';
+  });
+  const [nightGuideActive, setNightGuideActive] = useState<boolean>(() => {
+    const val = localStorage.getItem('efado_night_guide');
+    return val === null ? true : val === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('efado_payment_shield', shieldActive.toString());
+  }, [shieldActive]);
+
+  useEffect(() => {
+    localStorage.setItem('efado_night_guide', nightGuideActive.toString());
+  }, [nightGuideActive]);
+
+  useEffect(() => {
+    setProfileDisplayName(user.displayName || '');
+    setProfileBio(user.bio || '');
+    setProfileBankName(user.bankName || '');
+    setProfileAccountNumber(user.accountNumber || '');
+    setProfileAccountName(user.accountName || '');
+    setProfileExternalWallet(user.externalWallet || '');
+    setProfileMobileMoneyNumber(user.mobileMoneyNumber || '');
+    setProfileMobileMoneyProvider(user.mobileMoneyProvider || '');
+    setAccountDetails({
+      accountNumber: user.accountNumber || '',
+      bankName: user.bankName || '',
+      accountName: user.accountName || user.displayName || '',
+      routingNumber: ''
+    });
+  }, [user]);
+
+  const globalAndLocalBanks = [
+    // Nigeria / West Africa
     { code: '044', name: 'Access Bank' },
     { code: '011', name: 'First Bank of Nigeria' },
     { code: '058', name: 'GTBank' },
@@ -77,26 +134,30 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
     { code: '033', name: 'United Bank for Africa (UBA)' },
     { code: '070', name: 'Fidelity Bank' },
     { code: '214', name: 'First City Monument Bank (FCMB)' },
-    { code: '032', name: 'Union Bank of Nigeria' },
-    { code: '215', name: 'Unity Bank' },
-    { code: '035', name: 'Wema Bank' },
-    { code: '057', name: 'Zenith Bank' },
-    { code: '030', name: 'Heritage Bank' },
-    { code: '082', name: 'Keystone Bank' },
-    { code: '076', name: 'Polaris Bank' },
-    { code: '221', name: 'Stanbic IBTC Bank' },
-    { code: '068', name: 'Standard Chartered Bank' },
-    { code: '232', name: 'Sterling Bank' },
-    { code: '100', name: 'SunTrust Bank' },
-    { code: '301', name: 'Jaiz Bank' },
     { code: '090267', name: 'Kuda Bank' },
     { code: '999992', name: 'OPay Digital Services' },
     { code: '50515', name: 'Moniepoint MFB' },
+    // United States / North America
+    { code: 'JPM', name: 'JP Morgan Chase' },
+    { code: 'BOA', name: 'Bank of America' },
+    { code: 'WFC', name: 'Wells Fargo' },
+    { code: 'CITI', name: 'Citibank' },
+    { code: 'GS', name: 'Goldman Sachs' },
+    // United Kingdom / Europe
+    { code: 'BARC', name: 'Barclays Bank Plc' },
+    { code: 'HSBC', name: 'HSBC United Kingdom' },
+    { code: 'LLOY', name: 'Lloyds Bank' },
+    { code: 'MONZO', name: 'Monzo Bank UK' },
+    { code: 'REVOL', name: 'Revolut' },
+    // Asia Pacific / Global
+    { code: 'STC', name: 'Standard Chartered Bank Plc' },
+    { code: 'DBS', name: 'DBS Bank' },
+    { code: 'ICBC', name: 'ICBC China' },
   ].sort((a, b) => a.name.localeCompare(b.name));
 
-  const filteredBanks = nigerianBanks.filter(b => 
+  const filteredBanks = globalAndLocalBanks.filter(b => 
     b.name.toLowerCase().includes(bankSearch.toLowerCase()) || 
-    b.code.includes(bankSearch)
+    b.code.toLowerCase().includes(bankSearch.toLowerCase())
   );
   const paymentMethods: PaymentMethod[] = [
     { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
@@ -195,16 +256,59 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
   const handleWithdraw = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
     const withdrawAmount = Number(amount);
-    if (withdrawAmount > user.cashOutWallet) {
+    const availableBalance = user.playerWallet;
+    const walletLabel = withdrawSource === 'playerWallet' ? "Player's Win Wallet" : "Cash Out Wallet";
+    if (withdrawAmount > availableBalance) {
       setNotifications(prev => [...prev, { 
         id: Date.now().toString(), 
-        message: 'Insufficient funds in Cash Out Wallet', 
+        message: `Insufficient funds in ${walletLabel}`, 
         type: 'warning' 
       }]);
       return;
     }
     setPendingAction({ type: 'withdraw', amount: withdrawAmount });
     setShowPinModal(true);
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    setProfileMessage(null);
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        displayName: profileDisplayName,
+        bio: profileBio,
+        bankName: profileBankName,
+        accountNumber: profileAccountNumber,
+        accountName: profileAccountName,
+        externalWallet: profileExternalWallet,
+        mobileMoneyNumber: profileMobileMoneyNumber,
+        mobileMoneyProvider: profileMobileMoneyProvider
+      });
+
+      setProfileMessage({
+        text: 'Profile and payment liaison credentials synchronized successfully with EFADO core registry.',
+        type: 'success'
+      });
+      
+      setAccountDetails(prev => ({
+        ...prev,
+        bankName: profileBankName,
+        accountNumber: profileAccountNumber,
+        accountName: profileAccountName
+      }));
+
+    } catch (err: any) {
+      console.error('Error saving profile: ', err);
+      setProfileMessage({
+        text: `Profile synchronization disrupted: ${err.message || String(err)}`,
+        type: 'error'
+      });
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const confirmTransaction = async () => {
@@ -229,10 +333,14 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
           hub: 'WALLET',
           purpose: 'Wallet Top-up',
           reference,
-          description: 'Wallet Deposit'
+          description: 'Wallet Deposit',
+          skipWalletUpdate: true
         });
       } else {
-        await onUpdateBalance(actionAmount, 'withdrawal');
+        await onUpdateBalance(actionAmount, 'withdrawal', {
+          ...accountDetails,
+          sourceWallet: withdrawSource
+        });
         txId = await TransactionService.recordTransaction({
           userId: user.uid,
           type: 'withdrawal',
@@ -243,7 +351,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
           hub: 'WALLET',
           purpose: 'Cash Out Request',
           reference,
-          description: 'Withdrawal Request'
+          description: 'Withdrawal Request',
+          skipWalletUpdate: true
         });
       }
       
@@ -308,6 +417,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
 
           {[
             { id: 'overview', label: 'Overview', icon: Wallet },
+            { id: 'profile', label: 'My Acc. Profile', icon: User },
             { id: 'deposit', label: 'Deposit Funds', icon: ArrowDownCircle },
             { id: 'withdraw', label: 'Withdraw Funds', icon: ArrowUpCircle },
             { id: 'history', label: 'History', icon: History },
@@ -327,7 +437,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
             </button>
           ))}
 
-          <div className="mt-auto pt-6 border-t border-gray-200">
+          <div className="mt-auto pt-6 border-t border-gray-200 space-y-3">
             <div className="bg-indigo-50 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Bell className="w-4 h-4 text-indigo-600" />
@@ -345,12 +455,239 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                 )}
               </div>
             </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-lg active:scale-95 border border-rose-500/20 shadow-rose-500/10"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Go Back</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Main Content Area */}
         <div className="flex-1 p-8 overflow-y-auto no-scrollbar">
+          {onClose && (
+            <div className="md:hidden flex justify-end mb-6">
+              <button
+                onClick={onClose}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase rounded-2xl shadow-sm transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Go Back</span>
+              </button>
+            </div>
+          )}
           <AnimatePresence mode="wait">
+            {activeTab === 'profile' && (
+              <motion.div
+                key="profile"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-8"
+              >
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">My Account Profile</h3>
+                    <p className="text-sm text-gray-500 font-medium">Verify credentials, configure payout information, and synchronize identity nodes.</p>
+                  </div>
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-2 text-indigo-700">
+                    <Fingerprint className="w-5 h-5 text-indigo-600" />
+                    <span className="text-[10px] font-black uppercase tracking-wider">Neural ID: {user.uid.slice(0, 8)}...</span>
+                  </div>
+                </div>
+
+                {/* Wallets & Activity Status Overview inside Profile tab */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Mining Balance:</span>
+                    <p className="text-lg font-extrabold mt-1 text-amber-500">{(user.miningWallet || 0).toLocaleString()} N-Notes</p>
+                  </div>
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Cash Out Balance:</span>
+                    <p className="text-lg font-extrabold mt-1 text-emerald-400">₦{user.playerWallet.toLocaleString()}</p>
+                  </div>
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Deposit / Stakes:</span>
+                    <p className="text-lg font-extrabold mt-1 text-indigo-400">₦{user.depositWallet.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveProfile} className="space-y-6">
+                  {profileMessage && (
+                    <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-2 ${
+                      profileMessage.type === 'success' ? 'bg-emerald-55 font-bold border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'
+                    }`}>
+                      {profileMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />}
+                      <span>{profileMessage.text}</span>
+                    </div>
+                  )}
+
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
+                      <User className="w-4 h-4 text-indigo-500" /> 01. User Identity & Status Statement
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Full Display Name / Identity</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Your full legal or alias name"
+                          value={profileDisplayName}
+                          onChange={(e) => setProfileDisplayName(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                        <p className="text-[9px] text-gray-400 font-medium">Used for direct peer audits & liaison identity.</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Account Registered Email</label>
+                        <input
+                          type="email"
+                          disabled
+                          value={user.email}
+                          className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-400 cursor-not-allowed outline-none shadow-sm"
+                        />
+                        <p className="text-[9px] text-gray-400 font-medium">Synced with primary Google single sign-on credential.</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Biographical Status / Affiliate Pitch</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Tell the community about yourself, your vendor plans, or your affiliate networks..."
+                        value={profileBio}
+                        onChange={(e) => setProfileBio(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
+                      <Building2 className="w-4 h-4 text-indigo-500" /> 02. Sovereign Bank Payout Account (Cash Out Route)
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Settlement Bank Name</label>
+                        <select
+                          value={profileBankName}
+                          onChange={(e) => {
+                            setProfileBankName(e.target.value);
+                            setBankSearch(e.target.value);
+                          }}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        >
+                          <option value="">-- Choose Settlement Bank --</option>
+                          {globalAndLocalBanks.map(b => (
+                            <option key={b.code} value={b.name}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Account Number (10 Digits)</label>
+                        <input
+                          type="text"
+                          maxLength={15}
+                          placeholder="0123456789"
+                          value={profileAccountNumber}
+                          onChange={(e) => setProfileAccountNumber(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Beneficiary Account Name</label>
+                        <input
+                          type="text"
+                          placeholder="Exact Match as registered with bank"
+                          value={profileAccountName}
+                          onChange={(e) => setProfileAccountName(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
+                      <Smartphone className="w-4 h-4 text-indigo-500" /> 03. Decentralized Mobile Money & Crypto Wallets
+                    </h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Mobile Money Network</label>
+                        <select
+                          value={profileMobileMoneyProvider}
+                          onChange={(e) => setProfileMobileMoneyProvider(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        >
+                          <option value="">-- Choose Network Provider --</option>
+                          <option value="OPay">OPay</option>
+                          <option value="PalmPay">PalmPay</option>
+                          <option value="Kuda Bank">Kuda Bank</option>
+                          <option value="MTN MoMo">MTN MoMo</option>
+                          <option value="Airtel Money">Airtel Money</option>
+                          <option value="M-Pesa">M-Pesa</option>
+                          <option value="Orange Money">Orange Money</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Mobile Merchant Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 080 or 090 number"
+                          value={profileMobileMoneyNumber}
+                          onChange={(e) => setProfileMobileMoneyNumber(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">External Crypto Address (USDT/BTC)</label>
+                        <input
+                          type="text"
+                          placeholder="bc1q... or 0x... for TRC20"
+                          value={profileExternalWallet}
+                          onChange={(e) => setProfileExternalWallet(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingProfile}
+                      className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                    >
+                      {isSavingProfile ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Synchronizing...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-4 h-4" />
+                          Save & Synchronize Profile
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
             {activeTab === 'overview' && (
               <motion.div
                 key="overview"
@@ -359,23 +696,30 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-[2rem] text-white shadow-xl">
                     <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Total Balance</p>
-                    <h3 className="text-3xl font-black mb-4">₦{(user.depositWallet + user.playerWallet + user.cashOutWallet + (user.miningWallet || 0) * 0.01).toLocaleString()}</h3>
+                    <h3 className="text-3xl font-black mb-4">₦{(user.depositWallet + user.playerWallet + (user.miningWallet || 0) * 0.01).toLocaleString()}</h3>
                     <div className="flex items-center gap-2 text-[10px] font-bold bg-white/10 w-fit px-2 py-1 rounded-full">
                       <Shield className="w-3 h-3" /> Verified Account
                     </div>
                   </div>
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
-                    <p className="text-xs font-black text-gray-950 uppercase tracking-widest mb-1">Deposit Wallet</p>
+                    <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Deposit Wallet</p>
                     <h3 className="text-2xl font-black text-gray-950">₦{user.depositWallet.toLocaleString()}</h3>
-                    <p className="text-[10px] text-gray-950 font-bold mt-2">Ready for transfer</p>
+                    <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay/stakes</p>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-[2rem] shadow-sm">
+                    <p className="text-xs font-black text-emerald-950 uppercase tracking-widest mb-1 flex items-center gap-1">
+                      <Trophy className="w-3 h-3 text-emerald-600" /> Player's Win Wallet
+                    </p>
+                    <h3 className="text-2xl font-black text-emerald-950">₦{user.playerWallet.toLocaleString()}</h3>
+                    <p className="text-[10px] text-emerald-700/80 font-bold mt-2">Accumulated winnings</p>
                   </div>
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
                     <p className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Cash Out Wallet</p>
-                    <h3 className="text-2xl font-black text-gray-900">₦{user.cashOutWallet.toLocaleString()}</h3>
-                    <p className="text-[10px] text-emerald-700 font-bold mt-2">Available for withdrawal</p>
+                    <h3 className="text-2xl font-black text-gray-900">₦{user.playerWallet.toLocaleString()}</h3>
+                    <p className="text-[10px] text-emerald-600 font-bold mt-2">Available for withdrawal</p>
                   </div>
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-125 transition-transform">
@@ -443,9 +787,31 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                 exit={{ opacity: 0, x: -20 }}
                 className="max-w-2xl mx-auto space-y-8"
               >
-                <div className="text-center">
-                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2 italic">FUND YOUR ACCOUNT</h3>
-                  <p className="text-sm text-gray-950 font-black uppercase tracking-widest">Global & Local Strategic Alliances</p>
+                <div className="text-center space-y-4">
+                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">FUND YOUR ACCOUNT</h3>
+                  
+                  {/* DISTINCTIVE DEPOSIT SECTIONALIZATION */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left font-sans">
+                    <div className="p-4 bg-indigo-50 border-2 border-indigo-200 rounded-2xl flex gap-3 shadow-sm">
+                      <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[9px] font-black tracking-widest text-[#4f46e5] uppercase">SOVEREIGN AUTO-DEPOSIT SYSTEM</span>
+                        <p className="text-[10px] text-indigo-950 font-bold uppercase leading-normal mt-0.5">
+                          Funds routing directly to your internal <span className="underline decoration-wavy">personalized balance</span> via USSD & secure dynamic keys. Automatic instant clearance.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl flex gap-3 shadow-sm">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[9px] font-black tracking-widest text-amber-800 uppercase">CEO STRATEGIC TRUST DEPOSIT</span>
+                        <p className="text-[10px] text-amber-950 font-bold uppercase leading-normal mt-0.5">
+                          Funds sent manually to <span className="underline decoration-dashed">CEO Corporate accounts</span>. Requires uploading payment logs to finalise after transfer.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -528,7 +894,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                             >
                               {filteredBanks.length > 0 ? filteredBanks.map(bank => (
                                 <button
-                                  key={bank.code}
+                                  key={`deposit-${bank.code}`}
                                   onClick={() => {
                                     setAccountDetails({...accountDetails, bankName: bank.name});
                                     setBankSearch(bank.name);
@@ -651,9 +1017,82 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                 exit={{ opacity: 0, x: -20 }}
                 className="max-w-2xl mx-auto space-y-8"
               >
-                <div className="text-center">
-                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2 italic">STRATEGIC CASH OUT</h3>
-                  <p className="text-sm text-gray-950 font-black uppercase tracking-widest">Vault Allocation Terminal</p>
+                <div className="text-center space-y-4">
+                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">EXTERNAL BANK CASH OUT TERMINAL</h3>
+                  
+                  {/* DISTINCTIVE WITHDRAWAL FLAG */}
+                  <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 flex items-start gap-3 shadow-md text-left font-sans">
+                    <ArrowUpCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase block">EXTERNAL CASH OUT/WITHDRAWAL</span>
+                      <p className="text-[11px] text-emerald-950 font-bold leading-relaxed uppercase mt-0.5">
+                        You are initiating a direct payload withdrawal OUT of the E-FADO ecosystem into an <span className="underline decoration-wavy">External Personal Bank or virtual wallet</span>. Ensure all recipient details are completely correct prior to payout execution.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* OPAY-STYLE SHIELD & NIGHT GUIDE CONTROLS */}
+                  <div className="bg-[#0f172a] text-white rounded-[2rem] p-5 shadow-xl border border-white/5 space-y-4 text-left font-sans">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400 animate-pulse" />
+                        <div>
+                          <h4 className="text-xs font-black uppercase tracking-wider">CYBER SHIELD ACTIVE PRESETS</h4>
+                          <p className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest mt-0.5">Automated Cyber Sentry Protection Suite</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase">
+                        Shield Safe
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Shield Toggle */}
+                      <div className="flex items-center justify-between bg-slate-950/50 p-3.5 rounded-2xl border border-white/5">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${shieldActive ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
+                            OPay Payment Shield
+                          </span>
+                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Phishing protection & secure routing</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setShieldActive(!shieldActive)}
+                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-all ${shieldActive ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                        >
+                          <span className="w-4 h-4 rounded-full bg-white shadow-md block" />
+                        </button>
+                      </div>
+
+                      {/* Night Sentry Toggle */}
+                      <div className="flex items-center justify-between bg-slate-950/50 p-3.5 rounded-2xl border border-white/5">
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${nightGuideActive ? 'bg-indigo-500' : 'bg-slate-500'} animate-pulse`} />
+                            Night Safe Sentry
+                          </span>
+                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Late hours volume cap (10PM-6AM)</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setNightGuideActive(!nightGuideActive)}
+                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-all ${nightGuideActive ? 'bg-indigo-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                        >
+                          <span className="w-4 h-4 rounded-full bg-white shadow-md block" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {nightGuideActive && (new Date().getHours() >= 22 || new Date().getHours() < 6) && (
+                      <div className="p-3 bg-indigo-950/80 border border-indigo-500/30 rounded-2xl flex gap-2.5 items-start">
+                        <Clock className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-spin-slow" />
+                        <p className="text-[8.5px] text-indigo-200 font-bold leading-relaxed uppercase">
+                          ⚠️ NOCTURNAL HOURS PROTECTION ACTIVE (10 PM - 6 AM): Withdrawals will be subject to manual CEO-desk dual clearance. Sleep security lock holds your funds gracefully till sunrise.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -661,26 +1100,64 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                     <div className="bg-emerald-600 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -translate-y-12 translate-x-12" />
                       
-                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-4">Total Liquid Assets</p>
-                      <h4 className="text-5xl font-black mb-8 font-display italic tracking-tighter">${user.cashOutWallet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-4">Select Wallet Source</p>
                       
-                      <label className="block text-[11px] font-black text-emerald-100 uppercase tracking-widest mb-2">TYPE WITHDRAWAL AMOUNT ($)</label>
+                      <div className="grid grid-cols-2 gap-2 mb-6 pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawSource('cashOutWallet');
+                            setAmount('');
+                          }}
+                          className={`py-3 px-2 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all border ${
+                            withdrawSource === 'cashOutWallet' 
+                              ? 'bg-white text-emerald-900 border-white shadow-md font-sans' 
+                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
+                          }`}
+                        >
+                          Cash Out (₦{user.playerWallet.toLocaleString()})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawSource('playerWallet');
+                            setAmount('');
+                          }}
+                          className={`py-3 px-2 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all border ${
+                            withdrawSource === 'playerWallet' 
+                              ? 'bg-white text-emerald-950 border-white shadow-md font-sans' 
+                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
+                          }`}
+                        >
+                          Player Wins (₦{user.playerWallet.toLocaleString()})
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-1">
+                        Liquid Balance ({withdrawSource === 'playerWallet' ? "Player Wins" : "Cash Out"})
+                      </p>
+                      <h4 className="text-3xl font-black mb-6 font-display italic tracking-tighter">₦{user.playerWallet.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                      
+                      <label className="block text-[11px] font-black text-emerald-100 uppercase tracking-widest mb-2">TYPE WITHDRAWAL AMOUNT (₦)</label>
                       <div className="relative mb-6">
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-4xl font-black text-white/20 select-none">$</span>
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-black text-white/20 select-none">₦</span>
                         <input 
                           type="number"
                           value={amount}
                           onChange={(e) => setAmount(e.target.value)}
                           placeholder="Type Amount Here..."
-                          className="w-full pl-8 pr-4 bg-transparent border-b-2 border-white/20 py-4 font-display text-4xl font-black text-white focus:outline-none focus:border-white transition-all placeholder:text-white/20 outline-none"
+                          className="w-full pl-8 pr-4 bg-transparent border-b-2 border-white/20 py-3 font-display text-2xl font-black text-white focus:outline-none focus:border-white transition-all placeholder:text-white/20 outline-none"
                         />
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         {[0.25, 0.5, 0.75, 1].map(percent => (
                           <button 
                             key={percent}
-                            onClick={() => setAmount((user.cashOutWallet * percent).toString())}
+                            onClick={() => {
+                              const base = user.playerWallet;
+                              setAmount((base * percent).toString());
+                            }}
                             className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black tracking-widest transition-all border border-white/10"
                           >
                             {percent * 100}%
@@ -712,48 +1189,139 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
 
                   <div className="space-y-6">
                     <div className="space-y-4">
-                      <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">2. SELECT DESTINATION BANK</label>
-                      
-                      <div className="relative">
-                        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-                        <input 
-                          placeholder="Search Your Bank (Local / Int'l)"
-                          className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
-                          value={bankSearch}
-                          onChange={e => {
-                            setBankSearch(e.target.value);
-                            setShowBankDropdown(true);
-                          }}
-                          onFocus={() => setShowBankDropdown(true)}
-                        />
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-
-                        <AnimatePresence>
-                          {showBankDropdown && (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              className="absolute z-50 left-0 right-0 top-[110%] bg-white border-2 border-gray-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto no-scrollbar p-2"
-                            >
-                              {filteredBanks.map(bank => (
-                                <button
-                                  key={bank.code}
-                                  onClick={() => {
-                                    setAccountDetails({...accountDetails, bankName: bank.name});
-                                    setBankSearch(bank.name);
-                                    setShowBankDropdown(false);
-                                  }}
-                                  className="w-full text-left p-3.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all flex items-center justify-between group"
-                                >
-                                  <span className="text-[10px] font-black uppercase tracking-widest">{bank.name}</span>
-                                  <span className="text-[9px] font-mono font-black border border-current/20 px-1.5 rounded">{bank.code}</span>
-                                </button>
-                              ))}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest">2. SELECT DESTINATION BANK</label>
+                        {!manualBankMode && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setManualBankMode(true);
+                              setAccountDetails({
+                                ...accountDetails,
+                                bankName: bankSearch
+                              });
+                            }}
+                            className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-sans font-black uppercase tracking-wider text-[9px] rounded-full border border-indigo-100 transition-all shadow-sm"
+                          >
+                            Type Manually
+                          </button>
+                        )}
                       </div>
+                      
+                      {manualBankMode ? (
+                        <div className="space-y-4">
+                          <div className="relative">
+                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
+                            <input 
+                              placeholder="Type Your Bank Name (e.g. Lotus Bank, Signature Bank)..."
+                              className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
+                              value={accountDetails.bankName}
+                              onChange={e => {
+                                setAccountDetails({...accountDetails, bankName: e.target.value});
+                                setBankSearch(e.target.value);
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="relative">
+                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
+                            <input 
+                              placeholder="Bank Code / Sort Code (e.g. 057, 101) - Optional"
+                              className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
+                              value={accountDetails.routingNumber}
+                              onChange={e => {
+                                setAccountDetails({...accountDetails, routingNumber: e.target.value});
+                              }}
+                            />
+                          </div>
+
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setManualBankMode(false);
+                              setBankSearch('');
+                              setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
+                            }}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-black uppercase tracking-wider text-[9px] rounded-full border border-slate-200 flex items-center gap-1.5 transition-all shadow-sm"
+                          >
+                            ← Use Bank Directory Search
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
+                          <input 
+                            placeholder="Search Your Bank (Local / Int'l)"
+                            className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
+                            value={bankSearch}
+                            onChange={e => {
+                              setBankSearch(e.target.value);
+                              setShowBankDropdown(true);
+                            }}
+                            onFocus={() => setShowBankDropdown(true)}
+                          />
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
+
+                          <AnimatePresence>
+                            {showBankDropdown && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute z-50 left-0 right-0 top-[110%] bg-white border-2 border-gray-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto no-scrollbar p-2"
+                              >
+                                {filteredBanks.length > 0 ? (
+                                  <>
+                                    {filteredBanks.map(bank => (
+                                      <button
+                                        key={`withdraw-${bank.code}`}
+                                        type="button"
+                                        onClick={() => {
+                                          setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
+                                          setBankSearch(bank.name);
+                                          setShowBankDropdown(false);
+                                        }}
+                                        className="w-full text-left p-3.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all flex items-center justify-between group"
+                                      >
+                                        <span className="text-[10px] font-black uppercase tracking-widest">{bank.name}</span>
+                                        <span className="text-[9px] font-mono font-black border border-current/20 px-1.5 rounded">{bank.code}</span>
+                                      </button>
+                                    ))}
+                                    <div className="border-t border-slate-100 mt-2 pt-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setManualBankMode(true);
+                                          setShowBankDropdown(false);
+                                          setAccountDetails({...accountDetails, bankName: bankSearch});
+                                        }}
+                                        className="w-full text-center p-3 text-indigo-600 hover:bg-indigo-50 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all"
+                                      >
+                                        + Enter Custom Bank Name Manually
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="p-4 text-center space-y-2">
+                                    <div className="text-[10px] font-black text-gray-950 uppercase tracking-widest">Bank Not Found</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setManualBankMode(true);
+                                        setShowBankDropdown(false);
+                                        setAccountDetails({...accountDetails, bankName: bankSearch});
+                                      }}
+                                      className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black uppercase tracking-widest text-[9px] rounded-full transition-all"
+                                    >
+                                      Use "{bankSearch}" as Custom Bank Name
+                                    </button>
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
 
                       <div className="relative">
                         <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950" />
@@ -774,6 +1342,50 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance })
                           value={accountDetails.accountName}
                           onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
                         />
+                      </div>
+
+                      {/* Dynamic Beneficiary Details Live Card */}
+                      <div className="p-6 bg-slate-900 text-white rounded-[2rem] border border-white/10 relative overflow-hidden shadow-2xl space-y-4">
+                        {/* Card background/glow theme */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/10 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl -ml-6 -mb-6 pointer-events-none" />
+
+                        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
+                          </div>
+                          <span className="text-[8px] font-sans font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                            ACTIVE TACTICAL PATH
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-0.5">
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK OF SETTLEMENT</span>
+                            <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
+                              {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">SETTLEMENT CODE / ID</span>
+                            <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
+                              {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY DIGIT NUMBER</span>
+                            <p className="text-[11px] font-mono font-black text-indigo-400 uppercase tracking-widest truncate">
+                              {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY ACCOUNT NAME</span>
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">
+                              {accountDetails.accountName || <span className="text-rose-400 italic font-medium">PENDING NAME</span>}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 

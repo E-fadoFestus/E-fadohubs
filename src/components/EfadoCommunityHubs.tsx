@@ -38,7 +38,10 @@ import {
   Store,
   Mail,
   MapPin,
-  Loader2
+  Loader2,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CSCCGroup, CSCCMembership, CSCCCycle, CSCCContribution, ChatMessage } from '../types';
@@ -68,6 +71,46 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [showGuide, setShowGuide] = useState(false);
   const [raffleCards, setRaffleCards] = useState<{id: number, turn: number | null, isFlipped: boolean}[]>([]);
   const [recipientProfile, setRecipientProfile] = useState<UserProfile | null>(null);
+
+  // Active Extended UI Platforms State & Ledgers
+  const [allMemberships, setAllMemberships] = useState<CSCCMembership[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMethod, setDepositMethod] = useState<'bank_transfer' | 'credit_card' | 'mobile_money'>('bank_transfer');
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawMethod, setWithdrawMethod] = useState<'bank' | 'crypto'>('bank');
+  const [withdrawAccount, setWithdrawAccount] = useState('');
+  const [withdrawBeneficiary, setWithdrawBeneficiary] = useState('');
+  const [withdrawBankName, setWithdrawBankName] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+
+  useEffect(() => {
+    // Real-time listener for all memberships to power Admin Ops approvals
+    const unsub = onSnapshot(collection(db, 'cscc_memberships'), (snapshot) => {
+      setAllMemberships(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CSCCMembership)));
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    // Real-time listener for user transaction ledgers to power Financials Overview
+    const unsubTrans = onSnapshot(
+      query(collection(db, 'transactions'), where('userId', '==', user.uid)),
+      (snapshot) => {
+        setTransactions(
+          snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a: any, b: any) => {
+              const secA = a.timestamp?.seconds || 0;
+              const secB = b.timestamp?.seconds || 0;
+              return secB - secA;
+            })
+        );
+      }
+    );
+    return unsubTrans;
+  }, [user.uid]);
 
   useEffect(() => {
     if (activeTab === 'COMMUNITY' && selectedGroup) {
@@ -1375,6 +1418,618 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     );
   };
 
+  const handleApproveMembership = async (membershipId: string, groupId: string, userId: string) => {
+    try {
+      await updateDoc(doc(db, 'cscc_memberships', membershipId), {
+        status: 'approved'
+      });
+      
+      const groupRef = doc(db, 'cscc_groups', groupId);
+      const groupSnap = await getDoc(groupRef);
+      if (groupSnap.exists()) {
+        const groupData = groupSnap.data() as CSCCGroup;
+        const currentPayoutOrder = groupData.payoutOrder || [];
+        if (!currentPayoutOrder.includes(userId)) {
+          await updateDoc(groupRef, {
+            payoutOrder: [...currentPayoutOrder, userId]
+          });
+        }
+      }
+      alert('Membership request approved successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Could not approve request.');
+    }
+  };
+
+  const handleRejectMembership = async (membershipId: string) => {
+    try {
+      await updateDoc(doc(db, 'cscc_memberships', membershipId), {
+        status: 'rejected'
+      });
+      alert('Membership request rejected.');
+    } catch (err) {
+      console.error(err);
+      alert('Could not reject request.');
+    }
+  };
+
+  const handleAdvanceCycle = async (group: CSCCGroup) => {
+    try {
+      const nextIndex = group.currentCycleIndex + 1;
+      const isFinished = nextIndex >= group.maxMembers;
+      
+      await updateDoc(doc(db, 'cscc_groups', group.id!), {
+        currentCycleIndex: isFinished ? group.currentCycleIndex : nextIndex,
+        status: isFinished ? 'completed' : 'active'
+      });
+      
+      // Log transaction for audit
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'payment',
+        amount: group.contributionAmount,
+        currency: group.currency,
+        status: 'completed',
+        description: `Operational milestone: Advanced ${group.name} to Cycle #${nextIndex + 1}`,
+        timestamp: serverTimestamp()
+      });
+
+      alert(isFinished ? 'Group Savings Cycle completed successfully!' : `Successfully advanced to Cycle #${nextIndex + 1}!`);
+    } catch (err) {
+      console.error(err);
+      alert('Could not advance cycle.');
+    }
+  };
+
+  const handleDeposit = async () => {
+    const amt = parseFloat(depositAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    setIsDepositing(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        depositWallet: (user.depositWallet || 0) + amt
+      });
+      
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'deposit',
+        amount: amt,
+        currency: 'NGN',
+        status: 'completed',
+        description: `Strategic deposit to Investment Capital via ${depositMethod.toUpperCase()}`,
+        timestamp: serverTimestamp(),
+        method: depositMethod
+      });
+      
+      alert(`Deposit of ${formatPrice(amt)} credited successfully to your Deposit Wallet!`);
+      setDepositAmount('');
+    } catch (err) {
+      console.error(err);
+      alert('Deposit transaction failed.');
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid withdraw amount.');
+      return;
+    }
+    if (amt > (user.cashOutWallet || 0) && amt > (user.playerWallet || 0)) {
+      alert('Insufficient funds in your financial accounts.');
+      return;
+    }
+    setIsWithdrawing(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      if (amt <= (user.cashOutWallet || 0)) {
+        await updateDoc(userDocRef, {
+          cashOutWallet: Math.max(0, (user.cashOutWallet || 0) - amt)
+        });
+      } else {
+        await updateDoc(userDocRef, {
+          playerWallet: Math.max(0, (user.playerWallet || 0) - amt)
+        });
+      }
+
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'withdrawal',
+        amount: amt,
+        currency: 'NGN',
+        status: 'completed',
+        description: `Strategic withdraw of ${formatPrice(amt)} to ${withdrawBankName || 'External Crypto Node'} (${withdrawAccount})`,
+        timestamp: serverTimestamp(),
+        method: withdrawMethod
+      });
+      
+      alert(`Strategic Drawdown of ${formatPrice(amt)} initiated successfully!`);
+      setWithdrawAmount('');
+      setWithdrawAccount('');
+      setWithdrawBeneficiary('');
+      setWithdrawBankName('');
+    } catch (err) {
+      console.error(err);
+      alert('Drawdown failed.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const renderGroups = () => {
+    const myAdminGroups = groups.filter(g => g.adminId === user.uid);
+    // Find memberships where the groupId corresponds to groups managed by this admin
+    const pendingRequests = allMemberships.filter(m => 
+      m.status === 'pending' && 
+      myAdminGroups.some(g => g.id === m.groupId)
+    );
+
+    return (
+      <div className="space-y-12">
+        {/* Admin Overview Header Card */}
+        <div className="bg-gradient-to-br from-indigo-900 to-slate-950 p-12 rounded-[3.5rem] text-white overflow-hidden shadow-2xl relative">
+          <div className="absolute top-0 right-0 w-1/3 h-full bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 max-w-2xl">
+            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3 block">Manager Node Console</span>
+            <h2 className="text-4xl md:text-5xl font-black mb-4 tracking-tighter">Admin <span className="text-indigo-400 italic">Operations.</span></h2>
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              You are signed in as a Hub Operations Manager. You have supreme clearance to approve group registries, settle rotational disputes, and dispatch payout events.
+            </p>
+          </div>
+        </div>
+
+        {/* Pending Approvals */}
+        <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Pending Member Requests</h3>
+                <p className="text-xs text-gray-500 font-bold">Review and authorize savings circle enrollment requests</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-amber-100 text-amber-800 text-[10px] font-black uppercase rounded-full">
+              {pendingRequests.length} Pending
+            </span>
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <div className="p-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-gray-100">
+               <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+               <p className="text-gray-500 font-bold text-sm">All operations are synchronized. No pending approvals found.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingRequests.map(request => {
+                const grp = myAdminGroups.find(g => g.id === request.groupId);
+                return (
+                  <div key={request.id} className="p-6 bg-slate-50 rounded-2xl border border-gray-100 shadow-inner flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-slate-100/50 transition-colors">
+                    <div>
+                      <h4 className="font-black text-gray-950 text-sm uppercase tracking-wider">{request.userName}</h4>
+                      <p className="text-xs text-gray-400 font-semibold mb-2">UID: {request.userId}</p>
+                      <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase rounded">
+                        Target Circle: {grp?.name || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleRejectMembership(request.id!)}
+                        className="px-5 py-2.5 bg-white hover:bg-red-550 border border-gray-250 hover:border-red-500 hover:text-red-500 text-gray-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                      >
+                        Reject
+                      </button>
+                      <button 
+                        onClick={() => handleApproveMembership(request.id!, request.groupId, request.userId)}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-transform shadow-lg shadow-indigo-100"
+                      >
+                        Approve Enrollment
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Managed Groups Ledger */}
+        <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Active Circular Groups</h3>
+              <p className="text-xs text-gray-500 font-bold">Operational control panel for your created savings networks</p>
+            </div>
+          </div>
+
+          {myAdminGroups.length === 0 ? (
+            <div className="p-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-gray-100">
+              <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-bold text-sm mb-4">You have not created any rotational circles yet.</p>
+              <button 
+                onClick={() => {
+                  setPlusFormData({
+                    name: 'Elite Savers Circle',
+                    description: 'Rotational savings group for active ecosystem operators.',
+                    contributionAmount: 200,
+                    currency: 'USD',
+                    cycleDuration: 'monthly',
+                    maxMembers: 8,
+                    bonusTier: 50,
+                    isPublic: true
+                  });
+                  setShowCreatePlusGroup(true);
+                  setActiveTab('CSCC_PLUS');
+                }}
+                className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
+              >
+                Create PLUS Group
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {myAdminGroups.map(group => {
+                const approvedCount = allMemberships.filter(m => m.groupId === group.id && m.status === 'approved').length;
+                return (
+                  <div key={group.id} className="p-6 bg-slate-50/50 rounded-3xl border border-gray-100 hover:shadow-md transition-all space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-extrabold text-gray-900 text-base">{group.name}</h4>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{group.cycleDuration} Rotations</p>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                        group.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {group.status}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold uppercase">Authorized Core</span>
+                        <span className="text-gray-900 font-black">{approvedCount} / {group.maxMembers} Members</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold uppercase">Pool Capital</span>
+                        <span className="text-indigo-600 font-black">{formatPrice(group.contributionAmount * group.maxMembers)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400 font-semibold uppercase">Progress</span>
+                        <span className="text-gray-900 font-black">Cycle #{group.currentCycleIndex + 1}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-150 flex gap-2">
+                      <button 
+                        onClick={async () => {
+                          const conf = window.confirm('Are you sure you want to advance this circle to the next rotational phase? This is irreversible.');
+                          if (conf) handleAdvanceCycle(group);
+                        }}
+                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-indigo-100"
+                      >
+                        Advance Cycle
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setSelectedGroup(group);
+                          setActiveTab('CENTRAL');
+                        }}
+                        className="py-3 px-4 bg-white hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 text-[9px] font-black uppercase tracking-widest transition-colors"
+                      >
+                        Monitor
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  };
+
+  const renderWallets = () => {
+    return (
+      <div className="space-y-12 animate-fade-in">
+        {/* Balances Display Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Win Wallet Card */}
+          <div className="relative group overflow-hidden bg-gradient-to-br from-indigo-900 to-indigo-950 p-8 rounded-3xl border border-indigo-800 shadow-xl text-white">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/15 rounded-full blur-2xl" />
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 bg-indigo-500/20 rounded-2xl border border-indigo-500/30 text-indigo-300">
+                <Coins className="w-6 h-6" />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#a5b4fc]">Vault Primary</span>
+            </div>
+            <p className="text-[10px] font-semibold uppercase text-indigo-300 tracking-wider mb-1">Player Win Wallet</p>
+            <h3 className="text-3xl font-black text-white leading-none mb-2">{formatPrice(user.playerWallet)}</h3>
+            <p className="text-[9px] text-[#c7d2fe] font-medium leading-relaxed">Direct gaming winnings, live trading profits, and general earnings.</p>
+          </div>
+
+          {/* Deposit Wallet Card */}
+          <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-950 to-slate-900 p-8 rounded-3xl border border-emerald-900/40 shadow-xl text-white">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl" />
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/30 text-emerald-300">
+                <Wallet className="w-6 h-6" />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#a7f3d0]">Operation reserves</span>
+            </div>
+            <p className="text-[10px] font-semibold uppercase text-emerald-300 tracking-wider mb-1">Capital Deposit Wallet</p>
+            <h3 className="text-3xl font-black text-white leading-none mb-2">{formatPrice(user.depositWallet)}</h3>
+            <p className="text-[9px] text-[#d1fae5] font-medium leading-relaxed">Stored collective funding capital reserved strictly for rotational CSCC cycles.</p>
+          </div>
+
+          {/* Cash Out Wallet Card */}
+          <div className="relative group overflow-hidden bg-gradient-to-br from-slate-900 to-slate-950 p-8 rounded-3xl border border-white/5 shadow-xl text-white">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl" />
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-3 bg-white/10 rounded-2xl border border-white/15 text-indigo-300">
+                <ArrowUpRight className="w-6 h-6" />
+              </div>
+              <span className="text-[9px] font-black uppercase tracking-widest text-[#cbd5e1]">Extraction Pool</span>
+            </div>
+            <p className="text-[10px] font-semibold uppercase text-[#cbd5e1] tracking-wider mb-1">Cash Out Wallet</p>
+            <h3 className="text-3xl font-black text-white leading-none mb-2">{formatPrice(user.cashOutWallet)}</h3>
+            <p className="text-[9px] text-[#94a3b8] font-medium leading-relaxed">Withdrawable ledger dividends ready for local bank wire payouts or secure crypto withdrawals.</p>
+          </div>
+        </div>
+
+        {/* Terminals Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Funding Entry (Deposit) */}
+          <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <ArrowDownLeft className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Financial Inflow (Deposit)</h3>
+                  <p className="text-xs text-gray-500 font-bold font-sans">Deploy deposit resources to fuel rotational cycle commitments</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Amount NGN (₦)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">₦</span>
+                    <input 
+                      type="number"
+                      placeholder="e.g. 5000"
+                      value={depositAmount}
+                      onChange={e => setDepositAmount(e.target.value)}
+                      className="w-full pl-8 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[12px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Payment Infrastructure Gateway</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { id: 'bank_transfer', label: 'Local Wire' },
+                      { id: 'credit_card', label: 'Security Card' },
+                      { id: 'mobile_money', label: 'Mobile Money' }
+                    ].map(way => (
+                      <button
+                        key={way.id}
+                        type="button"
+                        onClick={() => setDepositMethod(way.id as any)}
+                        className={`p-3.5 border-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                          depositMethod === way.id 
+                            ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700' 
+                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        {way.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleDeposit}
+              disabled={isDepositing}
+              className="w-full mt-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-transform flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10"
+            >
+              {isDepositing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Encrypting Gateway...
+                </>
+              ) : (
+                'Execute Funding Settlement'
+              )}
+            </button>
+          </section>
+
+          {/* Drawdown Window (Withdrawal) */}
+          <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+                  <ArrowUpRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Strategic Drewdown (Withdraw)</h3>
+                  <p className="text-xs text-gray-500 font-bold font-sans">Extract ledger dividends and wins securely to checking profile</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Drawdown Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">₦</span>
+                      <input 
+                        type="number"
+                        placeholder="e.g. 10000"
+                        value={withdrawAmount}
+                        onChange={e => setWithdrawAmount(e.target.value)}
+                        className="w-full pl-8 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[12px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Discharge Route</label>
+                    <select
+                      value={withdrawMethod}
+                      onChange={e => setWithdrawMethod(e.target.value as any)}
+                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black appearance-none cursor-pointer"
+                    >
+                      <option value="bank">Commercial Bank</option>
+                      <option value="crypto">Cryptographic Node</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">
+                      {withdrawMethod === 'crypto' ? 'Node Wallet Address' : 'Account Number'}
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder={withdrawMethod === 'crypto' ? '0x...' : 'e.g. 0123456789'}
+                      value={withdrawAccount}
+                      onChange={e => setWithdrawAccount(e.target.value)}
+                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">
+                      {withdrawMethod === 'crypto' ? 'Protocol' : 'Bank/Gateway'}
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder={withdrawMethod === 'crypto' ? 'ERC20 / SOL' : 'e.g. Zenith, GTB'}
+                      value={withdrawBankName}
+                      onChange={e => setWithdrawBankName(e.target.value)}
+                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Beneficiary Custom Name</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. EFADO ENTERPRISE"
+                    value={withdrawBeneficiary}
+                    onChange={e => setWithdrawBeneficiary(e.target.value)}
+                    className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleWithdraw}
+              disabled={isWithdrawing}
+              className="w-full mt-8 py-4 bg-gray-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-transform flex items-center justify-center gap-2 shadow-lg shadow-gray-900/15"
+            >
+              {isWithdrawing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Shedding Capital...
+                </>
+              ) : (
+                'Initialize Drawdown Order'
+              )}
+            </button>
+          </section>
+        </div>
+
+        {/* Tactical Ledger Logs */}
+        <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-2 bg-slate-50 text-gray-700 rounded-xl">
+              <History className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Audit Transactions Ledger</h3>
+              <p className="text-xs text-gray-500 font-bold">Verifiable sequence logs of financial flows in HubsConnect</p>
+            </div>
+          </div>
+
+          {transactions.length === 0 ? (
+            <div className="p-12 text-center bg-slate-50 rounded-2xl border-2 border-dashed border-gray-100">
+               <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+               <p className="text-gray-400 font-bold text-sm">No transaction historical sequences recorded on this workspace.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-gray-150 text-gray-400 font-black uppercase tracking-widest">
+                    <th className="py-4">Hash / Date</th>
+                    <th className="py-4">Flow Action</th>
+                    <th className="py-4">Details Summary</th>
+                    <th className="py-4 text-right">Settled Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx, idx) => {
+                    const date_str = tx.timestamp?.toDate 
+                      ? tx.timestamp.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                      : tx.timestamp 
+                        ? new Date(tx.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'Instant Lock';
+
+                    const isDeposit = tx.type === 'deposit';
+                    const isWin = tx.type === 'game_win' || tx.type === 'payout';
+
+                    return (
+                      <tr key={tx.id || idx} className="border-b border-gray-100 hover:bg-slate-50/50 transition-colors">
+                        <td className="py-4.5">
+                          <p className="font-extrabold text-gray-900">{date_str}</p>
+                          <p className="font-mono text-[8px] text-gray-450 tracking-tight uppercase">TX_{tx.id?.substring(0, 8).toUpperCase() || 'EXTERNAL'}</p>
+                        </td>
+                        <td className="py-4.5">
+                          <span className={`px-2.5 py-1 text-[8px] font-black uppercase rounded-full ${
+                            isDeposit ? 'bg-emerald-150 text-emerald-800 bg-emerald-50' : isWin ? 'bg-indigo-100 text-indigo-700' : 'bg-red-50 text-red-700 bg-red-50'
+                          }`}>
+                            {tx.type}
+                          </span>
+                        </td>
+                        <td className="py-4.5 text-gray-700 font-semibold max-w-xs truncate">
+                          {tx.description || tx.purpose || 'Rotational Settlement'}
+                        </td>
+                        <td className={`py-4.5 text-right font-black ${
+                          isDeposit || isWin ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                          {isDeposit || isWin ? '+' : '-'}{formatPrice(tx.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  };
+
   const renderCommunity = () => {
     if (!selectedGroup) {
       return (
@@ -1617,7 +2272,9 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 {activeTab === 'COMMUNITY' && "Interactive Discourse."}
                 {activeTab === 'RAFFLE' && "Decentralized Selection."}
                 {activeTab === 'PARTNERS' && "Strategic Alliances."}
-                {['GROUPS', 'WALLETS', 'SUPPORT'].includes(activeTab) && `${activeTab} Intelligence.`}
+                {activeTab === 'GROUPS' && "Admin Operations."}
+                {activeTab === 'WALLETS' && "Financial Intelligence."}
+                {activeTab === 'SUPPORT' && "Support Frequency."}
               </h1>
             </div>
             
@@ -1649,9 +2306,11 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
               {activeTab === 'COMMUNITY' && renderCommunity()}
               {activeTab === 'RAFFLE' && renderRaffle()}
               {activeTab === 'PARTNERS' && <VendorRegistration user={user} onSuccess={() => setActiveTab('HOME')} />}
+              {activeTab === 'GROUPS' && renderGroups()}
+              {activeTab === 'WALLETS' && renderWallets()}
               
-              {activeTab === 'SUPPORT' ? (
-                <div className="p-12 md:p-20 bg-white rounded-[3rem] border border-gray-100 shadow-xl shadow-gray-200/50 text-center relative overflow-hidden">
+              {activeTab === 'SUPPORT' && (
+                <div className="p-12 md:p-20 bg-white rounded-[3rem] border border-gray-100 shadow-xl shadow-gray-200/50 text-center relative overflow-hidden animate-fade-in">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
                   <Mail className="w-16 h-16 text-indigo-400 mx-auto mb-6" />
                   <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Support Intelligence Hub</h3>
@@ -1689,19 +2348,6 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                       <Mail className="w-4 h-4" /> Launch Direct Support
                     </button>
                   </div>
-                </div>
-              ) : ['GROUPS', 'WALLETS'].includes(activeTab) && (
-                <div className="p-20 bg-white rounded-[3rem] border border-gray-100 shadow-xl shadow-gray-200/50 text-center relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -mr-32 -mt-32 opacity-50" />
-                  <ShieldCheck className="w-16 h-16 text-indigo-200 mx-auto mb-6" />
-                  <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">{activeTab} Interface Locked</h3>
-                  <p className="text-gray-400 max-w-md mx-auto font-medium">This module is protected by security level 04. Tactical data deployment in progress.</p>
-                  <button 
-                    onClick={() => setActiveTab('HOME')}
-                    className="mt-8 px-8 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-600 hover:text-white transition-all"
-                  >
-                    Return to Overview
-                  </button>
                 </div>
               )}
             </motion.div>

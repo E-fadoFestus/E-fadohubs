@@ -29,6 +29,34 @@ interface VendorRegistrationProps {
   onSuccess: () => void;
 }
 
+const FormField: React.FC<{
+  label: string,
+  icon?: React.ReactNode,
+  error?: string,
+  hint?: string,
+  required?: boolean,
+  children: React.ReactNode
+}> = ({ label, icon, error, hint, required = true, children }) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-700'}`}>
+        {icon} {label} {!required && <span className="text-[10px] opacity-80">(Optional)</span>}
+      </label>
+      {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
+    </div>
+    <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
+      {children}
+    </div>
+    {error ? (
+      <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
+        <CheckCircle2 className="w-3 h-3 rotate-45" /> {error}
+      </motion.p>
+    ) : hint && (
+      <p className="text-[10px] font-medium text-slate-700 leading-tight">{hint}</p>
+    )}
+  </div>
+);
+
 type PlanType = 'STARTER' | 'PRO' | 'ENTERPRISE';
 
 export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, onSuccess }) => {
@@ -45,35 +73,6 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
     estimatedTraffic: ''
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
-  // FormField Helper Component
-  const FormField: React.FC<{
-    label: string,
-    icon?: React.ReactNode,
-    error?: string,
-    hint?: string,
-    required?: boolean,
-    children: React.ReactNode
-  }> = ({ label, icon, error, hint, required = true, children }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-700'}`}>
-          {icon} {label} {!required && <span className="text-[10px] opacity-80">(Optional)</span>}
-        </label>
-        {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
-      </div>
-      <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
-        {children}
-      </div>
-      {error ? (
-        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3 rotate-45" /> {error}
-        </motion.p>
-      ) : hint && (
-        <p className="text-[10px] font-medium text-slate-700 leading-tight">{hint}</p>
-      )}
-    </div>
-  );
 
   const PLANS = [
     {

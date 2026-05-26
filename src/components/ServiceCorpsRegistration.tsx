@@ -43,6 +43,34 @@ const REGISTRATION_PLANS = [
   { id: 'Corporate', name: 'Sovereign Corporate', price: 3500, description: 'Company profile. Multi-service listing. Direct CEO pipeline.', icon: <Building2 className="w-5 h-5 text-purple-600" />, accent: 'border-purple-200 bg-purple-50/30' }
 ];
 
+const FormField: React.FC<{
+  label: string,
+  icon?: React.ReactNode,
+  error?: string,
+  hint?: string,
+  required?: boolean,
+  children: React.ReactNode
+}> = ({ label, icon, error, hint, required = true, children }) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-700'}`}>
+        {icon} {label} {!required && <span className="text-[10px] opacity-80">(Optional)</span>}
+      </label>
+      {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
+    </div>
+    <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
+      {children}
+    </div>
+    {error ? (
+      <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" /> {error}
+      </motion.p>
+    ) : hint && (
+      <p className="text-[10px] font-medium text-slate-700 leading-tight">{hint}</p>
+    )}
+  </div>
+);
+
 export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> = ({ 
   user, 
   onClose, 
@@ -58,35 +86,6 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
   const [showPayment, setShowPayment] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<typeof REGISTRATION_PLANS[0]>(REGISTRATION_PLANS[0]);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
-  // FormField Helper Component
-  const FormField: React.FC<{
-    label: string,
-    icon?: React.ReactNode,
-    error?: string,
-    hint?: string,
-    required?: boolean,
-    children: React.ReactNode
-  }> = ({ label, icon, error, hint, required = true, children }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-700'}`}>
-          {icon} {label} {!required && <span className="text-[10px] opacity-80">(Optional)</span>}
-        </label>
-        {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
-      </div>
-      <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
-        {children}
-      </div>
-      {error ? (
-        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" /> {error}
-        </motion.p>
-      ) : hint && (
-        <p className="text-[10px] font-medium text-slate-700 leading-tight">{hint}</p>
-      )}
-    </div>
-  );
 
   // Provider Form State
   const [providerData, setProviderData] = useState({

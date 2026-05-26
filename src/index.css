@@ -2,9 +2,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Outfit", sans-serif;
-  --font-adlam: "ADLaM Display", cursive;
+  --font-sans: "Georgia", Georgia, serif;
+  --font-display: "Georgia", Georgia, serif;
+  --font-adlam: "Georgia", Georgia, serif;
   
   --color-primary: #0F172A;
   --color-secondary: #64748B;

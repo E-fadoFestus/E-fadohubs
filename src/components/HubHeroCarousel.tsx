@@ -13,7 +13,7 @@ interface Slide {
 }
 
 interface HubHeroCarouselProps {
-  hubType: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'QUIZ' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'PARTNER_HUB';
+  hubType: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'QUIZ' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED';
   onAction?: (view: string, subview?: string) => void;
 }
 

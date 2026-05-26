@@ -35,6 +35,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, QuizQuestion, QuizSession, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { PaymentPlatform } from './PaymentPlatform';
 
 interface EfadoMoneyQuizProps {
   user: UserProfile;
@@ -859,7 +860,7 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
 
   const startGame = async () => {
     if (user.depositWallet < stakeAmount) {
-      addNotification('Insufficient funds in Deposit Wallet. Please fund your wallet.', 'error');
+      addNotification('Insufficient Funds / Balance', 'error');
       return;
     }
 
@@ -1078,7 +1079,7 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Win Wallet</p>
-            <h3 className="text-xl font-black text-slate-900">₦{user.cashOutWallet.toLocaleString()}</h3>
+            <h3 className="text-xl font-black text-slate-900">₦{user.playerWallet.toLocaleString()}</h3>
           </div>
           <button 
             onClick={() => {
@@ -1566,6 +1567,11 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
                                 className="w-full pl-10 pr-4 bg-transparent border-b-2 border-white/20 py-4 font-black text-6xl focus:outline-none focus:border-indigo-500 transition-all text-white placeholder:text-white/10 italic outline-none"
                               />
                             </div>
+                            {walletTab === 'withdraw' && Number(paymentAmount) > user.playerWallet && (
+                              <p className="text-red-400 font-extrabold uppercase tracking-widest text-[9px] animate-pulse">
+                                Insufficient funds in Win Wallet (₦{user.playerWallet.toLocaleString()})
+                              </p>
+                            )}
                             <div className="grid grid-cols-3 gap-3">
                               {[1000, 5000, 10000, 50000, 100000, 500000].map(val => (
                                 <button 
@@ -1675,7 +1681,10 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
                               setIsProcessingPayment(true);
                               const amount = Number(paymentAmount);
                               try {
-                                await onUpdateBalance(amount, walletTab === 'deposit' ? 'deposit' : 'withdrawal');
+                                await onUpdateBalance(
+                                  amount, 
+                                  walletTab === 'deposit' ? 'deposit' : 'withdrawal'
+                                );
                                 await onAddTransaction({
                                   userId: user.uid,
                                   type: walletTab === 'deposit' ? 'deposit' : 'withdrawal',

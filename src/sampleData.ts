@@ -21,7 +21,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     location: 'EFADO Central Hub, Lagos',
     warranty: '2 Year EFADO Shield Protection',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'EFADO Central Warehouse Block D-3, Victoria Island, Lagos (Near Eko Hotel)'
   },
   {
     id: 'sample-1',
@@ -41,7 +42,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/iphone13/800/600'],
     location: 'New York, USA',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'No. 12 Digital Plaza, Suite 4B, Broadway Street, NY'
   },
   {
     id: 'sample-2',
@@ -61,7 +63,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/jacket/800/600'],
     location: 'London, UK',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'Vintage Apparel Shop, 88 Portobello Road, London'
   },
   {
     id: 'sample-3',
@@ -81,7 +84,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/camera/800/600'],
     location: 'Tokyo, Japan',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'Akihabara Camera Hub, Building B 3rd Floor, Tokyo'
   },
   {
     id: 'sample-4',
@@ -101,7 +105,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/table/800/600'],
     location: 'Lagos, Nigeria',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'Alaba International Market, Block G Space 12, Ojo, Lagos'
   },
   {
     id: 'sample-5',
@@ -121,7 +126,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/laptop/800/600'],
     location: 'Berlin, Germany',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'Alexanderplatz Electronic Mart, Shop 18, Berlin'
   },
   {
     id: 'sample-6',
@@ -141,7 +147,8 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/watch/800/600'],
     location: 'Dubai, UAE',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'Gold Souk Luxury Pavilion, Shop No. 5-A, Deira, Dubai'
   },
   {
     id: 'sample-7',
@@ -161,6 +168,7 @@ export const SAMPLE_PRODUCTS: MarketProduct[] = [
     photos: ['https://picsum.photos/seed/security/800/600'],
     location: 'San Francisco, USA',
     complianceConfirmed: true,
-    createdAt: new Date()
+    createdAt: new Date(),
+    vendorPickupLocation: 'SOMA Innovation Suites, Ground Floor Lobby Counter, San Francisco, CA'
   }
 ];

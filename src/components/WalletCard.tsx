@@ -44,7 +44,7 @@ export function WalletGrid({ wallets, isAdmin }: { wallets: any, isAdmin: boolea
         amount={wallets.playerWallet || 0} 
         icon={<Coins />} 
         color="bg-yellow-500"
-        description="Funds available for playing the Lucky Spin."
+        description="Funds available for staking and playing Game Hub games."
       />
       <WalletCard 
         title="Cash Out Wallet" 

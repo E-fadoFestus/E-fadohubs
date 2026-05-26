@@ -365,17 +365,22 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
 
   // Load live requests for the "Sovereign Relief Feed"
   React.useEffect(() => {
-    const q = query(
-      collection(db, 'service_requests'),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc'),
-      limit(5)
-    );
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setLiveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRequest)));
-    });
+    let unsubscribe = () => {};
+    if (user?.uid) {
+      const q = query(
+        collection(db, 'service_requests'),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+      unsubscribe = onSnapshot(q, (snap) => {
+        setLiveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceRequest)));
+      }, (err) => {
+        console.warn("Service requests subscription deactivated or unauthorized", err);
+      });
+    }
     return () => unsubscribe();
-  }, []);
+  }, [user?.uid]);
 
   const handleBookNow = (family: ServiceFamily, subName: string, serviceName: string) => {
     setPrefilledData({

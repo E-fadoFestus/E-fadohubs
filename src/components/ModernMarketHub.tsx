@@ -43,8 +43,9 @@ import {
   Copy,
   ChevronDown,
   ArrowRightLeft,
-  Hash,
   Fingerprint,
+  User,
+  Hash,
   Mail
 } from 'lucide-react';
 import { SAMPLE_PRODUCTS } from '../sampleData';
@@ -240,8 +241,12 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     street: '',
     city: '',
     state: '',
-    zipCode: ''
+    zipCode: '',
+    landmark: '',
+    instructions: ''
   });
+  const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [addressError, setAddressError] = useState('');
   const [shippingMethod, setShippingMethod] = useState<'Standard' | 'Expedited' | 'Instant'>('Standard');
   const [paymentMethod, setPaymentMethod] = useState<string>('wallet');
   const [couponCode, setCouponCode] = useState('');
@@ -253,10 +258,12 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [manualBankMode, setManualBankMode] = useState(false);
   const [accountDetails, setAccountDetails] = useState({
     accountNumber: '',
     bankName: '',
-    accountName: ''
+    accountName: '',
+    routingNumber: ''
   });
 
   const nigerianBanks = [
@@ -443,9 +450,24 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
   const handleCheckout = () => {
-    if (checkoutStep === 'cart') setCheckoutStep('address');
-    else if (checkoutStep === 'address') setCheckoutStep('payment');
-    else if (checkoutStep === 'payment') {
+    if (checkoutStep === 'cart') {
+      setAddressError('');
+      setCheckoutStep('address');
+    } else if (checkoutStep === 'address') {
+      if (fulfillmentType === 'DELIVERY') {
+        if (!deliveryAddress.fullName || !deliveryAddress.phone || !deliveryAddress.street || !deliveryAddress.city || !deliveryAddress.state) {
+          setAddressError('Please supply all delivery address fields so your sovereign delivery coordinate can be processed.');
+          return;
+        }
+      } else {
+        if (!deliveryAddress.fullName || !deliveryAddress.phone) {
+          setAddressError('Please specify the recipient Name and liaison Phone number authorized to pickup items from the Vendor store.');
+          return;
+        }
+      }
+      setAddressError('');
+      setCheckoutStep('payment');
+    } else if (checkoutStep === 'payment') {
       if (paymentMethod === 'pod') {
         finalizePurchase();
       } else {
@@ -497,7 +519,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       currency: 'USD',
       deliveryDetails: {
         ...deliveryAddress,
-        method: shippingMethod
+        method: shippingMethod,
+        fulfillmentType: fulfillmentType
       },
       paymentMethod: paymentMethod,
       status: 'processing',
@@ -1065,7 +1088,48 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </div>
                       </div>
 
-                      <div className="flex-grow overflow-y-auto space-y-10 pr-4 custom-scrollbar pb-10">
+                      <div className="flex-grow overflow-y-auto space-y-8 pr-4 custom-scrollbar pb-10">
+                        {/* Delivery/Pickup Coordinates Summary Box */}
+                        <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
+                          <div className="flex items-center gap-2">
+                            {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? (
+                              <>
+                                <Store className="w-4 h-4 text-indigo-400" />
+                                <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
+                              </>
+                            ) : (
+                              <>
+                                <Truck className="w-4 h-4 text-blue-400" />
+                                <span className="text-[10px] font-black text-white uppercase tracking-wider">Direct Home/Office Delivery</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="text-[11px] leading-relaxed text-slate-300 font-bold uppercase">
+                            {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? (
+                              <div className="space-y-1">
+                                <p className="text-[10px] text-indigo-300">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
+                                <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
+                                <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
+                                  *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <p className="text-white">{selectedOrder.deliveryDetails.fullName} ({selectedOrder.deliveryDetails.phone})</p>
+                                <p className="text-slate-400">
+                                  {selectedOrder.deliveryDetails.street}, {selectedOrder.deliveryDetails.city}, {selectedOrder.deliveryDetails.state} {selectedOrder.deliveryDetails.zipCode || ''}
+                                </p>
+                                {selectedOrder.deliveryDetails.landmark && (
+                                  <p className="text-[9.5px] text-amber-400">Landmark Focus: {selectedOrder.deliveryDetails.landmark}</p>
+                                )}
+                                {selectedOrder.deliveryDetails.instructions && (
+                                  <p className="text-[9px] text-slate-500 lowercase italic">Instructions: "{selectedOrder.deliveryDetails.instructions}"</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
                         {/* Tracking Timeline */}
                         <div className="relative pl-10">
                           {/* Vertical Line */}
@@ -1075,9 +1139,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           <div className="relative mb-12">
                             <div className="absolute -left-10 top-0 w-6 h-6 rounded-full bg-blue-500 border-4 border-slate-900 z-10" />
                             <div>
-                              <h5 className="text-xs font-black text-white uppercase tracking-widest mb-1">Delivered to Point</h5>
+                              <h5 className="text-xs font-black text-white uppercase tracking-widest mb-1">
+                                {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? 'Ready at Vendor Station' : 'Delivered to Point'}
+                              </h5>
                               <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-tighter">
-                                {selectedOrder.deliveryDetails.street}, {selectedOrder.deliveryDetails.city}
+                                {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' 
+                                  ? 'Manual Store Pickup Collection Point' 
+                                  : `${selectedOrder.deliveryDetails.street}, ${selectedOrder.deliveryDetails.city}`}
                               </p>
                               {selectedOrder.status === 'delivered' ? (
                                 <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md uppercase">Completed</span>
@@ -1238,44 +1306,175 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
                 {checkoutStep === 'address' && (
                   <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3">
                       <MapPin className="w-5 h-5 text-blue-400" />
-                      <h4 className="text-sm font-black text-white uppercase tracking-widest">Delivery Address</h4>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                      <input 
-                        placeholder="Full Name"
-                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none"
-                        value={deliveryAddress.fullName}
-                        onChange={e => setDeliveryAddress({...deliveryAddress, fullName: e.target.value})}
-                      />
-                      <input 
-                        placeholder="Phone Number"
-                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none"
-                        value={deliveryAddress.phone}
-                        onChange={e => setDeliveryAddress({...deliveryAddress, phone: e.target.value})}
-                      />
-                      <input 
-                        placeholder="Street Address"
-                        className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none"
-                        value={deliveryAddress.street}
-                        onChange={e => setDeliveryAddress({...deliveryAddress, street: e.target.value})}
-                      />
-                      <div className="grid grid-cols-2 gap-4">
-                        <input 
-                          placeholder="City"
-                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none"
-                          value={deliveryAddress.city}
-                          onChange={e => setDeliveryAddress({...deliveryAddress, city: e.target.value})}
-                        />
-                        <input 
-                          placeholder="State"
-                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-blue-500 outline-none"
-                          value={deliveryAddress.state}
-                          onChange={e => setDeliveryAddress({...deliveryAddress, state: e.target.value})}
-                        />
+                      <div>
+                        <h4 className="text-sm font-black text-white uppercase tracking-widest">Sovereign Logistics Gateway</h4>
+                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Select your preferred fulfillment protocol below.</p>
                       </div>
                     </div>
+
+                    {/* Segmented fulfillment protocol selector */}
+                    <div className="bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFulfillmentType('DELIVERY');
+                          setAddressError('');
+                        }}
+                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                          fulfillmentType === 'DELIVERY'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                            : 'bg-transparent text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Truck className="w-4 h-4" />
+                        🚚 Delivery Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFulfillmentType('PICKUP');
+                          setAddressError('');
+                        }}
+                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                          fulfillmentType === 'PICKUP'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                            : 'bg-transparent text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Store className="w-4 h-4" />
+                        🏪 Vendor Store Pickup
+                      </button>
+                    </div>
+
+                    {addressError && (
+                      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-red-400">
+                        ⚠️ {addressError}
+                      </div>
+                    )}
+
+                    {fulfillmentType === 'DELIVERY' ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <input 
+                            placeholder="Recipient Full Name"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.fullName}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, fullName: e.target.value})}
+                          />
+                          <input 
+                            placeholder="Recipient Liaison Phone"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.phone}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, phone: e.target.value})}
+                          />
+                        </div>
+                        <input 
+                          placeholder="Street Address Details"
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                          value={deliveryAddress.street}
+                          onChange={e => setDeliveryAddress({...deliveryAddress, street: e.target.value})}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <input 
+                            placeholder="City / Town"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.city}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, city: e.target.value})}
+                          />
+                          <input 
+                            placeholder="State"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.state}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, state: e.target.value})}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <input 
+                            placeholder="Nearby Landmark (School, Hospital, Port, etc.)"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.landmark || ''}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, landmark: e.target.value})}
+                          />
+                          <input 
+                            placeholder="Postal Code / Zip"
+                            className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                            value={deliveryAddress.zipCode}
+                            onChange={e => setDeliveryAddress({...deliveryAddress, zipCode: e.target.value})}
+                          />
+                        </div>
+                        <textarea 
+                          placeholder="Additional detailed delivery instructions or landmarks..."
+                          className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                          rows={2}
+                          value={deliveryAddress.instructions || ''}
+                          onChange={e => setDeliveryAddress({...deliveryAddress, instructions: e.target.value})}
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2 text-amber-500">
+                            <Info className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">eFADO Independent Pickup Policy</span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
+                            eFADO operates as a decentralized network and does not maintain designated corporate pickup stations.
+                            All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
+                          </p>
+                        </div>
+
+                        {/* Point of Pickup Listing for each Cart Product */}
+                        <div className="space-y-3">
+                          <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-1">Your Selected Independent Pickup Coordinates:</label>
+                          {cart.map((item, idx) => {
+                            const p = item.product;
+                            const mainStr = p.vendorPickupLocation || 
+                                           `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
+                            return (
+                              <div key={idx} className="p-4 bg-slate-900/80 border border-white/5 rounded-2xl flex flex-col gap-2">
+                                <div className="flex justify-between items-start gap-2">
+                                  <span className="text-[10px] font-black text-white uppercase tracking-tight">{p.title}</span>
+                                  <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded-full outline-none">qty: {item.quantity}</span>
+                                </div>
+                                <div className="flex items-start gap-2 mt-1 bg-slate-950 p-3 rounded-xl border border-white/5">
+                                  <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
+                                    <p className="text-[11px] font-bold text-slate-200 mt-1 leading-relaxed whitespace-pre-line">{mainStr}</p>
+                                    {(p.phone || p.whatsapp) && (
+                                      <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
+                                        Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="space-y-3 pt-2">
+                          <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-1">Authorized Pickup Handshaking Credentials:</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input 
+                              placeholder="Fulfilling Recipient Full Name"
+                              className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                              value={deliveryAddress.fullName}
+                              onChange={e => setDeliveryAddress({...deliveryAddress, fullName: e.target.value})}
+                            />
+                            <input 
+                              placeholder="Liaison Verification Phone"
+                              className="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-blue-500 outline-none"
+                              value={deliveryAddress.phone}
+                              onChange={e => setDeliveryAddress({...deliveryAddress, phone: e.target.value})}
+                            />
+                          </div>
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest px-1">⚠️ Bring a valid ID or verification key matching the name specified above to the vendor's address.</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1324,40 +1523,131 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           exit={{ opacity: 0, height: 0 }}
                           className="space-y-4 pt-4 border-t border-white/5"
                         >
-                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Strategic Bank Details</label>
-                          <div className="relative">
-                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                            <input 
-                              placeholder="Search Destination Bank..."
-                              className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                              value={bankSearch}
-                              onChange={e => {
-                                setBankSearch(e.target.value);
-                                setShowBankDropdown(true);
-                                setAccountDetails({...accountDetails, bankName: e.target.value});
-                              }}
-                              onFocus={() => setShowBankDropdown(true)}
-                            />
-                            
-                            {showBankDropdown && (
-                              <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                {filteredBanks.map(bank => (
-                                  <button
-                                    key={bank.code}
-                                    onClick={() => {
-                                      setAccountDetails({...accountDetails, bankName: bank.name});
-                                      setBankSearch(bank.name);
-                                      setShowBankDropdown(false);
-                                    }}
-                                    className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
-                                  >
-                                    <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
-                                    <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
-                                  </button>
-                                ))}
-                              </div>
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest italic">2. SELECT BRAND/INSTITUTION</label>
+                            {!manualBankMode && (
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setManualBankMode(true);
+                                  setAccountDetails({
+                                    ...accountDetails,
+                                    bankName: bankSearch
+                                  });
+                                }}
+                                className="px-2.5 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-400 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-indigo-500/20 transition-all shadow-sm"
+                              >
+                                Type Manually
+                              </button>
                             )}
                           </div>
+
+                          {manualBankMode ? (
+                            <div className="space-y-4">
+                              <div className="relative">
+                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                <input 
+                                  placeholder="Type Custom Bank Name (e.g. Lotus Bank, Signature)..."
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                  value={accountDetails.bankName}
+                                  onChange={e => {
+                                    setAccountDetails({...accountDetails, bankName: e.target.value});
+                                    setBankSearch(e.target.value);
+                                  }}
+                                />
+                              </div>
+                              
+                              <div className="relative">
+                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                <input 
+                                  placeholder="Bank Code / Sort Code (e.g. 057, 101) - Optional"
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                  value={accountDetails.routingNumber || ''}
+                                  onChange={e => {
+                                    setAccountDetails({...accountDetails, routingNumber: e.target.value});
+                                  }}
+                                />
+                              </div>
+
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setManualBankMode(false);
+                                  setBankSearch('');
+                                  setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
+                                }}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-white/5 flex items-center gap-1.5 transition-all"
+                              >
+                                ← Use Directory Search
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Search Destination Bank..."
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                                value={bankSearch}
+                                onChange={e => {
+                                  setBankSearch(e.target.value);
+                                  setShowBankDropdown(true);
+                                }}
+                                onFocus={() => setShowBankDropdown(true)}
+                              />
+                              
+                              {showBankDropdown && (
+                                <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
+                                  {filteredBanks.length > 0 ? (
+                                    <>
+                                      {filteredBanks.map(bank => (
+                                        <button
+                                          key={`market-checkout-${bank.code}`}
+                                          type="button"
+                                          onClick={() => {
+                                            setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
+                                            setBankSearch(bank.name);
+                                            setShowBankDropdown(false);
+                                          }}
+                                          className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
+                                        >
+                                          <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
+                                          <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
+                                        </button>
+                                      ))}
+                                      <div className="border-t border-white/5 mt-1 pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setManualBankMode(true);
+                                            setShowBankDropdown(false);
+                                            setAccountDetails({...accountDetails, bankName: bankSearch});
+                                          }}
+                                          className="w-full text-center py-2 text-indigo-400 hover:bg-white/5 font-black uppercase tracking-widest text-[8px] rounded-lg transition-all"
+                                        >
+                                          + Enter Bank Name Manually
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="p-3 text-center space-y-1.5">
+                                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bank Not Found</div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setManualBankMode(true);
+                                          setShowBankDropdown(false);
+                                          setAccountDetails({...accountDetails, bankName: bankSearch});
+                                        }}
+                                        className="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-black uppercase tracking-widest text-[8px] rounded-full transition-all"
+                                      >
+                                        Use "{bankSearch || 'Custom'}" Manually
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className="relative">
                             <ArrowRightLeft className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
@@ -1368,6 +1658,59 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               value={accountDetails.accountNumber}
                               onChange={e => setAccountDetails({...accountDetails, accountNumber: e.target.value})}
                             />
+                          </div>
+
+                          <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                            <input 
+                              placeholder="Beneficiary Account Holder Name"
+                              className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                              value={accountDetails.accountName}
+                              onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
+                            />
+                          </div>
+
+                          {/* Dynamic Beneficiary Details Live Card */}
+                          <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/10 relative overflow-hidden shadow-2xl space-y-3">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -ml-4 -mb-4 pointer-events-none" />
+
+                            <div className="flex justify-between items-center pb-2 border-b border-white/5 border-slate-800">
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
+                              </div>
+                              <span className="text-[8px] font-sans font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                {paymentMethod.toUpperCase()} SOURCE
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-left">
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK NAME</span>
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
+                                  {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
+                                <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
+                                  {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
+                                <p className="text-[11px] font-mono font-black text-blue-400 uppercase tracking-widest truncate">
+                                  {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT HOLDER NAME</span>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">
+                                  {accountDetails.accountName || <span className="text-rose-400 italic font-medium">PENDING NAME</span>}
+                                </p>
+                              </div>
+                            </div>
                           </div>
 
                           {paymentMethod === 'ussd' && (

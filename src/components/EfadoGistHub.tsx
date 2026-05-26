@@ -149,17 +149,88 @@ const GIST_CATEGORIES = [
       { id: 'training', name: 'Elite Performance', groups: ['Fitness & Gym', 'Personal Training', 'Injury Recovery'] }
     ]
   },
-  { id: 'widows', title: 'Widows & Widowers', icon: UserMinus, color: 'purple', description: 'Connections, remarriage support.', subcategories: [] },
-  { id: 'dating-connections', title: 'Dating & Connections', icon: Link2, color: 'red', description: 'Safe dating practices, roadmaps.', subcategories: [] },
-  { id: 'youth', title: 'Youth & Character Development', icon: UserCircle, color: 'emerald', description: 'Character building, young men forum.', subcategories: [] },
-  { id: 'education', title: 'Education & Student Life', icon: GraduationCap, color: 'indigo', description: 'Career guidance, study tips.', subcategories: [] },
-  { id: 'technology', title: 'Technology & Knowledge Exchange', icon: Cpu, color: 'cyan', description: 'Trends, knowledge sharing.', subcategories: [] },
-  { id: 'jobs', title: 'Employment & Careers', icon: Briefcase, color: 'slate', description: 'Job vacancies, interview trends.', subcategories: [] },
-  { id: 'manufacturing', title: 'Manufacturing & Industry Trends', icon: Factory, color: 'zinc', description: 'Product insights, industry trends.', subcategories: [] }
+  { 
+    id: 'widows', 
+    title: 'Widows & Widowers', 
+    icon: UserMinus, 
+    color: 'purple', 
+    description: 'Connections, remarriage support.', 
+    subcategories: [
+      { id: 'widow-connections', name: 'Widow Connections', groups: ['Global Companionship', 'Support & Healing', 'New Horizons'] },
+      { id: 'remarriage-sup', name: 'Remarriage Support', groups: ['Blended Families', 'Courtship Protocols', 'Legal & Wisdom'] }
+    ] 
+  },
+  { 
+    id: 'dating-connections', 
+    title: 'Dating & Connections', 
+    icon: Link2, 
+    color: 'red', 
+    description: 'Safe dating practices, roadmaps.', 
+    subcategories: [
+      { id: 'courtship-roadmaps', name: 'Premium Courtship Roadmaps', groups: ['Match Selection Criteria', 'First Date Protocols', 'Value Alignment Audit'] },
+      { id: 'safe-dating-guard', name: 'Safe Dating Safeguards', groups: ['Verification Standards', 'Moderated Safe Dating', 'Red Flag Consulting Counsel'] }
+    ] 
+  },
+  { 
+    id: 'youth', 
+    title: 'Youth & Character Development', 
+    icon: UserCircle, 
+    color: 'emerald', 
+    description: 'Character building, young men forum.', 
+    subcategories: [
+      { id: 'char-building', name: 'Character Building Academy', groups: ['Ethical Leadership Initiatives', 'Mental Resilience Gym', 'Integrity Network Circle'] },
+      { id: 'young-men-council', name: 'Young Men Council', groups: ['Manhood Transition Councils', 'Sovereign Purpose Discovery', 'Civic Action duty'] }
+    ] 
+  },
+  { 
+    id: 'education', 
+    title: 'Education & Student Life', 
+    icon: GraduationCap, 
+    color: 'indigo', 
+    description: 'Career guidance, study tips.', 
+    subcategories: [
+      { id: 'career-acad-guidance', name: 'Career & Academic Guidance', groups: ['Global Scholarship Councils', 'Major Selection Advisors', 'Study Abroad networks'] },
+      { id: 'student-life-tactics', name: 'Student Life Tactics', groups: ['Cognitive Study Strategies', 'High-Performance Research Methods', 'Focus Optimization protocols'] }
+    ] 
+  },
+  { 
+    id: 'technology', 
+    title: 'Technology & Knowledge Exchange', 
+    icon: Cpu, 
+    color: 'cyan', 
+    description: 'Trends, knowledge sharing.', 
+    subcategories: [
+      { id: 'tech-frontier-trends', name: 'Tech Frontiers & Artificial Intelligence', groups: ['Neural Nets & LLM Tuning', 'Sovereign Decentralised Frameworks', 'Industrial Automation Lab'] },
+      { id: 'peer-knowledge-exch', name: 'Peer Knowledge Exchange Labs', groups: ['Coding Bootcamps Circles', 'Product Matrix design', 'Micro-architecture Forums'] }
+    ] 
+  },
+  { 
+    id: 'jobs', 
+    title: 'Employment & Careers', 
+    icon: Briefcase, 
+    color: 'slate', 
+    description: 'Job vacancies, interview trends.', 
+    subcategories: [
+      { id: 'career-job-placements', name: 'Career Opportunities & Job Placement', groups: ['Remote Tech Placements', 'Local Industry listings', 'Global C-Suite Executive Roles'] },
+      { id: 'interview-prep', name: 'Interview Prep Headquarters', groups: ['Resume Excellence Audit', 'Behavioral Masterclasses', 'Salary Negotiations Hub'] }
+    ] 
+  },
+  { 
+    id: 'manufacturing', 
+    title: 'Manufacturing & Industry Trends', 
+    icon: Factory, 
+    color: 'zinc', 
+    description: 'Product insights, industry trends.', 
+    subcategories: [
+      { id: 'supply-chain-insights', name: 'Supply Chain & Material Sourcing', groups: ['Supply Chain Security Grid', 'Raw Materials Exchanges', 'Precision Sourcing Strategies'] },
+      { id: 'factory-eco-trends', name: 'Factory Automation & Green Mfg', groups: ['Industrial IoT Sensor Nodes', 'Zero-Waste circular trends', 'Local Fab Facilities list'] }
+    ] 
+  }
 ];
 
 import { ReelCreator } from './ReelCreator';
 import { ReelFeed } from './ReelFeed';
+import { SovereignGroupArena } from './SovereignGroupArena';
 
 interface EfadoGistHubProps {
   user: UserProfile;
@@ -177,6 +248,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [showGuide, setShowGuide] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<any | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [reels, setReels] = useState<Reel[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -454,6 +526,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 whileHover={{ scale: 1.1, x: 5 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  setSelectedGroup(null);
+                  setSelectedSubCategory(null);
+                  setSelectedCategory(null);
                   if (item.id === 'ADS') {
                     onNavigate?.('ADVERTISING', 'ADVERT');
                   } else {
@@ -1313,13 +1388,22 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               )}
 
               {activeView === 'CATEGORIES' && selectedCategory && selectedSubCategory && (
-                <motion.div 
-                  key="groups"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="p-8 space-y-8"
-                >
+                selectedGroup ? (
+                  <SovereignGroupArena
+                    group={selectedGroup}
+                    subCategoryName={selectedSubCategory.name}
+                    categoryTitle={selectedCategory.title}
+                    user={user}
+                    onClose={() => setSelectedGroup(null)}
+                  />
+                ) : (
+                  <motion.div 
+                    key="groups"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="p-8 space-y-8"
+                  >
                   <div className="flex items-center justify-between pb-8 border-b border-white/5">
                     <div className="flex items-center gap-6">
                       <button 
@@ -1371,6 +1455,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           {selectedSubCategory.groups?.map((group: string, idx: number) => (
                             <button
                               key={idx}
+                              onClick={() => setSelectedGroup(group)}
                               className="group relative bg-slate-900/60 backdrop-blur-2xl border border-white/10 shadow-2xl p-8 rounded-[2.5rem] text-left hover:bg-slate-800 transition-all hover:-translate-y-2 golden-card-border overflow-hidden"
                             >
                               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 rounded-full blur-3xl -mr-16 -mt-16" />
@@ -1419,7 +1504,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
                   </div>
                 </motion.div>
-              )}
+              ))}
 
               {activeView === 'ADS' && (
                 <motion.div 

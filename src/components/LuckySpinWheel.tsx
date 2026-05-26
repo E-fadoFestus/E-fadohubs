@@ -30,7 +30,8 @@ import {
 } from 'lucide-react';
 
 import { UserProfile, AdminStats, Transaction } from '../types';
-import { db, doc, onSnapshot } from '../firebase';
+import { db, doc, onSnapshot, updateDoc, increment } from '../firebase';
+import { PaymentPlatform } from './PaymentPlatform';
 import { useCurrency } from '../lib/CurrencyContext';
 
 interface LuckySpinWheelProps {
@@ -89,6 +90,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
   const [copied, setCopied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState(false);
+  const [insufficientFundsError, setInsufficientFundsError] = useState(false);
   const [systemSettings, setSystemSettings] = useState({
     minWithdrawal: 50,
     maintenanceMode: false,
@@ -113,7 +115,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
     playerWin: user.playerWallet,
     deposit: user.depositWallet,
     admin: 0, // Admin wallet is handled by App.tsx
-    cashOut: user.cashOutWallet
+    cashOut: user.playerWallet
   };
 
   const controls = useAnimation();
@@ -171,7 +173,9 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
     }
 
     const stakeAmount = gameMode === 'standard' ? currentStage.stake : customStake;
-    if (wallets.deposit < stakeAmount) {
+    if (user.depositWallet < stakeAmount) {
+      setInsufficientFundsError(true);
+      setTimeout(() => setInsufficientFundsError(false), 4000);
       setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null });
       return;
     }
@@ -746,6 +750,17 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                           System Maintenance - Spins Locked
                         </motion.div>
                       )}
+                      {insufficientFundsError && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="px-6 py-2 bg-red-650 text-white border border-red-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2"
+                        >
+                          <ShieldAlert className="w-3 h-3 text-red-100" />
+                          Insufficient Funds / Balance
+                        </motion.div>
+                      )}
                       <button
                         disabled={isSpinning || systemSettings.maintenanceMode}
                         onClick={spinWheel}
@@ -823,244 +838,132 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Deposit Wallet Card */}
-          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-blue-500/50 transition-all">
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-blue-600/20 rounded-2xl border border-blue-500/30">
-                <ArrowDownLeft className="w-8 h-8 text-blue-500" />
+          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-blue-500/50 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-4 bg-blue-600/20 rounded-2xl border border-blue-500/30">
+                  <ArrowDownLeft className="w-8 h-8 text-blue-500" />
+                </div>
+                <div className="text-right">
+                  <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.deposit)}</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.deposit)}</div>
-              </div>
+              <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Deposit Wallet</h4>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Total funds deposited into your account for playing games.</p>
             </div>
-            <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Deposit Wallet</h4>
-            <p className="text-slate-500 text-sm font-medium leading-relaxed">Total funds deposited into your account for playing games.</p>
+            <button
+              onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
+            >
+              <ArrowDownLeft className="w-4 h-4 animate-bounce" />
+              Fund Your Wallet
+            </button>
           </div>
 
           {/* Player Wallet Card (Win Wallet) */}
-          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-yellow-500/50 transition-all">
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-yellow-500/20 rounded-2xl border border-yellow-500/30">
-                <Coins className="w-8 h-8 text-yellow-500" />
+          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-yellow-500/50 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-4 bg-yellow-500/20 rounded-2xl border border-yellow-500/30">
+                  <Coins className="w-8 h-8 text-yellow-500" />
+                </div>
+                <div className="text-right">
+                  <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.playerWin)}</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.playerWin)}</div>
-              </div>
+              <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Player Wallet</h4>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Funds available for playing the Lucky Spin and other games.</p>
             </div>
-            <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Player Wallet</h4>
-            <p className="text-slate-500 text-sm font-medium leading-relaxed">Funds available for playing the Lucky Spin and other games.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                className="py-4 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
+              >
+                Fund Wallet
+              </button>
+              <button
+                onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                className="py-4 bg-yellow-500 hover:bg-yellow-400 text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
+              >
+                Withdraw Wins
+              </button>
+            </div>
           </div>
 
           {/* Cash Out Wallet Card */}
-          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-green-500/50 transition-all">
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-green-500/20 rounded-2xl border border-green-500/30">
-                <ArrowUpRight className="w-8 h-8 text-green-500" />
+          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-green-500/50 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-4 bg-green-500/20 rounded-2xl border border-green-500/30">
+                  <ArrowUpRight className="w-8 h-8 text-green-500" />
+                </div>
+                <div className="text-right">
+                  <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.cashOut)}</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-4xl font-black text-white font-display">{formatPrice(wallets.cashOut)}</div>
-              </div>
+              <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Cash Out Wallet</h4>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Winnings ready to be withdrawn to your bank or crypto wallet.</p>
             </div>
-            <h4 className="text-xl font-black text-white uppercase tracking-tight mb-2">Cash Out Wallet</h4>
-            <p className="text-slate-500 text-sm font-medium leading-relaxed">Winnings ready to be withdrawn to your bank or crypto wallet.</p>
+            <button
+              onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+              className="w-full py-4 bg-green-500 hover:bg-green-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+            >
+              <ArrowUpRight className="w-4 h-4 animate-pulse" />
+              Cash Out / Withdraw Profit
+            </button>
           </div>
 
-          {/* Admin Wallet Card */}
-          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-purple-500/50 transition-all">
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-purple-600/20 rounded-2xl border border-purple-500/30">
-                <ShieldCheck className="w-8 h-8 text-purple-500" />
+          {/* Partner Wallet/Admin Card */}
+          <div className="bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-[2rem] p-8 shadow-2xl group hover:border-purple-500/50 transition-all flex flex-col justify-between">
+            <div>
+              <div className="flex justify-between items-start mb-6">
+                <div className="p-4 bg-purple-600/20 rounded-2xl border border-purple-500/30">
+                  <ShieldCheck className="w-8 h-8 text-purple-500" />
+                </div>
+                <div className="text-right">
+                  <div className="text-4xl font-black text-white/30 font-display">{formatPrice(wallets.admin)}</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="text-4xl font-black text-white/30 font-display">{formatPrice(wallets.admin)}</div>
-              </div>
+              <h4 className="text-xl font-black text-white/50 uppercase tracking-tight mb-2">Admin Wallet</h4>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Total house profit from game operations (System View).</p>
             </div>
-            <h4 className="text-xl font-black text-white/50 uppercase tracking-tight mb-2">Admin Wallet</h4>
-            <p className="text-slate-500 text-sm font-medium leading-relaxed">Total house profit from game operations (System View).</p>
+            <div className="p-4 bg-purple-950/20 rounded-2xl border border-purple-500/20 text-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Locked Platform Settlement Node</span>
+            </div>
           </div>
         </div>
       </motion.div>
     )}
     </div>
 
-        {/* Extended Payment UI Modal */}
+        {/* Extended Highly-Polished Unified EFADO Payment/Cashout Platform */}
         <AnimatePresence>
           {showPaymentUI.active && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[60] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-6"
-            >
-              <div className="w-full max-w-2xl">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h4 className="text-3xl font-display font-black text-white uppercase tracking-tighter">
-                      {showPaymentUI.type === 'deposit' ? 'Deposit Funds' : 'Cash Out Rewards'}
-                    </h4>
-                    <p className="text-slate-400 text-sm">
-                      {showPaymentUI.selectedMethod 
-                        ? `Complete your ${showPaymentUI.selectedMethod} transaction`
-                        : 'Select your preferred global payment method'
-                      }
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {showPaymentUI.selectedMethod && (
-                      <button 
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, selectedMethod: null }))}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white text-xs font-bold transition-all"
-                      >
-                        Back to Methods
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                      className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-white transition-all"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {!showPaymentUI.selectedMethod ? (
-                    <motion.div 
-                      key="methods"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="grid grid-cols-2 sm:grid-cols-3 gap-4"
-                    >
-                      {[
-                        { name: 'USSD (EFADO Code)', icon: Hash, color: 'orange' },
-                        { name: 'QR Scan Pay', icon: QrCode, color: 'emerald' },
-                        { name: 'Bank Transfer', icon: Building2, color: 'blue' },
-                        { name: 'Credit Card', icon: CreditCard, color: 'purple' },
-                        { name: 'Crypto Wallet', icon: Bitcoin, color: 'yellow' },
-                        { name: 'Palm Pay', icon: Smartphone, color: 'green' },
-                        { name: 'OPay', icon: Smartphone, color: 'blue' },
-                        { name: 'USD Global', icon: Globe, color: 'cyan' },
-                        { name: 'Mobile Money', icon: Smartphone, color: 'orange' },
-                      ].map((method, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setShowPaymentUI(prev => ({ ...prev, selectedMethod: method.name }))}
-                          className="group p-6 rounded-3xl bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10 transition-all text-center flex flex-col items-center gap-3"
-                        >
-                          <div className={`w-12 h-12 rounded-2xl bg-${method.color}-500/10 flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                            <method.icon className={`w-6 h-6 text-${method.color}-400`} />
-                          </div>
-                          <span className="text-xs font-bold text-slate-300 group-hover:text-white">{method.name}</span>
-                        </button>
-                      ))}
-                    </motion.div>
-                  ) : showPaymentUI.selectedMethod === 'USSD (EFADO Code)' ? (
-                    <motion.div 
-                      key="ussd"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-8 flex flex-col items-center text-center"
-                    >
-                      <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mb-6">
-                        <Hash className="w-8 h-8 text-orange-400" />
-                      </div>
-                      <h5 className="text-xl font-bold text-white mb-2">EFADO USSD Code</h5>
-                      <p className="text-slate-400 text-sm mb-8 max-w-md">
-                        Dial this unique EFADO code on your registered mobile number. Your wallet will be credited automatically upon successful transfer.
-                      </p>
-                      
-                      <div className="w-full bg-slate-950/50 border border-white/10 rounded-2xl p-6 flex items-center justify-between group mb-8">
-                        <code className="text-xl sm:text-2xl font-mono font-bold text-orange-400 tracking-wider">
-                          *555*88*EFADO*{userId}*500#
-                        </code>
-                        <button 
-                          onClick={() => handleCopyCode(`*555*88*EFADO*${userId}*500#`)}
-                          className="p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white"
-                        >
-                          {copied ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                        className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-display font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(234,88,12,0.3)] flex items-center justify-center gap-3"
-                      >
-                        <Smartphone className="w-5 h-5" />
-                        I HAVE DIALED THE CODE
-                      </button>
-                      
-                      <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                        <Sparkles className="w-3 h-3" />
-                        <span>Unique ID: {userId} | Instant Auto-Credit Enabled</span>
-                      </div>
-                    </motion.div>
-                  ) : showPaymentUI.selectedMethod === 'QR Scan Pay' ? (
-                    <motion.div 
-                      key="qr"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-8 flex flex-col items-center text-center"
-                    >
-                      <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-6">
-                        <QrCode className="w-8 h-8 text-emerald-400" />
-                      </div>
-                      <h5 className="text-xl font-bold text-white mb-2">Scan to Pay</h5>
-                      <p className="text-slate-400 text-sm mb-8 max-w-md">
-                        Scan this unique EFADO QR code with your banking app. The funds will reflect in your wallet instantly.
-                      </p>
-                      
-                      <div className="relative p-6 bg-white rounded-[2.5rem] shadow-2xl mb-8 group">
-                        <div className="w-48 h-48 bg-slate-100 flex items-center justify-center border-8 border-slate-50 rounded-3xl overflow-hidden relative">
-                          <QrCode className="w-32 h-32 text-slate-800 opacity-80" />
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <motion.div 
-                              animate={{ top: ['0%', '100%', '0%'] }}
-                              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                              className="absolute left-0 right-0 h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10" 
-                            />
-                          </div>
-                        </div>
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg">
-                          EFADO SECURE
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3"
-                      >
-                        <CheckCircle2 className="w-5 h-5" />
-                        I HAVE SCANNED & PAID
-                      </button>
-                      
-                      <p className="mt-6 text-[10px] font-bold text-emerald-500 uppercase tracking-widest animate-pulse">
-                        Awaiting Network Confirmation...
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      key="other"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-12 flex flex-col items-center text-center"
-                    >
-                      <p className="text-white font-bold mb-4">Processing {showPaymentUI.selectedMethod}...</p>
-                      <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="mt-10 p-6 rounded-3xl bg-blue-600/10 border border-blue-500/20 flex items-center gap-4">
-                  <ShieldCheck className="w-8 h-8 text-blue-400" />
-                  <div>
-                    <p className="text-sm font-bold text-white">Secure Transaction</p>
-                    <p className="text-xs text-slate-400">All payments are encrypted and processed through EFADO secure gateway.</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            <div className="fixed inset-0 z-[110]">
+              <PaymentPlatform 
+                user={user}
+                type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
+                onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
+                onComplete={async (amount, method) => {
+                  try {
+                    const userRef = doc(db, 'users', user.uid);
+                    if (showPaymentUI.type === 'deposit') {
+                      await updateDoc(userRef, {
+                        depositWallet: increment(amount),
+                        playerWallet: increment(amount)
+                      });
+                    } else {
+                      await updateDoc(userRef, {
+                        playerWallet: increment(-amount)
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Wallet update failed during spin wheel payment complete', err);
+                    throw err;
+                  }
+                }}
+              />
+            </div>
           )}
         </AnimatePresence>
       </div>

@@ -15,6 +15,7 @@ import {
   Plus,
   Minus,
   Truck,
+  Store,
   ShieldCheck,
   Clock,
   ExternalLink,
@@ -38,6 +39,7 @@ import {
   ArrowRightLeft,
   Hash,
   Fingerprint,
+  User,
   AlertCircle
 } from 'lucide-react';
 import { SAMPLE_PRODUCTS } from '../sampleData';
@@ -126,6 +128,34 @@ const CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
   }
 };
 
+const FormField: React.FC<{
+  label: string,
+  icon?: React.ReactNode,
+  error?: string,
+  hint?: string,
+  required?: boolean,
+  children: React.ReactNode
+}> = ({ label, icon, error, hint, required = true, children }) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-slate-400'}`}>
+        {icon} {label} {!required && <span className="text-[8px] opacity-60">(Optional)</span>}
+      </label>
+      {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
+    </div>
+    <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
+      {children}
+    </div>
+    {error ? (
+      <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[9px] font-bold text-rose-500 flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" /> {error}
+      </motion.p>
+    ) : hint && (
+      <p className="text-[8px] font-medium text-slate-500 leading-tight">{hint}</p>
+    )}
+  </div>
+);
+
 interface FairlyUsedMarketProps {
   user: UserProfile;
   onClose: () => void;
@@ -155,8 +185,12 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     street: '',
     city: '',
     state: '',
-    zipCode: ''
+    zipCode: '',
+    landmark: '',
+    instructions: ''
   });
+  const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [addressError, setAddressError] = useState('');
   const [shippingMethod, setShippingMethod] = useState<'Standard' | 'Expedited' | 'Instant'>('Standard');
   const [paymentMethod, setPaymentMethod] = useState<string>('wallet');
   const [couponCode, setCouponCode] = useState('');
@@ -168,40 +202,13 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [manualBankMode, setManualBankMode] = useState(false);
   const [accountDetails, setAccountDetails] = useState({
     bankName: '',
     accountNumber: '',
-    accountName: ''
+    accountName: '',
+    routingNumber: ''
   });
-
-  // FormField Helper Component
-  const FormField: React.FC<{
-    label: string,
-    icon?: React.ReactNode,
-    error?: string,
-    hint?: string,
-    required?: boolean,
-    children: React.ReactNode
-  }> = ({ label, icon, error, hint, required = true, children }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-slate-400'}`}>
-          {icon} {label} {!required && <span className="text-[8px] opacity-60">(Optional)</span>}
-        </label>
-        {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
-      </div>
-      <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
-        {children}
-      </div>
-      {error ? (
-        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[9px] font-bold text-rose-500 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" /> {error}
-        </motion.p>
-      ) : hint && (
-        <p className="text-[8px] font-medium text-slate-500 leading-tight">{hint}</p>
-      )}
-    </div>
-  );
 
   const nigerianBanks = [
     { code: '044', name: 'Access Bank' },
@@ -369,11 +376,16 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     }
     else if (checkoutStep === 'address') {
       const errors: Record<string, string> = {};
-      if (!deliveryAddress.fullName) errors.fullName = "Full name is required for delivery logistics.";
-      if (!deliveryAddress.phone) errors.phone = "Active phone is critical for dispatch coordination.";
-      if (!deliveryAddress.street) errors.street = "Detailed street info is required for mapping.";
-      if (!deliveryAddress.city) errors.city = "City deployment node must be specified.";
-      if (!deliveryAddress.state) errors.state = "State jurisdiction is required.";
+      if (fulfillmentType === 'DELIVERY') {
+        if (!deliveryAddress.fullName) errors.fullName = "Full name is required for delivery logistics.";
+        if (!deliveryAddress.phone) errors.phone = "Active phone is critical for dispatch coordination.";
+        if (!deliveryAddress.street) errors.street = "Detailed street info is required for mapping.";
+        if (!deliveryAddress.city) errors.city = "City deployment node must be specified.";
+        if (!deliveryAddress.state) errors.state = "State jurisdiction is required.";
+      } else {
+        if (!deliveryAddress.fullName) errors.fullName = "Full name of recipient authorized for pickup is required.";
+        if (!deliveryAddress.phone) errors.phone = "Liaison phone contact for coordination is required.";
+      }
 
       if (Object.keys(errors).length > 0) {
         setValidationErrors(errors);
@@ -444,7 +456,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       currency: 'USD',
       deliveryDetails: {
         ...deliveryAddress,
-        method: shippingMethod
+        method: shippingMethod,
+        fulfillmentType: fulfillmentType
       },
       paymentMethod: paymentMethod,
       status: 'processing',
@@ -901,6 +914,47 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </div>
                   </div>
 
+                  {/* Delivery/Pickup Coordinates Summary Box */}
+                  <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
+                    <div className="flex items-center gap-2">
+                      {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
+                        <>
+                          <Store className="w-4 h-4 text-indigo-400" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
+                        </>
+                      ) : (
+                        <>
+                          <Truck className="w-4 h-4 text-blue-400" />
+                          <span className="text-[10px] font-black text-white uppercase tracking-wider">Direct Home/Office Delivery</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[11px] leading-relaxed text-slate-300 font-bold uppercase">
+                      {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-indigo-300">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
+                          <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
+                          <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
+                            *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <p className="text-white">{selectedOrder.deliveryDetails?.fullName} ({selectedOrder.deliveryDetails?.phone})</p>
+                          <p className="text-slate-400">
+                            {selectedOrder.deliveryDetails?.street}, {selectedOrder.deliveryDetails?.city}, {selectedOrder.deliveryDetails?.state} {selectedOrder.deliveryDetails?.zipCode || ''}
+                          </p>
+                          {selectedOrder.deliveryDetails?.landmark && (
+                            <p className="text-[9.5px] text-amber-400">Landmark Focus: {selectedOrder.deliveryDetails.landmark}</p>
+                          )}
+                          {selectedOrder.deliveryDetails?.instructions && (
+                            <p className="text-[9px] text-slate-500 lowercase italic">Instructions: "{selectedOrder.deliveryDetails.instructions}"</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Tracking Timeline */}
                   <div className="space-y-6">
                     {selectedOrder.trackingHistory?.map((event, idx) => (
@@ -1058,78 +1112,214 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
                 {checkoutStep === 'address' && (
                   <div className="space-y-6">
-                    <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
-                      <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                        <Truck className="w-4 h-4" /> Recipient Identification
-                      </h4>
-                      <FormField label="Full Legal Name" error={validationErrors.fullName} hint="Official name as shown on national identity documents.">
-                        <input 
-                          type="text" 
-                          placeholder="Tactical Full Name" 
-                          value={deliveryAddress.fullName}
-                          onChange={(e) => {
-                            setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
-                            if (validationErrors.fullName) setValidationErrors({...validationErrors, fullName: ''});
-                          }}
-                          className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.fullName ? 'border-rose-500' : 'border-white/5'}`}
-                        />
-                      </FormField>
-                      <FormField label="Strategic Liaison Phone" error={validationErrors.phone} hint="Active mobile number for delivery verification.">
-                        <input 
-                          type="tel" 
-                          placeholder="080********" 
-                          value={deliveryAddress.phone}
-                          onChange={(e) => {
-                            setDeliveryAddress({...deliveryAddress, phone: e.target.value});
-                            if (validationErrors.phone) setValidationErrors({...validationErrors, phone: ''});
-                          }}
-                          className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
-                        />
-                      </FormField>
+                    {/* Segmented fulfillment protocol selector */}
+                    <div className="bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFulfillmentType('DELIVERY');
+                        }}
+                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                          fulfillmentType === 'DELIVERY'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                            : 'bg-transparent text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Truck className="w-4 h-4" />
+                        🚚 Delivery Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFulfillmentType('PICKUP');
+                        }}
+                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                          fulfillmentType === 'PICKUP'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                            : 'bg-transparent text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Store className="w-4 h-4" />
+                        🏪 Vendor Store Pickup
+                      </button>
                     </div>
-                    <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
-                      <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                        <MapPin className="w-4 h-4" /> Destination Node
-                      </h4>
-                      <FormField label="Street Deployment Point" error={validationErrors.street} hint="Specific street name and nearest landmark.">
-                        <input 
-                          type="text" 
-                          placeholder="N0 24. Strategic Avenue..." 
-                          value={deliveryAddress.street}
-                          onChange={(e) => {
-                            setDeliveryAddress({...deliveryAddress, street: e.target.value});
-                            if (validationErrors.street) setValidationErrors({...validationErrors, street: ''});
-                          }}
-                          className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.street ? 'border-rose-500' : 'border-white/5'}`}
-                        />
-                      </FormField>
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField label="City Core" error={validationErrors.city}>
-                          <input 
-                            type="text" 
-                            placeholder="City Name" 
-                            value={deliveryAddress.city}
-                            onChange={(e) => {
-                              setDeliveryAddress({...deliveryAddress, city: e.target.value});
-                              if (validationErrors.city) setValidationErrors({...validationErrors, city: ''});
-                            }}
-                            className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.city ? 'border-rose-500' : 'border-white/5'}`}
-                          />
-                        </FormField>
-                        <FormField label="Region/State" error={validationErrors.state}>
-                          <input 
-                            type="text" 
-                            placeholder="State" 
-                            value={deliveryAddress.state}
-                            onChange={(e) => {
-                              setDeliveryAddress({...deliveryAddress, state: e.target.value});
-                              if (validationErrors.state) setValidationErrors({...validationErrors, state: ''});
-                            }}
-                            className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.state ? 'border-rose-500' : 'border-white/5'}`}
-                          />
-                        </FormField>
+
+                    {fulfillmentType === 'DELIVERY' ? (
+                      <div className="space-y-6">
+                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
+                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <Truck className="w-4 h-4" /> Recipient Identification
+                          </h4>
+                          <FormField label="Full Legal Name" error={validationErrors.fullName} hint="Official name as shown on national identity documents.">
+                            <input 
+                              type="text" 
+                              placeholder="Tactical Full Name" 
+                              value={deliveryAddress.fullName}
+                              onChange={(e) => {
+                                setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
+                                if (validationErrors.fullName) setValidationErrors({...validationErrors, fullName: ''});
+                              }}
+                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.fullName ? 'border-rose-500' : 'border-white/5'}`}
+                            />
+                          </FormField>
+                          <FormField label="Strategic Liaison Phone" error={validationErrors.phone} hint="Active mobile number for delivery verification.">
+                            <input 
+                              type="tel" 
+                              placeholder="080********" 
+                              value={deliveryAddress.phone}
+                              onChange={(e) => {
+                                setDeliveryAddress({...deliveryAddress, phone: e.target.value});
+                                if (validationErrors.phone) setValidationErrors({...validationErrors, phone: ''});
+                              }}
+                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
+                            />
+                          </FormField>
+                        </div>
+                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
+                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <MapPin className="w-4 h-4" /> Destination Node
+                          </h4>
+                          <FormField label="Street Deployment Point" error={validationErrors.street} hint="Specific street name and nearest landmark.">
+                            <input 
+                              type="text" 
+                              placeholder="N0 24. Strategic Avenue..." 
+                              value={deliveryAddress.street}
+                              onChange={(e) => {
+                                setDeliveryAddress({...deliveryAddress, street: e.target.value});
+                                if (validationErrors.street) setValidationErrors({...validationErrors, street: ''});
+                              }}
+                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.street ? 'border-rose-500' : 'border-white/5'}`}
+                            />
+                          </FormField>
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField label="City Core" error={validationErrors.city}>
+                              <input 
+                                type="text" 
+                                placeholder="City Name" 
+                                value={deliveryAddress.city}
+                                onChange={(e) => {
+                                  setDeliveryAddress({...deliveryAddress, city: e.target.value});
+                                  if (validationErrors.city) setValidationErrors({...validationErrors, city: ''});
+                                }}
+                                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.city ? 'border-rose-500' : 'border-white/5'}`}
+                              />
+                            </FormField>
+                            <FormField label="Region/State" error={validationErrors.state}>
+                              <input 
+                                type="text" 
+                                placeholder="State" 
+                                value={deliveryAddress.state}
+                                onChange={(e) => {
+                                  setDeliveryAddress({...deliveryAddress, state: e.target.value});
+                                  if (validationErrors.state) setValidationErrors({...validationErrors, state: ''});
+                                }}
+                                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.state ? 'border-rose-500' : 'border-white/5'}`}
+                              />
+                            </FormField>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField label="Postal Code / Zip" error="">
+                              <input 
+                                type="text" 
+                                placeholder="Postal Code" 
+                                value={deliveryAddress.zipCode}
+                                onChange={(e) => setDeliveryAddress({...deliveryAddress, zipCode: e.target.value})}
+                                className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
+                              />
+                            </FormField>
+                            <FormField label="Nearby Landmark / Focal Point" error="">
+                              <input 
+                                type="text" 
+                                placeholder="Nearby Focal Point (School, Port, etc)" 
+                                value={deliveryAddress.landmark || ''}
+                                onChange={(e) => setDeliveryAddress({...deliveryAddress, landmark: e.target.value})}
+                                className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
+                              />
+                            </FormField>
+                          </div>
+                          <FormField label="Additional Delivery Coordinates Instruction" error="">
+                            <textarea 
+                              placeholder="Any specific delivery landmark, gate/flat number, instructions..." 
+                              value={deliveryAddress.instructions || ''}
+                              onChange={(e) => setDeliveryAddress({...deliveryAddress, instructions: e.target.value})}
+                              rows={2}
+                              className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
+                            />
+                          </FormField>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] space-y-2">
+                          <div className="flex items-center gap-2 text-amber-500">
+                            <Info className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-wider">Independent Pickup Protocol</span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
+                            eFADO operates as a decentralized network and does not maintain designated corporate pickup stations.
+                            All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
+                          </p>
+                        </div>
+
+                        {/* List coordinates for all items in cart */}
+                        <div className="space-y-4">
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Selected Location coordinates for Items:</label>
+                          {cart.map((item, idx) => {
+                            const p = item.product;
+                            const mainStr = p.vendorPickupLocation || 
+                                           `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
+                            return (
+                              <div key={idx} className="p-4 bg-slate-950/80 border border-white/5 rounded-[2rem] flex flex-col gap-2">
+                                <span className="text-xs font-black text-white uppercase tracking-tight">{p.title}</span>
+                                <div className="flex items-start gap-2 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+                                  <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
+                                    <p className="text-[10.5px] font-bold text-slate-200 mt-1 whitespace-pre-line leading-relaxed">{mainStr}</p>
+                                    {(p.phone || p.whatsapp) && (
+                                      <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
+                                        Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
+                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <UserPlus className="w-4 h-4" /> Authorized Liaison Credentials
+                          </h4>
+                          <FormField label="Full Name of Authorized Recipient" error={validationErrors.fullName} hint="The full name of the authorized individual arriving to pick up the item.">
+                            <input 
+                              type="text" 
+                              placeholder="Tactical Full Name" 
+                              value={deliveryAddress.fullName}
+                              onChange={(e) => {
+                                setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
+                                if (validationErrors.fullName) setValidationErrors({...validationErrors, fullName: ''});
+                              }}
+                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.fullName ? 'border-rose-500' : 'border-white/5'}`}
+                            />
+                          </FormField>
+                          <FormField label="Liaison Verification Contact Number" error={validationErrors.phone} hint="Phone number to submit secure pin and dispatch messages.">
+                            <input 
+                              type="tel" 
+                              placeholder="080********" 
+                              value={deliveryAddress.phone}
+                              onChange={(e) => {
+                                setDeliveryAddress({...deliveryAddress, phone: e.target.value});
+                                if (validationErrors.phone) setValidationErrors({...validationErrors, phone: ''});
+                              }}
+                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
+                            />
+                          </FormField>
+                          <p className="text-[8.5px] text-slate-400 uppercase font-bold tracking-widest">⚠️ Present dynamic matching passport ID or matching confirmation code to ensure item handshaking security.</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1179,42 +1369,131 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           className="space-y-6 pt-4 border-t border-white/5 px-2"
                         >
                           <FormField label="Strategic Bank Connection" error={validationErrors.bankName} hint="Identification of the financial institution.">
-                            <div className="relative">
-                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Search Destination Bank..."
-                                className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.bankName ? 'border-rose-500' : 'border-white/10'}`}
-                                value={bankSearch}
-                                onChange={e => {
-                                  setBankSearch(e.target.value);
-                                  setShowBankDropdown(true);
-                                  setAccountDetails({...accountDetails, bankName: e.target.value});
-                                  if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
-                                }}
-                                onFocus={() => setShowBankDropdown(true)}
-                              />
-                              
-                              {showBankDropdown && (
-                                <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-900 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                  {filteredBanks.map(bank => (
-                                    <button
-                                      key={bank.code}
-                                      onClick={() => {
-                                        setAccountDetails({...accountDetails, bankName: bank.name});
-                                        setBankSearch(bank.name);
-                                        setShowBankDropdown(false);
-                                        if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
-                                      }}
-                                      className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
-                                    >
-                                      <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
-                                      <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
-                                    </button>
-                                  ))}
+                            {manualBankMode ? (
+                              <div className="space-y-4">
+                                <div className="relative">
+                                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                  <input 
+                                    placeholder="Type Custom Bank Name (e.g. Signature Bank)..."
+                                    className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.bankName ? 'border-rose-500' : 'border-white/10'}`}
+                                    value={accountDetails.bankName}
+                                    onChange={e => {
+                                      setAccountDetails({...accountDetails, bankName: e.target.value});
+                                      setBankSearch(e.target.value);
+                                      if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
+                                    }}
+                                  />
                                 </div>
-                              )}
-                            </div>
+                                <div className="relative">
+                                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                  <input 
+                                    placeholder="Bank Code / Sort Code (Optional)"
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                    value={accountDetails.routingNumber || ''}
+                                    onChange={e => {
+                                      setAccountDetails({...accountDetails, routingNumber: e.target.value});
+                                    }}
+                                  />
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setManualBankMode(false);
+                                    setBankSearch('');
+                                    setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
+                                  }}
+                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-white/5 flex items-center gap-1.5 transition-all"
+                                >
+                                  ← Use Directory Search
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="relative">
+                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                                <input 
+                                  placeholder="Search Destination Bank..."
+                                  className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.bankName ? 'border-rose-500' : 'border-white/10'}`}
+                                  value={bankSearch}
+                                  onChange={e => {
+                                    setBankSearch(e.target.value);
+                                    setShowBankDropdown(true);
+                                  }}
+                                  onFocus={() => setShowBankDropdown(true)}
+                                />
+                                
+                                {showBankDropdown && (
+                                  <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-900 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
+                                    {filteredBanks.length > 0 ? (
+                                      <>
+                                        {filteredBanks.map(bank => (
+                                          <button
+                                            key={`fairly-checkout-${bank.code}`}
+                                            type="button"
+                                            onClick={() => {
+                                              setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
+                                              setBankSearch(bank.name);
+                                              setShowBankDropdown(false);
+                                              if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
+                                            }}
+                                            className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
+                                          >
+                                            <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
+                                            <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
+                                          </button>
+                                        ))}
+                                        <div className="border-t border-white/5 mt-1 pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setManualBankMode(true);
+                                              setShowBankDropdown(false);
+                                              setAccountDetails({...accountDetails, bankName: bankSearch});
+                                            }}
+                                            className="w-full text-center py-2 text-indigo-400 hover:bg-white/5 font-black uppercase tracking-widest text-[8px] rounded-lg transition-all"
+                                          >
+                                            + Enter Bank Name Manually
+                                          </button>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="p-3 text-center space-y-1.5">
+                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bank Not Found</div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setManualBankMode(true);
+                                            setShowBankDropdown(false);
+                                            setAccountDetails({...accountDetails, bankName: bankSearch});
+                                          }}
+                                          className="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-black uppercase tracking-widest text-[8px] rounded-full transition-all"
+                                        >
+                                          Use "{bankSearch || 'Custom'}" Manually
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </FormField>
+
+                          {!manualBankMode && (
+                            <div className="flex justify-end -mt-3">
+                              <button 
+                                type="button"
+                                onClick={() => {
+                                  setManualBankMode(true);
+                                  setAccountDetails({
+                                    ...accountDetails,
+                                    bankName: bankSearch
+                                  });
+                                }}
+                                className="px-2.5 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-400 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-indigo-500/20 transition-all shadow-sm"
+                              >
+                                Or Type Bank Manually
+                              </button>
+                            </div>
+                          )}
 
                           {paymentMethod !== 'ussd' && (
                             <FormField label="Tactical Account Identifier" error={validationErrors.accountNumber} hint="Target 10-digit account number.">
@@ -1233,6 +1512,63 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                               </div>
                             </FormField>
                           )}
+
+                          <FormField label="Strategic Account Owner Name" hint="Official layout name of recipient account.">
+                            <div className="relative">
+                              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Beneficiary Account Holder Name"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
+                                value={accountDetails.accountName}
+                                onChange={e => {
+                                  setAccountDetails({...accountDetails, accountName: e.target.value});
+                                }}
+                              />
+                            </div>
+                          </FormField>
+
+                          {/* Dynamic Beneficiary Details Live Card */}
+                          <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/10 relative overflow-hidden shadow-2xl space-y-3">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
+                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -ml-4 -mb-4 pointer-events-none" />
+
+                            <div className="flex justify-between items-center pb-2 border-b border-white/5 border-slate-800">
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
+                              </div>
+                              <span className="text-[8px] font-sans font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                {paymentMethod.toUpperCase()} SOURCE
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 text-left">
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK NAME</span>
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
+                                  {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
+                                <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
+                                  {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
+                                <p className="text-[11px] font-mono font-black text-blue-400 uppercase tracking-widest truncate">
+                                  {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
+                                </p>
+                              </div>
+                              <div className="space-y-0.5">
+                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT HOLDER NAME</span>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">
+                                  {accountDetails.accountName || <span className="text-rose-400 italic font-medium">PENDING NAME</span>}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
 
                           {paymentMethod === 'ussd' && (
                             <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 relative group overflow-hidden">

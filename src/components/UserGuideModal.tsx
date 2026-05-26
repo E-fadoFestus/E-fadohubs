@@ -19,9 +19,10 @@ import {
 interface UserGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenProfile?: () => void;
 }
 
-export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose }) => {
+export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, onOpenProfile }) => {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -114,7 +115,10 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose 
                     <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
                       <h4 className="text-sm font-black text-white uppercase tracking-widest">Profile Synchronisation</h4>
                       <p className="text-xs text-slate-400 leading-relaxed font-medium">Your profile acts as your neural signature. Complete your details to unlock premium patronage and tactical community access.</p>
-                      <button className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 hover:translate-x-2 transition-all">
+                      <button 
+                        onClick={onOpenProfile} 
+                        className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 hover:translate-x-2 transition-all"
+                      >
                         Update Profile <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>

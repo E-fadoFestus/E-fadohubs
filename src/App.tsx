@@ -39,6 +39,7 @@ import { EfadoEquilibrium } from './components/EfadoEquilibrium';
 import { EfadoEducationHub } from './components/EfadoEducationHub';
 import { EfadoTechHub } from './components/tech/EfadoTechHub';
 import { EfadoZoom } from './components/EfadoZoom';
+import { EfadoHelpChat } from './components/EfadoHelpChat';
 import { EfadoZoomPlanSelection } from './components/EfadoZoomPlanSelection';
 import { EfadoLogo } from './components/EfadoLogo';
 import { EfadoPartnerHub } from './components/EfadoPartnerHub';
@@ -50,8 +51,9 @@ import { EfadoAdvertisingHub } from './components/EfadoAdvertisingHub';
 import { EfadoIntelligenceFeed } from './components/EfadoIntelligenceFeed';
 import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
+import { AboutCeoModal } from './components/AboutCeoModal';
 import { 
-  Wallet, 
+  Info,  Wallet, Lock,
   LogOut, 
   LogIn, 
   ArrowDownCircle, 
@@ -208,14 +210,23 @@ function AppContent() {
   const [showCommunityHub, setShowCommunityHub] = useState(false);
   const [showHepiHandsLoan, setShowHepiHandsLoan] = useState(false);
   const [showDomainHub, setShowDomainHub] = useState(false);
+  const [domainHubSection, setDomainHubSection] = useState<'domains' | 'course' | 'tools' | 'vending' | 'otc' | 'sourcing'>('domains');
   const [showCSCCRegistration, setShowCSCCRegistration] = useState(false);
   const [showEducationHub, setShowEducationHub] = useState(false);
   const [showMoneyQuiz, setShowMoneyQuiz] = useState(false);
   const [showEquilibrium, setShowEquilibrium] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
+  const [walletInitialTab, setWalletInitialTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>('overview');
+  
+  const openWalletWithTab = (tab: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => {
+    setWalletInitialTab(tab);
+    setShowWallet(true);
+  };
+
   const [showEfadoMining, setShowEfadoMining] = useState(false);
   const [showAdvertisingHub, setShowAdvertisingHub] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
+  const [showAboutCeo, setShowAboutCeo] = useState(false);
   const [adInitialType, setAdInitialType] = useState<'ADVERT' | 'SELL'>('ADVERT');
 
   const handleMiningUpdate = async (monetaryAmount: number) => {
@@ -242,12 +253,12 @@ function AppContent() {
   };
 
   const handleStakeDeduction = async (amount: number, gameId: string) => {
-    if (!user || user.playerWallet < amount) return;
+    if (!user || user.depositWallet < amount) return;
 
     if (DEVELOPMENT_MODE) {
       setUser({
         ...user,
-        playerWallet: user.playerWallet - amount
+        depositWallet: user.depositWallet - amount
       });
       if (adminStats) {
         setAdminStats({
@@ -273,7 +284,7 @@ function AppContent() {
         const stats = statsSnap.data() as AdminStats;
 
         transaction.update(userRef, {
-          playerWallet: increment(-amount)
+          depositWallet: increment(-amount)
         });
 
         transaction.update(adminRef, {
@@ -297,7 +308,7 @@ function AppContent() {
   const [activeZoomSession, setActiveZoomSession] = useState<any>(null);
   const [gistInitialView, setGistInitialView] = useState<'FEED' | 'REELS' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS'>('FEED');
   const [gistAutoStartLive, setGistAutoStartLive] = useState(false);
-  const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB'>('HOME');
+  const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED'>('HOME');
   const [showAgeGate, setShowAgeGate] = useState(false);
   const [isAgeVerified, setIsAgeVerified] = useState(false);
   const [showLegalHub, setShowLegalHub] = useState(false);
@@ -305,6 +316,15 @@ function AppContent() {
   const [showTechHub, setShowTechHub] = useState(false);
 
   const handleNavigate = (hub: any, subview?: any) => {
+    if (hub === 'COMMUNITY_HUBS') {
+      if (user && !user.csccRegistered) {
+        setShowCSCCRegistration(true);
+      } else {
+        setActiveHub('COMMUNITY_HUBS');
+      }
+      return;
+    }
+
     setActiveHub(hub);
     if (hub === 'GAMES' && !isAgeVerified) {
       setShowAgeGate(true);
@@ -332,6 +352,12 @@ function AppContent() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setAdInitialType(subview === 'SELL' ? 'SELL' : 'ADVERT');
       setShowAdvertisingHub(true);
+      return;
+    }
+
+    if (hub === 'DOMAIN_HUB') {
+      setDomainHubSection(subview || 'domains');
+      setShowDomainHub(true);
       return;
     }
   };
@@ -381,12 +407,28 @@ function AppContent() {
       return;
     }
 
+    // Unsubscribers for nested Firestore observers
+    let unsubUser: (() => void) | null = null;
+    let unsubTx: (() => void) | null = null;
+    let unsubAnn: (() => void) | null = null;
+    let unsubAdmin: (() => void) | null = null;
+
+    const cleanupFirestore = () => {
+      if (unsubUser) { unsubUser(); unsubUser = null; }
+      if (unsubTx) { unsubTx(); unsubTx = null; }
+      if (unsubAnn) { unsubAnn(); unsubAnn = null; }
+      if (unsubAdmin) { unsubAdmin(); unsubAdmin = null; }
+    };
+
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      // Always cleanup previous Firestore listeners before registering new ones
+      cleanupFirestore();
+
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
         
         // Listen for user profile changes
-        const unsubUser = onSnapshot(userRef, async (snapshot) => {
+        unsubUser = onSnapshot(userRef, async (snapshot) => {
           if (snapshot.exists()) {
             setUser(snapshot.data() as UserProfile);
           } else {
@@ -423,7 +465,10 @@ function AppContent() {
             setUser(newUser);
           }
           setLoading(false);
-        }, (e) => handleFirestoreError(e, OperationType.GET, `users/${firebaseUser.uid}`));
+        }, (e) => {
+          handleFirestoreError(e, OperationType.GET, `users/${firebaseUser.uid}`);
+          setLoading(false); // Do not let user hang on white screen if Firestore listener encounters permission or region errors
+        });
 
         // Listen for transactions
         const txQuery = query(
@@ -431,13 +476,13 @@ function AppContent() {
           where('userId', '==', firebaseUser.uid),
           orderBy('timestamp', 'desc')
         );
-        const unsubTx = onSnapshot(txQuery, (snapshot) => {
+        unsubTx = onSnapshot(txQuery, (snapshot) => {
           const txs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
           setTransactions(txs);
         }, (e) => handleFirestoreError(e, OperationType.GET, 'transactions'));
 
         // Listen for announcements
-        const unsubAnn = onSnapshot(collection(db, 'announcements'), (snapshot) => {
+        unsubAnn = onSnapshot(collection(db, 'announcements'), (snapshot) => {
           const ann = snapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
             .filter(a => a.active)
@@ -447,7 +492,7 @@ function AppContent() {
 
         // Listen for admin stats if admin
         if (firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com') {
-          const unsubAdmin = onSnapshot(doc(db, 'adminStats', 'global'), (snapshot) => {
+          unsubAdmin = onSnapshot(doc(db, 'adminStats', 'global'), (snapshot) => {
             if (snapshot.exists()) {
               setAdminStats(snapshot.data() as AdminStats);
             } else {
@@ -467,17 +512,17 @@ function AppContent() {
               setAdminStats(initialStats);
             }
           }, (e) => handleFirestoreError(e, OperationType.GET, 'adminStats/global'));
-          return () => { unsubUser(); unsubTx(); unsubAnn(); unsubAdmin(); };
         }
-
-        return () => { unsubUser(); unsubTx(); unsubAnn(); };
       } else {
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      cleanupFirestore();
+    };
   }, []);
 
   const handleLogin = async () => {
@@ -527,19 +572,47 @@ function AppContent() {
     }
   };
 
-  const handleWalletUpdate = async (amount: number, type: 'deposit' | 'withdrawal') => {
+  const handleWalletUpdate = async (amount: number, type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win', withdrawalAccountDetails?: any) => {
     if (!user) return;
     if (DEVELOPMENT_MODE) {
       if (type === 'deposit') {
         setUser({
           ...user,
-          depositWallet: user.depositWallet + amount,
-          playerWallet: user.playerWallet + amount
+          depositWallet: user.depositWallet + amount
         });
-      } else {
+      } else if (type === 'withdrawal') {
+        const fee = amount * 0.03;
+        const netAmount = amount - fee;
+        const walletToDeduct = withdrawalAccountDetails?.sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
         setUser({
           ...user,
-          cashOutWallet: Math.max(0, user.cashOutWallet - amount)
+          [walletToDeduct]: Math.max(0, user[walletToDeduct] - amount)
+        });
+        if (adminStats) {
+          setAdminStats({
+            ...adminStats,
+            adminWallet: adminStats.adminWallet + fee,
+            pendingPayouts: adminStats.pendingPayouts + netAmount,
+            lastUpdated: new Date()
+          });
+        }
+      } else if (type === 'game_bet') {
+        setUser({
+          ...user,
+          depositWallet: Math.max(0, user.depositWallet - amount)
+        });
+        if (adminStats) {
+          setAdminStats({
+            ...adminStats,
+            adminWallet: adminStats.adminWallet + amount,
+            totalHouseGain: adminStats.totalHouseGain + amount,
+            lastUpdated: new Date()
+          });
+        }
+      } else if (type === 'game_win') {
+        setUser({
+          ...user,
+          playerWallet: user.playerWallet + amount
         });
       }
       return;
@@ -547,14 +620,61 @@ function AppContent() {
 
     try {
       const userRef = doc(db, 'users', user.uid);
+      const adminRef = doc(db, 'adminStats', 'global');
+
       if (type === 'deposit') {
         await updateDoc(userRef, {
-          depositWallet: increment(amount),
-          playerWallet: increment(amount)
+          depositWallet: increment(amount)
         });
-      } else {
+      } else if (type === 'withdrawal') {
+        const withdrawalRef = doc(collection(db, 'withdrawals'));
+
+        const fee = amount * 0.03;
+        const netAmount = amount - fee;
+        const walletToDeduct = withdrawalAccountDetails?.sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
+
+        await runTransaction(db, async (transaction) => {
+          const statsSnap = await transaction.get(adminRef);
+          const stats = statsSnap.data() as AdminStats;
+
+          transaction.update(userRef, {
+            [walletToDeduct]: increment(-amount)
+          });
+
+          transaction.update(adminRef, {
+            adminWallet: increment(fee), // Credit 3% fee to admin wallet
+            pendingPayouts: increment(netAmount),
+            lastUpdated: serverTimestamp()
+          });
+
+          transaction.set(withdrawalRef, {
+            userId: user.uid,
+            userEmail: user.email,
+            amount: netAmount,
+            originalAmount: amount,
+            fee: fee,
+            status: 'pending',
+            timestamp: serverTimestamp(),
+            accountDetails: {
+              ...(withdrawalAccountDetails || { method: 'default' }),
+              walletSource: walletToDeduct
+            }
+          });
+        });
+      } else if (type === 'game_bet') {
+        await runTransaction(db, async (transaction) => {
+          transaction.update(userRef, {
+            depositWallet: increment(-amount)
+          });
+          transaction.update(adminRef, {
+            adminWallet: increment(amount),
+            totalHouseGain: increment(amount),
+            lastUpdated: serverTimestamp()
+          });
+        });
+      } else if (type === 'game_win') {
         await updateDoc(userRef, {
-          cashOutWallet: increment(-amount)
+          playerWallet: increment(amount)
         });
       }
     } catch (e) {
@@ -587,13 +707,24 @@ function AppContent() {
   const handleCashOut = async () => {
     if (!user || user.cashOutWallet <= 0) return;
     const amount = user.cashOutWallet;
+    const fee = amount * 0.03;
+    const netAmount = amount - fee;
+
     if (DEVELOPMENT_MODE) {
       setUser({
         ...user,
         cashOutWallet: 0
       });
+      if (adminStats) {
+        setAdminStats({
+          ...adminStats,
+          adminWallet: adminStats.adminWallet + fee,
+          pendingPayouts: adminStats.pendingPayouts + netAmount,
+          lastUpdated: new Date()
+        });
+      }
       setTransactions([
-        { id: Math.random().toString(), userId: user.uid, type: 'withdrawal', amount, status: 'pending', timestamp: { toDate: () => new Date() } as any, currency: 'NGN' },
+        { id: Math.random().toString(), userId: user.uid, type: 'withdrawal', amount: netAmount, fee: fee, status: 'pending', timestamp: { toDate: () => new Date() } as any, currency: 'NGN' },
         ...transactions
       ]);
       return;
@@ -613,13 +744,16 @@ function AppContent() {
         });
 
         transaction.update(adminRef, {
-          pendingPayouts: stats.pendingPayouts + amount
+          adminWallet: increment(fee), // Credit 3% fee to admin/ceo wallet
+          pendingPayouts: increment(netAmount)
         });
 
         const txData = {
           userId: user.uid,
           type: 'withdrawal',
-          amount,
+          amount: netAmount,
+          fee: fee,
+          originalAmount: amount,
           status: 'pending',
           timestamp: serverTimestamp()
         };
@@ -644,31 +778,24 @@ function AppContent() {
   const onResult = async (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium', payoutOverride?: number) => {
     if (!user) return;
     const winAmount = payoutOverride !== undefined ? payoutOverride : bet * multiplier;
-    // If payoutOverride is sent, we assume bet was already handled upfront or should be ignored for gain calc.
-    const houseGain = payoutOverride !== undefined ? -payoutOverride : (bet - winAmount);
 
     if (DEVELOPMENT_MODE) {
-      if (bet > 0) {
-        setUser({
-          ...user,
-          playerWallet: user.playerWallet - bet,
-          cashOutWallet: user.cashOutWallet + winAmount
-        });
-      } else {
-        setUser({
-          ...user,
-          cashOutWallet: user.cashOutWallet + winAmount
-        });
-      }
+      // Stake money -> deducted from Player's Deposit Wallet, credited entirely to Admin/CEO Wallet
+      // Player wins -> credited to Player's Win Wallet (user.playerWallet)
+      setUser({
+        ...user,
+        depositWallet: Math.max(0, user.depositWallet - bet),
+        playerWallet: user.playerWallet + winAmount
+      });
       
       if (adminStats) {
         setAdminStats({
           ...adminStats,
-          adminWallet: adminStats.adminWallet + houseGain,
-          totalHouseGain: adminStats.totalHouseGain + houseGain,
+          adminWallet: adminStats.adminWallet + bet, // Entire stake is the benefit
+          totalHouseGain: adminStats.totalHouseGain + bet,
           gameWallets: {
             ...adminStats.gameWallets,
-            [gameId]: ((adminStats.gameWallets as any)[gameId] || 0) + houseGain
+            [gameId]: ((adminStats.gameWallets as any)[gameId] || 0) + bet
           },
           lastUpdated: new Date()
         });
@@ -691,26 +818,30 @@ function AppContent() {
         const statsSnap = await transaction.get(adminRef);
         const stats = statsSnap.data() as AdminStats;
 
-        // WRITES AFTER
-        // Update User Wallet
+        // Deduct stake from Player's Deposit Wallet, add wins to Player's Win Wallet
         if (bet > 0) {
           transaction.update(userRef, {
-            playerWallet: increment(-bet),
-            cashOutWallet: increment(winAmount)
+            depositWallet: increment(-bet),
+            playerWallet: increment(winAmount)
           });
         } else if (winAmount > 0) {
           transaction.update(userRef, {
-            cashOutWallet: increment(winAmount)
+            playerWallet: increment(winAmount)
           });
         }
 
-        // Update Admin Stats (House Gain/Loss)
+        // Entire stake goes to admin wallet
+        const currentAdminWalletIncrement = bet;
+        const currentTotalHouseGainIncrement = bet;
+        const currentGameWalletIncrement = bet;
+
+        // WRITES AFTER
         transaction.update(adminRef, {
-          adminWallet: increment(houseGain),
-          totalHouseGain: increment(houseGain),
+          adminWallet: increment(currentAdminWalletIncrement),
+          totalHouseGain: increment(currentTotalHouseGainIncrement),
           gameWallets: {
             ...stats.gameWallets,
-            [gameId]: ((stats.gameWallets as any)[gameId] || 0) + houseGain
+            [gameId]: ((stats.gameWallets as any)[gameId] || 0) + currentGameWalletIncrement
           },
           lastUpdated: serverTimestamp()
         });
@@ -735,8 +866,25 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white relative overflow-hidden">
+        <NocturnalBackground />
+        
+        {/* Glowing glassmorphic container */}
+        <div className="flex flex-col items-center gap-6 relative z-10 p-8 rounded-3xl bg-slate-900/40 backdrop-blur-md border border-white/5 shadow-2xl">
+          {/* Pulse glowing spinner */}
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-4 border-indigo-500/10" />
+            <div className="absolute inset-0 rounded-full border-4 border-t-indigo-500 border-r-indigo-400 border-b-indigo-500 animate-spin shadow-lg" />
+            <div className="absolute inset-2 rounded-full bg-slate-950/80 flex items-center justify-center">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
+            </div>
+          </div>
+          
+          <div className="text-center space-y-1">
+            <h3 className="text-xs font-black tracking-[0.3em] text-indigo-400 uppercase">EFADO CONNECT</h3>
+            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Sovereign Link Active...</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -785,6 +933,15 @@ function AppContent() {
                 <span className="sm:hidden">?</span>
               </button>
 
+              <button 
+                onClick={() => setShowAboutCeo(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
+              >
+                <Info className="w-4 h-4 text-emerald-400" />
+                <span className="hidden sm:inline uppercase">About CEO</span>
+                <span className="sm:hidden">CEO</span>
+              </button>
+
               {user.role === 'admin' && (
                 <button 
                   onClick={() => isCeoVerified ? setShowCeoPortal(true) : setShowCeoVerification(true)}
@@ -795,6 +952,15 @@ function AppContent() {
                   <span className="sm:hidden">CEO</span>
                 </button>
               )}
+
+              <button 
+                onClick={() => openWalletWithTab('profile')}
+                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-[10px] font-bold tracking-widest hover:brightness-110 transition-all shadow-lg border border-white/5"
+              >
+                <UserCheck className="w-4 h-4 text-amber-400" />
+                <span className="hidden lg:inline uppercase">My Profile & Payouts</span>
+                <span className="lg:hidden uppercase">Profile</span>
+              </button>
             </div>
 
             <CurrencySelector />
@@ -872,13 +1038,7 @@ function AppContent() {
                   if (item.id === 'ADVERTISING') handleNavigate('ADVERTISING', 'ADVERT');
                   else if (item.id === 'ZOOM') handleNavigate('ZOOM');
                   else if (item.id === 'GIST') handleNavigate('GIST');
-                  else if (item.id === 'COMMUNITY_HUBS') {
-                     if (user && !user.csccRegistered) {
-                       setShowCSCCRegistration(true);
-                     } else {
-                       setActiveHub('COMMUNITY_HUBS');
-                     }
-                  }
+                  else if (item.id === 'COMMUNITY_HUBS') handleNavigate('COMMUNITY_HUBS');
                   else setActiveHub(item.id as any);
                 }}
                 className={`px-8 py-6 rounded-[2.5rem] font-black tracking-widest text-xs transition-all flex flex-col items-center gap-3 min-w-[160px] shadow-sm border border-white/10 group relative transition-all duration-300 ${
@@ -956,9 +1116,9 @@ function AppContent() {
         {/* Announcements */}
         {announcements.length > 0 && (
           <div className="mb-8 space-y-2">
-            {announcements.map(ann => (
+            {announcements.map((ann, idx) => (
               <motion.div 
-                key={ann.id}
+                key={`${ann.id || idx}-${idx}`}
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="p-4 bg-indigo-600 text-white rounded-2xl flex items-center justify-between shadow-lg shadow-indigo-200"
@@ -986,7 +1146,7 @@ function AppContent() {
         {activeHub === 'HOME' && user ? (
           <EfadoHomePage 
             user={user} 
-            onNavigate={setActiveHub} 
+            onNavigate={handleNavigate} 
             onOpenMining={() => setShowEfadoMining(true)} 
           />
         ) : (
@@ -1000,8 +1160,35 @@ function AppContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-8"
               >
-                {/* Strategic Intelligence Alert */}
+                 {/* Strategic Intelligence Alert */}
                 <EfadoIntelligenceFeed mode="ticker-only" />
+
+                {/* Sovereign Confidential & Encrypted Workspace Banner */}
+                <div className="p-6 bg-slate-900/80 backdrop-blur-3xl border-2 border-emerald-500/20 rounded-3xl relative overflow-hidden shadow-2xl">
+                  {/* Glowing background aura */}
+                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
+                    <div className="flex items-start sm:items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-950/80 rounded-2xl border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/50 shrink-0 mt-1 sm:mt-0">
+                        <Lock className="w-6 h-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] bg-emerald-950/55 border border-emerald-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Sovereign Private Port
+                          </span>
+                          <span className="text-[9px] font-mono text-slate-500 select-none hidden sm:inline">[NODE PORT: 443_SSL_TLS]</span>
+                        </div>
+                        <h2 className="text-lg font-black text-white tracking-tight uppercase mt-1">CONFIDENTIAL USER PORTAL</h2>
+                        <p className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
+                          Active Account: <span className="text-emerald-300 font-bold font-mono">{user.email}</span>. Your wallets, transactions, gaming history, and account logs are dynamically encrypted to prevent outside access. This dashboard is <span className="text-emerald-400 font-bold underline">100% CONFIDENTIAL</span> and strictly hidden from other network users, ensuring private sovereign navigation.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Wallets */}
                 {/* Wallet Section */}
@@ -1012,7 +1199,7 @@ function AppContent() {
                       Financial Status
                     </h2>
                     <button 
-                      onClick={() => setShowWallet(true)}
+                      onClick={() => openWalletWithTab('overview')}
                       className="px-6 py-2.5 bg-white/5 backdrop-blur-xl border border-white/10 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all shadow-xl"
                     >
                       Management
@@ -1356,6 +1543,7 @@ function AppContent() {
                 onClose={() => setShowMoneyCard(false)} 
                 user={user}
                 onResult={onResult}
+                onUpdateBalance={handleWalletUpdate}
               />
             )}
 
@@ -1439,6 +1627,8 @@ function AppContent() {
                     <UserWallet 
                       user={user} 
                       onUpdateBalance={handleWalletUpdate}
+                      onClose={() => setShowWallet(false)}
+                      initialTab={walletInitialTab}
                     />
                   </div>
                 </motion.div>
@@ -1531,6 +1721,15 @@ function AppContent() {
               <UserGuideModal 
                 isOpen={showUserGuide}
                 onClose={() => setShowUserGuide(false)}
+                onOpenProfile={() => {
+                  setShowUserGuide(false);
+                  openWalletWithTab('profile');
+                }}
+              />
+
+              <AboutCeoModal 
+                isOpen={showAboutCeo}
+                onClose={() => setShowAboutCeo(false)}
               />
             </AnimatePresence>
 
@@ -1623,9 +1822,53 @@ function AppContent() {
                     <p className="text-indigo-100 max-w-xl mx-auto">Find and register your perfect domain with top global registrars. Earn commissions and grow your digital presence.</p>
                     <button 
                       onClick={() => setShowDomainHub(true)}
-                      className="px-12 py-5 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all"
+                      className="px-12 py-5 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
                     >
                       Enter Domain Marketplace
+                    </button>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
+            {activeHub === 'TECH_HUB' && (
+              <motion.section
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <div className="bg-gradient-to-br from-cyan-600 to-teal-850 p-12 rounded-[3rem] text-white text-center relative overflow-hidden shadow-2xl golden-card-border">
+                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
+                  <div className="relative z-10 space-y-6">
+                    <Cpu className="w-20 h-20 text-cyan-300 mx-auto mb-4 animate-bounce" style={{ animationDuration: '3s' }} />
+                    <h2 className="text-4xl font-black tracking-tighter">EFADO TechHub</h2>
+                    <p className="text-cyan-100 max-w-xl mx-auto">Explore high-quality state-of-the-art technological resources, system engineering tutorials, programming modules, and software innovation assets.</p>
+                    <button 
+                      onClick={() => setShowTechHub(true)}
+                      className="px-12 py-5 bg-white text-cyan-700 hover:text-cyan-800 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
+                    >
+                      Enter Tech Marketplace & Portal
+                    </button>
+                  </div>
+                </div>
+              </motion.section>
+            )}
+
+            {activeHub === 'FAIRLY_USED' && (
+              <motion.section
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <div className="bg-gradient-to-br from-indigo-700 to-slate-900 p-12 rounded-[3rem] text-white text-center relative overflow-hidden shadow-2xl golden-card-border">
+                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
+                  <div className="relative z-10 space-y-6">
+                    <Package className="w-20 h-20 text-indigo-300 mx-auto mb-4 animate-bounce" style={{ animationDuration: '3.5s' }} />
+                    <h2 className="text-4xl font-black tracking-tighter">EFADO FairlyUsed Market</h2>
+                    <p className="text-indigo-100 max-w-xl mx-auto">List or purchase certified pre-owned gadgets, electronics, and tech resources from verified sellers in the EFADO community.</p>
+                    <button 
+                      onClick={() => setShowMarketHub(true)}
+                      className="px-12 py-5 bg-white text-indigo-800 hover:text-indigo-900 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
+                    >
+                      Enter Fairly Used Marketplace
                     </button>
                   </div>
                 </div>
@@ -1674,6 +1917,7 @@ function AppContent() {
               <EfadoTechHub 
                 user={user}
                 onClose={() => setShowTechHub(false)}
+                onStartZoomSession={handleStartZoom}
               />
             )}
 
@@ -1691,7 +1935,7 @@ function AppContent() {
                   >
                     <X className="w-6 h-6" />
                   </button>
-                  <EfadoDomainHub user={user} />
+                  <EfadoDomainHub user={user} initialSection={domainHubSection} />
                 </div>
               </motion.div>
             )}
@@ -1721,8 +1965,8 @@ function AppContent() {
                           </td>
                         </tr>
                       ) : (
-                        transactions.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
+                        transactions.map((tx, idx) => (
+                          <tr key={`${tx.id || idx}-${idx}`} className="hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4">
                               <span className={`text-sm font-bold capitalize ${
                                 tx.type === 'game_win' ? 'text-green-600' : 
@@ -1733,7 +1977,7 @@ function AppContent() {
                               </span>
                             </td>
                             <td className="px-6 py-4 font-mono font-bold text-sm">
-                              ${tx.amount.toFixed(2)}
+                              ${(tx.amount || 0).toFixed(2)}
                             </td>
                             <td className="px-6 py-4">
                               <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
@@ -1770,13 +2014,13 @@ function AppContent() {
                 <div className="space-y-6">
                   <div>
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total House Gain</span>
-                    <p className="text-4xl font-black text-indigo-400 mt-1">${adminStats.totalHouseGain.toFixed(2)}</p>
+                    <p className="text-4xl font-black text-indigo-400 mt-1">${(adminStats.totalHouseGain || 0).toFixed(2)}</p>
                   </div>
                   
                   <div className="pt-6 border-t border-gray-800">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-400">Admin Wallet</span>
-                      <span className="text-lg font-bold text-white">${adminStats.adminWallet.toFixed(2)}</span>
+                      <span className="text-lg font-bold text-white">${(adminStats.adminWallet || 0).toFixed(2)}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-2">
                       <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '70%' }}></div>
@@ -1905,6 +2149,8 @@ function AppContent() {
         onClose={() => setShowLegalHub(false)} 
         initialSection={legalHubSection}
       />
+
+      {user && <EfadoHelpChat user={user} />}
     </div>
   );
 }

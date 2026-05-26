@@ -48,6 +48,8 @@ import confetti from 'canvas-confetti';
 
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { db, doc, updateDoc, increment } from '../firebase';
+import { PaymentPlatform } from './PaymentPlatform';
 
 interface Trade {
   id: string;
@@ -88,7 +90,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Derived from user prop
-  const balance = user.playerWallet;
+  const balance = user.depositWallet;
   const userId = user.uid.slice(0, 5).toUpperCase();
 
   const priceRef = useRef(currentPrice);
@@ -372,9 +374,9 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
 
   const handleTrade = (type: 'BUY' | 'SELL') => {
     if (balance < stake) {
-      setError("Insufficient balance");
+      setError("Insufficient Funds / Balance");
       setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null });
-      setTimeout(() => setError(null), 3000);
+      setTimeout(() => setError(null), 3550);
       return;
     }
 
@@ -910,192 +912,34 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
           )}
         </AnimatePresence>
 
-        {/* Extended Payment UI Modal */}
+        {/* Extended Highly-Polished Unified EFADO Payment/Cashout Platform */}
         <AnimatePresence>
           {showPaymentUI.active && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 z-[110] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-6"
-            >
-              <div className="w-full max-w-2xl">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h4 className="text-3xl font-display font-black text-white uppercase tracking-tighter">
-                      {showPaymentUI.type === 'deposit' ? 'Deposit Funds' : 'Cash Out Rewards'}
-                    </h4>
-                    <p className="text-slate-300 text-sm">
-                      {showPaymentUI.selectedMethod 
-                        ? `Complete your ${showPaymentUI.selectedMethod} transaction`
-                        : 'Select your preferred global payment method'
-                      }
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {showPaymentUI.selectedMethod && (
-                      <button 
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, selectedMethod: null }))}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-300 hover:text-white text-xs font-bold transition-all"
-                      >
-                        Back to Methods
-                      </button>
-                    )}
-                    <button 
-                      onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                      className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-white transition-all"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-                </div>
-
-                <AnimatePresence mode="wait">
-                  {!showPaymentUI.selectedMethod ? (
-                    <motion.div 
-                      key="methods"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto no-scrollbar pr-2"
-                    >
-                      {paymentCategories.map((cat) => (
-                        <div 
-                          key={cat.id}
-                          className="bg-white/5 border border-white/10 rounded-[2rem] p-5 hover:border-blue-500/30 hover:bg-white/10 transition-all group"
-                        >
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-slate-900 rounded-2xl border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                              {cat.icon}
-                            </div>
-                            <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{cat.title}</h4>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {cat.options.map(opt => (
-                              <button
-                                key={opt.id}
-                                onClick={() => setShowPaymentUI(prev => ({ ...prev, selectedMethod: opt.id }))}
-                                className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
-                                  showPaymentUI.selectedMethod === opt.id
-                                    ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20'
-                                    : 'bg-slate-950/50 border-white/5 text-slate-400 hover:bg-slate-800'
-                                }`}
-                              >
-                                {opt.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </motion.div>
-                  ) : showPaymentUI.selectedMethod === 'USSD (EFADO Code)' ? (
-                    <motion.div 
-                      key="ussd"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-8 flex flex-col items-center text-center"
-                    >
-                      <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mb-6">
-                        <Hash className="w-8 h-8 text-orange-400" />
-                      </div>
-                      <h5 className="text-xl font-bold text-white mb-2">EFADO USSD Code</h5>
-                      <p className="text-slate-400 text-sm mb-8 max-w-md">
-                        Dial this unique EFADO code on your registered mobile number. Your wallet will be credited automatically upon successful transfer.
-                      </p>
-                      
-                      <div className="w-full bg-slate-950/50 border border-white/10 rounded-2xl p-6 flex items-center justify-between group mb-8">
-                        <code className="text-xl sm:text-2xl font-mono font-bold text-orange-400 tracking-wider">
-                          *555*88*EFADO*{userId}*500#
-                        </code>
-                        <button 
-                          onClick={() => handleCopyCode(`*555*88*EFADO*${userId}*500#`)}
-                          className="p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white"
-                        >
-                          {copied ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                        className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-display font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(234,88,12,0.3)] flex items-center justify-center gap-3"
-                      >
-                        <Smartphone className="w-5 h-5" />
-                        I HAVE DIALED THE CODE
-                      </button>
-                      
-                      <div className="mt-6 flex items-center gap-2 text-[10px] text-slate-500 uppercase font-bold tracking-tighter">
-                        <Sparkles className="w-3 h-3" />
-                        <span>Unique ID: {userId} | Instant Auto-Credit Enabled</span>
-                      </div>
-                    </motion.div>
-                  ) : showPaymentUI.selectedMethod === 'QR Scan Pay' ? (
-                    <motion.div 
-                      key="qr"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-8 flex flex-col items-center text-center"
-                    >
-                      <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mb-6">
-                        <QrCode className="w-8 h-8 text-emerald-400" />
-                      </div>
-                      <h5 className="text-xl font-bold text-white mb-2">Scan to Pay</h5>
-                      <p className="text-slate-400 text-sm mb-8 max-w-md">
-                        Scan this unique EFADO QR code with your banking app. The funds will reflect in your wallet instantly.
-                      </p>
-                      
-                      <div className="relative p-6 bg-white rounded-[2.5rem] shadow-2xl mb-8 group">
-                        <div className="w-48 h-48 bg-slate-100 flex items-center justify-center border-8 border-slate-50 rounded-3xl overflow-hidden relative">
-                          <QrCode className="w-32 h-32 text-slate-800 opacity-80" />
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <motion.div 
-                              animate={{ top: ['0%', '100%', '0%'] }}
-                              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                              className="absolute left-0 right-0 h-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)] z-10" 
-                            />
-                          </div>
-                        </div>
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-emerald-500 text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg">
-                          EFADO SECURE
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setShowPaymentUI(prev => ({ ...prev, active: false, selectedMethod: null }))}
-                        className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-display font-black uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3"
-                      >
-                        <CheckCircle2 className="w-5 h-5" />
-                        I HAVE SCANNED & PAID
-                      </button>
-                      
-                      <p className="mt-6 text-[10px] font-bold text-emerald-500 uppercase tracking-widest animate-pulse">
-                        Awaiting Network Confirmation...
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      key="other"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="bg-white/5 border border-white/10 rounded-[2rem] p-12 flex flex-col items-center text-center"
-                    >
-                      <p className="text-white font-bold mb-4">Processing {showPaymentUI.selectedMethod}...</p>
-                      <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="mt-10 p-6 rounded-3xl bg-blue-600/10 border border-blue-500/20 flex items-center gap-4">
-                  <ShieldCheck className="w-8 h-8 text-blue-400" />
-                  <div>
-                    <p className="text-sm font-bold text-white">Secure Transaction</p>
-                    <p className="text-xs text-slate-400">All payments are encrypted and processed through EFADO secure gateway.</p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+            <div className="fixed inset-0 z-[110]">
+              <PaymentPlatform 
+                user={user}
+                type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
+                onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
+                onComplete={async (amount, method) => {
+                  try {
+                    const userRef = doc(db, 'users', user.uid);
+                    if (showPaymentUI.type === 'deposit') {
+                      await updateDoc(userRef, {
+                        depositWallet: increment(amount),
+                        playerWallet: increment(amount)
+                      });
+                    } else {
+                      await updateDoc(userRef, {
+                        playerWallet: increment(-amount)
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Wallet update failed during trading game payment complete', err);
+                    throw err;
+                  }
+                }}
+              />
+            </div>
           )}
         </AnimatePresence>
 

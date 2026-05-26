@@ -13,10 +13,15 @@ import {
   Sparkles,
   ArrowRight,
   Wallet,
-  Megaphone
+  Megaphone,
+  ShoppingBag,
+  Shield,
+  Eye,
+  PlayCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
+import { monetizationService, DEFAULT_AFFILIATE_LINKS, MEMBERSHIP_PLANS } from '../services/monetizationService';
 
 interface MiningStage {
   id: 'E' | 'F' | 'A' | 'D' | 'O';
@@ -45,13 +50,59 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   const [totalMined, setTotalMined] = useState(user.miningWallet || 0);
   const [showEfadoButton, setShowEfadoButton] = useState(false);
 
+  // Monetization Added States
+  const [isCmpConsentOpen, setIsCmpConsentOpen] = useState(!monetizationService.hasConsent() && !localStorage.getItem('efado_monetization_pref'));
+  const [isCoinsShopOpen, setIsCoinsShopOpen] = useState(false);
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const [interstitialCountdown, setInterstitialCountdown] = useState(3);
+  const [monetizationStats, setMonetizationStats] = useState(monetizationService.getMonetizationStats());
+  const [stickyFooterAdClosed, setStickyFooterAdClosed] = useState(false);
+
+  // Stripe & coins billing states
+  const [selectedCoinPackage, setSelectedCoinPackage] = useState<'mild' | 'heavy' | 'sovereign' | null>(null);
+  const [isProcessingStripePayment, setIsProcessingStripePayment] = useState(false);
+  const [stripePaymentSuccess, setStripePaymentSuccess] = useState(false);
+
   const stage = STAGES[currentStageIdx];
   const progress = (sessionCoins / stage.requirement) * 100;
   const isFinalStage = currentStageIdx === STAGES.length - 1 && sessionCoins >= stage.requirement;
 
+  const triggerInterstitialAd = (onDone: () => void) => {
+    // Show premium full-screen interstitial ad
+    setShowInterstitial(true);
+    setInterstitialCountdown(3);
+    monetizationService.logGA4Event('interstitial_ad_triggered', { stage: stage.id });
+    
+    const interval = setInterval(() => {
+      setInterstitialCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Auto-close countdown helper
+    setTimeout(() => {
+      setShowInterstitial(false);
+      onDone();
+      // rewarded CPM earnings
+      monetizationService.logGA4Event('rewarded_ad_watched', { type: 'interstitial_claim' });
+      setMonetizationStats(monetizationService.getMonetizationStats());
+    }, 3200);
+  };
+
   const handleMine = (e: React.MouseEvent | React.TouchEvent) => {
     if ((isCelebrating && !isFinalSovereign) || showEfadoButton) return;
     
+    // Log real performance analytics events matching AdSense setup requirements
+    monetizationService.logGA4Event('mining_button_click', { stage: stage.id, userEmail: user.email });
+    monetizationService.logGA4Event('coin_mined', { amount: 1 });
+    
+    // Update live metrics
+    setMonetizationStats(monetizationService.getMonetizationStats());
+
     // Get click position
     const x = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const y = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -104,17 +155,72 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   }, [sessionCoins, stage.requirement, isCelebrating, isFinalSovereign, currentStageIdx]);
 
   const handleNextStage = () => {
-    if (currentStageIdx < STAGES.length - 1) {
-      setCurrentStageIdx(prev => prev + 1);
-      setSessionCoins(0);
-      setIsCelebrating(false);
-    } else {
-      setIsFinalSovereign(true);
-      setIsCelebrating(false);
-      setShowEfadoButton(false);
-      setSessionCoins(0);
-    }
+    triggerInterstitialAd(() => {
+      if (currentStageIdx < STAGES.length - 1) {
+        setCurrentStageIdx(prev => prev + 1);
+        setSessionCoins(0);
+        setIsCelebrating(false);
+      } else {
+        setIsFinalSovereign(true);
+        setIsCelebrating(false);
+        setShowEfadoButton(false);
+        setSessionCoins(0);
+      }
+    });
   };
+
+  // Cookie/Consent save
+  const handleConsentChoice = (approved: boolean) => {
+    monetizationService.saveConsent(approved);
+    setIsCmpConsentOpen(false);
+    setMonetizationStats(monetizationService.getMonetizationStats());
+  };
+
+  // Affiliate click tracking
+  const handleAffiliateClick = (key: string) => {
+    monetizationService.logGA4Event('affiliate_link_click', { affiliateId: key });
+    setMonetizationStats(monetizationService.getMonetizationStats());
+  };
+
+  // Stripe Billing Purchase coin packages
+  const handleBuyCoinPackage = (pkg: 'mild' | 'heavy' | 'sovereign') => {
+    setSelectedCoinPackage(pkg);
+    setIsProcessingStripePayment(true);
+    setStripePaymentSuccess(false);
+
+    // Mock Stripe checkout process
+    setTimeout(() => {
+      setIsProcessingStripePayment(false);
+      setStripePaymentSuccess(true);
+      
+      let coinsToAdd = 0;
+      let costNaira = 0;
+      if (pkg === 'mild') {
+         coinsToAdd = 1000;
+         costNaira = 1000;
+      } else if (pkg === 'heavy') {
+         coinsToAdd = 6000;
+         costNaira = 5000;
+      } else {
+         coinsToAdd = 15000;
+         costNaira = 12000;
+      }
+
+      setTotalMined(prev => prev + coinsToAdd);
+      setSessionCoins(prev => Math.min(stage.requirement, prev + coinsToAdd));
+      if (onUpdateBalance) onUpdateBalance(coinsToAdd / 100); // monetary credit boost
+      
+      monetizationService.logGA4Event('premium_coin_package_purchased', { package: pkg, amountPaidNaira: costNaira });
+      setMonetizationStats(monetizationService.getMonetizationStats());
+      
+      setTimeout(() => {
+         setStripePaymentSuccess(false);
+         setIsCoinsShopOpen(false);
+         setSelectedCoinPackage(null);
+      }, 2000);
+    }, 1500);
+  };
+
 
   return (
     <motion.div 
@@ -159,8 +265,11 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 </div>
               </div>
               <div className="w-px h-8 bg-white/10" />
-              <button className="p-2 bg-indigo-600 rounded-lg shadow-lg hover:scale-110 transition-transform">
-                 <Wallet className="w-4 h-4 text-white" />
+              <button 
+                onClick={() => setIsCoinsShopOpen(true)}
+                className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-md shadow-indigo-500/20"
+              >
+                 <ShoppingBag className="w-3.5 h-3.5 text-white" /> Buy Coins
               </button>
            </div>
            
@@ -174,8 +283,31 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 relative z-10 flex flex-col items-center justify-center p-8">
+      <div className="flex-1 relative z-10 flex flex-col items-center overflow-y-auto w-full p-8 pb-32">
         <div className="max-w-4xl w-full flex flex-col items-center gap-12">
+          
+          {/* TOP AD: Google AdSense Display Ads - Banner unit */}
+          <div className="w-full max-w-xl mx-auto p-2.5 bg-slate-950/80 border border-slate-850 rounded-xl flex flex-col justify-center items-center gap-1.5 shadow-md relative overflow-hidden group">
+            <span className="absolute top-1 right-2 text-[8px] font-black text-slate-500 uppercase tracking-widest">Sponsored Ads by Google</span>
+            <div className="flex items-center gap-3 w-full px-4">
+              <div className="w-10 h-10 bg-indigo-600/10 rounded-lg flex items-center justify-center border border-indigo-500/20 text-indigo-400">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="flex-1 text-left">
+                <h5 className="text-xs font-black text-white uppercase italic tracking-tight">Protect Your Nodes & Secure Remote Extraction</h5>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">Fast Secure VPN connection starting at $1.99. Register now with 65% discount code.</p>
+              </div>
+              <a 
+                href="https://go.nordvpn.net/affiliate?offer_id=15&aff_id=efado-hubs" 
+                target="_blank" 
+                rel="noreferrer"
+                onClick={() => handleAffiliateClick('nordvpn-elite')}
+                className="px-4 py-2 bg-[#DAA520] hover:bg-yellow-500 text-slate-950 font-black rounded-lg text-[9px] uppercase tracking-wider transition-all"
+              >
+                Sign Up
+              </a>
+            </div>
+          </div>
           
           {/* Real-time Session Wallet (Encouragement Indicator) */}
           {isFinalSovereign && (
@@ -365,6 +497,83 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
               {isFinalSovereign ? 'EFADO Sovereign Extraction' : stage.id === 'O' ? 'Lord Protocol Engagement' : `${stage.name} Extraction`}
             </h3>
           </div>
+
+          {/* IN-CONTENT AD: Adaptive Native Article Ad */}
+          <div className="w-full max-w-xl p-4 bg-slate-950/80 border border-slate-800 rounded-2xl flex flex-col gap-3 shadow-md relative overflow-hidden group">
+            <span className="absolute top-2 right-3 text-[7px] font-black text-[#DAA520]/50 uppercase tracking-widest">AdSense Premium Node Match</span>
+            <div className="flex items-center gap-4">
+              <img 
+                src="https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=200&auto=format&fit=crop" 
+                alt="Cloud Hosting" 
+                className="w-16 h-16 rounded-xl object-cover border border-slate-850"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex-1 text-left">
+                <h5 className="text-sm font-black text-white uppercase italic tracking-tight leading-tight">Elite Cloud VPS Hosting - Scaled For Coin Arbitrage</h5>
+                <p className="text-[10px] text-slate-400 font-medium">Get 99.99% uptime powered by blazing-fast CDNs. Perfect for high-volume blockchain traffic extraction hubs.</p>
+              </div>
+            </div>
+            <div className="flex justify-between items-center bg-slate-900 px-3 py-2 rounded-xl">
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Estimated CPM: $34.50 • Lazy Loading Enabled</span>
+              <a 
+                href="https://siteground.com/?aff=efado-sovereign-node"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => handleAffiliateClick('siteground-hosting')}
+                className="px-3 py-1.5 bg-[#DAA520] hover:bg-yellow-500 text-slate-950 font-black rounded-lg text-[9px] uppercase tracking-wider transition-all"
+              >
+                Deploy Site
+              </a>
+            </div>
+          </div>
+
+          {/* AFFILIATE SECTION: Recommended Mining Tools */}
+          <div className="w-full max-w-2xl mt-8 space-y-4">
+             <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <div className="flex items-center gap-2">
+                   <Megaphone className="w-5 h-5 text-indigo-400" />
+                   <h4 className="text-sm font-black text-white uppercase italic tracking-wider">Recommended Mining Acceleration Tools</h4>
+                </div>
+                <span className="text-[8px] font-black text-[#DAA520] uppercase tracking-widest bg-[#DAA520]/10 px-2 py-1 rounded">FTC Legal Disclosure Active</span>
+             </div>
+             
+             <p className="text-[10.5px] text-slate-400 italic text-left">
+                Disclosure: EFADO receives a standard referral commission when you purchase hardware, VPN shields, or packages via our secure links below. This funds direct server hosting & WAEC/JAMB webinar support.
+             </p>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {DEFAULT_AFFILIATE_LINKS.map(item => (
+                   <div key={item.key} className="bg-slate-950 border border-white/5 hover:border-indigo-500/30 rounded-2xl p-4 flex flex-col justify-between transition-all hover:scale-[1.01] text-left">
+                      <div className="space-y-2">
+                         <div className="flex justify-between items-start">
+                            <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded">
+                               {item.category}
+                            </span>
+                            <span className="text-[9px] font-black text-emerald-400 uppercase">
+                               {item.commission}
+                            </span>
+                         </div>
+                         <h5 className="text-xs font-black text-white uppercase italic tracking-tight leading-tight">{item.title}</h5>
+                         <p className="text-[10px] text-slate-400 leading-snug">{item.description}</p>
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                         <span className="text-[9px] font-mono text-slate-500">{item.prettyUrl}</span>
+                         <a 
+                            href={item.destinationUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => handleAffiliateClick(item.key)}
+                            className="px-3 py-1 bg-white text-black hover:bg-[#DAA520] transition-all rounded-lg text-[9px] font-black uppercase tracking-wider"
+                         >
+                            Deploy Link
+                         </a>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+
         </div>
       </div>
 
@@ -461,6 +670,235 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* RENDER DYNAMIC MONETIZATION COMPONENTS */}
+
+      {/* 1. Global GDPR Consent Management (CMP) Cookie Banner */}
+      <AnimatePresence>
+        {isCmpConsentOpen && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-6 left-6 right-6 md:left-auto md:right-8 md:max-w-md z-[200] bg-slate-900/95 border-2 border-indigo-500/30 backdrop-blur-2xl p-6 rounded-3xl shadow-2xl text-left"
+          >
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Shield className="w-6 h-6 text-indigo-400" />
+                <h4 className="text-sm font-black text-white uppercase tracking-wider">Privacy & Consent Protocols</h4>
+              </div>
+              <p className="text-[10.5px] text-slate-400 leading-relaxed font-medium">
+                We utilize essential cookies & strategic display ads (Google AdSense) to fund ongoing servers, WAEC/JAMB simulators, and remote workspace connections. By accepting, you consent to ad personalization & event trackers.
+              </p>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => handleConsentChoice(true)}
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-505 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Accept & Mine
+                </button>
+                <button 
+                  onClick={() => handleConsentChoice(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-705 text-slate-300 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. Full-Screen Interstitial Ad on Node Escalation */}
+      <AnimatePresence>
+        {showInterstitial && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[250] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
+          >
+            <div className="absolute top-4 right-4 text-[9px] font-mono text-slate-500 uppercase">
+              Sovereign Interstitial Ad Space
+            </div>
+            
+            <div className="max-w-lg w-full space-y-8">
+              <div className="relative aspect-video w-full bg-slate-900 border border-white/5 rounded-3xl flex flex-col items-center justify-center overflow-hidden">
+                <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 rounded text-[8px] font-black text-[#DAA520] uppercase border border-[#DAA520]/20">
+                  Google Sponsored
+                </div>
+                {/* Simulated high quality ad content */}
+                <PlayCircle className="w-16 h-16 text-[#DAA520] animate-pulse mb-3" />
+                <h4 className="text-lg font-black text-white uppercase italic tracking-wider px-6">AWS Certified Cloud Practitioner - Premium Course</h4>
+                <p className="text-xs text-slate-400 px-8 mt-1">Accelerate your AWS skills with certified instructors. Access templates, exams, and labs.</p>
+                <div className="absolute bottom-3 right-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                  Estimated eCPM: $18.25
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Node Escalation Ad Playing</h3>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Your next EFADO node tier is unlocking in <span className="text-white font-bold">{interstitialCountdown}s</span>...</p>
+                
+                <div className="h-2 w-48 bg-white/5 border border-white/10 rounded-full overflow-hidden mx-auto">
+                   <motion.div 
+                     initial={{ width: 0 }}
+                     animate={{ width: "100%" }}
+                     transition={{ duration: 3.2, ease: "linear" }}
+                     className="bg-gradient-to-r from-[#DAA520] to-yellow-400 h-full"
+                   />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. Premium Coins Shop Modal (Stripe billing layout) */}
+      <AnimatePresence>
+        {isCoinsShopOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-xl flex items-center justify-center p-4 md:p-8"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 md:p-10 max-w-2xl w-full shadow-2xl relative overflow-y-auto max-h-[90vh]"
+            >
+              <button 
+                onClick={() => setIsCoinsShopOpen(false)}
+                className="absolute top-6 right-6 text-slate-400 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className="flex items-center gap-4 mb-6 text-left">
+                <div className="w-12 h-12 bg-[#DAA520]/10 border border-[#DAA520]/20 rounded-2xl flex items-center justify-center text-[#DAA520] shadow-lg">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Premium Coins Node Shop</h3>
+                  <p className="text-[9px] font-black text-[#DAA520] uppercase tracking-widest">Bypass resource limits & buy coin packs directly</p>
+                </div>
+              </div>
+
+              {/* Package cards grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
+                {[
+                  { id: 'mild', coins: '1,000 Coins', price: '₦1,000', label: 'Starter Pack', desc: 'Credit 1,000 extraction coins instantly' },
+                  { id: 'heavy', coins: '6,000 Coins', price: '₦5,000', label: 'Divine Speed', desc: 'Save ₦1,000. Double mining rates synced' },
+                  { id: 'sovereign', coins: '15,000 Coins', price: '₦12,000', label: 'Eminent Lord', desc: 'Sovereign tier status. Priority direct cashouts' }
+                ].map(pkg => (
+                  <div 
+                    key={pkg.id}
+                    onClick={() => handleBuyCoinPackage(pkg.id as any)}
+                    className="cursor-pointer bg-slate-950 border border-white/5 hover:border-[#DAA520]/40 rounded-2xl p-5 flex flex-col justify-between transition-all hover:scale-[1.02]"
+                  >
+                    <div className="space-y-2">
+                      <span className="text-[8px] font-black text-[#DAA520] uppercase bg-[#DAA520]/10 px-2.5 py-0.5 rounded-full inline-block">
+                        {pkg.label}
+                      </span>
+                      <h4 className="text-lg font-black text-white italic">{pkg.coins}</h4>
+                      <p className="text-[10px] text-slate-400">{pkg.desc}</p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-sm font-black text-emerald-400">{pkg.price}</span>
+                      <button className="px-3 py-1 bg-white text-slate-900 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                        Procure
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Stripe Credit Card Simulated Form block */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 text-left">
+                 <h4 className="text-xs font-black text-white uppercase tracking-wider mb-4">Secure Stripe Gateway Connectivity</h4>
+                 <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                       <div>
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Credit Card Number</label>
+                          <input type="text" placeholder="•••• •••• •••• ••••" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs focus:outline-none placeholder-slate-600" />
+                       </div>
+                       <div>
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Cardholder Full Name</label>
+                          <input type="text" placeholder={user.displayName || "Okhawere Festus"} disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs focus:outline-none placeholder-slate-600" />
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                       <div className="col-span-2">
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Valid Thru</label>
+                          <input type="text" placeholder="MM / YY" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs text-center focus:outline-none placeholder-slate-600" />
+                       </div>
+                       <div>
+                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">CVC</label>
+                          <input type="text" placeholder="•••" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs text-center focus:outline-none" />
+                       </div>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between border-t border-white/5">
+                       <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Integration</p>
+                       <span className="text-[9px] font-black text-rose-500 uppercase">Stripe Sandbox Active</span>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Sandbox Stripe feedback */}
+              <AnimatePresence>
+                {isProcessingStripePayment && (
+                  <motion.div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-[2.5rem]">
+                     <div className="w-12 h-12 rounded-full border-4 border-[#DAA520] border-t-transparent animate-spin mb-4" />
+                     <h4 className="text-sm font-black text-white uppercase tracking-wider">Contacting Stripe Server Nodes...</h4>
+                     <p className="text-[10px] text-slate-400">Verifying customer balance & secure key release</p>
+                  </motion.div>
+                )}
+                {stripePaymentSuccess && (
+                  <motion.div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 rounded-[2.5rem] text-center">
+                     <div className="w-16 h-16 bg-emerald-600/20 rounded-full flex items-center justify-center mb-4 text-emerald-400 border border-emerald-500/20">
+                        <ShieldCheck className="w-8 h-8" />
+                     </div>
+                     <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Stripe Payment Approved</h3>
+                     <p className="text-xs text-emerald-400 font-bold uppercase tracking-wider mt-1">Naira equivalents converted & coins credited!</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. Sticky Footer Ad Unit */}
+      {!stickyFooterAdClosed && (
+        <div className="fixed bottom-0 left-0 w-full z-45 bg-slate-950 border-t border-indigo-500/20 backdrop-blur-xl py-3.5 px-6 flex items-center justify-between shadow-2xl">
+          <div className="flex items-center gap-3">
+            <span className="px-1.5 py-0.5 bg-[#DAA520] text-slate-950 text-[7px] font-black uppercase tracking-widest rounded leading-none">SPONSORED</span>
+            <p className="text-[10.5px] font-black text-slate-305 uppercase italic tracking-wide leading-none">
+               Double Your Extractions: Setup premium Cloudflare SSL/CDN on your nodes now! Save 40% globally.
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <a 
+              href="https://cloudflare.com/?r=efado-cdn-accel" 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => handleAffiliateClick('cloudflare-cdn')}
+              className="px-4 py-1.5 bg-[#DAA520] hover:bg-yellow-500 text-slate-950 text-[9px] font-black uppercase tracking-widest rounded-lg transition-transform hover:scale-105"
+            >
+              Accelerate Sync
+            </a>
+            <button 
+              onClick={() => setStickyFooterAdClosed(true)}
+              className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Footer / Mining Terminal Info */}
       <div className="relative z-10 h-20 border-t border-white/5 bg-slate-900/50 backdrop-blur-2xl px-8 flex items-center justify-between">

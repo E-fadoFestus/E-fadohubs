@@ -77,7 +77,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'bio', 'followers', 'following', 'playerWallet', 'depositWallet', 'cashOutWallet', 'miningWallet', 'miningProgress', 'role', 'createdAt', 'fullName', 'phoneNumber', 'country', 'language', 'csccRegistered', 'updatedAt', 'vendorStatus', 'vendorPlan', 'vendorId', 'isDeveloper', 'termsAccepted', 'emailVerified', 'adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'bio', 'followers', 'following', 'playerWallet', 'depositWallet', 'cashOutWallet', 'miningWallet', 'miningProgress', 'role', 'createdAt', 'fullName', 'phoneNumber', 'country', 'language', 'csccRegistered', 'updatedAt', 'vendorStatus', 'vendorPlan', 'vendorId', 'isDeveloper', 'termsAccepted', 'emailVerified', 'adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts', 'bankName', 'accountNumber', 'accountName', 'externalWallet', 'mobileMoneyNumber', 'mobileMoneyProvider']) &&
              data.uid is string && data.uid.size() > 0 &&
              data.email is string &&
              data.role in ['player', 'admin', 'user', 'vendor'];
@@ -168,9 +168,9 @@ service cloud.firestore {
     }
 
     function isValidTransaction(data) {
-      return hasOnlyAllowedFields(['userId', 'type', 'amount', 'status', 'timestamp', 'currency', 'paymentMethod', 'description', 'recipient']) &&
+      return hasOnlyAllowedFields(['userId', 'type', 'amount', 'status', 'timestamp', 'currency', 'paymentMethod', 'description', 'recipient', 'reference', 'fee', 'hub', 'purpose', 'method', 'metadata']) &&
              data.userId is string && data.userId.size() > 0 &&
-             data.type in ['deposit', 'withdrawal', 'game_bet', 'game_win', 'payment'] &&
+             data.type in ['deposit', 'withdrawal', 'game_bet', 'game_win', 'payment', 'payout'] &&
              data.amount is number && data.amount > 0 &&
              data.status in ['pending', 'completed', 'failed'] &&
              data.timestamp is timestamp;
@@ -343,6 +343,83 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAdmin();
+    }
+
+    // Help Support Tickets Database
+    match /help_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Innovation Forge Ideas Incubator
+    match /incubator_ideas/{ideaId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Live Zoom Classes / Presenting hub
+    match /live_classes/{classId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Test Connection
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Add lacking database tables/schema rules to avoid permission errors
+    match /service_providers/{providerId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /service_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /service_bargains/{bargainId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /admin_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+    match /quiz_sessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /email_accounts/{accountId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /email_messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /loans/{loanId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /loan_applications/{applicationId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /loan_vendors/{vendorId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /domain_sellers/{sellerId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /domain_orders/{orderId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /domain_catalog/{catalogId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /market_orders/{orderId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /posts/{postId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /ad_listings/{listingId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

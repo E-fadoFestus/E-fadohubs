@@ -16,7 +16,8 @@ import {
   Smartphone,
   Bitcoin,
   Image as ImageIcon,
-  ChevronDown
+  ChevronDown,
+  ArrowLeft
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -86,20 +87,25 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
           exit={{ scale: 0.9, y: 20 }}
           className="bg-white rounded-[3rem] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
         >
-          {/* Header Controls */}
+          {/* Header Controls / Back Navigation Bar */}
           <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest">Transaction Receipt</h2>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Automatic Command Generated</p>
-              </div>
+            <button 
+              onClick={onClose}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 text-xs font-black uppercase tracking-wider rounded-xl transition-all border border-gray-200 select-none"
+            >
+              <ArrowLeft className="w-4 h-4 text-indigo-600" />
+              <span>Back</span>
+            </button>
+
+            <div className="flex-1 text-center px-2">
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest leading-none">Transaction Receipt</h2>
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Sovereign Proof of Equity</p>
             </div>
+
             <button 
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
+              title="Close Receipt Overlay"
             >
               <X className="w-6 h-6" />
             </button>

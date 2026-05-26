@@ -27,6 +27,34 @@ import { UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
 
+const FormField: React.FC<{
+  label: string,
+  icon?: React.ReactNode,
+  error?: string,
+  hint?: string,
+  required?: boolean,
+  children: React.ReactNode
+}> = ({ label, icon, error, hint, required = true, children }) => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-400'}`}>
+        {icon} {label} {!required && <span className="text-[8px] opacity-60">(Optional)</span>}
+      </label>
+      {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-emerald-400'}`} />}
+    </div>
+    <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
+      {children}
+    </div>
+    {error ? (
+      <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
+        <ShieldAlert className="w-3 h-3" /> {error}
+      </motion.p>
+    ) : hint && (
+      <p className="text-[9px] font-medium text-slate-400 leading-tight">{hint}</p>
+    )}
+  </div>
+);
+
 interface LoanVendorRegistrationProps {
   user: UserProfile;
   onClose: () => void;
@@ -38,35 +66,6 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
   const [step, setStep] = useState<'WELCOME' | 'IDENTITY' | 'CREDENTIALS' | 'PARAMETERS' | 'SUCCESS'>('WELCOME');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-
-  // FormField Helper Component
-  const FormField: React.FC<{
-    label: string,
-    icon?: React.ReactNode,
-    error?: string,
-    hint?: string,
-    required?: boolean,
-    children: React.ReactNode
-  }> = ({ label, icon, error, hint, required = true, children }) => (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-gray-400'}`}>
-          {icon} {label} {!required && <span className="text-[8px] opacity-60">(Optional)</span>}
-        </label>
-        {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-emerald-400'}`} />}
-      </div>
-      <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
-        {children}
-      </div>
-      {error ? (
-        <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[10px] font-bold text-rose-500 flex items-center gap-1">
-          <ShieldAlert className="w-3 h-3" /> {error}
-        </motion.p>
-      ) : hint && (
-        <p className="text-[9px] font-medium text-slate-400 leading-tight">{hint}</p>
-      )}
-    </div>
-  );
 
   const [formData, setFormData] = useState({
     vendorType: 'Organization' as 'Individual' | 'Organization',

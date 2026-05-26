@@ -30,33 +30,55 @@ import {
 } from '../firebase';
 import { VendorProfile, MarketProduct } from '../types';
 
-interface VendorRegistrationFlowProps {
-  onClose: () => void;
-  categories: Record<string, Record<string, Record<string, string[]>>>;
-  hubName: string;
-  accentColor?: string;
-}
+const allColorClasses = {
+  indigo: {
+    bg: 'bg-indigo-600',
+    hover: 'hover:bg-indigo-500',
+    text: 'text-indigo-400',
+    border: 'border-indigo-500/30',
+    shadow: 'shadow-indigo-500/20',
+    ring: 'focus:ring-indigo-500'
+  },
+  cyan: {
+    bg: 'bg-cyan-600',
+    hover: 'hover:bg-cyan-500',
+    text: 'text-cyan-400',
+    border: 'border-cyan-500/30',
+    shadow: 'shadow-cyan-500/20',
+    ring: 'focus:ring-cyan-500'
+  },
+  blue: {
+    bg: 'bg-blue-600',
+    hover: 'hover:bg-blue-500',
+    text: 'text-blue-400',
+    border: 'border-blue-500/30',
+    shadow: 'shadow-blue-500/20',
+    ring: 'focus:ring-blue-500'
+  },
+  emerald: {
+    bg: 'bg-emerald-600',
+    hover: 'hover:bg-emerald-500',
+    text: 'text-emerald-400',
+    border: 'border-emerald-500/30',
+    shadow: 'shadow-emerald-500/20',
+    ring: 'focus:ring-emerald-500'
+  }
+};
 
-export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({ 
-  onClose, 
-  categories, 
-  hubName,
-  accentColor = 'indigo'
-}) => {
-  const { selectedCurrency } = useCurrency();
-  const [regStep, setRegStep] = useState<'VENDOR' | 'PRODUCTS' | 'SUCCESS'>('VENDOR');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+const AccentColorContext = React.createContext<string>('indigo');
 
-  // FormField Helper Component
-  const FormField: React.FC<{
-    label: string,
-    icon?: React.ReactNode,
-    error?: string,
-    hint?: string,
-    required?: boolean,
-    children: React.ReactNode
-  }> = ({ label, icon, error, hint, required = true, children }) => (
+// FormField Helper Component
+const FormField: React.FC<{
+  label: string,
+  icon?: React.ReactNode,
+  error?: string,
+  hint?: string,
+  required?: boolean,
+  children: React.ReactNode
+}> = ({ label, icon, error, hint, required = true, children }) => {
+  const accentColor = React.useContext(AccentColorContext);
+  const colorClasses = allColorClasses[accentColor as keyof typeof allColorClasses] || allColorClasses.indigo;
+  return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-slate-400'}`}>
@@ -76,6 +98,25 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
       )}
     </div>
   );
+};
+
+interface VendorRegistrationFlowProps {
+  onClose: () => void;
+  categories: Record<string, Record<string, Record<string, string[]>>>;
+  hubName: string;
+  accentColor?: string;
+}
+
+export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({ 
+  onClose, 
+  categories, 
+  hubName,
+  accentColor = 'indigo'
+}) => {
+  const { selectedCurrency } = useCurrency();
+  const [regStep, setRegStep] = useState<'VENDOR' | 'PRODUCTS' | 'SUCCESS'>('VENDOR');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Vendor Form State
   const [vendorForm, setVendorForm] = useState({
@@ -112,7 +153,8 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
     whatsapp: '',
     phone: '',
     email: '',
-    complianceConfirmed: false
+    complianceConfirmed: false,
+    vendorPickupLocation: ''
   });
 
   const validateVendor = () => {
@@ -171,7 +213,8 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
         whatsapp: '',
         phone: '',
         email: '',
-        complianceConfirmed: false
+        complianceConfirmed: false,
+        vendorPickupLocation: ''
       });
       setErrors({});
     }
@@ -211,46 +254,12 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
     }
   };
 
-  const allColorClasses = {
-    indigo: {
-      bg: 'bg-indigo-600',
-      hover: 'hover:bg-indigo-500',
-      text: 'text-indigo-400',
-      border: 'border-indigo-500/30',
-      shadow: 'shadow-indigo-500/20',
-      ring: 'focus:ring-indigo-500'
-    },
-    cyan: {
-      bg: 'bg-cyan-600',
-      hover: 'hover:bg-cyan-500',
-      text: 'text-cyan-400',
-      border: 'border-cyan-500/30',
-      shadow: 'shadow-cyan-500/20',
-      ring: 'focus:ring-cyan-500'
-    },
-    blue: {
-      bg: 'bg-blue-600',
-      hover: 'hover:bg-blue-500',
-      text: 'text-blue-400',
-      border: 'border-blue-500/30',
-      shadow: 'shadow-blue-500/20',
-      ring: 'focus:ring-blue-500'
-    },
-    emerald: {
-      bg: 'bg-emerald-600',
-      hover: 'hover:bg-emerald-500',
-      text: 'text-emerald-400',
-      border: 'border-emerald-500/30',
-      shadow: 'shadow-emerald-500/20',
-      ring: 'focus:ring-emerald-500'
-    }
-  };
-
   const colorClasses = allColorClasses[accentColor as keyof typeof allColorClasses] || allColorClasses.indigo;
 
   return (
-    <motion.div 
-      initial={{ scale: 0.9, y: 20, opacity: 0 }}
+    <AccentColorContext.Provider value={accentColor}>
+      <motion.div 
+        initial={{ scale: 0.9, y: 20, opacity: 0 }}
       animate={{ scale: 1, y: 0, opacity: 1 }}
       exit={{ scale: 0.9, y: 20, opacity: 0 }}
       className="bg-slate-900 border border-white/10 rounded-[3rem] w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden"
@@ -594,16 +603,21 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
 
                 <div className="md:col-span-2 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Listing Deployment Coordinates</h5>
+                    <div>
+                      <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Listing Deployment Coordinates</h5>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Define physical coordinates and direct pickup fulfillment details.</p>
+                    </div>
                     <button 
+                      type="button"
                       onClick={() => setCurrentProduct({
                         ...currentProduct,
-                        location: vendorForm.address,
+                        location: vendorForm.city,
                         village: vendorForm.village,
                         landmark: vendorForm.landmark,
                         phone: vendorForm.phone,
                         whatsapp: vendorForm.whatsapp,
-                        email: vendorForm.email
+                        email: vendorForm.email,
+                        vendorPickupLocation: vendorForm.address
                       })}
                       className={`text-[9px] font-black uppercase tracking-widest ${colorClasses.text} hover:opacity-80 transition-all flex items-center gap-1`}
                     >
@@ -631,6 +645,19 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                       value={currentProduct.landmark}
                       onChange={e => setCurrentProduct({...currentProduct, landmark: e.target.value})}
                       className="bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none lg:col-span-1 md:col-span-1"
+                    />
+                  </div>
+                  <div className="space-y-2 mt-2">
+                    <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-1 flex items-center gap-1">
+                      <span>Vendor Partner Independent Pick-up Location & address</span>
+                      <span className="text-[7.5px] text-amber-500/80 lowercase italic font-normal">(required - eFADO has no designated pickup stations)</span>
+                    </label>
+                    <textarea 
+                      placeholder="Specify your private store/point pick-up address, landmark, and operating hours for customer manual pickup..."
+                      value={currentProduct.vendorPickupLocation}
+                      onChange={e => setCurrentProduct({...currentProduct, vendorPickupLocation: e.target.value})}
+                      rows={2}
+                      className="w-full bg-slate-900/50 border border-white/5 rounded-xl px-4 py-3 text-xs font-bold text-white outline-none placeholder:text-slate-600 focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -801,5 +828,6 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
         )}
       </div>
     </motion.div>
+    </AccentColorContext.Provider>
   );
 };

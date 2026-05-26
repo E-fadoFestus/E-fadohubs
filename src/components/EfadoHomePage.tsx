@@ -31,7 +31,8 @@ import {
   Cpu,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -121,6 +122,36 @@ const HUBS_DATA = [
     color: 'from-indigo-600 to-blue-800',
     tag: 'EFADO Mail',
     stats: 'Top Sellers'
+  },
+  {
+    id: 'DOMAIN_HUB',
+    subview: 'vending',
+    title: 'Airtime & Data Vending',
+    description: 'Instant global top-up and airtime vending for over 120 countries. Quick recharging for data plans with payment gateway integrations.',
+    icon: Zap,
+    color: 'from-amber-500 to-yellow-600',
+    tag: 'Utility',
+    stats: '120+ Countries'
+  },
+  {
+    id: 'DOMAIN_HUB',
+    subview: 'sourcing',
+    title: 'China Sourcing Hub',
+    description: 'Direct factory sourcing pipeline from China. Inspect manufacturing, request wholesale quotes, and orchestrate direct sea/air shipping.',
+    icon: Network,
+    color: 'from-teal-600 to-emerald-700',
+    tag: 'B2B Trade',
+    stats: 'Factory Sourcing'
+  },
+  {
+    id: 'DOMAIN_HUB',
+    subview: 'otc',
+    title: 'Crypto OTC & Convert',
+    description: 'Exchange digital assets seamlessly for standard local fiat or global bank transfers. Features instant rates and safe escrow pipelines.',
+    icon: Coins,
+    color: 'from-emerald-500 to-indigo-600',
+    tag: 'Exchange',
+    stats: '80+ Currencies'
   },
   {
     id: 'PARTNER_HUB',
@@ -268,7 +299,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
                 damping: 20
               }}
               viewport={{ once: true }}
-              onClick={() => onNavigate(hub.id as any)}
+              onClick={() => onNavigate(hub.id as any, (hub as any).subview)}
               className="group cursor-pointer"
             >
               <div className="glass-card-ultra golden-card-border p-10 rounded-[3rem] text-left transition-all duration-500 group-hover:shadow-[0_40px_80px_rgba(0,0,0,0.6)] border-t-[6px] border-t-white/10 group-hover:border-t-indigo-500 h-full flex flex-col">

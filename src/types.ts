@@ -25,6 +25,12 @@ export interface UserProfile {
   createdAt: string;
   wallet?: UserWallet;
   csccRegistered?: boolean;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  externalWallet?: string;
+  mobileMoneyNumber?: string;
+  mobileMoneyProvider?: string;
 }
 
 export interface UserWallet {
@@ -147,6 +153,7 @@ export interface MarketProduct {
   warranty?: string;
   complianceConfirmed: boolean;
   createdAt: any;
+  vendorPickupLocation?: string;
 }
 
 export interface MarketOrder {
@@ -170,6 +177,9 @@ export interface MarketOrder {
     state: string;
     zipCode: string;
     method: 'Standard' | 'Expedited' | 'Instant';
+    fulfillmentType?: 'DELIVERY' | 'PICKUP';
+    landmark?: string;
+    instructions?: string;
   };
   paymentMethod: string;
   status: 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';

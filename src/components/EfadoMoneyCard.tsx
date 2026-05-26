@@ -41,10 +41,11 @@ interface Card {
 interface EfadoMoneyCardProps {
   onClose: () => void;
   user: UserProfile;
-  onResult: (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame') => Promise<void>;
+  onResult: (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium', payoutOverride?: number) => Promise<void>;
+  onUpdateBalance?: (amount: number, type: 'deposit' | 'withdrawal', accountDetails?: any) => Promise<void>;
 }
 
-export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, onResult }) => {
+export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, onResult, onUpdateBalance }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
   const [currentStage, setCurrentStage] = useState(0);
   const [cards, setCards] = useState<Card[]>([]);
@@ -68,8 +69,8 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
   const [isBigWinCelebration, setIsBigWinCelebration] = useState(false);
 
   // Derived from user prop
-  const balance = user.playerWallet;
-  const winWallet = user.cashOutWallet;
+  const balance = user.depositWallet;
+  const winWallet = user.playerWallet;
   const depositWallet = user.depositWallet;
 
   // Constants based on user requirements
@@ -136,8 +137,8 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
 
   const handleStart = () => {
     if (balance < stake) {
-      setMessage("Insufficient balance to play!");
-      setTimeout(() => setMessage(null), 3000);
+      setMessage("Insufficient Funds / Balance");
+      setTimeout(() => setMessage(null), 3500);
       return;
     }
 
@@ -765,6 +766,11 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
                         autoFocus
                       />
                     </div>
+                    {paymentModalType === 'CASHOUT' && parseFloat(paymentAmount) > winWallet && (
+                      <p className="mt-3 text-red-500 font-extrabold uppercase tracking-widest text-[10px] animate-pulse">
+                        Insufficient funds in Win Wallet ({formatPrice(winWallet)})
+                      </p>
+                    )}
                     <div className="flex flex-wrap justify-center gap-2 mt-6">
                       {['50', '100', '500', '1000'].map(amt => (
                         <button 
@@ -815,8 +821,20 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
                     </div>
 
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         setQrScanning(true);
+                        const amt = parseFloat(paymentAmount);
+                        if (onUpdateBalance && !isNaN(amt) && amt > 0) {
+                          if (paymentModalType === 'FUND') {
+                            await onUpdateBalance(amt, 'deposit');
+                          } else {
+                            await onUpdateBalance(amt, 'withdrawal', {
+                              bankName: selectedPaymentMethod || 'Efado QR Code Scan',
+                              accountNumber: 'EFADO-GAME-USER',
+                              accountName: user.displayName || user.email
+                            });
+                          }
+                        }
                         setTimeout(() => {
                           setPaymentStep('SUCCESS');
                           playSound('win');
@@ -874,11 +892,24 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
                     </button>
                     {paymentStep === 'AMOUNT' && (
                       <button 
-                        disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
-                        onClick={() => {
+                        disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || (paymentModalType === 'CASHOUT' && parseFloat(paymentAmount) > winWallet)}
+                        onClick={async () => {
                           if (selectedPaymentMethod === 'Scan & Pay' || selectedPaymentMethod === 'EFADO QR') {
                             setPaymentStep('QR_SCAN');
                             return;
+                          }
+                          const amt = parseFloat(paymentAmount);
+                          if (onUpdateBalance && !isNaN(amt) && amt > 0) {
+                            if (paymentModalType === 'FUND') {
+                              await onUpdateBalance(amt, 'deposit');
+                            } else {
+                              await onUpdateBalance(amt, 'withdrawal', {
+                                bankName: selectedPaymentMethod || 'Game Wallet Direct',
+                                accountNumber: 'EFADO-GAME-USER',
+                                accountName: user.displayName || user.email,
+                                sourceWallet: 'playerWallet'
+                              });
+                            }
                           }
                           setPaymentStep('SUCCESS');
                           playSound('win');

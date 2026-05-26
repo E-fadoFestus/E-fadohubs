@@ -110,7 +110,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
   };
 
   const rollSlots = async () => {
-    if (isSpinning || user.playerWallet < stakeAmount) return;
+    if (isSpinning || user.depositWallet < stakeAmount) return;
 
     setIsSpinning(true);
     isSpinningRef.current = true;
@@ -270,7 +270,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
           description: 'Equilibrium Wallet Top-up'
         });
       } else {
-        // Withdrawal from cashOutWallet
+        // Withdrawal from playerWallet (linked cash out)
         await onUpdateBalance(amount, 'withdrawal');
         await onAddTransaction({
           userId: user.uid,
@@ -372,7 +372,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                       <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cash Out Wallet</div>
                       <ArrowUpRight className="w-3 h-3 text-emerald-400 cursor-pointer" onClick={() => { setPaymentType('withdraw'); setShowPayment(true); }} />
                    </div>
-                   <div className="text-xl font-black text-white">{formatPrice(user.cashOutWallet)}</div>
+                   <div className="text-xl font-black text-white">{formatPrice(user.playerWallet)}</div>
                     <button 
                     onClick={() => { setPaymentType('withdraw'); setShowPayment(true); }}
                     className="w-full mt-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
@@ -460,7 +460,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
               animate={machineControls}
               className="relative p-8 rounded-[3rem] border border-white/20 shadow-[0_0_80px_rgba(245,158,11,0.2)] w-full max-w-xl mb-12 overflow-hidden bg-slate-900 group"
               style={{
-                background: isSpinning 
+                backgroundImage: isSpinning 
                   ? 'linear-gradient(-45deg, #FF0000, #00FF00, #0000FF, #FFFF00, #800080, #FFD700)'
                   : undefined,
                 backgroundSize: '400% 400%',
@@ -640,10 +640,10 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
 
               <button 
                 onClick={rollSlots}
-                disabled={isSpinning || user.playerWallet < stakeAmount}
+                disabled={isSpinning || user.depositWallet < stakeAmount}
                 className={`
                   relative w-full py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-4 transition-all uppercase tracking-[0.2em] shadow-2xl overflow-hidden
-                  ${isSpinning || user.playerWallet < stakeAmount
+                  ${isSpinning || user.depositWallet < stakeAmount
                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5' 
                     : 'bg-gradient-to-r from-yellow-500 via-orange-500 to-yellow-600 text-white hover:scale-[1.02] active:scale-[0.98] shadow-orange-500/20'
                   }
@@ -668,9 +668,9 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                 )}
               </button>
 
-              {user.playerWallet < stakeAmount && !isSpinning && (
+              {user.depositWallet < stakeAmount && !isSpinning && (
                 <p className="text-center text-rose-500 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                  Insufficient funds in player wallet
+                  Insufficient Funds / Balance
                 </p>
               )}
               

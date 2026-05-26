@@ -6,18 +6,26 @@ export const TransactionService = {
    * Records a new transaction in the EFADO ecosystem.
    * This is the master ledger for all value movements.
    */
-  async recordTransaction(data: Omit<Transaction, 'timestamp' | 'id'>): Promise<string> {
+  async recordTransaction(data: Omit<Transaction, 'timestamp' | 'id'> & { skipWalletUpdate?: boolean }): Promise<string> {
     try {
       // Generate a unique reference if not provided
       const reference = data.reference || `EFD-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
       
+      // Separate out skipWalletUpdate before writing to Firestore if needed
+      const { skipWalletUpdate, ...cleanedData } = data;
+      
       const txData = {
-        ...data,
+        ...cleanedData,
         reference,
         timestamp: serverTimestamp(),
       };
 
       const docRef = await addDoc(collection(db, 'transactions'), txData);
+      
+      // Skip updates if requested
+      if (skipWalletUpdate || data.metadata?.skipWalletUpdate) {
+        return docRef.id;
+      }
       
       // Update user wallet balances based on transaction type
       const userRef = doc(db, 'users', data.userId);

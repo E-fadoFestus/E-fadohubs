@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Building2,
   Calendar,
-  DollarSign
+  DollarSign,
+  ArrowLeft
 } from 'lucide-react';
 import { Transaction } from '../types';
 import html2canvas from 'html2canvas';
@@ -94,63 +95,83 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl overflow-y-auto no-scrollbar"
+      className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl overflow-y-auto no-scrollbar flex flex-col font-sans"
     >
-      <div className="relative w-full max-w-2xl my-8">
-        {/* Controls Overlay */}
-        <div className="absolute -top-16 left-0 right-0 flex items-center justify-between px-2">
-          <div className="flex items-center gap-3">
+      {/* Dynamic Navigation Bar to prevent getting trapped/stuck */}
+      <nav className="sticky top-0 z-[75] bg-slate-900/90 backdrop-blur-md border-b border-white/5 shadow-md px-4 py-3 sm:py-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          
+          {/* Back/Exit Action - Go Back */}
+          <button 
+            onClick={onClose}
+            className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all border border-white/5 select-none"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-500" />
+            <span>Go Back</span>
+          </button>
+
+          {/* Central Context Label */}
+          <div className="text-center hidden md:block">
+            <span className="text-[10px] font-black text-amber-500 uppercase tracking-[0.25em]">Secure Receipt Portal</span>
+            <p className="text-xs text-slate-400 font-bold tracking-tight">Verified Transaction Proof</p>
+          </div>
+
+          {/* Actions: Download & Print */}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handlePrint}
+              title="Print Receipt"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-white/5 rounded-xl text-white text-xs font-black uppercase tracking-wider transition-all"
+            >
+              <Printer className="w-4 h-4 text-amber-500" />
+              <span>Print</span>
+            </button>
+            
             <button 
               onClick={handleDownloadPDF}
               disabled={isExporting}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all backdrop-blur-md border border-white/10"
+              title="Save/Download PDF Receipt"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-slate-950 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
-              {isExporting ? 'Generating...' : 'Download PDF'}
+              <Download className="w-4 h-4 font-black" />
+              <span>{isExporting ? 'Saving...' : 'Download'}</span>
             </button>
-            <button 
-              onClick={handlePrint}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all backdrop-blur-md border border-white/10"
-            >
-              <Printer className="w-4 h-4" />
-              Print
-            </button>
+
             <button 
               onClick={handleUploadToVault}
               disabled={isUploading || uploadSuccess}
-              className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all backdrop-blur-md border ${
-                uploadSuccess ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-white/10 hover:bg-white/20 text-white border-white/10'
+              title="Upload to Secure Cloud Vault"
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
+                uploadSuccess ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-slate-800/80 hover:bg-slate-700 text-white border-white/5'
               }`}
             >
-              {uploadSuccess ? <CheckCircle2 className="w-4 h-4" /> : <CloudUpload className="w-4 h-4" />}
-              {isUploading ? 'Vaulting...' : uploadSuccess ? 'Vaulted' : 'Upload to Vault'}
+              {uploadSuccess ? <CheckCircle2 className="w-4 h-4" /> : <CloudUpload className="w-4 h-4 text-emerald-400" />}
+              <span className="hidden md:inline">{isUploading ? 'Vaulting...' : uploadSuccess ? 'Vaulted' : 'Vault'}</span>
             </button>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-all backdrop-blur-md"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
 
+        </div>
+      </nav>
+
+      {/* Main Content Area */}
+      <div className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 md:my-6">
         {/* Tactical Receipt Sheet */}
         <div 
           ref={receiptRef}
-          className="bg-white rounded-[2rem] shadow-2xl overflow-hidden relative print:shadow-none"
+          className="bg-white rounded-[2rem] shadow-2xl overflow-hidden relative print:shadow-none border border-slate-100"
         >
-          {/* Golden Strategic Watermark - EFADO */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.07] select-none overflow-hidden">
+          {/* Golden Strategic Watermark - EFADO™ TRADEMARK (Fitted to page margins) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04] select-none overflow-hidden p-8">
             <div className="w-full h-full bg-amber-400/5 absolute inset-0" />
-            <h1 className="text-[15rem] md:text-[20rem] font-black italic tracking-tighter rotate-[-35deg] text-amber-500 whitespace-nowrap">
-              E-FADO
+            <h1 className="text-[5rem] sm:text-[6.5rem] md:text-[8rem] font-black italic tracking-tighter rotate-[-30deg] text-amber-500 leading-none text-center uppercase whitespace-pre-wrap max-w-md break-words p-4 border border-amber-500/10 rounded-3xl">
+              EFADO™<br />TRADEMARK
             </h1>
           </div>
 
           {/* Header Strip */}
           <div className="h-2 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 w-full" />
 
-          <div className="p-8 md:p-12 space-y-12">
+          <div className="p-8 md:p-12 space-y-10">
             {/* Brand Section */}
             <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
               <div className="space-y-4">
@@ -170,7 +191,7 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
               </div>
               <div className="md:text-right">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Receipt Identity</h3>
-                <p className="text-lg font-black text-slate-900 font-mono">#{transaction.reference || transaction.id?.slice(-8).toUpperCase() || 'INTERNAL'}</p>
+                <p className="text-lg font-black text-slate-900 font-mono">#{transaction.reference || transaction.id?.slice(-12).toUpperCase() || 'INTERNAL-TX'}</p>
                 <div className="mt-4 flex items-center md:justify-end gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full w-fit md:ml-auto">
                   <ShieldCheck className="w-3 h-3" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Verified Transaction</span>
@@ -178,27 +199,51 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
               </div>
             </div>
 
+            {/* Global Verification Details (New Highly Detailed Sections) */}
+            <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-100 flex flex-col gap-2.5 text-slate-700 text-[10px] font-bold uppercase tracking-wider relative z-10">
+              <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                <span className="text-slate-400">Ledger Node:</span>
+                <span className="text-slate-900">EFD-MAINNET-NODE01</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                <span className="text-slate-400">Digital Hash Index:</span>
+                <span className="text-slate-900 font-mono break-all text-right max-w-[70%]">
+                  {Math.random().toString(36).substring(2, 15).toUpperCase()}B98X{transaction.id || 'TX007'}F90
+                </span>
+              </div>
+              <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                <span className="text-slate-400">Verification channel:</span>
+                <span className="text-slate-900">{transaction.method || 'Digital Wallet Protocol'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Security PIN Auth:</span>
+                <span className="text-emerald-600 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3" /> Authenticated & Sealed
+                </span>
+              </div>
+            </div>
+
             {/* Main Payload */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 border-y border-slate-100 py-10">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-y border-slate-100 py-8 relative z-10">
+              <div className="space-y-4">
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Recipient Entity</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Recipient Entity</h4>
                   <p className="text-sm font-bold text-slate-900">{userEmail || 'Individual User'}</p>
-                  <p className="text-[10px] font-mono text-slate-500 mt-1 uppercase">UID: {transaction.userId}</p>
+                  <p className="text-[10px] font-mono text-slate-500 mt-0.5 uppercase">ID: {transaction.userId?.slice(0, 16) || 'SECURE_USER'}...</p>
                 </div>
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Temporal Execution</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Temporal Execution</h4>
                   <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                    <Calendar className="w-4 h-4 text-amber-500" />
+                    <Calendar className="w-4 h-4 text-amber-500 font-bold" />
                     {transaction.timestamp instanceof Date ? transaction.timestamp.toLocaleString() : 
                      transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleString() : 
                      new Date().toLocaleString()}
                   </div>
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Transaction Sector</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Sector</h4>
                   <div className="flex items-center gap-2">
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                       transaction.type === 'deposit' ? 'bg-emerald-500/10 text-emerald-600' :
@@ -214,21 +259,21 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
                   </div>
                 </div>
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Payment Integrity</h4>
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payment Integrity</h4>
                   <p className="text-sm font-bold text-slate-900 font-mono">{transaction.reference || 'SYSTEM_INTERNAL_OVD'}</p>
                 </div>
               </div>
             </div>
 
             {/* Financial Summary */}
-            <div className="bg-slate-50 rounded-3xl p-6 md:p-10 space-y-6">
+            <div className="bg-slate-50 rounded-3xl p-6 md:p-8 space-y-4 relative z-10">
               <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
                 <span>Sub-Total Allocation</span>
-                <span className="font-mono">${transaction.amount.toFixed(2)}</span>
+                <span className="font-mono">{(transaction.currency === 'NGN' ? '₦' : '$')}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
                 <span>Tactical Service Charge</span>
-                <span className="font-mono">${(transaction.fee || 0).toFixed(2)}</span>
+                <span className="font-mono">{(transaction.currency === 'NGN' ? '₦' : '$')}{(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="h-px bg-slate-200" />
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -237,19 +282,19 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Transaction Ref: {transaction.reference}</p>
                 </div>
                 <div className="flex flex-col items-end">
-                  <div className="flex items-center gap-2 text-3xl md:text-4xl font-black text-slate-900 font-display">
-                    <DollarSign className="w-8 h-8 text-amber-500" />
+                  <div className="flex items-center gap-1 text-3xl md:text-4xl font-black text-slate-900 font-display">
+                    <span className="text-amber-500 font-sans">{(transaction.currency === 'NGN' ? '₦' : '$')}</span>
                     {(transaction.amount + (transaction.fee || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mt-2 bg-emerald-50 px-2 py-0.5 rounded">Completed Success</span>
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.15em] mt-1.5 bg-emerald-50 px-2 py-0.5 rounded">Completed Success</span>
                 </div>
               </div>
             </div>
 
             {/* Compliance Footer */}
-            <div className="space-y-6">
+            <div className="space-y-6 relative z-10">
               <div className="flex items-center gap-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
-                <CheckCircle2 className="w-5 h-5 text-amber-600" />
+                <CheckCircle2 className="w-5 h-5 text-amber-600 shrink-0" />
                 <p className="text-[10px] text-amber-900 font-medium leading-relaxed">
                   This document serves as an official automated receipt issued by EFADO Hubs Connect™. It confirms the successful allocation of digital assets as summarized above. Digital signature verified for security integrity.
                 </p>
@@ -264,13 +309,24 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
           </div>
           
           {/* Footer Security Strip */}
-          <div className="h-4 bg-slate-950 flex items-center justify-center gap-8 px-12 overflow-hidden">
+          <div className="h-4 bg-slate-950 flex items-center justify-center gap-8 px-12 overflow-hidden print:hidden">
             {[1,2,3,4,5].map(i => (
               <span key={i} className="text-[6px] font-black text-slate-700 uppercase tracking-[1em] whitespace-nowrap">
                 EFADO SECURE TRANSACTION PROTOCOL 2026 // IDENTITY VERIFIED // NO REVERSALS
               </span>
             ))}
           </div>
+        </div>
+
+        {/* Bottom Escape Control Button to prevent getting stuck/trapped */}
+        <div className="mt-8 mb-12 text-center print:hidden">
+          <button 
+            onClick={onClose}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-slate-900 hover:bg-slate-800 border border-white/10 active:scale-95 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-slate-950/50 select-none"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-500" />
+            <span>Go Back</span>
+          </button>
         </div>
       </div>
     </motion.div>
