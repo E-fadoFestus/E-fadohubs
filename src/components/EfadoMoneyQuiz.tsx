@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, QuizQuestion, QuizSession, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { PaymentPlatform } from './PaymentPlatform';
+import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 
 interface EfadoMoneyQuizProps {
   user: UserProfile;
@@ -1538,185 +1539,37 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className="space-y-10"
+                      className="w-full max-w-[500px] mx-auto bg-white rounded-3xl overflow-hidden"
                     >
-                      <div className="mb-10">
-                        <h3 className="text-4xl font-black text-slate-950 tracking-tighter italic uppercase underline decoration-indigo-500/30 underline-offset-4">
-                          {walletTab === 'deposit' ? 'Capital Strategic Inflow' : 'Strategic extraction'}
-                        </h3>
-                        <p className="text-slate-500 text-[11px] font-black uppercase tracking-widest mt-2">
-                          {walletTab === 'deposit' ? 'Fund your quest for knowledge' : 'Harvest your intellectual dividends'}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                        <div className="space-y-8">
-                          {/* Amount Input */}
-                          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-6 shadow-2xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-[50px] -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-1000" />
-                            <label className="block text-[11px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">
-                              1. TYPE AMOUNT TO {walletTab === 'deposit' ? 'DEPOSIT' : 'WITHDRAW'} (NGN)
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-0 top-1/2 -translate-y-1/2 text-4xl font-black text-white/10 select-none italic">₦</span>
-                              <input 
-                                type="number"
-                                value={paymentAmount}
-                                onChange={(e) => setPaymentAmount(e.target.value)}
-                                placeholder="0.00"
-                                className="w-full pl-10 pr-4 bg-transparent border-b-2 border-white/20 py-4 font-black text-6xl focus:outline-none focus:border-indigo-500 transition-all text-white placeholder:text-white/10 italic outline-none"
-                              />
-                            </div>
-                            {walletTab === 'withdraw' && Number(paymentAmount) > user.playerWallet && (
-                              <p className="text-red-400 font-extrabold uppercase tracking-widest text-[9px] animate-pulse">
-                                Insufficient funds in Win Wallet (₦{user.playerWallet.toLocaleString()})
-                              </p>
-                            )}
-                            <div className="grid grid-cols-3 gap-3">
-                              {[1000, 5000, 10000, 50000, 100000, 500000].map(val => (
-                                <button 
-                                  key={val}
-                                  onClick={() => setPaymentAmount(val.toString())}
-                                  className="py-2.5 bg-white/5 hover:bg-indigo-600 border border-white/10 hover:border-indigo-500 rounded-xl text-[10px] font-black tracking-widest transition-all"
-                                >
-                                  +₦{val.toLocaleString()}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* USSD Info */}
-                          {walletTab === 'deposit' && (
-                            <div className="bg-indigo-950/50 p-8 rounded-[2.5rem] border border-indigo-500/20 relative group">
-                              <div className="absolute top-0 right-0 p-6 opacity-10">
-                                <Smartphone className="w-16 h-16 text-indigo-400" />
-                              </div>
-                              <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.25em] mb-6 italic underline underline-offset-4 decoration-indigo-500/50">Tactical USSD Command</h4>
-                              <p className="text-[10px] text-white/60 font-black mb-3 uppercase tracking-widest">Global USSD Link:</p>
-                              <div className="bg-slate-950 p-5 rounded-2xl border border-white/5 flex items-center justify-between group-hover:border-indigo-500/50 transition-all">
-                                <code className="text-emerald-400 font-mono font-black text-xl italic tracking-tighter">
-                                  *555*88*EFADO*{user.uid.slice(0, 5).toUpperCase()}*{(Number(paymentAmount) || 0)}#
-                                </code>
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(`*555*88*EFADO*${user.uid.slice(0, 5).toUpperCase()}*${paymentAmount || 0}#`);
-                                    addNotification('USSD Code copied to clipboard!', 'info');
-                                  }}
-                                  className="p-3 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-                                >
-                                  <Copy className="w-5 h-5" />
-                                </button>
-                              </div>
-                              <p className="mt-6 text-[9px] text-indigo-300/50 font-black uppercase tracking-widest italic leading-relaxed">
-                                Universal strategic protocol. Dial on any registered device for instant synchronization.
-                              </p>
-                            </div>
-                          )}
-
-                          {walletTab === 'withdraw' && (
-                            <div className="bg-emerald-950/50 p-8 rounded-[2.5rem] border border-emerald-500/20">
-                              <div className="flex items-center gap-4 mb-6">
-                                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
-                                  <AlertCircle className="w-6 h-6 text-emerald-400" />
-                                </div>
-                                <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest italic">Verification Level 3</h4>
-                              </div>
-                              <ul className="space-y-4">
-                                {[
-                                  'Withdrawal Processing: Sub-linear time (Immediate - 24H)',
-                                  'Minimum extraction limit: ₦1,000.00',
-                                  'Security tax: 2.5% tactical fee applies',
-                                  'Identity match protocol enabled'
-                                ].map((step, i) => (
-                                  <li key={i} className="flex items-start gap-4 text-[10px] text-emerald-100 font-black uppercase tracking-tight">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                                    {step}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-8">
-                          <label className="block text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2 italic">2. CHANNEL SELECTION</label>
-                          <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
-                            {paymentCategories.map((cat) => (
-                              <div 
-                                key={cat.id}
-                                className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-6 hover:border-indigo-500/30 transition-all group"
-                              >
-                                <div className="flex items-center gap-4 mb-5">
-                                  <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-50 transition-all">
-                                    {cat.icon}
-                                  </div>
-                                  <div>
-                                    <h4 className="text-[11px] font-black text-slate-950 uppercase tracking-[0.2em]">{cat.title}</h4>
-                                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Tactical Link</p>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2.5">
-                                  {cat.options.map(opt => (
-                                    <button
-                                      key={opt.id}
-                                      onClick={() => setSelectedMethod(opt.name)}
-                                      className={`px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
-                                        selectedMethod === opt.name
-                                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-xl shadow-indigo-500/20'
-                                          : 'bg-slate-50 border-slate-100 text-slate-500 hover:bg-slate-950 hover:text-white hover:border-slate-950'
-                                      }`}
-                                    >
-                                      {opt.name}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-
-                          <button 
-                            disabled={!paymentAmount || !selectedMethod || isProcessingPayment}
-                            onClick={async () => {
-                              setIsProcessingPayment(true);
-                              const amount = Number(paymentAmount);
-                              try {
-                                await onUpdateBalance(
-                                  amount, 
-                                  walletTab === 'deposit' ? 'deposit' : 'withdrawal'
-                                );
-                                await onAddTransaction({
-                                  userId: user.uid,
-                                  type: walletTab === 'deposit' ? 'deposit' : 'withdrawal',
-                                  amount,
-                                  currency: 'NGN',
-                                  status: 'completed',
-                                  method: selectedMethod || 'Gateway',
-                                  description: walletTab === 'deposit' ? 'Efado Money Quiz Recharge' : 'Efado Money Quiz Extraction'
-                                });
-                                addNotification(`${walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'} of ${formatPrice(amount)} successful!`, 'success');
-                                setPaymentAmount('');
-                                setSelectedMethod(null);
-                                setWalletTab('history');
-                              } catch (e) {
-                                addNotification('Transaction failed. Contact strategic support.', 'error');
-                              } finally {
-                                setIsProcessingPayment(false);
-                              }
-                            }}
-                            className="w-full py-6 bg-slate-950 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-4 italic active:scale-95"
-                          >
-                            {isProcessingPayment ? (
-                              <RefreshCcw className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <>
-                                <Zap className="w-5 h-5" /> 
-                                Finalize {walletTab === 'deposit' ? 'Capital Deposit' : 'Cash Extraction'}
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
+                      <EasyPaymentPlatform
+                        user={user}
+                        type={walletTab === 'deposit' ? 'deposit' : 'withdraw'}
+                        onComplete={async (amount, method) => {
+                          try {
+                            await onUpdateBalance(
+                              amount, 
+                              walletTab === 'deposit' ? 'deposit' : 'withdrawal'
+                            );
+                            await onAddTransaction({
+                              userId: user.uid,
+                              type: walletTab === 'deposit' ? 'deposit' : 'withdrawal',
+                              amount,
+                              currency: 'NGN',
+                              status: 'completed',
+                              method: method || 'Easy Transfer',
+                              description: walletTab === 'deposit' ? 'Efado Money Quiz Recharge' : 'Efado Money Quiz Extraction'
+                            });
+                            addNotification(`${walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₦${amount.toLocaleString()} successful!`, 'success');
+                            setPaymentAmount('');
+                            setWalletTab('history');
+                          } catch (e) {
+                            addNotification('Transaction failed. Contact strategic support.', 'error');
+                          }
+                        }}
+                        onClose={() => setShowWalletHub({ ...showWalletHub, active: false })}
+                        hub="MONEY_QUIZ"
+                        purpose={walletTab === 'deposit' ? "Efado Money Quiz Credit Top-up" : "Efado Money Quiz Dividend Cashout"}
+                      />
                     </motion.div>
                   )}
 
