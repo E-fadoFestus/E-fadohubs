@@ -11,6 +11,8 @@ import {
   Zap, 
   Coins, 
   ArrowRight,
+  ArrowLeft,
+  Printer,
   User,
   Fingerprint,
   RotateCcw,
@@ -24,6 +26,7 @@ import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { db, doc, updateDoc } from '../firebase';
+import { ReceiptTerminal } from './ReceiptTerminal';
 
 interface EasyPaymentPlatformProps {
   user: UserProfile;
@@ -82,6 +85,8 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   const [processingProgress, setProcessingProgress] = useState(0);
   const [step, setStep] = useState<'form' | 'processing' | 'success' | 'failed'>('form');
   const [createdTxId, setCreatedTxId] = useState<string | null>(null);
+  const [showPrinterOverlay, setShowPrinterOverlay] = useState(false);
+  const [reference, setReference] = useState(() => `EZP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`);
 
   // Auto pre-populate user details
   useEffect(() => {
@@ -159,7 +164,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     try {
       const parsedAmt = Number(amount);
       const isDeposit = activeTab === 'deposit';
-      const reference = `EZP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
       // Invoke optional parent complete triggers
       if (onComplete) {
@@ -231,7 +235,17 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       {/* Header Panel */}
       <div className="bg-[#059669] text-white p-5 flex items-center justify-between shadow-md shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+          {/* Active Go Back / Cancel Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 hover:bg-white/20 active:scale-95 rounded-lg transition-all text-white mr-1 flex items-center justify-center"
+            title="Go Back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center hidden sm:flex">
             <Coins className="w-5 h-5 text-white animate-pulse" />
           </div>
           <div>
@@ -495,6 +509,16 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   >
                     Submit Easy Funding Proof
                   </button>
+
+                  {/* Cancel & Go Back Button */}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-3.5 mt-2 bg-slate-250 hover:bg-slate-300 text-slate-700 hover:text-slate-950 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all active:scale-[0.98] border border-slate-300 flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Cancel & Go Back
+                  </button>
                 </form>
               </motion.div>
             ) : (
@@ -609,6 +633,16 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   >
                     Submit Easy Withdrawal Request
                   </button>
+
+                  {/* Cancel & Go Back Button */}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-3.5 mt-2 bg-slate-250 hover:bg-slate-300 text-slate-700 hover:text-slate-950 rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all active:scale-[0.98] border border-slate-300 flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Cancel & Go Back
+                  </button>
                 </form>
               </motion.div>
             )}
@@ -691,12 +725,24 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={onClose}
-              className="px-8 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95"
-            >
-              Back to App Hubs
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full justify-center max-w-sm mt-2">
+              <button
+                type="button"
+                onClick={() => setShowPrinterOverlay(true)}
+                className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print Receipt
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95"
+              >
+                Back to App Hubs
+              </button>
+            </div>
           </div>
         )}
 
@@ -736,6 +782,25 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         amount={Number(amount)}
         action={activeTab === 'deposit' ? 'Wallet Funding' : 'Wallet Withdrawal'}
       />
+
+      {showPrinterOverlay && (
+        <ReceiptTerminal
+          receipt={{
+            transactionId: createdTxId || reference,
+            amount: activeTab === 'deposit' ? `₦${Number(amount).toLocaleString()}` : `$${Number(amount).toLocaleString()}`,
+            currency: activeTab === 'deposit' ? 'NGN' : 'USD',
+            date: new Date().toLocaleDateString(),
+            type: activeTab === 'deposit' ? 'deposit' : 'withdrawal',
+            method: activeTab === 'deposit' ? 'Easy Transfer' : 'Direct PayOut',
+            status: 'pending',
+            sender: activeTab === 'deposit' ? accountName : 'EFADO CORPORATE',
+            recipient: activeTab === 'deposit' ? 'EFADO CORPORATE' : accountName,
+            description: activeTab === 'deposit' ? `Naira Topup Proof - ${proofNote}` : `USD Withdrawal to ${bankName}`,
+            reference: reference
+          }}
+          onClose={() => setShowPrinterOverlay(false)}
+        />
+      )}
     </div>
   );
 };
