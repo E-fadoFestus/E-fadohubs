@@ -13,7 +13,11 @@ import {
   HelpCircle,
   Cpu,
   Globe,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  ArrowDownCircle,
+  User,
+  CreditCard
 } from 'lucide-react';
 
 interface UserGuideModalProps {
@@ -196,6 +200,78 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                         className="px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-rose-600/20 active:scale-95"
                       >
                         Start Advertising Now
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* 4. Wallet Funding & Cashout Protocol */}
+                <section className="space-y-8">
+                  <div className="flex items-center gap-4 border-l-4 border-emerald-500 pl-6">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500">
+                      <Building2 className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Wallet Funding & Profile</h3>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Protocol 04: Real Bank Transfers & Fast Payouts</p>
+                    </div>
+                  </div>
+
+                  <div className="p-8 bg-emerald-500/5 border border-emerald-500/10 rounded-[2.5rem] space-y-8">
+                    <p className="text-sm font-medium text-slate-300 leading-relaxed uppercase tracking-tighter">
+                      To fund your EFADO Wallet to stake on games or buy services, follow these simple and 100% secure instructions:
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
+                        <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wider">
+                          <span className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">1</span> Copy CEO Bank Accounts
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
+                          Open your EFADO Wallet and navigate to the <strong>Deposit</strong> page. You will see the authorized <strong>CEO Corporate Accounts</strong>. Select one, hit "Copy", and pay from your real bank app.
+                        </p>
+                      </div>
+
+                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
+                        <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
+                          <span className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">2</span> Submit Sender details
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
+                          After making the bank transfer, type your <strong>Sender Bank Name</strong>, <strong>Sender Account Number</strong>, and <strong>Sender Name</strong>. This is critical so the CEO can verify your payment and credit you!
+                        </p>
+                      </div>
+
+                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
+                        <div className="flex items-center gap-2 text-amber-400 font-extrabold text-xs uppercase tracking-wider">
+                          <span className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">3</span> Setup Account Profile
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
+                          Go to <strong>My Acc. Profile</strong> and enter your own Bank Acc. Details once. This binds your profile so withdrawals can be sent directly back to your real bank account instantly!
+                        </p>
+                      </div>
+
+                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
+                        <div className="flex items-center gap-2 text-rose-400 font-extrabold text-xs uppercase tracking-wider">
+                          <span className="p-1.5 bg-rose-500/10 rounded-lg text-rose-400">4</span> CEO Approval Check
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
+                          The CEO instantly receives a secure signal of your sending account details and verifies the payout against the live incoming feed, leading to sub-second manual clearances.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs">
+                          ✓
+                        </div>
+                        <p className="text-[9px] font-black text-white uppercase tracking-widest italic">Fast & Direct Bank Settlements Active</p>
+                      </div>
+                      <button 
+                        onClick={onOpenProfile}
+                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                      >
+                        Set Up Payment Profile Now
                       </button>
                     </div>
                   </div>

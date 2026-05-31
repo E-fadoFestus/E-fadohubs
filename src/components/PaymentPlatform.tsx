@@ -39,6 +39,7 @@ import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
 import { CEO_BANK_ACCOUNTS, SUPPORT_EMAILS } from '../constants/businessProfile';
 import { db, doc, updateDoc } from '../firebase';
+import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 
 export interface WorldBank {
   name: string;
@@ -159,6 +160,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
   const [showReceipt, setShowReceipt] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [useEasyPlatform, setUseEasyPlatform] = useState(true);
   
   // World Bank directory and Recipient Resolution validator states
   const [showWorldBankModal, setShowWorldBankModal] = useState(false);
@@ -436,7 +438,21 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
       }
     }
 
-    if (type === 'deposit' && (selectedMethod === 'bank_transfer' || selectedMethod === 'ussd' || selectedMethod?.toString().includes('crypto'))) {
+    if (type === 'deposit' && !['mining_wallet', 'player_wallet'].includes(selectedMethod || '')) {
+      if (!accountDetails.bankName) {
+        setError('Please select/specify your sending bank before initiating deposit');
+        return;
+      }
+      if (!accountDetails.accountNumber || accountDetails.accountNumber.length < 8) {
+        setError('Please enter your sending account number (min 8 digits)');
+        return;
+      }
+      if (!accountDetails.accountName) {
+        setError('Please enter your sending account name');
+        return;
+      }
+      setStep('verification');
+    } else if (type === 'deposit' && (selectedMethod === 'bank_transfer' || selectedMethod === 'ussd' || selectedMethod?.toString().includes('crypto'))) {
       setStep('verification');
     } else {
       setShowPinModal(true);
@@ -474,8 +490,10 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
 
               processPromise.then(async () => {
                 if (!isMounted.current) return;
-                
-                const isManual = selectedMethod === 'bank_transfer' || selectedMethod === 'ussd' || selectedMethod?.toString().includes('crypto');
+                              const isManual = (type === 'deposit' && !['mining_wallet', 'player_wallet'].includes(selectedMethod || '')) ||
+                  selectedMethod === 'bank_transfer' || 
+                  selectedMethod === 'ussd' || 
+                  selectedMethod?.toString().includes('crypto');
                 
                 // Save user bank details to Firestore profile for automatic loading in the future
                 if (isExternalCashout && (
@@ -508,9 +526,15 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                   purpose: intentPurpose || (type === 'deposit' ? 'Wallet Top-up' : 'Cash Out'),
                   reference,
                   description: isManual 
-                    ? `Verification Pending: ${accountDetails.transactionRef || 'Manual Transfer'}` 
+                    ? `Verification Pending: Sender [${accountDetails.bankName || 'Unknown Bank'} / ${accountDetails.accountNumber || 'N/A'} / ${accountDetails.accountName || 'N/A'}]` 
                     : (intentPurpose || (type === 'deposit' ? 'Wallet Funding' : 'Withdrawal Request')),
-                  skipWalletUpdate: !!onComplete
+                  skipWalletUpdate: !!onComplete,
+                  metadata: {
+                    senderBankName: accountDetails.bankName,
+                    senderAccountNumber: accountDetails.accountNumber,
+                    senderAccountName: accountDetails.accountName,
+                    transactionRef: accountDetails.transactionRef || ''
+                  }
                 };
 
                 const txId = await TransactionService.recordTransaction(txData);
@@ -545,13 +569,37 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+      {useEasyPlatform ? (
+        <div className="w-full max-w-[500px]">
+          {/* Quick toggle banner */}
+          <div className="flex items-center justify-between p-3 bg-slate-900 border border-indigo-500/30 text-white rounded-3xl mb-2.5 shadow-lg">
+            <span className="text-[10px] uppercase font-black tracking-widest text-[#a5b4fc] pl-0.5">Payment Mode: Easy-Pay</span>
+            <button
+              onClick={() => setUseEasyPlatform(false)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all"
+            >
+              Advanced Pro Mode
+            </button>
+          </div>
+          <EasyPaymentPlatform
+            user={user}
+            type={type}
+            onComplete={onComplete}
+            onClose={onClose}
+            amount={fixedAmount}
+            onSuccess={onSuccess}
+            purpose={intentPurpose}
+            hub={hub}
+          />
+        </div>
+      ) : (
         <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white w-full max-w-2xl rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col md:flex-row h-[650px] border border-white/20"
-      >
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="bg-white w-full max-w-2xl rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] overflow-hidden flex flex-col md:flex-row h-auto max-h-[92vh] md:max-h-[750px] border border-white/20"
+        >
         {/* Sidebar Info - Tactical Control Hub */}
-        <div className="w-full md:w-80 bg-[#020617] p-10 text-white flex flex-col justify-between relative overflow-hidden">
+        <div className="w-full md:w-80 bg-[#020617] p-10 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
           <div className="absolute top-0 left-0 w-full h-full bg-grid-white/[0.03] pointer-events-none" />
           <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] -mt-32 -ml-32" />
           
@@ -617,7 +665,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
       </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-10 flex flex-col relative bg-white">
+        <div className="flex-1 p-6 md:p-10 flex flex-col relative bg-white overflow-y-auto max-h-[92vh] md:max-h-[750px] no-scrollbar">
           <div className="absolute top-8 right-8 flex items-center gap-3">
             <button 
               onClick={() => setShowGuide(true)}
@@ -1028,6 +1076,67 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                               >
                                 <Copy className="w-3 h-3 text-amber-600" />
                               </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SENDER BANK DETAILS (SO THAT CEO CAN VERIFY PAYMENT) */}
+                      {!['mining_wallet', 'player_wallet'].includes(selectedMethod || '') && (
+                        <div className="p-6 bg-slate-50 border-2 border-slate-200/50 rounded-[2rem] space-y-4 text-left">
+                          <span className="text-[10px] font-black tracking-widest text-[#0f172a] uppercase block">2. ENTER SENDER BANKING DETAILS</span>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase leading-snug">
+                            Type your sender account details so the CEO can verify your payment instantly.
+                          </p>
+                          
+                          <div className="space-y-4">
+                            {/* Searchable Bank Selector / Text entry */}
+                            <div className="relative">
+                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 pointer-events-none animate-pulse" />
+                              <select 
+                                className="w-full pl-10 pr-10 py-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-[#0f172a] shadow-sm appearance-none cursor-pointer border-slate-300"
+                                value={accountDetails.bankName}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  if (val) {
+                                    const selectedBank = globalAndLocalBanks.find(b => b.name === val);
+                                    setAccountDetails({
+                                      ...accountDetails,
+                                      bankName: val,
+                                      bankCode: selectedBank ? selectedBank.code : ''
+                                    });
+                                  }
+                                }}
+                              >
+                                <option value="" className="text-gray-400">-- SELECT YOUR SENDING BANK --</option>
+                                {globalAndLocalBanks.map(bank => (
+                                  <option key={bank.code} value={bank.name}>
+                                    {bank.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                            </div>
+
+                            <div className="relative">
+                              <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0f172a]" />
+                              <input 
+                                placeholder="ENTER SENDER ACCOUNT NUMBER"
+                                maxLength={10}
+                                className="w-full pl-10 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-[#0f172a] placeholder:text-gray-500 shadow-sm font-mono border-slate-300"
+                                value={accountDetails.accountNumber}
+                                onChange={e => setAccountDetails({...accountDetails, accountNumber: e.target.value})}
+                              />
+                            </div>
+
+                            <div className="relative">
+                              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0f172a]" />
+                              <input 
+                                placeholder="ENTER SENDER ACCOUNT HOLDER NAME"
+                                className="w-full pl-10 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-[#0f172a] placeholder:text-gray-500 shadow-sm border-slate-300"
+                                value={accountDetails.accountName}
+                                onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
+                              />
                             </div>
                           </div>
                         </div>
@@ -1598,6 +1707,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
           </AnimatePresence>
         </div>
       </motion.div>
+      )}
 
       {/* Worldwide Bank Directory Modal */}
       <AnimatePresence>

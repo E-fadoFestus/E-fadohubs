@@ -783,6 +783,51 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     }
   };
 
+  const handleProcessDeposit = async (tx: Transaction, status: 'completed' | 'failed') => {
+    setIsProcessing(true);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const txRef = doc(db, 'transactions', tx.id!);
+        const userRef = doc(db, 'users', tx.userId);
+        
+        // READ USER DOC FIRST
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("Specified user does not exist");
+        }
+        const userData = userSnap.data() as UserProfile;
+
+        // WRITE STATUS TO TRANSACTION 
+        transaction.update(txRef, { 
+          status,
+          adminNote: `Manual Deposit processed by CEO`
+        });
+
+        if (status === 'completed') {
+          // Increment both depositWallet and playerWallet for manual deposit funding
+          transaction.update(userRef, {
+            playerWallet: (userData.playerWallet || 0) + tx.amount,
+            depositWallet: ((userData as any).depositWallet || 0) + tx.amount
+          });
+          
+          // Audit Log
+          const logRef = doc(collection(db, 'admin_logs'));
+          transaction.set(logRef, {
+            action: 'APPROVE_MANUAL_DEPOSIT',
+            targetUser: userData.email,
+            amount: tx.amount,
+            timestamp: serverTimestamp(),
+            admin: 'CEO'
+          });
+        }
+      });
+    } catch (e) {
+      console.error("Error approving manual deposit:", e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handlePostAnnouncement = async () => {
     if (!newAnnouncement.trim()) return;
     try {
@@ -1406,6 +1451,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                             <div className="flex flex-col">
                               <span className="text-sm font-bold text-white">{users.find(u => u.uid === tx.userId)?.email || 'Unknown Entity'}</span>
                               <span className="text-[10px] text-slate-500 font-mono italic">{tx.userId}</span>
+                              {tx.description && (
+                                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 mt-1 max-w-[280px]">
+                                  {tx.description}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -1426,15 +1476,35 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                             <span className="text-[10px] font-bold text-slate-500">{tx.timestamp?.toDate().toLocaleString() || 'PROCESSING'}</span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2 text-right">
-                              {tx.status === 'completed' ? (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                              ) : tx.status === 'pending' ? (
-                                <Clock className="w-4 h-4 text-amber-500" />
-                              ) : (
-                                <XCircle className="w-4 h-4 text-rose-500" />
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="flex items-center justify-end gap-2 text-right">
+                                {tx.status === 'completed' ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                ) : tx.status === 'pending' ? (
+                                  <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                                ) : (
+                                  <XCircle className="w-4 h-4 text-rose-500" />
+                                )}
+                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{tx.status}</span>
+                              </div>
+                              {tx.status === 'pending' && tx.type === 'deposit' && (
+                                <div className="flex gap-1.5 mt-1">
+                                  <button
+                                    onClick={() => handleProcessDeposit(tx, 'completed')}
+                                    disabled={isProcessing}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-[9px] font-black text-white uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                  >
+                                    Approve & Credit
+                                  </button>
+                                  <button
+                                    onClick={() => handleProcessDeposit(tx, 'failed')}
+                                    disabled={isProcessing}
+                                    className="px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-500 border border-rose-500/10 rounded text-[9px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
                               )}
-                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{tx.status}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-right">

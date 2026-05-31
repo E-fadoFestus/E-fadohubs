@@ -4,6 +4,8 @@ import {
   db, 
   googleProvider, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   signOut, 
   doc, 
   getDoc, 
@@ -407,6 +409,26 @@ function AppContent() {
       return;
     }
 
+    // Handle redirect result from Google Sign-In redirect flow (important for mobile)
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log('Successfully completed redirect login:', result.user);
+        }
+      })
+      .catch((e: any) => {
+        console.error('Redirect login error:', e);
+        if (e?.code === 'auth/unauthorized-domain') {
+          setError(
+            'This domain is not authorized in Firebase. Please add "e-fado.com", "www.e-fado.com", and "e-fadohubs-nrxj.vercel.app" to the "Authorized domains" list under Authentication -> Settings in your Firebase Console.'
+          );
+        } else if (e?.message) {
+          setError(`Login redirect failed: ${e.message}`);
+        } else {
+          setError('Login redirect failed. Please try again.');
+        }
+      });
+
     // Unsubscribers for nested Firestore observers
     let unsubUser: (() => void) | null = null;
     let unsubTx: (() => void) | null = null;
@@ -526,10 +548,34 @@ function AppContent() {
   }, []);
 
   const handleLogin = async () => {
+    setError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (e) {
-      setError('Login failed. Please try again.');
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        console.log('Mobile device detected, using redirect login...');
+        await signInWithRedirect(auth, googleProvider);
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
+    } catch (e: any) {
+      console.error('Login error details:', e);
+      if (e?.code === 'auth/unauthorized-domain') {
+        setError(
+          'This domain (e-fado.com) is not authorized in Firebase. Please add "e-fado.com" to the "Authorized domains" list under Authentication -> Settings in your Firebase Console.'
+        );
+      } else if (e?.code === 'auth/popup-blocked' || e?.message?.includes('popup')) {
+        // If popup was blocked, fall back immediately to redirect
+        try {
+          console.log('Popup blocked, falling back to redirect login...');
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError: any) {
+          setError(`Login failed: ${redirectError.message || redirectError}`);
+        }
+      } else if (e?.message) {
+        setError(`Login failed: ${e.message}`);
+      } else {
+        setError('Login failed. Please try again.');
+      }
     }
   };
 
@@ -896,16 +942,46 @@ function AppContent() {
         <div className="bg-slate-900/80 backdrop-blur-2xl p-12 rounded-[3rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 golden-card-border">
           <EfadoLogo size="lg" className="mb-8" />
           <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Access Ecosystem</h2>
-          <p className="text-slate-400 mb-10 text-sm font-medium leading-relaxed">
+          <p className="text-slate-400 mb-6 text-sm font-medium leading-relaxed">
             Connect your global identity to synchronize with EFADO's tactical financial network and elite opportunity hubs.
           </p>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
-          >
-            <LogIn className="w-5 h-5" />
-            Establish Connection
-          </button>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center gap-2 text-red-400 text-left text-xs">
+              <div className="flex items-center gap-2 font-bold w-full">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>CONNECTION ERROR</span>
+              </div>
+              <p className="leading-relaxed font-mono">{error}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button 
+              onClick={handleLogin}
+              className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
+              id="login-standard-btn"
+            >
+              <LogIn className="w-5 h-5" />
+              Establish Connection
+            </button>
+
+            <button
+              onClick={async () => {
+                setError(null);
+                try {
+                  console.log('User requested redirect login explicitly...');
+                  await signInWithRedirect(auth, googleProvider);
+                } catch (e: any) {
+                  setError(`Redirect Connection failed: ${e.message || e}`);
+                }
+              }}
+              className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
+              id="login-redirect-btn"
+            >
+              Having issues? Try Redirect Connection
+            </button>
+          </div>
         </div>
       </div>
     );

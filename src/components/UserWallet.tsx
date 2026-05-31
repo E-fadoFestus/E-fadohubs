@@ -43,6 +43,7 @@ import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
 import { db, doc, updateDoc } from '../firebase';
+import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
@@ -248,7 +249,22 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   ]);
 
   const handleDeposit = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter a valid deposit amount", type: 'warning' }]);
+      return;
+    }
+    if (!accountDetails.bankName) {
+      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter or select your sending bank", type: 'warning' }]);
+      return;
+    }
+    if (!accountDetails.accountNumber || accountDetails.accountNumber.length < 8) {
+      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter your sending 10-digit account number", type: 'warning' }]);
+      return;
+    }
+    if (!accountDetails.accountName) {
+      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter your sending account name", type: 'warning' }]);
+      return;
+    }
     setPendingAction({ type: 'deposit', amount: Number(amount) });
     setShowPinModal(true);
   };
@@ -322,19 +338,28 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       const reference = `EFD-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
       if (type === 'deposit') {
+        const isManualDep = !['Direct Wallet', 'player_wallet', 'mining_wallet'].includes(selectedMethod);
         await onUpdateBalance(actionAmount, 'deposit');
         txId = await TransactionService.recordTransaction({
           userId: user.uid,
           type: 'deposit',
           amount: actionAmount,
           currency: 'USD',
-          status: 'completed',
+          status: isManualDep ? 'pending' : 'completed',
           method: selectedMethod || 'Direct Deposit',
           hub: 'WALLET',
           purpose: 'Wallet Top-up',
           reference,
-          description: 'Wallet Deposit',
-          skipWalletUpdate: true
+          description: isManualDep 
+            ? `Verification Pending: Sender [${accountDetails.bankName || 'Unknown Bank'} / ${accountDetails.accountNumber || 'N/A'} / ${accountDetails.accountName || 'N/A'}]`
+            : 'Wallet Deposit',
+          skipWalletUpdate: true,
+          metadata: {
+            senderBankName: accountDetails.bankName,
+            senderAccountNumber: accountDetails.accountNumber,
+            senderAccountName: accountDetails.accountName,
+            transactionRef: reference
+          }
         });
       } else {
         await onUpdateBalance(actionAmount, 'withdrawal', {
@@ -934,6 +959,49 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           value={accountDetails.accountName}
                           onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
                         />
+                      </div>
+                    </div>
+
+                    {/* CEO STRATEGIC TARGET ACCOUNTS */}
+                    <div className="space-y-4 mb-6">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-black text-slate-900 uppercase tracking-widest">
+                          CEO STRATEGIC ACCOUNTS (PAY TO ANY ACC BELOW)
+                        </label>
+                        <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">
+                          Real Receiver
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1 no-scrollbar border-2 border-indigo-100 rounded-3xl p-4 bg-indigo-50/20">
+                        {([...CEO_BANK_ACCOUNTS.savings, ...CEO_BANK_ACCOUNTS.current, ...CEO_BANK_ACCOUNTS.business]).map((acc, i) => (
+                          <div key={i} className="bg-white border border-gray-100 p-3.5 rounded-2xl hover:border-indigo-400/50 hover:shadow-md transition-all relative text-left">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">
+                                  <Building2 className="w-3.5 h-3.5" />
+                                </div>
+                                <div>
+                                  <p className="text-[7.5px] font-black text-gray-400 uppercase tracking-widest">{acc.bank} • {acc.type}</p>
+                                  <p className="text-[10px] font-black text-gray-800 uppercase tracking-tight">{acc.accountName}</p>
+                                </div>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(acc.accountNumber);
+                                }}
+                                className="p-1 px-2.5 bg-gray-50 hover:bg-emerald-50 text-[8px] font-black text-slate-500 hover:text-emerald-600 border border-gray-200 hover:border-emerald-200 rounded-lg transition-all flex items-center gap-1 active:scale-95"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </button>
+                            </div>
+                            <div className="bg-gray-50 p-2 rounded-xl flex items-center justify-between">
+                              <span className="text-xs font-black text-slate-800 font-mono tracking-widest">{acc.accountNumber}</span>
+                              <span className="text-[7.5px] font-semibold text-emerald-600 uppercase bg-emerald-50 px-1.5 rounded-full tracking-tighter">Verified CEO Account</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
