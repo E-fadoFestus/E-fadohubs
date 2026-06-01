@@ -419,8 +419,9 @@ function AppContent() {
       .catch((e: any) => {
         console.error('Redirect login error:', e);
         if (e?.code === 'auth/unauthorized-domain') {
+          const currentHost = window.location.hostname;
           setError(
-            'This domain is not authorized in Firebase. Please add "e-fado.com", "www.e-fado.com", and "e-fadohubs-nrxj.vercel.app" to the "Authorized domains" list under Authentication -> Settings in your Firebase Console.'
+            `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
           );
         } else if (e?.message) {
           setError(`Login redirect failed: ${e.message}`);
@@ -560,8 +561,9 @@ function AppContent() {
     } catch (e: any) {
       console.error('Login error details:', e);
       if (e?.code === 'auth/unauthorized-domain') {
+        const currentHost = window.location.hostname;
         setError(
-          'This domain (e-fado.com) is not authorized in Firebase. Please add "e-fado.com" to the "Authorized domains" list under Authentication -> Settings in your Firebase Console.'
+          `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
         );
       } else if (e?.code === 'auth/popup-blocked' || e?.message?.includes('popup')) {
         // If popup was blocked, fall back immediately to redirect

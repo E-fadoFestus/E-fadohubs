@@ -49,7 +49,7 @@ import confetti from 'canvas-confetti';
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { db, doc, updateDoc, increment } from '../firebase';
-import { PaymentPlatform } from './PaymentPlatform';
+import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 
 interface Trade {
   id: string;
@@ -915,30 +915,34 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
         {/* Extended Highly-Polished Unified EFADO Payment/Cashout Platform */}
         <AnimatePresence>
           {showPaymentUI.active && (
-            <div className="fixed inset-0 z-[110]">
-              <PaymentPlatform 
-                user={user}
-                type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
-                onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                onComplete={async (amount, method) => {
-                  try {
-                    const userRef = doc(db, 'users', user.uid);
-                    if (showPaymentUI.type === 'deposit') {
-                      await updateDoc(userRef, {
-                        depositWallet: increment(amount),
-                        playerWallet: increment(amount)
-                      });
-                    } else {
-                      await updateDoc(userRef, {
-                        playerWallet: increment(-amount)
-                      });
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
+                <EasyPaymentPlatform 
+                  user={user}
+                  type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
+                  onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
+                  onComplete={async (amount, method) => {
+                    try {
+                      const userRef = doc(db, 'users', user.uid);
+                      if (showPaymentUI.type === 'deposit') {
+                        await updateDoc(userRef, {
+                          depositWallet: increment(amount),
+                          playerWallet: increment(amount)
+                        });
+                      } else {
+                        await updateDoc(userRef, {
+                          playerWallet: increment(-amount)
+                        });
+                      }
+                    } catch (err) {
+                      console.error('Wallet update failed during trading game payment complete', err);
+                      throw err;
                     }
-                  } catch (err) {
-                    console.error('Wallet update failed during trading game payment complete', err);
-                    throw err;
-                  }
-                }}
-              />
+                  }}
+                  hub="DMT_GAME"
+                  purpose={showPaymentUI.type === 'deposit' ? "Tactical DMT Trading Account Funding" : "Tactical DMT Trading Profit Cashout"}
+                />
+              </div>
             </div>
           )}
         </AnimatePresence>

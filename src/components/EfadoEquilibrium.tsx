@@ -20,7 +20,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { PaymentPlatform } from './PaymentPlatform';
+import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 
 interface EfadoEquilibriumProps {
   user: UserProfile;
@@ -303,13 +303,17 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
         
         <AnimatePresence>
           {showPayment && (
-            <div className="fixed inset-0 z-[110]">
-              <PaymentPlatform 
-                user={user}
-                type={paymentType}
-                onClose={() => setShowPayment(false)}
-                onComplete={handlePaymentComplete}
-              />
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+              <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
+                <EasyPaymentPlatform 
+                  user={user}
+                  type={paymentType}
+                  onClose={() => setShowPayment(false)}
+                  onComplete={handlePaymentComplete}
+                  hub="EQUILIBRIUM"
+                  purpose={paymentType === 'deposit' ? "EFADO Equilibrium Stake Funding" : "EFADO Equilibrium Dividend Extraction"}
+                />
+              </div>
             </div>
           )}
         </AnimatePresence>
