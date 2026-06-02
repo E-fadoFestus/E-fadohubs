@@ -51,6 +51,7 @@ import { UserProfile, AdListing, AdPlan } from '../types';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
 import { PaymentPlatform } from './PaymentPlatform';
+import { EfadoPromoKit } from './EfadoPromoKit';
 
 interface EfadoAdvertisingHubProps {
   user: UserProfile;
@@ -199,7 +200,7 @@ const CATEGORY_FIELDS: Record<string, { label: string; type: string; placeholder
 
 export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, onClose, onNavigate, initialType }) => {
   const { formatPrice } = useCurrency();
-  const [view, setView] = useState<'BROWSE' | 'REGISTER'>('REGISTER');
+  const [view, setView] = useState<'BROWSE' | 'REGISTER' | 'PROMO'>('REGISTER');
   const [adType, setAdType] = useState<'ADVERT' | 'SELL'>(initialType || 'ADVERT');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [registerStep, setRegisterStep] = useState<'CATEGORY' | 'DETAILS' | 'PREVIEW' | 'PLAN'>('CATEGORY');
@@ -330,21 +331,36 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
           
           <div className="flex items-center gap-2 md:gap-4">
             <button 
-              onClick={() => handleTypeSwitch(adType)}
+              onClick={() => setView(view === 'PROMO' ? 'BROWSE' : 'PROMO')}
+              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:scale-105 duration-300 ${view === 'PROMO' ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-lg shadow-amber-500/20 animate-pulse' : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'}`}
+            >
+              🚀 Global Promo Kit
+            </button>
+            <button 
+              onClick={() => {
+                setView('REGISTER');
+                setRegisterStep('CATEGORY');
+              }}
               className={`hidden md:flex items-center gap-2 px-6 py-2 ${adType === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'} text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-indigo-100`}
             >
               <Plus className="w-4 h-4" /> Register {adType === 'ADVERT' ? 'Ad' : 'Listing'}
             </button>
             <div className="flex bg-gray-200 p-1 rounded-xl">
                <button 
-                onClick={() => handleTypeSwitch('ADVERT')}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${adType === 'ADVERT' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
+                onClick={() => {
+                  setView('BROWSE');
+                  handleTypeSwitch('ADVERT');
+                }}
+                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${view === 'BROWSE' && adType === 'ADVERT' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
               >
                 Advertise
               </button>
               <button 
-                onClick={() => handleTypeSwitch('SELL')}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${adType === 'SELL' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
+                onClick={() => {
+                  setView('BROWSE');
+                  handleTypeSwitch('SELL');
+                }}
+                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${view === 'BROWSE' && adType === 'SELL' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
               >
                 Sell Now
               </button>
@@ -612,6 +628,8 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                )}
             </section>
           </div>
+        ) : view === 'PROMO' ? (
+          <EfadoPromoKit user={user} onClose={() => setView('BROWSE')} />
         ) : (
           <div className="max-w-4xl mx-auto">
              <header className="mb-12 text-center">
