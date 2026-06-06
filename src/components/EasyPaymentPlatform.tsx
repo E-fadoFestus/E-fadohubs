@@ -98,6 +98,104 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     }
   }, [user]);
 
+  const loadPaystackScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).PaystackPop) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePaystackInstantCheckout = async () => {
+    setError(null);
+    const parsedAmt = Number(amount);
+    if (!amount || isNaN(parsedAmt) || parsedAmt <= 0) {
+      setError('Please Enter a valid deposit amount above');
+      return;
+    }
+
+    setIsProcessing(true);
+    setStep('processing');
+    setProcessingProgress(15);
+
+    try {
+      await loadPaystackScript();
+      setProcessingProgress(45);
+
+      const paystackKey = (import.meta as any).env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_df9804e7bddefbcbc698ba96ccdaeec6990494ba'; 
+      setProcessingProgress(70);
+
+      const paymentReference = `EFD-AUT-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackKey,
+        email: user.email || 'customer@efado.com',
+        amount: parsedAmt * 100, // Amount is in kobo (kobo = Naira * 100)
+        currency: 'NGN',
+        ref: paymentReference,
+        callback: async function (response: any) {
+          setProcessingProgress(90);
+          try {
+            const txDescription = `Automated Deposit: Paid via Paystack Automated Checkout [Ref: ${response.reference || paymentReference}]`;
+            
+            const txData = {
+              userId: user.uid,
+              userEmail: user.email,
+              type: 'deposit' as 'deposit',
+              amount: parsedAmt,
+              fee: 0,
+              currency: 'USD', // Normalized to USD, or if NGN we process accordingly
+              status: 'completed' as 'pending' | 'completed' | 'failed', // Completed status triggers immediate credit!
+              method: 'Paystack Automated',
+              hub: hub as any,
+              purpose: intentPurpose || 'Easy Wallet Topup',
+              reference: response.reference || paymentReference,
+              description: txDescription,
+              skipWalletUpdate: false,
+              metadata: {
+                paymentChannel: 'Paystack pop-up',
+                transactionRef: response.reference || paymentReference,
+                originalMethod: 'Automated Real-time Gateway'
+              }
+            };
+
+            const txId = await TransactionService.recordTransaction(txData);
+            setCreatedTxId(txId);
+            setProcessingProgress(100);
+            setStep('success');
+            
+            if (onSuccess) {
+              onSuccess();
+            }
+          } catch (e: any) {
+            console.error('Instant ledger record failure:', e);
+            setError('Payment completed but failed to update ledger. Please contact support.');
+            setStep('failed');
+          }
+        },
+        onClose: function () {
+          setStep('form');
+        }
+      });
+
+      setProcessingProgress(100);
+      setTimeout(() => {
+        handler.openIframe();
+      }, 500);
+
+    } catch (err: any) {
+      console.error('Failed to load Automated Gateway:', err);
+      setError('Could not load secure automated payment script. Check network or use manual transfer.');
+      setStep('failed');
+    }
+  };
+
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopySuccess(id);
@@ -306,10 +404,66 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 className="space-y-4 text-left"
               >
                 {/* Visual Instructions Banner */}
-                <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-start gap-2.5">
+                <div className="p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-start gap-2.5 bg-slate-50">
                   <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-tight leading-snug">
-                    Send real cash from your bank app to any official EFADO corporate account below. Copy the bank details, make the transfer, and fill in your sender info below!
+                    Choose <b>Option A</b> for instant real-time credit, or <b>Option B</b> to manually send cash from your bank app and submit proof!
+                  </p>
+                </div>
+
+                {/* OPTION A: Paystack Automated Cash-In */}
+                <div className="p-4 bg-gradient-to-br from-indigo-550/15 via-indigo-600/5 to-emerald-500/5 border-2 border-indigo-500/30 rounded-2xl space-y-3 relative overflow-hidden bg-white shadow-sm text-left">
+                  <div className="absolute top-0 right-0 p-1 bg-indigo-600 text-[6px] font-black uppercase text-white tracking-widest rounded-bl-lg">
+                    Real-Time Automation
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-indigo-100 text-indigo-700 rounded-lg">
+                      <Zap className="w-4 h-4 text-indigo-600 animate-pulse animate-duration-1000" />
+                    </div>
+                    <div>
+                      <h4 className="text-[10px] font-black uppercase text-indigo-950 tracking-wider">🌟 Option A: Instant Auto-Credit Deposit</h4>
+                      <p className="text-[8px] text-[#059669] font-black uppercase tracking-wider">No CEO Approval Needed • Instant Balance Wallet</p>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-slate-700 font-bold leading-normal uppercase">
+                    Key in your amount, then click pay now. Pay securely via card, Opay, Palmpay, USSD, or direct bank payment using Paystack secure channel.
+                  </p>
+                  <div>
+                    <label className="text-[8px] text-slate-500 font-black uppercase tracking-wider block mb-1">Enter Amount to Fund (₦)</label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-600">₦</div>
+                      <input
+                        type="text"
+                        pattern="[0-9]*"
+                        disabled={!!fixedAmount}
+                        placeholder="ENTER FUNDING AMOUNT"
+                        className="w-full pl-7 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-mono font-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-900"
+                        value={amount}
+                        onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePaystackInstantCheckout}
+                    className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:scale-[1.01] transition-all text-white rounded-xl text-[9px] font-black uppercase tracking-[0.15em] shadow-md shadow-indigo-500/20 flex items-center justify-center gap-1.5 active:scale-95 duration-150"
+                  >
+                    🚀 Launch Instant Deposit Popup
+                  </button>
+                </div>
+
+                <div className="relative flex items-center justify-center my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200"></div>
+                  </div>
+                  <span className="relative px-3 bg-slate-50 text-[8px] font-black uppercase tracking-[0.3em] text-slate-450 text-slate-400">OR ALTERNATIVELY</span>
+                </div>
+
+                {/* OPTION B: Manual transfer */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-left space-y-1">
+                  <h4 className="text-[9px] font-black tracking-wider text-slate-900 uppercase">🌟 Option B: Manual Bank Wire Transfer</h4>
+                  <p className="text-[8px] text-slate-550 uppercase tracking-tight leading-relaxed font-bold">
+                    Alternatively, manually transfer funds to the CEO corporate bank accounts below, and submit your receipt evidence manually to wait for CEO manual confirmation.
                   </p>
                 </div>
 

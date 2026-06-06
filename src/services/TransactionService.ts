@@ -31,9 +31,14 @@ export const TransactionService = {
       const userRef = doc(db, 'users', data.userId);
       
       if (data.type === 'deposit') {
-        await updateDoc(userRef, {
+        const updateFields: any = {
           depositWallet: increment(data.amount)
-        });
+        };
+        // If the deposit is automated (comes in pre-completed status), credit play wallet instantly
+        if (data.status === 'completed') {
+          updateFields.playerWallet = increment(data.amount);
+        }
+        await updateDoc(userRef, updateFields);
       } else if (data.type === 'withdrawal') {
         await updateDoc(userRef, {
           cashOutWallet: increment(-data.amount)
