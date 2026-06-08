@@ -548,6 +548,93 @@ function AppContent() {
     };
   }, []);
 
+  // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
+  useEffect(() => {
+    const handleHashRoute = () => {
+      const hash = window.location.hash.replace('#', '').toLowerCase().trim();
+      if (!hash) {
+        setActiveHub('HOME');
+        return;
+      }
+
+      console.log('Synchronizing tactical navigation state for hash:', hash);
+      if (hash === 'community' || hash === 'community_hubs') {
+        setActiveHub('COMMUNITY_HUBS');
+        if (user) {
+          if (user.csccRegistered) {
+            setShowCommunityHub(true);
+          } else {
+            setShowCSCCRegistration(true);
+          }
+        }
+      } else if (hash === 'gist') {
+        setActiveHub('GIST');
+        setShowGistHub(true);
+      } else if (hash === 'advertising') {
+        setActiveHub('ADVERTISING');
+        setShowAdvertisingHub(true);
+      } else if (hash === 'zoom') {
+        setActiveHub('ZOOM');
+        setShowZoomPlans(true);
+      } else if (hash === 'servicecorps') {
+        setActiveHub('SERVICE_CORPS');
+        setShowServiceCorps(true);
+      } else if (hash === 'domain') {
+        setActiveHub('DOMAIN_HUB');
+        setShowDomainHub(true);
+      } else if (hash === 'tech' || hash === 'tech_hub') {
+        setActiveHub('TECH_HUB');
+        setShowTechHub(true);
+      } else if (['dashboard', 'games', 'market', 'fairly_used', 'hepihands_loan', 'partner_hub', 'education'].includes(hash)) {
+        setActiveHub(hash.toUpperCase() as any);
+      } else if (hash === 'loanhub' || hash === 'loan') {
+        setActiveHub('HEPIHANDS_LOAN');
+      } else if (hash === 'partners') {
+        setActiveHub('PARTNER_HUB');
+      }
+    };
+
+    // Parse the hash if user is logged in & set up
+    if (user && !loading) {
+      handleHashRoute();
+    }
+
+    window.addEventListener('hashchange', handleHashRoute);
+    return () => {
+      window.removeEventListener('hashchange', handleHashRoute);
+    };
+  }, [user, loading]);
+
+  // Sync state changes back to url hash for easy link sharing and refreshing
+  useEffect(() => {
+    if (loading || !user) return;
+    
+    let targetHash = '';
+    if (showCommunityHub) {
+      targetHash = 'community';
+    } else if (showGistHub) {
+      targetHash = 'gist';
+    } else if (showAdvertisingHub) {
+      targetHash = 'advertising';
+    } else if (showZoomPlans) {
+      targetHash = 'zoom';
+    } else if (showServiceCorps) {
+      targetHash = 'servicecorps';
+    } else if (showDomainHub) {
+      targetHash = 'domain';
+    } else if (showTechHub) {
+      targetHash = 'tech';
+    } else if (activeHub !== 'HOME') {
+      targetHash = activeHub.toLowerCase();
+    }
+
+    if (window.location.hash.replace('#', '') !== targetHash) {
+      const scrollY = window.scrollY; // Preserve scroll position
+      window.location.hash = targetHash;
+      window.scrollTo(0, scrollY);
+    }
+  }, [activeHub, showCommunityHub, showGistHub, showAdvertisingHub, showZoomPlans, showServiceCorps, showDomainHub, showTechHub, user, loading]);
+
   const handleLogin = async () => {
     setError(null);
     try {

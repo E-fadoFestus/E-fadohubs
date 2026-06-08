@@ -89,6 +89,8 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     // Real-time listener for all memberships to power Admin Ops approvals
     const unsub = onSnapshot(collection(db, 'cscc_memberships'), (snapshot) => {
       setAllMemberships(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CSCCMembership)));
+    }, (error) => {
+      console.warn('Silent fallback: Permission denied reading all cscc_memberships.', error);
     });
     return unsub;
   }, []);
@@ -107,6 +109,9 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
               return secB - secA;
             })
         );
+      },
+      (error) => {
+        console.error('Error fetching user transactions ledger:', error);
       }
     );
     return unsubTrans;
@@ -118,6 +123,9 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
         query(collection(db, 'cscc_messages'), where('groupId', '==', selectedGroup.id)),
         (snapshot) => {
           setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatMessage)).sort((a, b) => a.createdAt?.seconds - b.createdAt?.seconds));
+        },
+        (error) => {
+          console.error('Error listening to communal messages:', error);
         }
       );
       return () => unsubMessages();
@@ -133,6 +141,8 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       if (recipientId) {
         getDoc(doc(db, 'users', recipientId)).then(snap => {
           if (snap.exists()) setRecipientProfile(snap.data() as UserProfile);
+        }).catch(err => {
+          console.error('Error loading recipient user profile:', err);
         });
       }
     }
@@ -142,12 +152,18 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     const unsubGroups = onSnapshot(collection(db, 'cscc_groups'), (snapshot) => {
       setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CSCCGroup)));
       setLoading(false);
+    }, (error) => {
+      console.error('Error listening to CSCC groups collection:', error);
+      setLoading(false);
     });
 
     const unsubMemberships = onSnapshot(
       query(collection(db, 'cscc_memberships'), where('userId', '==', user.uid)),
       (snapshot) => {
         setMyMemberships(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CSCCMembership)));
+      },
+      (error) => {
+        console.error('Error loading user CSCC list memberships:', error);
       }
     );
 

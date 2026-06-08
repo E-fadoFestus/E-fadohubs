@@ -114,7 +114,8 @@ export const EfadoPromoKit: React.FC<EfadoPromoKitProps> = ({ user, onClose }) =
   const [phoneNumber, setPhoneNumber] = useState('+234 or your local office');
   
   // Script Type state
-  const [scriptView, setScriptView] = useState<'VIRAL' | 'EXPLAINER' | 'SOCIAL' | 'EMAIL'>('VIRAL');
+  const [scriptView, setScriptView] = useState<'VIRAL' | 'EXPLAINER' | 'SOCIAL' | 'EMAIL' | 'PITCH'>('VIRAL');
+  const [pitchSlideIdx, setPitchSlideIdx] = useState(0);
   
   // Interactive Storyboard step tracking
   const [activeStoryIdx, setActiveStoryIdx] = useState(0);
@@ -295,6 +296,7 @@ Ecosystem Link: e-fado.com`;
       case 'EXPLAINER': return explainer;
       case 'SOCIAL': return social;
       case 'EMAIL': return email;
+      default: return "";
     }
   };
 
@@ -593,12 +595,13 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
             </div>
 
             {/* Script section tabs */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
               {[
                 { id: 'VIRAL', label: '🎥 Short Video', desc: 'TikTok, Shorts, Reels' },
                 { id: 'EXPLAINER', label: '📺 Explainer', desc: '60s YouTube, FB' },
                 { id: 'SOCIAL', label: '🚀 Social post', desc: 'WhatsApp, Telegram' },
                 { id: 'EMAIL', label: '✉️ Partner cold', desc: 'B2B outreach Email' },
+                { id: 'PITCH', label: '📊 Pitch Deck', desc: 'Live Presentation' },
               ].map((tab) => (
                 <button 
                   key={tab.id}
@@ -614,43 +617,492 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
               ))}
             </div>
 
-            {/* Interactive Hydrated Code Box */}
-            <div className="relative bg-slate-950 rounded-[2rem] border border-white/10 flex-grow flex flex-col overflow-hidden min-h-[300px]">
-              
-              {/* Absolute Action over Console */}
-              <div className="absolute top-4 right-4 flex gap-2 z-10">
-                <button 
-                  onClick={() => handleDownloadText(scriptView, currentActiveScript())}
-                  className="p-2 bg-slate-900 border border-white/15 hover:border-white/20 rounded-xl hover:bg-slate-800 transition-all text-slate-300 hover:text-white"
-                  title="Download Script text"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => copyToClipboard(currentActiveScript(), scriptView)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-white/15 hover:border-white/20 rounded-xl hover:bg-slate-800 transition-all text-slate-300 hover:text-white"
-                >
-                  {copiedSection === scriptView ? (
-                    <>
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
+            {/* Interactive Hydrated Code Box or Live Pitch Deck */}
+            {scriptView === 'PITCH' ? (
+              <div className="relative bg-slate-950 rounded-[2rem] border-2 border-indigo-500/30 flex-grow flex flex-col overflow-hidden min-h-[460px] transition-all">
+                <div className="absolute inset-0 bg-radial-gradient(from-center, rgba(99,102,241,0.05) 0%, transparent 80%) pointer-events-none" />
+                
+                {/* Simulated Glass Slide Content Container */}
+                <div className="p-6 md:p-8 flex-grow flex flex-col justify-between relative z-10">
+                  <AnimatePresence mode="wait">
+                    {pitchSlideIdx === 0 && (
+                      <motion.div
+                        key="slide0"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.3 }}
+                        className="flex flex-col items-center justify-center text-center space-y-4 my-auto w-full"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20">SLIDE 1: INTRO</span>
+                        <h4 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-white italic leading-tight">
+                          {tagline}
+                        </h4>
+                        <p className="text-lg md:text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-indigo-400">
+                          Your All-In-One Digital Ecosystem
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Connect · Transact · Thrive</p>
+                        <div className="flex gap-3 mt-1">
+                          <span className="px-3 py-1.5 bg-slate-900 border border-white/5 rounded-xl text-[9px] items-center text-slate-300 font-semibold flex gap-1">
+                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" /> e-fado.com
+                          </span>
+                        </div>
 
-              {/* Scrollable code text */}
-              <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-grow select-text selection:bg-amber-500/20">
-                <pre className="text-[11px] md:text-[12px] font-mono text-slate-200 whitespace-pre-wrap leading-relaxed">
-                  {currentActiveScript()}
-                </pre>
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 6s | Tone: Welcoming, Confident</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Voice actor starts with a warm, energetic, welcoming smile in his tone] Are you tired of switching between fifty different applications every single day just to manage your life? Welcome to the ultimate digital lock. This is <span className="text-amber-400 font-black">{tagline}</span>—your all-in-one digital ecosystem!"
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Deep electronic riser fading into smooth Afrobeat chords.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Are you tired of switching between fifty different applications every single day just to manage your life? Welcome to the ultimate digital lock. This is ${tagline}—your all-in-one digital ecosystem!`, 'VO_S1'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S1' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 1 && (
+                      <motion.div
+                        key="slide1"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-left my-auto w-full"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 2: MEET THE VISIONARY</span>
+                        <h4 className="text-2xl font-black text-white uppercase tracking-tight">Okhawere Festus</h4>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Chief Executive Officer · EFADO Market Hubs</p>
+                        <div className="h-0.5 w-12 bg-gradient-to-r from-amber-500 to-transparent" />
+                        <p className="text-xs md:text-sm font-semibold text-slate-300 leading-relaxed max-w-xl">
+                          A visionary leader dedicated to building Africa's most innovative digital marketplace. With a passion for technology and community empowerment, Festus is driving the revolution that connects millions of people to life-changing opportunities.
+                        </p>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 8s | Tone: Respectful, Reassuring</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Voiceover style shifts to professional reassurance] Behind every grand shift, there stands a solid vision. Meet Okhawere Festus, Chief Executive Officer of EFADO Market Hubs. Driven by a relentless passion for modern tech and direct civic empowerment, Festus is steering a model built to launch millions into shared growth."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Light keystroke acoustic pad backing, slow majestic strings.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Behind every grand shift, there stands a solid vision. Meet Okhawere Festus, Chief Executive Officer of EFADO Market Hubs. Driven by a relentless passion for modern tech and direct civic empowerment, Festus is steering a model built to launch millions into shared growth.`, 'VO_S2'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S2' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 2 && (
+                      <motion.div
+                        key="slide2"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-6 text-center my-auto w-full"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 3: PLATFORM BLUEPRINT</span>
+                        <h4 className="text-2xl font-black text-white uppercase tracking-tight">One Platform. Infinite Possibilities.</h4>
+                        <p className="text-xs text-slate-350 max-w-lg mx-auto leading-relaxed">
+                          EFADO Hubs Connect is an innovative, unified digital ecosystem linking buyers, sellers, employers, employees, landlords, savers, and gamers securely across physical boundaries.
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-xl mx-auto pt-2">
+                          {[
+                            { value: '8+', label: 'Core Services' },
+                            { value: '1', label: 'Ecosystem' },
+                            { value: '∞', label: 'Opportunities' },
+                            { value: '24/7', label: 'Ecosystem Sync' }
+                          ].map((stat, idx) => (
+                            <div key={idx} className="p-3 bg-slate-900 border border-white/5 rounded-2xl">
+                              <span className="block text-xl font-bold text-amber-500">{stat.value}</span>
+                              <span className="block text-[8px] font-black uppercase tracking-widest text-slate-400 mt-1">{stat.label}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 10s | Tone: High-impact, Data-driven</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Voiceover escalates with impressive pace and heavy confidence] One single digital environment. Beautifully engineered with infinite commercial possibilities. Spanning {targetLocation}, EFADO bridges peer connections, rotates community capital, and integrates 8 specialized hubs, serving you completely with no borders."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Upbeat electronic background beats with subtle, metallic typing clicks.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`One single digital environment. Beautifully engineered with infinite commercial possibilities. Spanning ${targetLocation}, EFADO bridges peer connections, rotates community capital, and integrates 8 specialized hubs, serving you completely with no borders.`, 'VO_S3'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S3' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 3 && (
+                      <motion.div
+                        key="slide3"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-center my-auto w-full"
+                      >
+                        <div className="mb-2">
+                          <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 4: THE APP SERVICES</span>
+                          <h4 className="text-xl font-black text-white uppercase mt-2">Everything You Need. One App.</h4>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
+                          {[
+                            { icon: '🛒', name: 'Marketplace', desc: 'Secure P2P trade' },
+                            { icon: '💼', name: 'Job Portal', desc: 'Sovereign careers' },
+                            { icon: '🏠', name: 'Real Estate', desc: 'Land & housing lock' },
+                            { icon: '🎓', name: 'Education', desc: 'Curriculum & learning' },
+                            { icon: '🏦', name: 'Community Savings', desc: 'CSCC rotational pools' },
+                            { icon: '💰', name: 'Credit Access', desc: 'HepiHands collateral-free' },
+                            { icon: '🏪', name: 'Vendor Hub', desc: 'Merchant global sync' },
+                            { icon: '🎮', name: 'Game Arena', desc: 'Risk-free fun stakes' }
+                          ].map((svc, idx) => (
+                            <div key={idx} className="p-2.5 bg-slate-900 border border-white/5 rounded-xl text-left hover:border-indigo-500/30 transition-all">
+                              <div className="text-base mb-1">{svc.icon}</div>
+                              <span className="block text-[10px] font-black text-white uppercase tracking-tight truncate">{svc.name}</span>
+                              <span className="block text-[8px] text-slate-400 truncate mt-0.5">{svc.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 12s | Tone: Enterprising, Highly Energetic</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Energetic video ad style] Every critical commercial tool seamlessly synchronized. Sell products securely via verified escrow, discover sovereign job pathways, pool decentralized capital under structured communal rotating logs, access fair credit, trade digital assets, and test your luck in risk-free games. It's your complete portal empire inside your pocket!"
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Bouncy Afrobeat bass line, chiming alert sound fx on word 'synchronised'.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Every critical commercial tool seamlessly synchronized. Sell products securely via verified escrow, discover sovereign job pathways, pool decentralized capital under structured communal rotating logs, access fair credit, trade digital assets, and test your luck in risk-free games. It's your complete portal empire inside your pocket!`, 'VO_S4'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S4' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 4 && (
+                      <motion.div
+                        key="slide4"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-center my-auto max-w-xl mx-auto w-full"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 5: FOUNDER VISION</span>
+                        <div className="text-amber-500 text-3xl font-black">“</div>
+                        <blockquote className="text-sm md:text-base font-semibold text-slate-200 italic leading-relaxed">
+                          We built {tagline} because we believe every person — no matter where they are — deserves access to a world of digital sovereignty. This is not just an app. It is a movement.
+                        </blockquote>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-amber-400">— Okhawere Festus, CEO</div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 8s | Tone: Inspired, Sincere</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Sincere, human interest tone] At the heart of EFADO lies a simple, profound core. High technology is not just for global conglomerates. Every single person deserves to be interconnected. It's time to build a robust safety net where everyone can save, thrive, and own their own data. This is more than technology. It's a digital revolution."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Sincere, warm acoustic guitar notes with smooth ambient reverb.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`At the heart of EFADO lies a simple, profound core. High technology is not just for global conglomerates. Every single person deserves to be interconnected. It's time to build a robust safety net where everyone can save, thrive, and own their own data. This is more than technology. It's a digital revolution.`, 'VO_S5'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S5' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 5 && (
+                      <motion.div
+                        key="slide5"
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-5 text-left my-auto w-full max-w-xl mx-auto"
+                      >
+                        <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-indigo-500/20 inline-block font-mono">SLIDE 6: CRITICAL WHY</span>
+                        <h4 className="text-xl font-black text-white uppercase">Built For Your True Success</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {[
+                            { icon: '🔒', title: 'Security First', desc: 'Tactical escrow protection protocols' },
+                            { icon: '⚡', title: 'All-In-One Ease', desc: 'No more jumping between separate apps' },
+                            { icon: '🌍', title: 'Community Led', desc: 'Unlock collective capital & savings' },
+                            { icon: '🚀', title: 'Pristine Tech Core', desc: 'Optimized for mobile-first global speed' }
+                          ].map((why, idx) => (
+                            <div key={idx} className="flex gap-2.5 items-start">
+                              <span className="text-lg mt-0.5">{why.icon}</span>
+                              <div>
+                                <span className="block text-[11px] font-black uppercase text-white tracking-wide">{why.title}</span>
+                                <span className="block text-[10px] text-slate-400 mt-1 leading-normal">{why.desc}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 10s | Tone: Strategic, Decisive, Convincing</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Voiceover shifts to deep strategic authority] Why is EFADO a game changer? Four unyielding pillars: uncompromising security backed by robust escrow system; elegant convenience replacing disjointed apps; community-fueled financial savings programs; and an optimized technology framework built for global high-tempo execution."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Heavy industrial drum hit with constant metallic tech clanks.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Why is EFADO a game changer? Four unyielding pillars: uncompromising security backed by robust escrow system; elegant convenience replacing disjointed apps; community-fueled financial savings programs; and an optimized technology framework built for global high-tempo execution.`, 'VO_S6'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S6' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 6 && (
+                      <motion.div
+                        key="slide6"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-center my-auto w-full max-w-2xl mx-auto"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 7: ECOSYSTEM WORKFLOW</span>
+                        <h4 className="text-xl font-black text-white uppercase">How It Works in Days</h4>
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 pt-2">
+                          {[
+                            { step: '1', title: 'Register', desc: 'Create account online' },
+                            { step: '2', title: 'Profile', desc: 'Add business info' },
+                            { step: '3', title: 'Explore', desc: 'Review active hubs' },
+                            { step: '4', title: 'Transact', desc: 'Buy, sell & save' },
+                            { step: '5', title: 'Harvest', desc: 'Expand net value' }
+                          ].map((step, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md shadow-indigo-500/10 mb-2">
+                                {step.step}
+                              </div>
+                              <span className="block text-[10px] font-black text-white uppercase">{step.title}</span>
+                              <span className="block text-[8px] text-slate-500 text-center mt-1 max-w-[100px] leading-tight">{step.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 8s | Tone: Explanatory, Streamlined, Clear</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Warm, tutorial-style tone] Joining our global ecosystem requires no friction. Just register your master account online, configure your professional business credentials, discover all the robust integrated hubs, transact with complete confidence, and scale your personal network capital immediately."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Smooth, medium-tempo acoustic guitar pluck sounds.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Joining our global ecosystem requires no friction. Just register your master account online, configure your professional business credentials, discover all the robust integrated hubs, transact with complete confidence, and scale your personal network capital immediately.`, 'VO_S7'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S7' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 7 && (
+                      <motion.div
+                        key="slide7"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.05 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-center my-auto max-w-md mx-auto w-full"
+                      >
+                        <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-indigo-500/20 inline-block font-mono">SLIDE 8: PORTABLE EMPIRE</span>
+                        <h4 className="text-2xl font-black text-white uppercase tracking-tight">Ecosystem Download</h4>
+                        <p className="text-xs font-semibold text-slate-400 leading-normal">
+                          Grab the fully featured EFADO app directly and launch your decentralized commercial pipeline in minutes under robust secure environments.
+                        </p>
+                        <button className="w-full py-3 bg-gradient-to-r from-amber-500 to-indigo-600 text-[10px] text-white font-black uppercase tracking-widest rounded-xl hover:scale-102 active:scale-95 transition-all shadow-xl shadow-indigo-500/10">
+                          📲 Download The App Now
+                        </button>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 8s | Tone: Urgent, Convincing, Call-to-Action</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Bold call-to-action tone] Launching is just a tap away. Bypass standard bulky download channels, download our fully encapsulated sovereign mobile app at e-fado.com directly, and deploy a state-of-the-art secure transactional pipeline right at your fingertips."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Sharp synthetic swoosh and an encouraging upward-building pitch scale.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`Launching is just a tap away. Bypass standard bulky download channels, download our fully encapsulated sovereign mobile app at e-fado.com directly, and deploy a state-of-the-art secure transactional pipeline right at your fingertips.`, 'VO_S8'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S8' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {pitchSlideIdx === 8 && (
+                      <motion.div
+                        key="slide8"
+                        initial={{ opacity: 0, translateY: 20 }}
+                        animate={{ opacity: 1, translateY: 0 }}
+                        exit={{ opacity: 0, translateY: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-4 text-center my-auto w-full max-w-xl mx-auto"
+                      >
+                        <span className="px-3 py-1 bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-500/20 inline-block font-mono">SLIDE 9: JOIN THE REVOLUTION</span>
+                        <h4 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">Let's Build The Future Together</h4>
+                        <p className="text-xs text-slate-350 leading-relaxed font-semibold">
+                          Connect, collaborate, and create a better decentralized environment with {tagline} — your ultimate digital commercial ecosystem choice.
+                        </p>
+                        <div className="flex gap-2.5 justify-center flex-wrap">
+                          <span className="px-4 py-2 bg-indigo-600/30 text-indigo-400 text-[8px] font-mono font-black uppercase tracking-widest border border-indigo-500/20 rounded-xl">www.efadohubsconnect.com</span>
+                          <span className="px-4 py-2 bg-amber-500/20 text-amber-400 text-[8px] font-mono font-black uppercase tracking-widest border border-amber-500/20 rounded-xl">efado226@gmail.com</span>
+                        </div>
+
+                        {/* Strategic Voiceover Audio Narration Box */}
+                        <div className="w-full text-left bg-slate-900/80 border border-amber-500/15 p-4 rounded-2xl space-y-2 mt-4 select-text">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                            <span className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1">
+                              <Volume2 className="w-3.5 h-3.5 text-amber-400" /> Strategic Voiceover Narration
+                            </span>
+                            <span className="text-[8px] font-mono text-slate-400 uppercase">Duration: 10s | Tone: Grand, Professional, Melodic sign-off</span>
+                          </div>
+                          <p className="text-[10.5px] text-slate-200 leading-relaxed font-semibold">
+                            "[Broadcaster final signature tone] The global sync has begun. Do not get left behind inside a fragmented web. Join the movement now at www.efadohubsconnect.com or write us at efado226@gmail.com today. EFADO Hubs Connect: Your Entire World, Fully Synchronized."
+                          </p>
+                          <div className="text-[7.5px] font-mono text-slate-500 uppercase tracking-widest">SFX Recommendation: Symphonic bass swell resolving out to a sparkling, highly-polished electric node chime.</div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); copyToClipboard(`The global sync has begun. Do not get left behind inside a fragmented web. Join the movement now at www.efadohubsconnect.com or write us at efado226@gmail.com today. EFADO Hubs Connect: Your Entire World, Fully Synchronized.`, 'VO_S9'); }}
+                            className="text-[8px] font-black uppercase text-slate-400 hover:text-white flex items-center gap-1.5 mt-2 transition-all p-1 hover:bg-white/5 rounded-md"
+                          >
+                            <Copy className="w-3 h-3" /> {copiedSection === 'VO_S9' ? 'VO Script Copied!' : 'Copy VO Script'}
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Pitch Slide Navigation Controllers */}
+                  <div className="flex items-center justify-between mt-8 pt-4 border-t border-white/5">
+                    <button
+                      disabled={pitchSlideIdx === 0}
+                      onClick={() => setPitchSlideIdx(p => Math.max(0, p - 1))}
+                      className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 disabled:opacity-30 transition-all text-white"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Navigation Mini-bar Indicator */}
+                    <div className="flex gap-1.5 items-center">
+                      {[...Array(9)].map((_, i) => (
+                        <button 
+                          key={i}
+                          onClick={() => setPitchSlideIdx(i)}
+                          className={`h-1.5 rounded-full transition-all duration-300 ${pitchSlideIdx === i ? 'w-6 bg-gradient-to-r from-amber-500 to-indigo-600' : 'w-1.5 bg-white/10'}`}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      disabled={pitchSlideIdx === 8}
+                      onClick={() => setPitchSlideIdx(p => Math.min(8, p + 1))}
+                      className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 disabled:opacity-30 transition-all text-white"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative bg-slate-950 rounded-[2rem] border border-white/10 flex-grow flex flex-col overflow-hidden min-h-[300px]">
+                
+                {/* Absolute Action over Console */}
+                <div className="absolute top-4 right-4 flex gap-2 z-10">
+                  <button 
+                    onClick={() => handleDownloadText(scriptView, currentActiveScript())}
+                    className="p-2 bg-slate-900 border border-white/15 hover:border-white/20 rounded-xl hover:bg-slate-800 transition-all text-slate-300 hover:text-white"
+                    title="Download Script text"
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => copyToClipboard(currentActiveScript(), scriptView)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-white/15 hover:border-white/20 rounded-xl hover:bg-slate-800 transition-all text-slate-300 hover:text-white"
+                  >
+                    {copiedSection === scriptView ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Scrollable code text */}
+                <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar flex-grow select-text selection:bg-amber-500/20">
+                  <pre className="text-[11px] md:text-[12px] font-mono text-slate-200 whitespace-pre-wrap leading-relaxed">
+                    {currentActiveScript()}
+                  </pre>
+                </div>
+              </div>
+            )}
 
             {/* Quick Action Info Tips */}
             <div className="p-5 bg-gradient-to-r from-amber-500/10 to-indigo-600/10 border-2 border-white/5 rounded-2xl mt-6 flex gap-4">
