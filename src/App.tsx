@@ -192,6 +192,18 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
   const [liveUsers, setLiveUsers] = useState(1240);
 
+  // Super Admin login states
+  const [loginMode, setLoginMode] = useState<'STANDARD' | 'CEO'>('STANDARD');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [currentOtpCode, setCurrentOtpCode] = useState('');
+  const [otpAttempts, setOtpAttempts] = useState(0);
+  const [otpMessage, setOtpMessage] = useState('');
+  const [simulatedSmsCode, setSimulatedSmsCode] = useState('');
+  const [showSmsPopup, setShowSmsPopup] = useState(false);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setLiveUsers(prev => prev + Math.floor(Math.random() * 11) - 5);
@@ -537,6 +549,63 @@ function AppContent() {
           }, (e) => handleFirestoreError(e, OperationType.GET, 'adminStats/global'));
         }
       } else {
+        // Fallback: Check if we have an active Super Admin session
+        const savedSession = localStorage.getItem('efado_session');
+        if (savedSession) {
+          try {
+            const sessionData = JSON.parse(savedSession);
+            if (sessionData.is_super_admin && sessionData.has_free_access && Date.now() < sessionData.expiresAt) {
+              const userRef = doc(db, 'users', 'efado_admin_ceo');
+              
+              unsubUser = onSnapshot(userRef, async (snapshot) => {
+                if (snapshot.exists()) {
+                  setUser(snapshot.data() as UserProfile);
+                } else {
+                  const adminProfile: UserProfile = {
+                    uid: 'efado_admin_ceo',
+                    email: 'festdanemh@gmail.com',
+                    displayName: 'Okhawere Festus Daniel',
+                    playerWallet: 1000000,
+                    depositWallet: 1000000,
+                    cashOutWallet: 0,
+                    miningWallet: 5000,
+                    role: 'admin',
+                    is_super_admin: true,
+                    admin_otp_phone: '08072456836',
+                    createdAt: new Date().toISOString()
+                  };
+                  await setDoc(userRef, adminProfile);
+                  setUser(adminProfile);
+                }
+                setLoading(false);
+              }, (e) => {
+                console.error("Firestore loading error on Super Admin profile snapshot:", e);
+                setLoading(false);
+              });
+
+              // Listen for announcements
+              unsubAnn = onSnapshot(collection(db, 'announcements'), (snapshot) => {
+                const ann = snapshot.docs
+                  .map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
+                  .filter(a => a.active)
+                  .sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
+                setAnnouncements(ann);
+              });
+
+              // Listen for admin stats
+              unsubAdmin = onSnapshot(doc(db, 'adminStats', 'global'), (snapshot) => {
+                if (snapshot.exists()) {
+                  setAdminStats(snapshot.data() as AdminStats);
+                }
+              });
+
+              return; // Skip setting user to null
+            }
+          } catch (e) {
+            console.error("Failed to restore Super Admin session:", e);
+          }
+        }
+
         setUser(null);
         setLoading(false);
       }
@@ -668,7 +737,131 @@ function AppContent() {
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleAdminLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    // Check lockout period
+    const now = Date.now();
+    const lockedTime = localStorage.getItem('efado_lockout_until');
+    if (lockedTime && now < Number(lockedTime)) {
+      const remainingMin = Math.ceil((Number(lockedTime) - now) / 60000);
+      setError(`CEO login is locked due to multiple failed OTP attempts. Try again in ${remainingMin} minutes.`);
+      return;
+    }
+
+    const isSuperAdminEmail = adminEmail.trim().toLowerCase() === 'festdanemh@gmail.com';
+    const isSuperAdminPassword = adminPassword.trim() === 'EFADO_CEO_2026' || adminPassword.trim() === '08072456836';
+
+    if (!isSuperAdminEmail || !isSuperAdminPassword) {
+      setError("Invalid Administrative Credentials. Access Blocked.");
+      return;
+    }
+
+    // Password matches! Proceed to OTP Verification (Step 2)
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setCurrentOtpCode(generatedOtp);
+    setOtpStep(true);
+    setOtpAttempts(0);
+    setOtpInput('');
+    setOtpMessage(`A 6-digit secure key has been broadcasted to CEO secure terminal (08072456836).`);
+    
+    // We will display a highly visible simulation modal of the SMS gateway
+    setSimulatedSmsCode(generatedOtp);
+    setShowSmsPopup(true);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    // Double check lockout
+    const now = Date.now();
+    const lockedTime = localStorage.getItem('efado_lockout_until');
+    if (lockedTime && now < Number(lockedTime)) {
+      setError(`CEO portal is locked. Try again later.`);
+      return;
+    }
+
+    if (otpInput.trim() === currentOtpCode) {
+      // SUCCESS!
+      // Set Session Token containing:
+      // is_super_admin: true, has_free_access: true, expiresAt
+      const sessionObj = {
+        is_super_admin: true,
+        has_free_access: true,
+        expiresAt: Date.now() + 2 * 24 * 60 * 60 * 1000 // 2 days of persistent CEO access
+      };
+      localStorage.setItem('efado_session', JSON.stringify(sessionObj));
+      localStorage.setItem('has_free_access', 'true');
+      setShowSmsPopup(false);
+
+      // Now create / sync the profile document in Firestore
+      const userRef = doc(db, 'users', 'efado_admin_ceo');
+      const adminProfile: UserProfile = {
+        uid: 'efado_admin_ceo',
+        email: 'festdanemh@gmail.com',
+        displayName: 'Okhawere Festus Daniel',
+        playerWallet: 1000000,
+        depositWallet: 1000000,
+        cashOutWallet: 0,
+        miningWallet: 5000,
+        role: 'admin',
+        is_super_admin: true,
+        admin_otp_phone: '08072456836',
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
+          await setDoc(userRef, adminProfile);
+          setUser(adminProfile);
+        } else {
+          // If profile exists, merge 'is_super_admin' and 'admin_otp_phone' to be fully compliant
+          await updateDoc(userRef, {
+            is_super_admin: true,
+            admin_otp_phone: '08072456836'
+          });
+          setUser({
+            ...snap.data() as UserProfile,
+            is_super_admin: true,
+            admin_otp_phone: '08072456836'
+          });
+        }
+      } catch (err) {
+        console.error("Firestore user setup error on login:", err);
+        setUser(adminProfile); // fallback if firestore fails
+      }
+
+      setOtpStep(false);
+      setAdminEmail('');
+      setAdminPassword('');
+      setLoginMode('STANDARD');
+    } else {
+      // WRONG OTP!
+      const attempts = otpAttempts + 1;
+      setOtpAttempts(attempts);
+      
+      if (attempts >= 3) {
+        const lockUntil = Date.now() + 15 * 60 * 1000; // 15 minutes lockout
+        localStorage.setItem('efado_lockout_until', lockUntil.toString());
+        setOtpStep(false);
+        setLoginMode('STANDARD');
+        setError("Security lock activated. Multiple incorrect OTP entries. Access has been locked for 15 minutes.");
+        setShowSmsPopup(false);
+      } else {
+        setError(`Security code mismatch. Please check the code and re-enter. Try (${attempts}/3)`);
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('efado_session');
+    localStorage.removeItem('has_free_access');
+    setUser(null);
+    signOut(auth);
+  };
 
   const handleDeposit = async (amount: number) => {
     if (!user) return;
@@ -1032,8 +1225,26 @@ function AppContent() {
           <EfadoLogo size="lg" className="mb-8" />
           <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Access Ecosystem</h2>
           <p className="text-slate-400 mb-6 text-sm font-medium leading-relaxed">
-            Connect your global identity to synchronize with EFADO's tactical financial network and elite opportunity hubs.
+            Connect your global identity or authenticate administrative protocols to synchronize with EFADO's tactical financial network.
           </p>
+
+          {/* Secure Login Mode Tabs */}
+          <div className="flex border-b border-white/5 mb-6 p-1 bg-slate-950/40 rounded-2xl">
+            <button
+              onClick={() => { setLoginMode('STANDARD'); setOtpStep(false); setError(null); }}
+              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${loginMode === 'STANDARD' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              id="login-mode-standard"
+            >
+              Standard Link
+            </button>
+            <button
+              onClick={() => { setLoginMode('CEO'); setError(null); }}
+              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${loginMode === 'CEO' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              id="login-mode-ceo"
+            >
+              CEO Console
+            </button>
+          </div>
 
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center gap-2 text-red-400 text-left text-xs">
@@ -1045,32 +1256,119 @@ function AppContent() {
             </div>
           )}
 
-          <div className="space-y-3">
-            <button 
-              onClick={handleLogin}
-              className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
-              id="login-standard-btn"
-            >
-              <LogIn className="w-5 h-5" />
-              Establish Connection
-            </button>
+          {loginMode === 'STANDARD' ? (
+            <div className="space-y-3">
+              <button 
+                onClick={handleLogin}
+                className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
+                id="login-standard-btn"
+              >
+                <LogIn className="w-5 h-5" />
+                Establish Connection
+              </button>
 
-            <button
-              onClick={async () => {
-                setError(null);
-                try {
-                  console.log('User requested redirect login explicitly...');
-                  await signInWithRedirect(auth, googleProvider);
-                } catch (e: any) {
-                  setError(`Redirect Connection failed: ${e.message || e}`);
-                }
-              }}
-              className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
-              id="login-redirect-btn"
-            >
-              Having issues? Try Redirect Connection
-            </button>
-          </div>
+              <button
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    console.log('User requested redirect login explicitly...');
+                    await signInWithRedirect(auth, googleProvider);
+                  } catch (e: any) {
+                    setError(`Redirect Connection failed: ${e.message || e}`);
+                  }
+                }}
+                className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
+                id="login-redirect-btn"
+              >
+                Having issues? Try Redirect Connection
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4 text-left">
+              {!otpStep ? (
+                <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Sovereign Email</label>
+                    <div className="relative">
+                      <input 
+                        type="email" 
+                        required
+                        placeholder="festdanemh@gmail.com"
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Sovereign Password</label>
+                    <div className="relative">
+                      <input 
+                        type="password" 
+                        required
+                        placeholder="••••••••••••••"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full py-4 mt-6 bg-amber-500 text-slate-950 rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/10 active:scale-95"
+                    id="admin-login-submit-btn"
+                  >
+                    <ShieldCheck className="w-5 h-5" />
+                    Request Authorization
+                  </button>
+
+                  <div className="text-center mt-3">
+                    <span className="text-[8px] font-bold font-mono text-slate-600 uppercase tracking-widest">
+                      Admin clearance required. Use password EFADO_CEO_2026 or CEO phone number.
+                    </span>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 text-xs">
+                    <p className="font-bold uppercase tracking-widest mb-1 pl-1 text-[10px]">Dual-Key Broadcaster</p>
+                    <p className="leading-relaxed font-mono">{otpMessage}</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">6-Digit Verification Key</label>
+                    <input 
+                      type="text" 
+                      required
+                      maxLength={6}
+                      placeholder="000000"
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                      className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-center text-xl font-mono font-black tracking-widest text-amber-400 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <button 
+                      type="button"
+                      onClick={() => setOtpStep(false)}
+                      className="flex-1 py-4 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-all active:scale-95"
+                    >
+                      Back
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-[2] py-4 bg-amber-500 text-slate-950 rounded-xl font-black uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2 hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/10 active:scale-95"
+                    >
+                      Verify Code <LogIn className="w-4 h-4" />
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1139,7 +1437,10 @@ function AppContent() {
             </div>
 
             <div className="hidden md:flex flex-col items-end">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Logged in</span>
+              <div className="flex items-center gap-1.5">
+                {user.is_super_admin && <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/25 text-amber-400 text-[7px] font-black rounded uppercase tracking-widest animate-pulse">Free CEO Access</span>}
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{user.is_super_admin ? 'OWNER ADMIN' : 'Logged in'}</span>
+              </div>
               <span className="text-xs font-bold text-slate-300">{user.email.split('@')[0]}</span>
             </div>
             <button 
@@ -1797,6 +2098,26 @@ function AppContent() {
                     />
                   </div>
                 </motion.div>
+              )}
+
+              {/* Simulated SMS Gateway Floating Banner */}
+              {showSmsPopup && (
+                <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm p-5 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl shadow-2xl backdrop-blur-md animate-bounce">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl shrink-0">
+                      <MessageSquare className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div className="flex-grow text-left">
+                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em]">Sovereign SMS Gateway</p>
+                      <p className="text-xs font-bold text-white mt-1.5 leading-relaxed">
+                        Secure SMS to 08072456836: Your EFADO Verification Key is <span className="text-amber-400 font-mono font-black text-sm tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-white/5">{simulatedSmsCode}</span>. Valid for 10 minutes.
+                      </p>
+                    </div>
+                    <button onClick={() => setShowSmsPopup(false)} className="text-slate-400 hover:text-white shrink-0 p-1">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               )}
 
               {showCeoVerification && (

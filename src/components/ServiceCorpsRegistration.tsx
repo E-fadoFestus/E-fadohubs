@@ -239,7 +239,7 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
     if (!validateStep()) return;
     
     if (regType === 'PROVIDER' && step === 3) {
-      if (selectedPlan.price > 0) {
+      if (selectedPlan.price > 0 && !user?.is_super_admin) {
         setShowPayment(true);
       } else {
         handleProviderSubmit();

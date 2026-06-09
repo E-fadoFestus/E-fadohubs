@@ -2161,7 +2161,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                        }}
                        className="w-full py-6 bg-white text-slate-900 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-white/5 hover:scale-[1.02] active:scale-95 transition-all"
                      >
-                       {selectedAdPlan.amount === 0 ? 'Activate Free Deployment' : 
+                       {(selectedAdPlan.amount === 0 || user?.is_super_admin) ? 'Activate Free CEO Deployment' : 
                         selectedAdPlan.amount === -1 ? 'Contact Sovereign Sales' : 
                         'Authorise Transaction'}
                      </button>

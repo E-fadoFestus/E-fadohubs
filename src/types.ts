@@ -22,6 +22,8 @@ export interface UserProfile {
     points: number;
   };
   role: 'player' | 'admin';
+  is_super_admin?: boolean;
+  admin_otp_phone?: string;
   createdAt: string;
   wallet?: UserWallet;
   csccRegistered?: boolean;

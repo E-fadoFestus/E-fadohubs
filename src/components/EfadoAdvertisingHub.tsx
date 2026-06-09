@@ -1072,7 +1072,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       </button>
                       <button 
                         disabled={!selectedPlan}
-                        onClick={() => selectedPlan?.price === 0 ? handleCreateAd() : setShowPayment(true)}
+                        onClick={() => (selectedPlan?.price === 0 || user?.is_super_admin) ? handleCreateAd() : setShowPayment(true)}
                         className="flex-[2] py-5 bg-gray-950 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
                       >
                         Deploy Strategy <Zap className="w-4 h-4 text-amber-400 animate-pulse" />

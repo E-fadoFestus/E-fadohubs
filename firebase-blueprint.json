@@ -24,6 +24,8 @@
           }
         },
         "role": { "type": "string", "enum": ["player", "admin"], "description": "User role." },
+        "is_super_admin": { "type": "boolean", "description": "Super admin flat access bypass indicator." },
+        "admin_otp_phone": { "type": "string", "description": "Secret phone number for Super Admin login OTP validation." },
         "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date." }
       },
       "required": ["uid", "email", "playerWallet", "depositWallet", "cashOutWallet", "role"]
