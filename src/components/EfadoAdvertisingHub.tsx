@@ -210,6 +210,34 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
   const [selectedPlan, setSelectedPlan] = useState<AdPlan | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Photo uploading refs and handlers
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Engagement modal / terminal states
+  const [selectedAdForEngagement, setSelectedAdForEngagement] = useState<AdListing | null>(null);
+  const [engagementMessage, setEngagementMessage] = useState('');
+  const [engagementSending, setEngagementSending] = useState(false);
+  const [engagementSuccess, setEngagementSuccess] = useState(false);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const base64Data = reader.result;
+          setFormData(prev => ({
+            ...prev,
+            photos: [...prev.photos, base64Data]
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const SELLER_BENEFITS = [
     { title: "Global Neural Reach", desc: "Instantly propagate your assets to millions of active nodes in 190+ jurisdictions.", icon: Globe },
     { title: "Escrow Secured", desc: "All transactions are shielded by EFADO's tactical escrow protocols for total peace of mind.", icon: Shield },
@@ -612,7 +640,15 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                               <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-1">Starting At</p>
                               <p className="text-lg font-black text-gray-950 italic tracking-tighter">{formatPrice(ad.price)}</p>
                            </div>
-                           <button className="px-8 py-4 bg-gray-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-gray-200">
+                           <button 
+                             onClick={() => {
+                                setSelectedAdForEngagement(ad);
+                                setEngagementMessage(`Hi! I am interested in your listed asset: "${ad.title}". Please advise on physical alignment or transaction options.`);
+                                setEngagementSuccess(false);
+                                setEngagementSending(false);
+                             }}
+                             className="px-8 py-4 bg-gray-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-gray-200"
+                           >
                              Engage Now
                            </button>
                         </div>
@@ -919,14 +955,45 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                        <div className="space-y-4">
                           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tactical Assets (Photos)</label>
                           <div className="grid grid-cols-4 gap-4">
-                             <button className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 hover:border-indigo-600 hover:text-indigo-600 transition-all">
+                             <button 
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                             >
                                 <Upload className="w-6 h-6 mb-2" />
                                 <span className="text-[9px] font-black uppercase">Upload</span>
                              </button>
-                             <div className="aspect-square bg-indigo-50 border border-indigo-100 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group">
-                                <img src={`https://picsum.photos/seed/adp1/300/300`} alt="Sample" className="w-full h-full object-cover opacity-50" />
-                                <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-indigo-600 uppercase tracking-widest">Placeholder</span>
-                             </div>
+                             <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                className="hidden" 
+                                accept="image/*" 
+                                multiple 
+                                onChange={handlePhotoUpload} 
+                             />
+                             {formData.photos.map((photo, index) => (
+                                <div key={index} className="aspect-square bg-gray-50 border border-gray-100 rounded-3xl relative overflow-hidden group animate-in fade-in zoom-in-95">
+                                   <img src={photo} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
+                                   <button 
+                                      type="button"
+                                      onClick={() => {
+                                         setFormData(prev => ({
+                                            ...prev,
+                                            photos: prev.photos.filter((_, i) => i !== index)
+                                         }));
+                                      }}
+                                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all shadow-md"
+                                   >
+                                      <X className="w-3 h-3" />
+                                   </button>
+                                </div>
+                             ))}
+                             {formData.photos.length === 0 && (
+                                <div className="aspect-square bg-indigo-50 border border-indigo-100 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group animate-pulse">
+                                   <img src={`https://picsum.photos/seed/adp1/300/300`} alt="Sample" className="w-full h-full object-cover opacity-50" />
+                                   <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-indigo-600 uppercase tracking-widest">Select Photos</span>
+                                </div>
+                             )}
                           </div>
                           <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest italic flex items-center gap-2">
                              <Info className="w-3 h-3" /> high-fidelity images increase conversion by 85%
@@ -1100,6 +1167,120 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
              onCancel={() => setShowPayment(false)}
              onClose={() => setShowPayment(false)}
            />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedAdForEngagement && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-gray-950/85 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden"
+            >
+              <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{selectedAdForEngagement.category}</span>
+                  <h3 className="text-xl font-black text-gray-950 uppercase tracking-tighter italic mt-2">Sovereign Engagement Gate</h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedAdForEngagement(null)}
+                  className="w-10 h-10 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-950 hover:bg-gray-50 transition-all shadow-sm"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Target Asset</p>
+                  <p className="text-sm font-black text-gray-950 uppercase">{selectedAdForEngagement.title}</p>
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{selectedAdForEngagement.description}</p>
+                </div>
+
+                {engagementSuccess ? (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="p-6 bg-teal-50 border border-teal-100 rounded-3xl text-center space-y-3"
+                  >
+                    <CheckCircle2 className="w-12 h-12 text-teal-600 mx-auto" />
+                    <h4 className="text-md font-black text-teal-950 uppercase tracking-tight">Transmission Successful</h4>
+                    <p className="text-xs text-teal-800 font-bold uppercase tracking-wide">Your tactical intent has been dispatched to the listed owner. They will align coordinates shortly.</p>
+                    <button 
+                      onClick={() => {
+                        setSelectedAdForEngagement(null);
+                        setEngagementSuccess(false);
+                      }}
+                      className="mt-2 px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white text-[10px] uppercase font-black tracking-widest rounded-xl transition-all shadow-md"
+                    >
+                      Dismiss Portal
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex gap-3">
+                      {selectedAdForEngagement.contact?.phone && (
+                        <a 
+                          href={`tel:${selectedAdForEngagement.contact.phone}`}
+                          className="flex-1 p-4 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group"
+                        >
+                          <Phone className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 group-hover:scale-110 transition-all" />
+                          <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:text-indigo-600 mt-1">Direct Call</span>
+                          <span className="text-[10px] font-mono font-bold text-gray-950 mt-1">{selectedAdForEngagement.contact.phone}</span>
+                        </a>
+                      )}
+
+                      {selectedAdForEngagement.contact?.whatsapp && (
+                        <a 
+                          href={`https://wa.me/${selectedAdForEngagement.contact.whatsapp.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group"
+                        >
+                          <MessageCircle className="w-5 h-5 text-gray-600 group-hover:text-emerald-600 group-hover:scale-110 transition-all" />
+                          <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:text-emerald-600 mt-1">WhatsApp</span>
+                          <span className="text-[10px] font-mono font-bold text-gray-950 mt-1">{selectedAdForEngagement.contact.whatsapp}</span>
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest block">Dispatch Simulated Intent (Offline Mesh Network)</label>
+                      <textarea 
+                        value={engagementMessage}
+                        onChange={(e) => setEngagementMessage(e.target.value)}
+                        placeholder="Type your strategic inquiry..."
+                        rows={3}
+                        className="w-full p-4 bg-gray-50 border-2 border-gray-100 focus:border-indigo-600 rounded-2xl text-xs font-bold font-mono resize-none focus:outline-none transition-all"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setEngagementSending(true);
+                        setTimeout(() => {
+                          setEngagementSending(false);
+                          setEngagementSuccess(true);
+                        }, 1200);
+                      }}
+                      disabled={!engagementMessage || engagementSending}
+                      className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {engagementSending ? "Propagating Signal..." : "Transmit Signal"} 
+                      <Zap className="w-4 h-4 text-amber-300" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>

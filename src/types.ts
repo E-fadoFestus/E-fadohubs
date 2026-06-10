@@ -633,6 +633,11 @@ export interface AdListing {
   };
   details: Record<string, any>;
   photos: string[];
+  contact?: {
+    phone?: string;
+    whatsapp?: string;
+    email?: string;
+  };
   plan: 'Free' | 'Weekly' | 'Monthly' | 'Quarterly' | 'BiAnnual' | 'Yearly' | 'Express';
   expiryDate: any;
   status: 'active' | 'expired' | 'pending';

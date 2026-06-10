@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   UserPlus, 
@@ -156,6 +156,27 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
     complianceConfirmed: false,
     vendorPickupLocation: ''
   });
+
+  const productPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProductPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const base64Data = reader.result;
+          setCurrentProduct(prev => ({
+            ...prev,
+            photos: [...(prev.photos || []), base64Data]
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   const validateVendor = () => {
     const newErrors: Record<string, string> = {};
@@ -745,6 +766,51 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                       className="w-full bg-slate-900/50 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-indigo-500 outline-none transition-all resize-none font-bold placeholder:italic placeholder:font-normal"
                     />
                   </FormField>
+                </div>
+
+                <div className="md:col-span-2 space-y-4">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Tactical Product Assets (Photos)</span>
+                  <div className="grid grid-cols-4 gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => productPhotoInputRef.current?.click()}
+                      className={`aspect-square bg-slate-900/40 border-2 border-dashed ${colorClasses.border} rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-indigo-500 hover:text-white transition-all`}
+                    >
+                      <Camera className="w-6 h-6 mb-2" />
+                      <span className="text-[9px] font-black uppercase">Browse Files</span>
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={productPhotoInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleProductPhotoUpload} 
+                    />
+                    {(currentProduct.photos || []).map((photo, index) => (
+                      <div key={index} className="aspect-square bg-slate-900/20 border border-white/5 rounded-2xl relative overflow-hidden group">
+                        <img src={photo} alt={`Product Asset ${index + 1}`} className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setCurrentProduct(prev => ({
+                              ...prev,
+                              photos: prev.photos?.filter((_, i) => i !== index)
+                            }));
+                          }}
+                          className="absolute top-2 right-2 w-6 h-6 bg-rose-600 rounded-full flex items-center justify-center text-white hover:bg-rose-500 transition-all shadow-md"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {(currentProduct.photos || []).length === 0 && (
+                      <div className="aspect-square bg-slate-950/20 border border-white/5 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
+                        <img src="https://picsum.photos/seed/prd1/300/300" alt="Blank" className="w-full h-full object-cover opacity-20" />
+                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-slate-500 uppercase tracking-widest animate-pulse">Select Photos</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 p-4 bg-slate-800/30 rounded-2xl border border-white/5 md:col-span-2">
