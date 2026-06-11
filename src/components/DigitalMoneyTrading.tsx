@@ -690,7 +690,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
           </div>
 
           {/* Side Control Panel */}
-          <div className="w-80 bg-slate-900/50 border-l border-white/5 p-6 flex flex-col gap-6 z-10">
+          <div className="w-80 flex-shrink-0 bg-slate-900/50 border-l border-white/5 p-6 flex flex-col gap-6 z-10">
             <div>
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Amount</label>
               <div className="grid grid-cols-2 gap-2 mb-3">

@@ -257,6 +257,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [searchQuery, setSearchQuery] = useState('');
   const [isCalling, setIsCalling] = useState<'VOICE' | 'VIDEO' | null>(null);
   const [showNewsletter, setShowNewsletter] = useState(true);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
+  const [isNewsletterSubscribed, setIsNewsletterSubscribed] = useState(false);
+  const [activeChatRoomId, setActiveChatRoomId] = useState<string>('sarah');
+  const [newMessageText, setNewMessageText] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
   const [sharingItem, setSharingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
   const [promotingItem, setPromotingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
@@ -406,6 +412,114 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     };
   }, []);
 
+  // Synchronise Live Chat Room Messages from Firestore
+  useEffect(() => {
+    if (activeView !== 'CHAT') return;
+    const messagesQuery = query(
+      collection(db, 'gist_chat_messages'),
+      where('roomId', '==', activeChatRoomId),
+      orderBy('timestamp', 'asc'),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(messagesQuery, (snap) => {
+      const dbMsgs = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMessages(dbMsgs as any);
+    }, (err) => {
+      console.error("Error loading Gist Hub live messages:", err);
+    });
+
+    return unsubscribe;
+  }, [activeChatRoomId, activeView]);
+
+  const handleSubscribeNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail || !newsletterEmail.includes('@')) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+    setIsNewsletterSubmitting(true);
+    try {
+      await addDoc(collection(db, 'subscribers'), {
+        email: newsletterEmail.toLowerCase().trim(),
+        subscribedAt: serverTimestamp(),
+        source: 'GistHub_Newsletter'
+      });
+      setIsNewsletterSubscribed(true);
+    } catch (err) {
+      console.error("Error subscribing to newsletter:", err);
+      alert("Subscription failed. Please try again.");
+    } finally {
+      setIsNewsletterSubmitting(false);
+    }
+  };
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newMessageText.trim() || isSendingMessage) return;
+
+    const text = newMessageText.trim();
+    setNewMessageText('');
+    setIsSendingMessage(true);
+
+    try {
+      await addDoc(collection(db, 'gist_chat_messages'), {
+        roomId: activeChatRoomId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email.split('@')[0],
+        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        content: text,
+        timestamp: serverTimestamp()
+      });
+
+      // Simulate live tactical reply
+      setTimeout(async () => {
+        let reply = "Affirmative. Command received.";
+        let senderName = "System";
+        let senderPhoto = "https://picsum.photos/seed/system/100/100";
+        
+        if (activeChatRoomId === 'sarah') {
+          reply = "Understood. The signal remains secure. Syncing node updates now.";
+          senderName = "Dr. Sarah (Lead Eng)";
+          senderPhoto = "https://picsum.photos/seed/sarah/100/100";
+        } else if (activeChatRoomId === 'tactical-hq') {
+          reply = "Node received. Broadcasting data stream to strategic channels.";
+          senderName = "Tactical HQ";
+          senderPhoto = "https://picsum.photos/seed/tactical/100/100";
+        } else if (activeChatRoomId === 'global') {
+          reply = "Live bridge signal received with 100% integrity. Welcome!";
+          senderName = "Global Outreach";
+          senderPhoto = "https://picsum.photos/seed/global/100/100";
+        } else if (activeChatRoomId === 'bishop') {
+          reply = "Blessings to you. Keep pushing the boundary of strategic excellence.";
+          senderName = "Bishop T. (Spiritual)";
+          senderPhoto = "https://picsum.photos/seed/bishop/100/100";
+        }
+
+        try {
+          await addDoc(collection(db, 'gist_chat_messages'), {
+            roomId: activeChatRoomId,
+            senderId: activeChatRoomId,
+            senderName,
+            senderPhoto,
+            content: reply,
+            timestamp: serverTimestamp()
+          });
+        } catch (rErr) {
+          console.error("Error writing automated response:", rErr);
+        }
+      }, 1500);
+
+    } catch (err) {
+      console.error("Error sending message:", err);
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
+
   const handleCreatePost = async (content: string, media?: any) => {
     try {
       await addDoc(collection(db, 'social_posts'), {
@@ -491,7 +605,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       <div className="relative w-full max-w-[1600px] h-full md:h-[95vh] bg-slate-950/80 backdrop-blur-xl border border-white/10 md:rounded-[3rem] flex overflow-hidden shadow-2xl">
         
         {/* Left Sidebar - Navigation */}
-        <div className="w-20 md:w-72 bg-slate-900 border-r border-white/5 flex flex-col z-30">
+        <div className="w-20 md:w-72 flex-shrink-0 bg-slate-900 border-r border-white/5 flex flex-col z-30">
           <div className="p-6 md:p-8 flex items-center gap-4">
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
               <Zap className="w-6 h-6 text-white" />
@@ -987,7 +1101,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                        </div>
                     </div>
                            {/* Right Column: Trending & Strategic Mining Sidebar */}
-                  <div className="hidden lg:flex w-96 flex-col p-8 space-y-8 border-l border-white/5 overflow-y-auto custom-scrollbar no-scrollbar bg-slate-900/40">
+                  <div className="hidden lg:flex xl:hidden w-96 flex-col p-8 space-y-8 border-l border-white/5 overflow-y-auto custom-scrollbar no-scrollbar bg-slate-900/40">
                     {/* EFADO Mining Strategic Module */}
                     <div className="space-y-4">
                        <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-2">Sovereign Extraction</h5>
@@ -1111,167 +1225,237 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   exit={{ opacity: 0, x: -20 }}
                   className="h-full flex flex-col md:flex-row"
                 >
-                  {/* Chat List - WhatsApp Style Tabs */}
-                  <div className="w-full md:w-96 border-r border-white/5 flex flex-col bg-slate-900">
-                    <div className="p-6 border-b border-white/5 bg-indigo-600">
-                       <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Secure Comms</h4>
-                       <div className="flex items-center gap-1 bg-white/10 p-1 rounded-2xl">
-                          <button className="flex-grow py-3 px-4 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl">Direct</button>
-                          <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Groups</button>
-                          <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Bridges</button>
-                       </div>
-                    </div>
-                    
-                    <div className="p-6 border-b border-white/5">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input 
-                          type="text" 
-                          placeholder="Search sovereign logs..."
-                          className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/30"
-                        />
-                      </div>
-                    </div>
+                  {/* Chat List - Style Tabs */}
+                  {(() => {
+                    const CHAT_ROOM_DEFS = [
+                      { id: 'tactical-hq', name: 'Tactical HQ', status: '8 members', time: '12:45', msg: 'System check complete.', unread: 0, type: 'GROUP' },
+                      { id: 'sarah', name: 'Dr. Sarah (Lead Eng)', status: 'Active', time: '11:20', msg: 'The encryption keys are synced.', unread: 0, type: 'DIRECT' },
+                      { id: 'global', name: 'Global Outreach', status: 'Public Bridge', time: 'Yesterday', msg: 'Welcome to the Hub!', unread: 0, type: 'GROUP' },
+                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' }
+                    ];
+                    const activeRoomDef = CHAT_ROOM_DEFS.find(r => r.id === activeChatRoomId) || CHAT_ROOM_DEFS[1];
 
-                    <div className="flex-grow overflow-y-auto custom-scrollbar">
-                      {[
-                        { name: 'Tactical HQ', status: '8 members', time: '12:45', msg: 'System check complete.', unread: 4, type: 'GROUP' },
-                        { name: 'Dr. Sarah (Lead Eng)', status: 'Active', time: '11:20', msg: 'The encryption keys are synced.', unread: 0, type: 'DIRECT' },
-                        { name: 'Global Outreach', status: 'Public Bridge', time: 'Yesterday', msg: 'Welcome to the Hub!', unread: 2, type: 'GROUP' },
-                        { name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' }
-                      ].map((chat, i) => (
-                        <button key={i} className="w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 border-l-transparent hover:border-l-indigo-600">
-                          <div className="relative">
-                            <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 overflow-hidden border border-white/10 shadow-sm">
-                              <img src={`https://picsum.photos/seed/${chat.name}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                    // Helper to get fallback messages if Firestore list is empty
+                    const getDisplayMessagesList = () => {
+                      if (messages && messages.length > 0) return messages;
+                      const dummy: any[] = [];
+                      if (activeChatRoomId === 'sarah') {
+                        dummy.push({
+                          id: 'init-sarah',
+                          senderId: 'sarah',
+                          senderName: 'Dr. Sarah (Lead Eng)',
+                          content: 'The sovereign encryption protocols are now live. All tactical bridges are holding 100% integrity. 🛡️',
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
+                      } else if (activeChatRoomId === 'tactical-hq') {
+                        dummy.push({
+                          id: 'init-hq',
+                          senderId: 'tactical-hq',
+                          senderName: 'Tactical HQ',
+                          content: 'System check complete. Welcome to Tactical HQ. Report active status.',
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
+                      } else if (activeChatRoomId === 'global') {
+                        dummy.push({
+                          id: 'init-global',
+                          senderId: 'global',
+                          senderName: 'Global Outreach',
+                          content: 'Welcome to the Hub! This is our public communication bridge for global discourse.',
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
+                      } else if (activeChatRoomId === 'bishop') {
+                        dummy.push({
+                          id: 'init-bishop',
+                          senderId: 'bishop',
+                          senderName: 'Bishop T. (Spiritual)',
+                          content: 'Blessings for the project. Wisdom is the principal thing, so get wisdom and understanding.',
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
+                      }
+                      return dummy;
+                    };
+
+                    const shownMessages = getDisplayMessagesList();
+
+                    return (
+                      <>
+                        <div className="w-full md:w-96 border-r border-white/5 flex flex-col bg-slate-900">
+                          <div className="p-6 border-b border-white/5 bg-indigo-600">
+                             <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Secure Comms</h4>
+                             <div className="flex items-center gap-1 bg-white/10 p-1 rounded-2xl">
+                                <button className="flex-grow py-3 px-4 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl">Direct</button>
+                                <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Groups</button>
+                                <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Bridges</button>
+                             </div>
+                          </div>
+                          
+                          <div className="p-6 border-b border-white/5">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                              <input 
+                                type="text" 
+                                placeholder="Search sovereign logs..."
+                                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/30"
+                              />
                             </div>
-                            {chat.status.includes('Active') && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />}
                           </div>
-                          <div className="flex-grow text-left">
-                            <div className="flex items-center gap-2">
-                               {chat.type === 'GROUP' && <Users className="w-3 h-3 text-indigo-400" />}
-                               <h5 className="text-sm font-black text-white uppercase tracking-tight">{chat.name}</h5>
+
+                          <div className="flex-grow overflow-y-auto custom-scrollbar">
+                            {CHAT_ROOM_DEFS.map((chat) => (
+                              <button 
+                                key={chat.id} 
+                                onClick={() => setActiveChatRoomId(chat.id)}
+                                className={`w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 ${activeChatRoomId === chat.id ? 'border-l-indigo-600 bg-indigo-600/5' : 'border-l-transparent'}`}
+                              >
+                                <div className="relative flex-shrink-0">
+                                  <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 overflow-hidden border border-white/10 shadow-sm">
+                                    <img src={`https://picsum.photos/seed/${chat.id}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                                  </div>
+                                  {chat.status.includes('Active') && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />}
+                                </div>
+                                <div className="flex-grow text-left overflow-hidden">
+                                  <div className="flex items-center gap-2">
+                                     {chat.type === 'GROUP' && <Users className="w-3 h-3 text-indigo-400" />}
+                                     <h5 className="text-sm font-black text-white uppercase tracking-tight truncate">{chat.name}</h5>
+                                  </div>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mt-1">{chat.msg}</p>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{chat.time}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Chat Window */}
+                        <div className="flex-grow flex flex-col bg-slate-950 relative">
+                          {/* Chat Header */}
+                          <div className="px-8 py-6 bg-slate-900/60 backdrop-blur-3xl border-b border-white/5 flex items-center justify-between shadow-lg z-10">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
+                                <img src={`https://picsum.photos/seed/${activeChatRoomId}/100/100`} alt="User" className="rounded-2xl w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </div>
+                              <div>
+                                <h5 className="text-base font-black text-white uppercase tracking-tight">{activeRoomDef.name}</h5>
+                                <div className="flex items-center gap-2">
+                                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Encrypted Signal Active</p>
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-[10px] font-bold text-slate-200 uppercase tracking-widest truncate mt-1">{chat.msg}</p>
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => setIsCalling('VOICE')} className="p-4 bg-white/5 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-2xl transition-all shadow-sm">
+                                <Phone className="w-5 h-5" />
+                              </button>
+                              <button onClick={() => setIsCalling('VIDEO')} className="p-4 bg-white/5 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-2xl transition-all shadow-sm">
+                                <VideoIcon className="w-5 h-5" />
+                              </button>
+                              <div className="w-px h-8 bg-white/10 mx-2" />
+                              <button className="p-4 bg-white/5 text-slate-400 hover:text-white rounded-2xl transition-all shadow-sm">
+                                <MoreVertical className="w-5 h-5" />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-2">
-                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{chat.time}</span>
-                            {chat.unread > 0 && <span className="w-5 h-5 bg-indigo-600 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20">{chat.unread}</span>}
+
+                          {/* Messages Area */}
+                          <div className="flex-grow p-8 space-y-6 overflow-y-auto custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed opacity-90">
+                            <div className="flex flex-col items-center gap-3 mb-6">
+                              <div className="px-6 py-2 bg-amber-500/15 border border-amber-500/20 rounded-xl flex items-center gap-3 shadow-sm">
+                                 <Lock className="w-3.5 h-3.5 text-amber-400" />
+                                 <span className="text-[9px] font-black text-amber-300 uppercase tracking-widest text-center max-w-xs leading-normal">
+                                   Messages are end-to-end encrypted. No one outside of this chat can read them.
+                                 </span>
+                              </div>
+                              <span className="px-4 py-1.5 bg-slate-900 border border-white/5 rounded-xl text-[9px] font-black text-slate-400 uppercase tracking-widest">Live Comm Established</span>
+                            </div>
+                            
+                            {shownMessages.map((msg: any, idx: number) => {
+                              const isSelf = msg.senderId === user.uid;
+                              if (isSelf) {
+                                return (
+                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[70%] ml-auto">
+                                    <div className="p-5 bg-indigo-600 text-white rounded-3xl rounded-tr-none shadow-2xl border border-indigo-500">
+                                      <p className="text-sm leading-relaxed text-indigo-50">{msg.content}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 mr-4">
+                                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                         {msg.timestamp?.seconds 
+                                           ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                                           : 'Sending...'}
+                                       </p>
+                                       <Zap className="w-3 h-3 text-indigo-400" />
+                                    </div>
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[70%]">
+                                    <div className="p-5 bg-slate-900 border border-white/10 text-slate-100 rounded-3xl rounded-tl-none shadow-xl">
+                                      <p className="text-sm leading-relaxed">{msg.content}</p>
+                                    </div>
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                      {msg.senderName} • {msg.timestamp?.seconds 
+                                        ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                                        : 'Now'}
+                                    </p>
+                                  </div>
+                                );
+                              }
+                            })}
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Chat Window - Modern High-Fidelity */}
-                  <div className="flex-grow flex flex-col bg-slate-950 relative">
-                    {/* Chat Header */}
-                    <div className="px-8 py-6 bg-slate-900/60 backdrop-blur-3xl border-b border-white/5 flex items-center justify-between shadow-lg z-10">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20">
-                          <img src="https://picsum.photos/seed/sarah/100/100" alt="User" className="rounded-2xl" referrerPolicy="no-referrer" />
+                          {/* Chat Input Area */}
+                          <form 
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }}
+                            className="p-6 bg-slate-900 border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.2)]"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center bg-white/5 rounded-2xl p-1">
+                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><Paperclip className="w-5 h-5" /></button>
+                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><ImageIcon className="w-5 h-5" /></button>
+                              </div>
+                              <div className="flex-grow relative group">
+                                <input 
+                                  type="text" 
+                                  value={newMessageText}
+                                  onChange={(e) => setNewMessageText(e.target.value)}
+                                  placeholder={`Message ${activeRoomDef.name}...`}
+                                  className="w-full pl-6 pr-14 py-4 bg-white/5 border border-white/10 rounded-3xl text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner placeholder:text-slate-500"
+                                />
+                                <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-400 transition-all">
+                                  <Smile className="w-5 h-5" />
+                                </button>
+                              </div>
+                              <button 
+                                type="submit"
+                                className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                              >
+                                <Send className="w-6 h-6" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
+                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                <Contact className="w-3.5 h-3.5" /> Share Intels
+                              </button>
+                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                <Download className="w-3.5 h-3.5" /> Transmit Ledger
+                              </button>
+                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                <Zap className="w-3.5 h-3.5" /> Flash Buzz
+                              </button>
+                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-all whitespace-nowrap ml-auto">
+                                <Shield className="w-3.5 h-3.5" /> Verification Req
+                              </button>
+                            </div>
+                          </form>
                         </div>
-                        <div>
-                          <h5 className="text-base font-black text-white uppercase tracking-tight">Dr. Sarah (Lead Eng)</h5>
-                          <div className="flex items-center gap-2">
-                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                             <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Encrypted Signal Active</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => setIsCalling('VOICE')} className="p-4 bg-gray-50 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all shadow-sm">
-                          <Phone className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => setIsCalling('VIDEO')} className="p-4 bg-gray-50 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all shadow-sm">
-                          <VideoIcon className="w-5 h-5" />
-                        </button>
-                        <div className="w-px h-8 bg-gray-100 mx-2" />
-                        <button className="p-4 bg-gray-50 text-gray-500 hover:text-gray-900 rounded-2xl transition-all shadow-sm">
-                          <MoreVertical className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Messages Area - WhatsApp Aesthetic */}
-                    <div className="flex-grow p-8 space-y-8 overflow-y-auto custom-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed opacity-90">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="px-6 py-2 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-3 shadow-sm">
-                           <Lock className="w-3.5 h-3.5 text-amber-600" />
-                           <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest text-center max-w-xs">Messages are end-to-end encrypted. No one outside of this chat, not even EFADO, can read them.</span>
-                        </div>
-                        <span className="px-4 py-1.5 bg-slate-50 shadow-sm border border-gray-100 rounded-xl text-[9px] font-black text-gray-950 uppercase tracking-widest">Today</span>
-                      </div>
-                      
-                      {/* Received Message */}
-                      <div className="flex flex-col gap-2 max-w-[70%]">
-                        <div className="p-5 bg-slate-50 text-gray-700 rounded-3xl rounded-tl-none shadow-xl shadow-slate-200/50 border border-gray-50">
-                          <p className="text-sm leading-relaxed">The sovereign encryption protocols are now live. All tactical bridges are holding 100% integrity. 🛡️</p>
-                        </div>
-                        <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Eng. Sarah • 12:45 PM</p>
-                      </div>
-
-                      {/* Sent Message */}
-                      <div className="flex flex-col items-end gap-2 max-w-[70%] ml-auto">
-                        <div className="p-5 bg-indigo-600 text-white rounded-3xl rounded-tr-none shadow-2xl shadow-indigo-200 border border-indigo-500">
-                          <p className="text-sm leading-relaxed text-indigo-50">Understood. I've initiated the global promote sequence for the Gist Hub. Excellent work on the UI latency. 🚀</p>
-                        </div>
-                        <div className="flex items-center gap-2 mr-4">
-                           <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">12:46 PM</p>
-                           <Zap className="w-3 h-3 text-indigo-400" />
-                        </div>
-                      </div>
-
-                      {/* Floating Prompt for high-engagement */}
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex justify-center"
-                      >
-                         <button className="px-6 py-3 bg-white border border-indigo-100 rounded-2xl flex items-center gap-3 shadow-lg hover:scale-105 transition-all">
-                            <Zap className="w-4 h-4 text-indigo-600 animate-pulse" />
-                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Engage Tactical Response</span>
-                         </button>
-                      </motion.div>
-                    </div>
-
-                    {/* Chat Input Area - Precisely Optimized */}
-                    <div className="p-6 bg-slate-900 border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.2)]">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-white/5 rounded-2xl p-1">
-                          <button className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><Paperclip className="w-5 h-5" /></button>
-                          <button className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><ImageIcon className="w-5 h-5" /></button>
-                        </div>
-                        <div className="flex-grow relative group">
-                          <input 
-                            type="text" 
-                            placeholder="Type a secure message..."
-                            className="w-full pl-6 pr-14 py-4 bg-white/5 border border-white/10 rounded-3xl text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner placeholder:text-slate-500"
-                          />
-                          <button className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-400 transition-all">
-                            <Smile className="w-5 h-5" />
-                          </button>
-                        </div>
-                        <button className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all">
-                          <Send className="w-6 h-6" />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
-                        <button className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                          <Contact className="w-3.5 h-3.5" /> Share Intels
-                        </button>
-                        <button className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                          <Download className="w-3.5 h-3.5" /> Transmit Ledger
-                        </button>
-                        <button className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                          <Zap className="w-3.5 h-3.5" /> Flash Buzz
-                        </button>
-                        <button className="flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-all whitespace-nowrap ml-auto">
-                          <Shield className="w-3.5 h-3.5" /> Verification Req
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                      </>
+                    );
+                  })()}
                 </motion.div>
               )}
 
@@ -1836,12 +2020,21 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         </div>
 
         {/* Right Sidebar - Trending & Suggestions */}
-        <div className="hidden xl:flex w-80 bg-slate-900/50 backdrop-blur-3xl border-l border-white/5 flex-col p-8 space-y-10 overflow-y-auto no-scrollbar">
+        <div className="hidden xl:flex w-80 flex-shrink-0 bg-slate-900/50 backdrop-blur-3xl border-l border-white/5 flex-col p-8 space-y-10 overflow-y-auto no-scrollbar">
           <section>
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 pl-1">Tactical Trending</h4>
             <div className="space-y-6">
               {GIST_CATEGORIES.slice(0, 4).map((cat) => (
-                <div key={cat.id} className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all">
+                <div 
+                  key={cat.id} 
+                  onClick={() => {
+                    setSelectedGroup(null);
+                    setSelectedSubCategory(null);
+                    setSelectedCategory(cat);
+                    setActiveView('CATEGORIES');
+                  }}
+                  className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all"
+                >
                   <div className={`w-12 h-12 rounded-2xl bg-${cat.color}-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-${cat.color}-500/20 transition-all shadow-lg`}>
                     <cat.icon className={`w-6 h-6 text-${cat.color}-400`} />
                   </div>
@@ -1975,20 +2168,47 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                  initial={{ opacity: 0, y: 50, scale: 0.9 }}
                  animate={{ opacity: 1, y: 0, scale: 1 }}
                  exit={{ opacity: 0, y: 50, scale: 0.9 }}
-                 className="w-80 bg-slate-900 border border-white/10 shadow-3xl p-8 rounded-[2.5rem] golden-card-border pointer-events-auto"
+                 className="relative w-80 bg-slate-900 border border-white/10 shadow-3xl p-8 rounded-[2.5rem] golden-card-border pointer-events-auto"
                >
                  <button onClick={() => setShowNewsletter(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors">
                    <X className="w-4 h-4" />
                  </button>
-                 <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
-                    <Mail className="w-5 h-5 text-white" />
-                 </div>
-                 <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">Tactical Intelligence</h5>
-                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join 124K+ strategists receiving monthly industry roadmaps.</p>
-                 <div className="space-y-3">
-                   <input type="email" placeholder="YOUR EMAIL..." className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none" />
-                   <button className="w-full py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all">Subscribe</button>
-                 </div>
+                 {isNewsletterSubscribed ? (
+                   <div className="text-center py-4 space-y-3">
+                     <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                       <Check className="w-5 h-5 text-emerald-400" />
+                     </div>
+                     <p className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Transmission Sync'd</p>
+                     <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">
+                       Sovereign node verified. Monthly roadmaps will be routed to your endpoint.
+                     </p>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
+                        <Mail className="w-5 h-5 text-white" />
+                     </div>
+                     <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">Tactical Intelligence</h5>
+                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join 124K+ strategists receiving monthly industry roadmaps.</p>
+                     <form onSubmit={handleSubscribeNewsletter} className="space-y-3">
+                       <input 
+                         type="email" 
+                         value={newsletterEmail}
+                         onChange={(e) => setNewsletterEmail(e.target.value)}
+                         placeholder="YOUR EMAIL..." 
+                         required
+                         className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none" 
+                       />
+                       <button 
+                         type="submit"
+                         disabled={isNewsletterSubmitting}
+                         className="w-full py-3 bg-indigo-600 disabled:bg-indigo-600/50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all"
+                       >
+                         {isNewsletterSubmitting ? 'Syncing...' : 'Subscribe'}
+                       </button>
+                     </form>
+                   </>
+                 )}
                </motion.div>
              )}
            </AnimatePresence>

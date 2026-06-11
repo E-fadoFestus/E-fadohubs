@@ -245,7 +245,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              className="absolute right-0 top-0 bottom-0 w-full lg:w-[350px] bg-slate-900/95 lg:bg-slate-900/80 backdrop-blur-xl border-l border-white/5 z-50 flex flex-col"
+              className="absolute right-0 top-0 bottom-0 w-full lg:w-[350px] flex-shrink-0 bg-slate-900/95 lg:bg-slate-900/80 backdrop-blur-xl border-l border-white/5 z-50 flex flex-col"
             >
               <div className="h-16 flex items-center justify-around border-b border-white/5 p-2">
                  <button 
