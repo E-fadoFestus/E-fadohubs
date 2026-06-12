@@ -55,6 +55,7 @@ import { EfadoMining, AdvertisingMiniCard, MiningMiniCard } from './EfadoMining'
 import { SeminarPortal } from './education/SeminarPortal';
 import { JambDetailedGuide } from './education/JambDetailedGuide';
 import { EfadoIntelligenceFeed } from './EfadoIntelligenceFeed';
+import { CurrencySelector } from './CurrencySelector';
 import { ExamCategory } from '../data/examData';
 import { UserProfile } from '../types';
 
@@ -550,12 +551,15 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
             />
           </div>
           
-          <button 
-            onClick={onClose}
-            className="px-6 py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5"
-          >
-            Terminal Output
-          </button>
+          <div className="flex items-center gap-3">
+            <CurrencySelector />
+            <button 
+              onClick={onClose}
+              className="px-6 py-4 bg-white/5 hover:bg-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5"
+            >
+              Terminal Output
+            </button>
+          </div>
         </div>
       </div>
 

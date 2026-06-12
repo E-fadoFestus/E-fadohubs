@@ -46,11 +46,15 @@ import {
   Fingerprint,
   User,
   Hash,
-  Mail
+  Mail,
+  Star,
+  Award,
+  ThumbsUp
 } from 'lucide-react';
 import { SAMPLE_PRODUCTS } from '../sampleData';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CurrencySelector } from './CurrencySelector';
 import { VendorRegistrationFlow } from './VendorRegistrationFlow';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
@@ -256,6 +260,17 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const [selectedOrder, setSelectedOrder] = useState<MarketOrder | null>(null);
   const [generatedOrderCode, setGeneratedOrderCode] = useState<string>('');
   
+  // Market testimonial state hooks
+  const [showMarketReviewModal, setShowMarketReviewModal] = useState(false);
+  const [marketReviewRating, setMarketReviewRating] = useState(5);
+  const [marketReviewText, setMarketReviewText] = useState('');
+  const [marketReviewChecks, setMarketReviewChecks] = useState<string[]>([
+    'Authentic Quality',
+    'Flawless Delivery',
+    'Secured Tracking'
+  ]);
+  const [submittingMarketReview, setSubmittingMarketReview] = useState(false);
+  
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [manualBankMode, setManualBankMode] = useState(false);
@@ -373,6 +388,57 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     });
     return unsub;
   }, [user.uid]);
+
+  const handleSubmitMarketTestimony = async () => {
+    if (!selectedOrder) return;
+    setSubmittingMarketReview(true);
+    try {
+      // 1. Add testimony to DB
+      await addDoc(collection(db, 'market_testimonies'), {
+        orderId: selectedOrder.id,
+        orderCode: selectedOrder.orderCode,
+        userId: user.uid,
+        userName: user.displayName || 'Authorized Buyer',
+        userPhoto: `https://picsum.photos/seed/${user.uid}/100/100`,
+        items: selectedOrder.items,
+        rating: marketReviewRating,
+        testimonyText: marketReviewText.trim() || 'Flawless transaction and perfect product delivery via direct tracking link.',
+        proficiencyChecks: marketReviewChecks,
+        createdAt: Date.now()
+      });
+
+      // 2. Update order status to delivered
+      await updateDoc(doc(db, 'market_orders', selectedOrder.id), {
+        status: 'delivered',
+        reviewCompleted: true,
+        reviewDetails: {
+          rating: marketReviewRating,
+          text: marketReviewText.trim() || 'Flawless transaction and perfect product delivery via direct tracking link.',
+          checks: marketReviewChecks,
+          timestamp: Date.now()
+        }
+      });
+
+      // Update local selectedOrder state to immediate reflect in UI
+      setSelectedOrder({
+        ...selectedOrder,
+        status: 'delivered',
+        reviewCompleted: true,
+        reviewDetails: {
+          rating: marketReviewRating,
+          text: marketReviewText.trim() || 'Flawless transaction and perfect product delivery via direct tracking link.',
+          checks: marketReviewChecks,
+          timestamp: Date.now()
+        }
+      } as any);
+
+      setShowMarketReviewModal(false);
+    } catch (err) {
+      console.error('Error finalising market order completion', err);
+    } finally {
+      setSubmittingMarketReview(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = SAMPLE_PRODUCTS;
@@ -667,6 +733,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </span>
                 <span className="text-[8px] font-bold text-cyan-200 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
+              <CurrencySelector />
               <button onClick={onClose} className="p-3 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-2xl hover:bg-white/10">
                 <X className="w-7 h-7" />
               </button>
@@ -1176,22 +1243,47 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </div>
                       </div>
 
-                      <div className="mt-auto p-6 bg-slate-950/50 rounded-3xl border border-white/5 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
-                            <Truck className="w-5 h-5 text-slate-400" />
+                      <div className="mt-auto space-y-4">
+                        {selectedOrder.reviewCompleted && (
+                          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-black uppercase tracking-widest text-amber-400">Your Certified Testimony Vibe</span>
+                              <span className="text-amber-400 font-bold">{selectedOrder.reviewDetails?.rating || 5} Stars</span>
+                            </div>
+                            <p className="text-slate-300 italic">"{selectedOrder.reviewDetails?.text}"</p>
                           </div>
-                          <div>
-                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Delivery Status</p>
-                            <p className="text-xs font-black text-white uppercase">{selectedOrder.status.replace('_', ' ')}</p>
+                        )}
+                        <div className="p-6 bg-slate-950/50 rounded-3xl border border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center">
+                              <Truck className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Delivery Status</p>
+                              <p className="text-xs font-black text-white uppercase">{selectedOrder.status.replace('_', ' ')}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {selectedOrder.status !== 'delivered' && (
+                              <button 
+                                onClick={() => {
+                                  setMarketReviewText('');
+                                  setShowMarketReviewModal(true);
+                                }}
+                                className="px-5 py-3 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xl shadow-emerald-500/10 mr-1"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-slate-950" /> Confirm Received
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => window.location.href = `mailto:${SUPPORT_EMAILS.MARKET}`}
+                              className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
+                            >
+                              <Mail className="w-4 h-4" /> Help Center
+                            </button>
                           </div>
                         </div>
-                        <button 
-                          onClick={() => window.location.href = `mailto:${SUPPORT_EMAILS.MARKET}`}
-                          className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
-                        >
-                          <Mail className="w-4 h-4" /> Help Center
-                        </button>
                       </div>
                     </motion.div>
                   ) : (
@@ -1913,6 +2005,120 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                   </button>
                 </div>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Product & Order Testimony Modal Overlay */}
+      <AnimatePresence>
+        {showMarketReviewModal && selectedOrder && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md p-8 overflow-y-auto flex items-center justify-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="max-w-xl w-full bg-slate-900 border border-white/10 rounded-[3rem] p-8 space-y-6 relative"
+            >
+              <button 
+                onClick={() => setShowMarketReviewModal(false)}
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white rounded-full bg-white/5 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                <Award className="w-6 h-6 text-emerald-400 animate-spin" />
+                <h3 className="text-lg font-black text-white uppercase tracking-wider">Deploy Certified Delivery Testimony</h3>
+              </div>
+
+              <div className="p-6 bg-slate-950/50 rounded-2xl border border-white/5 space-y-4 text-left">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Selected Cargo Order</p>
+                  <h4 className="text-white font-bold text-sm">Order Code: <span className="text-blue-400 font-mono italic">{selectedOrder.orderCode}</span></h4>
+                  <div className="text-xs text-slate-400 space-y-1">
+                    {selectedOrder.items.map((item, id) => (
+                      <p key={id}>• {item.productTitle} (x{item.quantity})</p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Star Rating Testimony</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setMarketReviewRating(star)}
+                        className="p-1 hover:scale-110 active:scale-95 transition-all text-amber-400"
+                      >
+                        <Star className={`w-8 h-8 ${marketReviewRating >= star ? 'fill-amber-400 text-amber-400' : 'text-slate-700'}`} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Mark Order Vibe Standards</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      'Authentic Quality',
+                      'Flawless Delivery',
+                      'Secured Tracking',
+                      'Eco-Friendly Pack',
+                      'Exemplary Care',
+                      'Trusted Vendor'
+                    ].map((check) => (
+                      <button
+                        key={check}
+                        onClick={() => {
+                          if (marketReviewChecks.includes(check)) {
+                            setMarketReviewChecks(marketReviewChecks.filter(c => c !== check));
+                          } else {
+                            setMarketReviewChecks([...marketReviewChecks, check]);
+                          }
+                        }}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${
+                          marketReviewChecks.includes(check) 
+                            ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/15' 
+                            : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${
+                          marketReviewChecks.includes(check) ? 'border-white bg-white text-emerald-600' : 'border-slate-500'
+                        }`}>
+                          {marketReviewChecks.includes(check) && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-wider">{check}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Global Order Review & Testimony</label>
+                  <textarea
+                    rows={3}
+                    value={marketReviewText}
+                    onChange={(e) => setMarketReviewText(e.target.value)}
+                    placeholder="Provide your high-authenticity review to make the marketplace trustworthy and reliable internationally..."
+                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-2xl text-white text-xs outline-none focus:border-blue-500 transition-all font-bold"
+                  />
+                </div>
+
+                <button
+                  onClick={handleSubmitMarketTestimony}
+                  disabled={submittingMarketReview}
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 font-black uppercase tracking-[0.2em] text-xs rounded-2xl transition-all shadow-xl shadow-emerald-500/10 flex items-center justify-center gap-2"
+                >
+                  {submittingMarketReview ? 'Publishing Delivery Testimony...' : 'Delivered & Publish Testimony 🚀'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -68,6 +68,21 @@ export const EfadoHelpChat: React.FC<EfadoHelpChatProps> = ({ user }) => {
     'System Bug / Error'
   ];
 
+  useEffect(() => {
+    const handleOpenHelp = (e: Event) => {
+      setIsOpen(true);
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.category) {
+        setCategory(customEvent.detail.category);
+        setActiveView('create');
+      } else {
+        setActiveView('list');
+      }
+    };
+    window.addEventListener('open-help-chat', handleOpenHelp);
+    return () => window.removeEventListener('open-help-chat', handleOpenHelp);
+  }, []);
+
   // Listen to user's tickets in real-time
   useEffect(() => {
     if (!user?.uid) return;

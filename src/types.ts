@@ -9,6 +9,10 @@ export interface UserProfile {
   playerWallet: number;
   depositWallet: number;
   cashOutWallet: number;
+  usd_balance?: number;
+  gbp_balance?: number;
+  eur_balance?: number;
+  fullName?: string;
   miningWallet?: number;
   miningProgress?: {
     stage: 'E' | 'F' | 'A' | 'D' | 'O' | 'COMPLETED';
@@ -192,6 +196,13 @@ export interface MarketOrder {
     timestamp: any;
     description: string;
   }[];
+  reviewCompleted?: boolean;
+  reviewDetails?: {
+    rating: number;
+    text: string;
+    checks: string[];
+    timestamp: number;
+  };
   createdAt: any;
 }
 

@@ -56,6 +56,7 @@ import {
   History,
   ClipboardList,
   Mail,
+  Check,
   HelpCircle,
   Calculator,
   ChevronUp,
@@ -90,6 +91,7 @@ import {
   arrayRemove
 } from '../firebase';
 import { MiningMiniCard, EfadoMining, AdvertisingMiniCard } from './EfadoMining';
+import { CurrencySelector } from './CurrencySelector';
 
 const GIST_CATEGORIES = [
   { 
@@ -274,6 +276,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const { formatPrice, selectedCurrency } = useCurrency();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ROI Calculator & Blog detail, Content Calendar states
+  const [roiImpressions, setRoiImpressions] = useState('50000');
+  const [roiEngagements, setRoiEngagements] = useState('2500');
+  const [roiResult, setRoiResult] = useState<number | null>(5.00);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<any | null>(null);
+  const [interactiveCalendarOpen, setInteractiveCalendarOpen] = useState(false);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
+
   // Interaction Handlers
   const handleLikePost = async (id: string, currentlyLiked: boolean) => {
     try {
@@ -321,7 +331,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       category: "Technology",
       excerpt: "Exploring how platforms like EFADO are redefining social interaction and local industry and manufacturing trends...",
       date: "Oct 12, 2023",
-      image: "https://picsum.photos/seed/blog1/600/400"
+      image: "https://picsum.photos/seed/blog1/600/400",
+      content: "Digital ecosystems in Nigeria are transitioning from passive chat boards to active value creation and micro-economy clusters. Emerging frameworks like EFADO demonstrate how high-integrity systems empower local industry, technical manufacturing, and remote collaboration. By nesting trust networks into functional hubs, we pave a non-linear path for youth development and sustainable regional tech-scale. Moving forward, the fusion of micro-banking protocols and secure peer coordination will define the absolute standard for online communities across emerging markets."
     },
     {
       id: 2,
@@ -329,7 +340,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       category: "Relationships",
       excerpt: "Tactical advice for young couples navigating the complexities of career and family in a fast-paced global economy...",
       date: "Oct 10, 2023",
-      image: "https://picsum.photos/seed/blog2/600/400"
+      image: "https://picsum.photos/seed/blog2/600/400",
+      content: "Building long-term relationship resilience in contemporary, fast-paced commercial hubs requires structured intentionality and shared priorities. Today's couples navigate complex pressures from hybrid career shifts, globalized social media comparisons, and evolving economic parameters. Tactical resilience begins with absolute financial transparency, transparent communication protocols, and dedicating screen-free spaces in home environments. EFADO's 'Wives Forum' and community circles seek to establish a solid backing where values and long-term commitments are anchored in communal wisdom."
     },
     {
       id: 3,
@@ -337,7 +349,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       category: "Religion",
       excerpt: "A deep dive into the theological foundations of leadership and how pastors can impact their communities positively...",
       date: "Oct 08, 2023",
-      image: "https://picsum.photos/seed/blog3/600/400"
+      image: "https://picsum.photos/seed/blog3/600/400",
+      content: "Primacy of integrity remains the absolute non-negotiable metric for spiritual guides and community builders in our contemporary connected age. Pastors, ministers, and elders must establish clear ethical boundaries, transparent financial reporting, and high personal accountability standards. Stewardship is not about visual popularity or digital engagement counts; it is about local human integration, spiritual authenticity, and the selfless growth of congregants. Engaging in tactical peer forums helps modern leaders align their actions with original scriptures and eternal parameters."
     }
   ];
 
@@ -725,6 +738,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 <Globe className="w-4 h-4" />
                 Invite & Promote Globally
               </button>
+              <CurrencySelector />
               <button onClick={onClose} className="p-3 text-gray-400 hover:text-gray-900 transition-colors">
                 <X className="w-6 h-6" />
               </button>
@@ -763,7 +777,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-4">{post.date}</p>
                           <h4 className="text-xl font-black text-gray-950 uppercase tracking-tight mb-4 leading-tight group-hover:text-indigo-600 transition-colors">{post.title}</h4>
                           <p className="text-sm font-black text-gray-950 line-clamp-3 mb-8 leading-relaxed">{post.excerpt}</p>
-                          <button className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-widest hover:translate-x-1 transition-all">
+                          <button 
+                            onClick={() => setSelectedBlogPost(post)}
+                            className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-widest hover:translate-x-1 hover:text-indigo-850 transition-all"
+                          >
                             Read Tactical Entry <ChevronRight className="w-4 h-4" />
                           </button>
                         </div>
@@ -811,6 +828,19 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             <input 
                               type="number" 
                               placeholder="e.g. 50000"
+                              value={roiImpressions}
+                              onChange={(e) => {
+                                setRoiImpressions(e.target.value);
+                                const imp = parseFloat(e.target.value);
+                                const eng = parseFloat(roiEngagements);
+                                if (!isNaN(imp) && imp > 0 && !isNaN(eng) && eng >= 0) {
+                                  let rate = (eng / imp) * 100;
+                                  if (rate > 100) rate = 100;
+                                  setRoiResult(parseFloat(rate.toFixed(2)));
+                                } else {
+                                  setRoiResult(null);
+                                }
+                              }}
                               className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                             />
                           </div>
@@ -819,18 +849,55 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             <input 
                               type="number" 
                               placeholder="e.g. 2500"
+                              value={roiEngagements}
+                              onChange={(e) => {
+                                setRoiEngagements(e.target.value);
+                                const imp = parseFloat(roiImpressions);
+                                const eng = parseFloat(e.target.value);
+                                if (!isNaN(imp) && imp > 0 && !isNaN(eng) && eng >= 0) {
+                                  let rate = (eng / imp) * 100;
+                                  if (rate > 100) rate = 100;
+                                  setRoiResult(parseFloat(rate.toFixed(2)));
+                                } else {
+                                  setRoiResult(null);
+                                }
+                              }}
                               className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-black text-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                             />
                           </div>
                         </div>
                         <div className="flex flex-col items-center justify-center p-8 bg-indigo-600/20 rounded-[2rem] border border-indigo-500/30">
                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Engagement Rate</p>
-                           <p className="text-6xl font-black text-white tracking-tighter mb-2">5.00%</p>
-                           <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Industry Standard: High</p>
+                           <p className="text-6xl font-black text-white tracking-tighter mb-2">
+                             {roiResult !== null ? `${roiResult}%` : '--'}
+                           </p>
+                           <p className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
+                             roiResult !== null && roiResult > 4 ? 'text-emerald-400' : roiResult !== null && roiResult > 1.5 ? 'text-amber-400' : 'text-slate-400'
+                           }`}>
+                             {roiResult !== null ? (roiResult > 4 ? 'Industry Standard: High' : roiResult > 1.5 ? 'Industry Standard: Average' : 'Industry Standard: Low') : 'Fill Out Estimates'}
+                           </p>
                         </div>
                       </div>
 
-                      <button className="mt-8 w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-500/20 hover:scale-[1.02] transition-all">
+                      <button 
+                        onClick={() => {
+                          const imp = parseFloat(roiImpressions);
+                          const eng = parseFloat(roiEngagements);
+                          if (isNaN(imp) || imp <= 0) {
+                            alert("Please enter a valid number of impressions greater than 0.");
+                            return;
+                          }
+                          if (isNaN(eng) || eng < 0) {
+                            alert("Please enter a valid engagement count of 0 or more.");
+                            return;
+                          }
+                          let rate = (eng / imp) * 100;
+                          if (rate > 100) rate = 100;
+                          setRoiResult(parseFloat(rate.toFixed(2)));
+                          alert(`Execution ROI Calculated successfully! Rate: ${rate.toFixed(2)}%. This falls in our high engagement sector bracket.`);
+                        }}
+                        className="mt-8 w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-500/20 hover:scale-[1.02] transition-all"
+                      >
                         Calculate Execution ROI
                       </button>
                     </div>
@@ -840,12 +907,36 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50">
                        <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Content Strategy Tool</h5>
                        <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Map out your community engagement roadmaps with our tactical content calendar generator.</p>
-                       <button className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">Execute App <ChevronRight className="w-4 h-4" /></button>
+                       <button 
+                         onClick={() => {
+                           setInteractiveCalendarOpen(true);
+                           setSelectedCalendarDay('MON');
+                         }}
+                         className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform"
+                       >
+                         Execute App <ChevronRight className="w-4 h-4" />
+                       </button>
                     </div>
                     <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50">
                        <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Ad Performance Matrix</h5>
                        <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Analyze conversion rates and sector-specific reach for your Efado hub advertisements.</p>
-                       <button className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">Execute App <ChevronRight className="w-4 h-4" /></button>
+                       <button 
+                         onClick={() => {
+                           const imp = parseFloat(roiImpressions) || 50000;
+                           const clicks = Math.floor(imp * 0.024);
+                           const conversions = Math.floor(clicks * 0.15);
+                           alert(
+                             `--- EFADO AD PERFORMANCE STRATEGIC ANALYSIS ---\n\n` + 
+                             `🎯 Estimated Reach: ${imp.toLocaleString()} users\n` +
+                             `🖱️ Predicted Clicks (2.4% CTR): ${clicks.toLocaleString()}\n` +
+                             `📈 Predicted Conversions (15% CR): ${conversions.toLocaleString()} leads\n\n` +
+                             `Your current campaign parameters reside within our primary tier efficiency rating!`
+                           );
+                         }}
+                         className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform"
+                       >
+                         Execute App <ChevronRight className="w-4 h-4" />
+                       </button>
                     </div>
                   </div>
                 </motion.div>
@@ -1683,7 +1774,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                <p className="text-[9px] font-bold text-emerald-500 uppercase">Field Expert</p>
                             </div>
                          </div>
-                         <button className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all">Launch Direct Support</button>
+                         <button 
+                           onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: 'Technical Hub Issues' } }))}
+                           className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all"
+                         >
+                           Launch Direct Support
+                         </button>
                        </div>
                     </div>
                   </div>
@@ -2214,7 +2310,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
            </AnimatePresence>
 
            <div className="flex items-center gap-3 pointer-events-auto">
-             <button className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group">
+             <button 
+               onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat'))}
+               className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group"
+             >
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Connect Support</span>
                 <MessageSquareIcon className="w-5 h-5 text-indigo-600 group-hover:rotate-12 transition-transform" />
@@ -2262,6 +2361,138 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   </button>
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Blog Post Detail Modal */}
+        <AnimatePresence>
+          {selectedBlogPost && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[2010] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-white text-gray-950 rounded-[2.5rem] overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
+              >
+                <button 
+                  onClick={() => setSelectedBlogPost(null)}
+                  className="absolute top-6 right-6 z-10 p-2.5 bg-black/40 text-white hover:bg-black/60 rounded-full transition-colors backdrop-blur-md"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="h-64 sm:h-80 w-full overflow-hidden relative flex-shrink-0">
+                  <img src={selectedBlogPost.image} alt={selectedBlogPost.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+                  <div className="absolute bottom-6 left-8 right-8 text-white">
+                    <span className="px-3 py-1 bg-indigo-600 rounded-full text-[9px] font-black uppercase tracking-widest">{selectedBlogPost.category}</span>
+                    <h4 className="text-xl sm:text-2xl font-black uppercase mt-3 leading-tight tracking-tight">{selectedBlogPost.title}</h4>
+                    <p className="text-[10px] opacity-75 font-bold uppercase tracking-widest mt-1">{selectedBlogPost.date}</p>
+                  </div>
+                </div>
+
+                <div className="p-8 sm:p-10 overflow-y-auto space-y-6 text-sm text-gray-700 leading-relaxed font-medium">
+                  <p className="border-l-4 border-indigo-600 pl-4 font-bold text-gray-950 italic text-base">
+                    {selectedBlogPost.excerpt}
+                  </p>
+                  <p className="text-gray-800 whitespace-pre-wrap">{selectedBlogPost.content}</p>
+                  
+                  <div className="pt-6 border-t border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-black text-sm">EF</div>
+                      <div>
+                        <p className="text-xs font-black text-gray-900 uppercase">EFADO Editorial</p>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase">Sovereign Content Board</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                        setSelectedBlogPost(null);
+                        window.dispatchEvent(new CustomEvent('open-help-chat'));
+                      }}
+                      className="px-5 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Share with Expert
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Interactive Calendar Tool Overlay */}
+        <AnimatePresence>
+          {interactiveCalendarOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[2010] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-white text-gray-950 rounded-[2.5rem] p-10 overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
+              >
+                <button 
+                  onClick={() => {
+                    setInteractiveCalendarOpen(false);
+                    setSelectedCalendarDay(null);
+                  }}
+                  className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="mb-6">
+                  <h3 className="text-2xl font-black text-gray-950 uppercase tracking-tight">Tactical content calendar</h3>
+                  <p className="text-xs text-gray-500 font-bold font-sans">Deploy community growth and social engagement campaigns across optimized weekly timelines.</p>
+                </div>
+
+                <div className="grid grid-cols-7 gap-3 mb-8">
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => (
+                    <button 
+                      key={day}
+                      onClick={() => setSelectedCalendarDay(day)}
+                      className={`p-4 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                        selectedCalendarDay === day 
+                          ? 'border-indigo-600 bg-indigo-50/55 text-indigo-700' 
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-wider">{day}</span>
+                      <span className="text-xs font-black">📅</span>
+                    </button>
+                  ))}
+                </div>
+
+                {selectedCalendarDay ? (
+                  <div className="p-6 bg-slate-50 border border-gray-200 rounded-2xl flex-1 overflow-y-auto space-y-4">
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Recommended Plan for {selectedCalendarDay}</p>
+                    <h4 className="text-lg font-black text-gray-900 uppercase">Targeted Community Engagement</h4>
+                    <ul className="text-xs text-gray-650 space-y-2.5 font-bold">
+                      <li>• Morning Session: Deploy interactive poll question inside selected Gist categories.</li>
+                      <li>• Afternoon Session: Disseminate ad campaigns generated from ROI Calculator predictions.</li>
+                      <li>• Evening Session: Launch Live Zoom conversation with Pastoral Leadership or tech mentors.</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="p-8 border-2 border-dashed border-gray-200 rounded-2xl flex-1 flex flex-col items-center justify-center text-center">
+                    <span className="text-3xl mb-3">👈</span>
+                    <p className="text-sm font-black text-gray-900 uppercase">Select Timeline Day</p>
+                    <p className="text-xs text-gray-500 font-bold mt-1 max-w-sm">Tap any day in the weekly calendar grid to extract customized community strategies.</p>
+                  </div>
+                )}
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

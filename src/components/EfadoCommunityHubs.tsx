@@ -45,9 +45,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CSCCGroup, CSCCMembership, CSCCCycle, CSCCContribution, ChatMessage } from '../types';
-import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, getDoc } from '../firebase';
+import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, getDoc, runTransaction, increment } from '../firebase';
 import { VendorRegistration } from './VendorRegistration';
+import { PaystackDeposit } from './PaystackDeposit';
+import { DirectBankDeposit } from './DirectBankDeposit';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CurrencySelector } from './CurrencySelector';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
 
@@ -85,6 +88,26 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [withdrawBankName, setWithdrawBankName] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
+  // New Wallet Dashboard Modal States
+  const [fundingModalOpen, setFundingModalOpen] = useState(false);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [activeFundTab, setActiveFundTab] = useState<'paystack' | 'bank_transfer'>('paystack');
+
+  // Peer Transfer States
+  const [transferTargetEmail, setTransferTargetEmail] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferCurrency, setTransferCurrency] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [lookupName, setLookupName] = useState<string | null>(null);
+
+  // Expanded Withdraw States
+  const [withdrawCur, setWithdrawCur] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
+  const [withdrawSelBank, setWithdrawSelBank] = useState('');
+  const [withdrawCustBank, setWithdrawCustBank] = useState('');
+  const [withdrawAccNum, setWithdrawAccNum] = useState('');
+  const [withdrawTargName, setWithdrawTargName] = useState('');
+
   useEffect(() => {
     // Real-time listener for all memberships to power Admin Ops approvals
     const unsub = onSnapshot(collection(db, 'cscc_memberships'), (snapshot) => {
@@ -116,6 +139,29 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     );
     return unsubTrans;
   }, [user.uid]);
+
+  useEffect(() => {
+    if (!transferTargetEmail.trim()) {
+      setLookupName(null);
+      return;
+    }
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const q = query(collection(db, 'users'), where('email', '==', transferTargetEmail.trim().toLowerCase()));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          setLookupName(data.displayName || data.fullName || 'Active EFADO Account');
+        } else {
+          setLookupName('beneficiary email not found');
+        }
+      } catch (err) {
+        console.error('Target lookup failing silently:', err);
+        setLookupName(null);
+      }
+    }, 600);
+    return () => clearTimeout(delayDebounceFn);
+  }, [transferTargetEmail]);
 
   useEffect(() => {
     if (activeTab === 'COMMUNITY' && selectedGroup) {
@@ -411,13 +457,237 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [plusFormData, setPlusFormData] = useState({
     name: '',
     description: '',
-    contributionAmount: 100,
+    contributionAmount: 1000,
     currency: 'USD',
     cycleDuration: 'monthly' as any,
     maxMembers: 10,
     bonusTier: 50 as any,
     isPublic: true
   });
+
+  const [standardFormData, setStandardFormData] = useState({
+    name: '',
+    description: '',
+    contributionAmount: 1000,
+    currency: 'NGN',
+    cycleDuration: 'weekly' as any,
+    maxMembers: 10,
+    isPublic: true,
+    rules: ''
+  });
+
+  const handleCreateStandardGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, 'cscc_groups'), {
+        ...standardFormData,
+        type: 'STANDARD',
+        adminId: user.uid,
+        status: 'pending',
+        currentCycleIndex: 0,
+        progressivePayments: {},
+        createdAt: serverTimestamp(),
+        payoutOrder: [],
+        useRaffle: true
+      });
+      setShowCreateGroup(false);
+      // reset form
+      setStandardFormData({
+        name: '',
+        description: '',
+        contributionAmount: 1000,
+        currency: 'NGN',
+        cycleDuration: 'weekly' as any,
+        maxMembers: 10,
+        isPublic: true,
+        rules: ''
+      });
+      alert('EFADO CSCC Standard Group created successfully!');
+    } catch (error) {
+      console.error('Error creating Standard group:', error);
+      alert('Failed to create standard group: ' + (error as any).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePeerTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(transferAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid transfer amount.');
+      return;
+    }
+
+    if (transferTargetEmail.trim().toLowerCase() === user.email.toLowerCase()) {
+      alert('You cannot transfer funds to yourself.');
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', transferTargetEmail.trim().toLowerCase()));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        alert('The recipient email was not found on the EFADO network.');
+        setIsTransferring(false);
+        return;
+      }
+
+      const targetDoc = snap.docs[0];
+      const targetId = targetDoc.id;
+      const targetData = targetDoc.data();
+
+      // Determine sender balance in the selected wallet/currency
+      let senderBalance = 0;
+      if (transferCurrency === 'NGN') {
+        senderBalance = user.depositWallet || 0;
+      } else if (transferCurrency === 'USD') {
+        senderBalance = user.usd_balance || 0;
+      } else if (transferCurrency === 'GBP') {
+        senderBalance = user.gbp_balance || 0;
+      } else if (transferCurrency === 'EUR') {
+        senderBalance = user.eur_balance || 0;
+      }
+
+      if (senderBalance < amt) {
+        alert(`Insufficient funds. Your alternative storage balance for ${transferCurrency} is ${senderBalance.toLocaleString()}.`);
+        setIsTransferring(false);
+        return;
+      }
+
+      // Execute transaction batch write
+      const senderRef = doc(db, 'users', user.uid);
+      const recipientRef = doc(db, 'users', targetId);
+
+      await runTransaction(db, async (tx) => {
+        const currencyField = transferCurrency === 'NGN' ? 'depositWallet' : `${transferCurrency.toLowerCase()}_balance`;
+        
+        // update sender
+        tx.update(senderRef, {
+          [currencyField]: increment(-amt)
+        });
+
+        // update receiver
+        tx.update(recipientRef, {
+          [currencyField]: increment(amt)
+        });
+      });
+
+      // Log transaction records on Firestore under transactions collection for record keeping (master ledger)
+      // Log for Sender
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'payment',
+        amount: amt,
+        currency: transferCurrency,
+        status: 'completed',
+        description: `Instant peer-to-peer transfer to ${targetData.displayName || targetData.fullName || transferTargetEmail}`,
+        timestamp: serverTimestamp(),
+        reference: `TX-TRF-SEN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+      });
+
+      // Log for Receiver
+      await addDoc(collection(db, 'transactions'), {
+        userId: targetId,
+        type: 'deposit',
+        amount: amt,
+        currency: transferCurrency,
+        status: 'completed',
+        description: `Instant peer-to-peer transfer from ${user.displayName || user.fullName || user.email}`,
+        timestamp: serverTimestamp(),
+        reference: `TX-TRF-REC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+      });
+
+      alert(`Successfully transferred ${amt.toLocaleString()} ${transferCurrency} to ${targetData.displayName || targetData.fullName || transferTargetEmail}!`);
+      
+      // Reset form & close
+      setTransferAmount('');
+      setTransferTargetEmail('');
+      setTransferModalOpen(false);
+    } catch (err) {
+      console.error('Peer-to-peer transfer error:', err);
+      alert('P2P Transfer failed: ' + (err as any).message);
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleWithdrawMultiCurrency = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert('Please enter a valid withdrawal amount.');
+      return;
+    }
+
+    let userBalance = 0;
+    if (withdrawCur === 'NGN') {
+      userBalance = user.cashOutWallet || 0;
+    } else if (withdrawCur === 'USD') {
+      userBalance = user.usd_balance || 0;
+    } else if (withdrawCur === 'GBP') {
+      userBalance = user.gbp_balance || 0;
+    } else if (withdrawCur === 'EUR') {
+      userBalance = user.eur_balance || 0;
+    }
+
+    if (userBalance < amt) {
+      alert(`Insufficient funds. Your available balance for ${withdrawCur} is ${userBalance.toLocaleString()}.`);
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const currencyField = withdrawCur === 'NGN' ? 'cashOutWallet' : `${withdrawCur.toLowerCase()}_balance`;
+
+      await updateDoc(userRef, {
+        [currencyField]: increment(-amt)
+      });
+
+      // Register the withdrawal record
+      await addDoc(collection(db, 'withdrawals'), {
+        userId: user.uid,
+        amount: amt,
+        currency: withdrawCur,
+        bankName: withdrawSelBank === 'Other' ? withdrawCustBank : withdrawSelBank,
+        accountNumber: withdrawAccNum,
+        accountName: withdrawTargName,
+        status: 'pending', // Pending Admin/CEO payout approval
+        createdAt: serverTimestamp(),
+        reference: `WD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+      });
+
+      // Write a pending transaction log as well
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'withdrawal',
+        amount: amt,
+        currency: withdrawCur,
+        status: 'pending',
+        description: `Strategic withdrawal of ${amt.toLocaleString()} ${withdrawCur} to ${withdrawSelBank === 'Other' ? withdrawCustBank : withdrawSelBank} (${withdrawAccNum})`,
+        timestamp: serverTimestamp(),
+        reference: `TX-WD-PEN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+      });
+
+      alert(`Withdrawal request of ${amt.toLocaleString()} ${withdrawCur} initialized successfully! Pending payment processing.`);
+      
+      // Reset form & close
+      setWithdrawAmount('');
+      setWithdrawAccNum('');
+      setWithdrawTargName('');
+      setWithdrawSelBank('');
+      setWithdrawCustBank('');
+      setWithdrawModalOpen(false);
+    } catch (err) {
+      console.error('Multi-currency withdrawal error:', err);
+      alert('Withdrawal request failed: ' + (err as any).message);
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
 
   const handleCreatePlusGroup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -732,6 +1002,139 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                   Deploy Elite Cycle
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+        {showCreateGroup && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-huge relative max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <button 
+                onClick={() => setShowCreateGroup(false)}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 transition-colors"
+                id="close-standard-group-modal"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className="mb-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tight leading-none uppercase">Initialize CSCC <br/><span className="text-indigo-600">Standard Cycle.</span></h2>
+                </div>
+                <p className="text-gray-500 text-sm font-bold uppercase tracking-widest opacity-60">Rotational Savings & Collaboration Nexus</p>
+              </div>
+
+              <form onSubmit={handleCreateStandardGroup} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Group Strategic Name</label>
+                    <input 
+                      required
+                      type="text" 
+                      placeholder="e.g. Sterling Savers Network"
+                      className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all placeholder:text-gray-500 text-black shadow-inner"
+                      value={standardFormData.name}
+                      onChange={(e) => setStandardFormData({...standardFormData, name: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Cycle Duration</label>
+                    <select 
+                      className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all cursor-pointer text-black"
+                      value={standardFormData.cycleDuration}
+                      onChange={(e) => setStandardFormData({...standardFormData, cycleDuration: e.target.value as any})}
+                    >
+                      <option value="daily">Daily Cycle</option>
+                      <option value="weekly">Weekly Cycle</option>
+                      <option value="monthly">Monthly Cycle</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Currency</label>
+                      <select 
+                        className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all cursor-pointer text-black"
+                        value={standardFormData.currency}
+                        onChange={(e) => setStandardFormData({...standardFormData, currency: e.target.value})}
+                      >
+                        <option value="NGN">NGN (₦)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="EUR">EUR (€)</option>
+                      </select>
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Contribution Amount</label>
+                      <input 
+                        required
+                        type="number" 
+                        min={100}
+                        className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all text-black"
+                        value={standardFormData.contributionAmount}
+                        onChange={(e) => setStandardFormData({...standardFormData, contributionAmount: parseInt(e.target.value)})}
+                      />
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Members Limit</label>
+                      <input 
+                        required
+                        type="number" 
+                        min={2}
+                        max={50}
+                        className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all text-black"
+                        value={standardFormData.maxMembers}
+                        onChange={(e) => setStandardFormData({...standardFormData, maxMembers: parseInt(e.target.value)})}
+                      />
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest block">Mission Statement / Description</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Describe the purpose of this rotational savings connection..."
+                    className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all resize-none placeholder:text-gray-500 text-black"
+                    value={standardFormData.description}
+                    onChange={(e) => setStandardFormData({...standardFormData, description: e.target.value})}
+                  />
+                </div>
+
+                <div className="p-6 bg-indigo-950 rounded-[2rem] text-white space-y-2">
+                   <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">Sovereign Rotation Payout Goal</p>
+                      <p className="text-2xl font-black text-emerald-400">
+                         {standardFormData.currency === 'USD' ? '$' : standardFormData.currency === 'GBP' ? '£' : standardFormData.currency === 'EUR' ? '€' : '₦'}
+                         {(standardFormData.contributionAmount * standardFormData.maxMembers).toLocaleString()}
+                      </p>
+                   </div>
+                   <p className="text-[9px] text-indigo-300 font-bold uppercase tracking-widest leading-relaxed">
+                      This represents standard full collective payout upon completion of a full rotation cycle sequence across all {standardFormData.maxMembers} peer members.
+                   </p>
+                </div>
+
+                <button 
+                  disabled={loading}
+                  type="submit"
+                  className="w-full py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-indigo-900/20 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                  id="standard-group-submit-btn"
+                >
+                  {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                  Deploy Standard Cycle
                 </button>
               </form>
             </motion.div>
@@ -1775,10 +2178,10 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
             <p className="text-[9px] text-[#c7d2fe] font-medium leading-relaxed">Direct gaming winnings, live trading profits, and general earnings.</p>
           </div>
 
-          {/* Deposit Wallet Card */}
+          {/* Deposit Wallet Card with Multi-Currency display nested */}
           <div className="relative group overflow-hidden bg-gradient-to-br from-emerald-950 to-slate-900 p-8 rounded-3xl border border-emerald-900/40 shadow-xl text-white">
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl" />
-            <div className="flex justify-between items-start mb-6">
+            <div className="flex justify-between items-start mb-4">
               <div className="p-3 bg-emerald-500/20 rounded-2xl border border-emerald-500/30 text-emerald-300">
                 <Wallet className="w-6 h-6" />
               </div>
@@ -1786,7 +2189,23 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
             </div>
             <p className="text-[10px] font-semibold uppercase text-emerald-300 tracking-wider mb-1">Capital Deposit Wallet</p>
             <h3 className="text-3xl font-black text-white leading-none mb-2">{formatPrice(user.depositWallet)}</h3>
-            <p className="text-[9px] text-[#d1fae5] font-medium leading-relaxed">Stored collective funding capital reserved strictly for rotational CSCC cycles.</p>
+            <p className="text-[9px] text-[#d1fae5] font-medium leading-relaxed mb-4">Stored collective funding capital reserved strictly for rotational CSCC cycles.</p>
+            
+            {/* Multi-Currency Balances */}
+            <div className="mt-4 pt-4 border-t border-emerald-800/40 grid grid-cols-3 gap-2 text-center bg-black/20 p-2.5 rounded-xl">
+              <div>
+                <p className="text-[7px] text-emerald-400 font-extrabold uppercase">USD Wallet</p>
+                <p className="text-[11px] font-black font-mono">${(user.usd_balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+              </div>
+              <div>
+                <p className="text-[7px] text-emerald-400 font-extrabold uppercase">GBP Wallet</p>
+                <p className="text-[11px] font-black font-mono">£{(user.gbp_balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+              </div>
+              <div>
+                <p className="text-[7px] text-emerald-400 font-extrabold uppercase">EUR Wallet</p>
+                <p className="text-[11px] font-black font-mono">€{(user.eur_balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+              </div>
+            </div>
           </div>
 
           {/* Cash Out Wallet Card */}
@@ -1804,175 +2223,346 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           </div>
         </div>
 
-        {/* Terminals Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Funding Entry (Deposit) */}
-          <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <ArrowDownLeft className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Financial Inflow (Deposit)</h3>
-                  <p className="text-xs text-gray-500 font-bold font-sans">Deploy deposit resources to fuel rotational cycle commitments</p>
-                </div>
-              </div>
+        {/* Action Buttons Hub */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50 p-6 rounded-[2rem] border border-gray-100">
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setFundingModalOpen(true)}
+            className="py-5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-600/10 transition-all flex items-center justify-center gap-2.5"
+            id="btn-fund-account"
+          >
+            <Plus className="w-5 h-5" /> Fund Account
+          </motion.button>
+          
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setWithdrawModalOpen(true)}
+            className="py-5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-rose-600/10 transition-all flex items-center justify-center gap-2.5"
+            id="btn-withdraw-assets"
+          >
+            <ArrowUpRight className="w-5 h-5" /> Withdraw Balance
+          </motion.button>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Amount NGN (₦)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">₦</span>
-                    <input 
-                      type="number"
-                      placeholder="e.g. 5000"
-                      value={depositAmount}
-                      onChange={e => setDepositAmount(e.target.value)}
-                      className="w-full pl-8 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[12px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
-                    />
-                  </div>
-                </div>
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setTransferModalOpen(true)}
+            className="py-5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-indigo-600/10 transition-all flex items-center justify-center gap-2.5"
+            id="btn-transfer-funds"
+          >
+            <ArrowRight className="w-5 h-5" /> Transfer Funds
+          </motion.button>
+        </div>
 
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Payment Infrastructure Gateway</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { id: 'bank_transfer', label: 'Local Wire' },
-                      { id: 'credit_card', label: 'Security Card' },
-                      { id: 'mobile_money', label: 'Mobile Money' }
-                    ].map(way => (
-                      <button
-                        key={way.id}
-                        type="button"
-                        onClick={() => setDepositMethod(way.id as any)}
-                        className={`p-3.5 border-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
-                          depositMethod === way.id 
-                            ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700' 
-                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                        }`}
-                      >
-                        {way.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleDeposit}
-              disabled={isDepositing}
-              className="w-full mt-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-transform flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/10"
+        {/* Dynamic Modals overlays */}
+        <AnimatePresence>
+          {fundingModalOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-xl"
             >
-              {isDepositing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Encrypting Gateway...
-                </>
-              ) : (
-                'Execute Funding Settlement'
-              )}
-            </button>
-          </section>
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-huge relative max-h-[90vh] overflow-y-auto no-scrollbar"
+              >
+                <button 
+                  onClick={() => setFundingModalOpen(false)}
+                  className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 transition-colors"
+                  id="close-funding-modal"
+                >
+                  <X className="w-6 h-6" />
+                </button>
 
-          {/* Drawdown Window (Withdrawal) */}
-          <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
-                  <ArrowUpRight className="w-5 h-5" />
+                <div className="mb-8">
+                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-4">Fund Capital Wallet</h3>
+                  <div className="flex gap-4 border-b border-gray-150 mb-6">
+                    <button 
+                      type="button"
+                      onClick={() => setActiveFundTab('paystack')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'paystack' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-gray-400 hover:text-gray-650'}`}
+                    >
+                      ⚡ Instant Paystack Inline
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setActiveFundTab('bank_transfer')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'bank_transfer' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-gray-400 hover:text-gray-650'}`}
+                    >
+                      🏦 Direct Bank / Wire Transfer
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Strategic Drewdown (Withdraw)</h3>
-                  <p className="text-xs text-gray-500 font-bold font-sans">Extract ledger dividends and wins securely to checking profile</p>
-                </div>
-              </div>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Drawdown Amount</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">₦</span>
+                {activeFundTab === 'paystack' ? (
+                  <PaystackDeposit user={user} onSuccess={() => setFundingModalOpen(false)} />
+                ) : (
+                  <DirectBankDeposit user={user} onSuccess={() => setFundingModalOpen(false)} />
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+
+          {withdrawModalOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-huge relative max-h-[90vh] overflow-y-auto no-scrollbar"
+              >
+                <button 
+                  onClick={() => setWithdrawModalOpen(false)}
+                  className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 transition-colors"
+                  id="close-withdraw-modal"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+                      <ArrowUpRight className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Withdrawal Settlement</h3>
+                      <p className="text-xs text-gray-505 font-bold font-sans">Extract ledger dividends and wins securely to checking profile</p>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleWithdrawMultiCurrency} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Select Currency</label>
+                      <select 
+                        value={withdrawCur}
+                        onChange={(e) => setWithdrawCur(e.target.value as any)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-black"
+                      >
+                        <option value="NGN">NGN (₦) - Cash Out Wallet</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="EUR">EUR (€)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Withdrawal Amount</label>
                       <input 
+                        required
                         type="number"
-                        placeholder="e.g. 10000"
+                        placeholder="e.g. 5000"
+                        min={100}
                         value={withdrawAmount}
-                        onChange={e => setWithdrawAmount(e.target.value)}
-                        className="w-full pl-8 pr-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[12px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Discharge Route</label>
-                    <select
-                      value={withdrawMethod}
-                      onChange={e => setWithdrawMethod(e.target.value as any)}
-                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black appearance-none cursor-pointer"
-                    >
-                      <option value="bank">Commercial Bank</option>
-                      <option value="crypto">Cryptographic Node</option>
-                    </select>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">
-                      {withdrawMethod === 'crypto' ? 'Node Wallet Address' : 'Account Number'}
-                    </label>
+                  <div className="p-4 bg-rose-50/50 rounded-2xl text-rose-950 text-xs font-bold uppercase tracking-wide flex justify-between border border-rose-100">
+                    <span>Available Balance:</span>
+                    <span>
+                      {withdrawCur === 'NGN' && `₦${(user.cashOutWallet || 0).toLocaleString()}`}
+                      {withdrawCur === 'USD' && `$${(user.usd_balance || 0).toLocaleString()}`}
+                      {withdrawCur === 'GBP' && `£${(user.gbp_balance || 0).toLocaleString()}`}
+                      {withdrawCur === 'EUR' && `€${(user.eur_balance || 0).toLocaleString()}`}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Payment Bank Destination</label>
+                      <select 
+                        required
+                        value={withdrawSelBank}
+                        onChange={(e) => setWithdrawSelBank(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase text-black"
+                      >
+                        <option value="">-- Choose Bank --</option>
+                        <option value="Access Bank">Access Bank</option>
+                        <option value="GTBank">Guaranty Trust Bank (GTB)</option>
+                        <option value="Zenith Bank">Zenith Bank</option>
+                        <option value="UBA">United Bank for Africa (UBA)</option>
+                        <option value="First Bank">First Bank</option>
+                        <option value="OPay">OPay</option>
+                        <option value="Palmpay">Palmpay</option>
+                        <option value="Standard Chartered">Standard Chartered</option>
+                        <option value="Barclays">Barclays Bank</option>
+                        <option value="Chase">JPMorgan Chase</option>
+                        <option value="Deutsche Bank">Deutsche Bank</option>
+                        <option value="Other">Other Bank (Type below)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Account Number / IBAN</label>
+                      <input 
+                        required
+                        type="text"
+                        placeholder="e.g. 1024823901"
+                        value={withdrawAccNum}
+                        onChange={(e) => setWithdrawAccNum(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
+                      />
+                    </div>
+                  </div>
+
+                  {withdrawSelBank === 'Other' && (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Custom Bank Name</label>
+                      <input 
+                        required
+                        type="text"
+                        placeholder="e.g. Lloyds PLC, UK"
+                        value={withdrawCustBank}
+                        onChange={(e) => setWithdrawCustBank(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Account Beneficiary Name</label>
                     <input 
+                      required
                       type="text"
-                      placeholder={withdrawMethod === 'crypto' ? '0x...' : 'e.g. 0123456789'}
-                      value={withdrawAccount}
-                      onChange={e => setWithdrawAccount(e.target.value)}
-                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
+                      placeholder="e.g. John Doe"
+                      value={withdrawTargName}
+                      onChange={(e) => setWithdrawTargName(e.target.value)}
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">
-                      {withdrawMethod === 'crypto' ? 'Protocol' : 'Bank/Gateway'}
-                    </label>
-                    <input 
-                      type="text"
-                      placeholder={withdrawMethod === 'crypto' ? 'ERC20 / SOL' : 'e.g. Zenith, GTB'}
-                      value={withdrawBankName}
-                      onChange={e => setWithdrawBankName(e.target.value)}
-                      className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Beneficiary Custom Name</label>
-                  <input 
-                    type="text"
-                    placeholder="e.g. EFADO ENTERPRISE"
-                    value={withdrawBeneficiary}
-                    onChange={e => setWithdrawBeneficiary(e.target.value)}
-                    className="w-full px-4 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:outline-none focus:border-indigo-500 transition-all text-black"
-                  />
-                </div>
-              </div>
-            </div>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
+                    * Local Naira bank withdrawals are processed automatically. Other currency withdrawals (USD, GBP, EUR) undergo compliance review and clearance by our tactical operations desk within 12 - 24 hours.
+                  </p>
 
-            <button
-              onClick={handleWithdraw}
-              disabled={isWithdrawing}
-              className="w-full mt-8 py-4 bg-gray-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-transform flex items-center justify-center gap-2 shadow-lg shadow-gray-900/15"
+                  <button 
+                    type="submit"
+                    disabled={isWithdrawing}
+                    className="w-full py-5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3"
+                  >
+                    {isWithdrawing ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                    Confirm & Execute Withdrawal
+                  </button>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {transferModalOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-xl"
             >
-              {isWithdrawing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Shedding Capital...
-                </>
-              ) : (
-                'Initialize Drawdown Order'
-              )}
-            </button>
-          </section>
-        </div>
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-huge relative max-h-[90vh] overflow-y-auto no-scrollbar"
+              >
+                <button 
+                  onClick={() => setTransferModalOpen(false)}
+                  className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 transition-colors"
+                  id="close-transfer-modal"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                      <ArrowRight className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Ecosystem Ledger Transfer</h3>
+                      <p className="text-xs text-gray-500 font-bold font-sans">Transfer funds instantly to any registered EFADO user for active collaboration</p>
+                    </div>
+                  </div>
+                </div>
+
+                <form onSubmit={handlePeerTransfer} className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Recipient Account Email</label>
+                    <input 
+                      required
+                      type="email"
+                      placeholder="e.g. collaborator@efado.app"
+                      value={transferTargetEmail}
+                      onChange={(e) => setTransferTargetEmail(e.target.value)}
+                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black placeholder:text-gray-400"
+                    />
+                    {lookupName && (
+                      <p className={`mt-2 text-[10px] font-black uppercase tracking-widest ${lookupName.includes('not found') ? 'text-rose-500' : 'text-emerald-500 animate-pulse'}`}>
+                        Recipient: {lookupName}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Select Wallet Currency</label>
+                      <select 
+                        value={transferCurrency}
+                        onChange={(e) => setTransferCurrency(e.target.value as any)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-black"
+                      >
+                        <option value="NGN">NGN (₦) - Deposit Wallet</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="EUR">EUR (€)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Transfer Amount</label>
+                      <input 
+                        required
+                        type="number"
+                        placeholder="e.g. 1000"
+                        min={10}
+                        value={transferAmount}
+                        onChange={(e) => setTransferAmount(e.target.value)}
+                        className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-indigo-50/50 rounded-2xl text-indigo-950 text-xs font-bold uppercase tracking-wide flex justify-between border border-indigo-100">
+                    <span>Sender Storage Balance:</span>
+                    <span>
+                      {transferCurrency === 'NGN' && `₦${(user.depositWallet || 0).toLocaleString()}`}
+                      {transferCurrency === 'USD' && `$${(user.usd_balance || 0).toLocaleString()}`}
+                      {transferCurrency === 'GBP' && `£${(user.gbp_balance || 0).toLocaleString()}`}
+                      {transferCurrency === 'EUR' && `€${(user.eur_balance || 0).toLocaleString()}`}
+                    </span>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isTransferring || (lookupName ? lookupName.includes('not found') : false)}
+                    className="w-full py-5 bg-gradient-to-r from-slate-900 to-black text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {isTransferring ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                    Confirm & Complete Transfer
+                  </button>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Tactical Ledger Logs */}
         <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
@@ -2294,14 +2884,17 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
               </h1>
             </div>
             
-            <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
-               <div className="text-right">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Wallet Credits</p>
-                  <p className="text-sm font-black text-indigo-600">{formatPrice(user.playerWallet)}</p>
-               </div>
-               <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-                  <Wallet className="w-5 h-5" />
-               </div>
+            <div className="flex items-center gap-4">
+              <CurrencySelector />
+              <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                 <div className="text-right">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Wallet Credits</p>
+                    <p className="text-sm font-black text-indigo-600">{formatPrice(user.playerWallet)}</p>
+                 </div>
+                 <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                    <Wallet className="w-5 h-5" />
+                 </div>
+              </div>
             </div>
           </motion.header>
 

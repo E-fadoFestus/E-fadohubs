@@ -45,6 +45,7 @@ import {
 import { SAMPLE_PRODUCTS } from '../sampleData';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CurrencySelector } from './CurrencySelector';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
@@ -533,6 +534,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 </span>
                 <span className="text-[8px] font-bold text-indigo-200 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
+              <CurrencySelector />
               <button onClick={onClose} className="p-3 text-slate-400 hover:text-white transition-colors">
                 <X className="w-6 h-6" />
               </button>

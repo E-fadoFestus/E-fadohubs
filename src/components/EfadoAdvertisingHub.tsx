@@ -50,6 +50,7 @@ import {
 import { UserProfile, AdListing, AdPlan } from '../types';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CurrencySelector } from './CurrencySelector';
 import { PaymentPlatform } from './PaymentPlatform';
 import { EfadoPromoKit } from './EfadoPromoKit';
 
@@ -393,12 +394,15 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                 Sell Now
               </button>
             </div>
-            <button 
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-6 h-6 text-gray-950" />
-            </button>
+            <div className="flex items-center gap-2">
+              <CurrencySelector />
+              <button 
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-950" />
+              </button>
+            </div>
           </div>
         </div>
       </header>

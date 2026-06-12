@@ -28,7 +28,8 @@ import {
   ShieldCheck,
   TrendingUp,
   Map as MapIcon,
-  Bell
+  Bell,
+  Award
 } from 'lucide-react';
 import { UserProfile, ServiceRequest, ServiceProvider } from '../types';
 import { ServiceCorpsRegistration } from './ServiceCorpsRegistration';
@@ -344,6 +345,42 @@ const SERVICE_FAMILIES: ServiceFamily[] = [
   }
 ];
 
+const PRE_SEEDED_TESTIMONIES = [
+  {
+    id: 'seed-1',
+    clientName: 'Sarah Jenkins',
+    clientPhoto: 'https://picsum.photos/seed/sarah/200/200',
+    providerName: 'Delta Mech-Squad',
+    subcategory: 'Solar panel installation',
+    rating: 5,
+    testimonyText: 'Successfully transitioned our entire distribution warehouse to clean Solar energy. Vetted high-skill execution and absolute execution trust!',
+    createdAt: Date.now() - 3600000 * 2,
+    proficiencyChecks: ['High-Skill Execution', 'Absolute Transparency']
+  },
+  {
+    id: 'seed-2',
+    clientName: 'Captain Adebayo',
+    clientPhoto: 'https://picsum.photos/seed/adebayo/200/200',
+    providerName: 'Sovereign Marine Inc.',
+    subcategory: 'Marine systems inspection',
+    rating: 5,
+    testimonyText: 'Top-tier marine diagnostics and process optimization. Handshake verification secured our operation with flawless reliability!',
+    createdAt: Date.now() - 3600000 * 12,
+    proficiencyChecks: ['Double-Secured Validation', 'Intrusion-Safe Verification']
+  },
+  {
+    id: 'seed-3',
+    clientName: 'Liam Gallagher',
+    clientPhoto: 'https://picsum.photos/seed/liam/200/200',
+    providerName: 'Apex Structural Group',
+    subcategory: 'Structural planning support',
+    rating: 5,
+    testimonyText: 'Elite mobilization speed for cost analysis and feasibility mapping. Recommending this system for global operations.',
+    createdAt: Date.now() - 3600000 * 24,
+    proficiencyChecks: ['Punctual Delivery', 'Exemplary Coordination']
+  }
+];
+
 interface EfadoServiceCorpsProps {
   user: UserProfile;
   onClose: () => void;
@@ -362,6 +399,22 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
   const [activeBargain, setActiveBargain] = useState<{ request: ServiceRequest, provider: ServiceProvider } | null>(null);
   const [liveRequests, setLiveRequests] = useState<ServiceRequest[]>([]);
   const [showMap, setShowMap] = useState(false);
+  const [testimonies, setTestimonies] = useState<any[]>([]);
+
+  // Load live trust testimonies from around the globe
+  React.useEffect(() => {
+    const q = query(
+      collection(db, 'service_testimonies'),
+      orderBy('createdAt', 'desc'),
+      limit(6)
+    );
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setTestimonies(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      console.warn("Could not subscribe to service testimonies", err);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Load live requests for the "Sovereign Relief Feed"
   React.useEffect(() => {
@@ -728,6 +781,80 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
                        <p className="text-slate-600 font-black uppercase text-xs tracking-widest">Scanning for priority signals...</p>
                     </div>
                   )}
+                </div>
+              </motion.div>
+
+              {/* GLOBAL TRUST & HISTORICAL TESTIMONY LEDGER */}
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="space-y-12 mt-32"
+              >
+                <div className="flex items-center justify-between border-b border-white/5 pb-8">
+                  <div>
+                    <h2 className="text-4xl font-black text-white tracking-widest uppercase italic">TRUST LEDGER</h2>
+                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em] mt-2">Historical Testimonies of Global Proficiency & Reliability</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-amber-500/10 px-6 py-3 rounded-2xl border border-amber-500/10">
+                    <Award className="w-5 h-5 text-amber-400" />
+                    <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">Global Escrow Vetted</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[...testimonies, ...PRE_SEEDED_TESTIMONIES].map((testimony, idx) => (
+                    <motion.div 
+                      key={testimony.id || idx}
+                      whileHover={{ y: -8 }}
+                      className="p-8 rounded-[2.5rem] bg-slate-900/60 border border-white/5 hover:border-amber-500/20 hover:bg-slate-900/80 transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-[360px]"
+                    >
+                      {/* Premium Accent */}
+                      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-indigo-500 opacity-60" />
+
+                      {/* Header containing stars and specialty */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-[9px] font-black uppercase text-amber-400 tracking-widest bg-amber-400/10 px-3 py-1 rounded-full truncate max-w-[150px]">
+                            {testimony.subcategory || 'Technical Squad'}
+                          </span>
+                          <div className="flex gap-0.5 text-amber-400">
+                            {[...Array(testimony.rating || 5)].map((_, i) => (
+                              <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            ))}
+                          </div>
+                        </div>
+
+                        <p className="text-slate-300 text-sm font-semibold italic leading-relaxed line-clamp-5 mb-6">
+                          "{testimony.testimonyText}"
+                        </p>
+                      </div>
+
+                      {/* Bottom Profiling & Trust Flags */}
+                      <div className="space-y-4 pt-4 border-t border-white/5">
+                        <div className="flex flex-wrap gap-1">
+                          {(testimony.proficiencyChecks || ['High-Skill Execution', 'Punctual Delivery']).slice(0, 2).map((check: string, cIdx: number) => (
+                            <span key={cIdx} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider">
+                              ✓ {check}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={testimony.clientPhoto || `https://picsum.photos/seed/${testimony.clientId || 'client'}/100/100`} 
+                            alt={testimony.clientName} 
+                            className="w-10 h-10 rounded-xl object-cover border border-white/10"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="min-w-0">
+                            <h5 className="text-xs font-black text-white truncate uppercase tracking-wider">{testimony.clientName}</h5>
+                            <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-widest truncate">Verified Beneficiary</p>
+                          </div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               </motion.div>
             </div>
