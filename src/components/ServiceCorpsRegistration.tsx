@@ -433,6 +433,78 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                     </select>
                   </FormField>
                 </div>
+
+                {/* Tactical Recognition Selfie / Photo */}
+                <div className="p-6 bg-slate-900 text-white rounded-3xl border border-white/10 space-y-6 mt-6">
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500 overflow-hidden shrink-0 relative bg-slate-800 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+                      {providerData.photos[0] ? (
+                        <img src={providerData.photos[0]} alt="Verification Headshot" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera className="w-10 h-10 text-slate-500" />
+                      )}
+                      <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
+                    </div>
+                    <div className="space-y-2 text-center md:text-left flex-1">
+                      <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400">Tactical Recognition Selfie / Photo</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Security requirement: Upload a clear, front-facing headshot. This is verified by the client prior to entry into their premises to prevent intrusion.
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-2 justify-center md:justify-start">
+                        <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md">
+                          Upload Headshot
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setProviderData(prev => ({
+                                    ...prev,
+                                    photos: [reader.result as string, ...prev.photos.slice(1)]
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                        {providerData.photos[0] && (
+                          <button
+                            type="button"
+                            onClick={() => setProviderData(prev => ({...prev, photos: prev.photos.slice(1)}))}
+                            className="px-4 py-2 bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-white/5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quick Test Identity Presets</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {RECOGNITION_PRESETS.map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setProviderData(prev => ({
+                            ...prev,
+                            photos: [preset.url, ...prev.photos.slice(1)]
+                          }))}
+                          className={`p-2 bg-white/5 hover:bg-white/10 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-2 border ${providerData.photos[0] === preset.url ? 'border-indigo-500 bg-indigo-950/20' : 'border-transparent'}`}
+                        >
+                          <img src={preset.url} alt={preset.name} className="w-10 h-10 rounded-full object-cover" />
+                          <span className="text-[8px] font-black uppercase tracking-tight text-slate-300 truncate w-full text-center">{preset.name.split(' ')[0]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -573,77 +645,6 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                     onChange={e => setProviderData({...providerData, bio: e.target.value})}
                   />
                 </div>
-
-                <div className="p-6 bg-slate-900 text-white rounded-3xl border border-white/10 space-y-6">
-                  <div className="flex flex-col md:flex-row gap-6 items-center">
-                    <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500 overflow-hidden shrink-0 relative bg-slate-800 flex items-center justify-center shadow-lg shadow-indigo-500/10">
-                      {providerData.photos[0] ? (
-                        <img src={providerData.photos[0]} alt="Verification Headshot" className="w-full h-full object-cover" />
-                      ) : (
-                        <Camera className="w-10 h-10 text-slate-500" />
-                      )}
-                      <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
-                    </div>
-                    <div className="space-y-2 text-center md:text-left flex-1">
-                      <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400">Tactical Recognition Selfie / Photo</h4>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        Security requirement: Upload a clear, front-facing headshot. This is verified by the client prior to entry into their premises to prevent intrusion.
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-2 justify-center md:justify-start">
-                        <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md">
-                          Upload Headshot
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setProviderData(prev => ({
-                                    ...prev,
-                                    photos: [reader.result as string, ...prev.photos.slice(1)]
-                                  }));
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                        {providerData.photos[0] && (
-                          <button
-                            type="button"
-                            onClick={() => setProviderData(prev => ({...prev, photos: prev.photos.slice(1)}))}
-                            className="px-4 py-2 bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-4 border-t border-white/5">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quick Test Identity Presets</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                      {RECOGNITION_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setProviderData(prev => ({
-                            ...prev,
-                            photos: [preset.url, ...prev.photos.slice(1)]
-                          }))}
-                          className={`p-2 bg-white/5 hover:bg-white/10 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-2 border ${providerData.photos[0] === preset.url ? 'border-indigo-500 bg-indigo-950/20' : 'border-transparent'}`}
-                        >
-                          <img src={preset.url} alt={preset.name} className="w-10 h-10 rounded-full object-cover" />
-                          <span className="text-[8px] font-black uppercase tracking-tight text-slate-300 truncate w-full text-center">{preset.name.split(' ')[0]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </motion.div>
             )}
           </div>
@@ -749,6 +750,78 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                     }}
                   />
                 </FormField>
+
+                {/* Seeker Recognition Selfie / Photo */}
+                <div className="p-6 bg-slate-900 text-white rounded-3xl border border-white/10 space-y-6 mt-6 text-left">
+                  <div className="flex flex-col md:flex-row gap-6 items-center">
+                    <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500 overflow-hidden shrink-0 relative bg-slate-800 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+                      {seekerData.photos[0] ? (
+                        <img src={seekerData.photos[0]} alt="Seeker Verification" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera className="w-10 h-10 text-slate-500" />
+                      )}
+                      <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
+                    </div>
+                    <div className="space-y-2 text-center md:text-left flex-1">
+                      <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400">Seeker Recognition Selfie / Photo</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Mutual Safety Mandate: Provide your profile photograph so the service provider can confirm your identity at the entry threshold.
+                      </p>
+                      <div className="flex flex-wrap gap-2 pt-2 justify-center md:justify-start">
+                        <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md">
+                          Upload Photo
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setSeekerData(prev => ({
+                                    ...prev,
+                                    photos: [reader.result as string, ...prev.photos.slice(1)]
+                                  }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
+                        {seekerData.photos[0] && (
+                          <button
+                            type="button"
+                            onClick={() => setSeekerData(prev => ({...prev, photos: prev.photos.slice(1)}))}
+                            className="px-4 py-2 bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-4 border-t border-white/5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quick Test Seeker Presets</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {RECOGNITION_PRESETS.slice(2).map((preset, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setSeekerData(prev => ({
+                            ...prev,
+                            photos: [preset.url, ...prev.photos.slice(1)]
+                          }))}
+                          className={`p-2 bg-white/5 hover:bg-white/10 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-2 border ${seekerData.photos[0] === preset.url ? 'border-indigo-500 bg-indigo-950/20' : 'border-transparent'}`}
+                        >
+                          <img src={preset.url} alt={preset.name} className="w-10 h-10 rounded-full object-cover" />
+                          <span className="text-[8px] font-black uppercase tracking-tight text-slate-300 truncate w-full text-center">{preset.name.split(' ')[0]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -824,77 +897,6 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                         }}
                       />
                     </FormField>
-                  </div>
-
-                  <div className="md:col-span-2 p-6 bg-slate-900 text-white rounded-3xl border border-white/10 space-y-6">
-                    <div className="flex flex-col md:flex-row gap-6 items-center">
-                      <div className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500 overflow-hidden shrink-0 relative bg-slate-800 flex items-center justify-center shadow-lg shadow-indigo-500/10">
-                        {seekerData.photos[0] ? (
-                          <img src={seekerData.photos[0]} alt="Seeker Verification" className="w-full h-full object-cover" />
-                        ) : (
-                          <Camera className="w-10 h-10 text-slate-500" />
-                        )}
-                        <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
-                      </div>
-                      <div className="space-y-2 text-center md:text-left flex-1">
-                        <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400">Seeker Recognition Selfie / Photo</h4>
-                        <p className="text-xs text-slate-300 leading-relaxed">
-                          Mutual Safety Mandate: Provide your profile photograph so the service provider can confirm your identity at the entry threshold.
-                        </p>
-                        <div className="flex flex-wrap gap-2 pt-2 justify-center md:justify-start">
-                          <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md">
-                            Upload Photo
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="hidden" 
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setSeekerData(prev => ({
-                                      ...prev,
-                                      photos: [reader.result as string, ...prev.photos.slice(1)]
-                                    }));
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                          </label>
-                          {seekerData.photos[0] && (
-                            <button
-                              type="button"
-                              onClick={() => setSeekerData(prev => ({...prev, photos: prev.photos.slice(1)}))}
-                              className="px-4 py-2 bg-white/10 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 pt-4 border-t border-white/5">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quick Test Seeker Presets</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                        {RECOGNITION_PRESETS.slice(2).map((preset, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setSeekerData(prev => ({
-                              ...prev,
-                              photos: [preset.url, ...prev.photos.slice(1)]
-                            }))}
-                            className={`p-2 bg-white/5 hover:bg-white/10 rounded-2xl hover:scale-105 transition-all flex flex-col items-center gap-2 border ${seekerData.photos[0] === preset.url ? 'border-indigo-500 bg-indigo-950/20' : 'border-transparent'}`}
-                          >
-                            <img src={preset.url} alt={preset.name} className="w-10 h-10 rounded-full object-cover" />
-                            <span className="text-[8px] font-black uppercase tracking-tight text-slate-300 truncate w-full text-center">{preset.name.split(' ')[0]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </motion.div>
