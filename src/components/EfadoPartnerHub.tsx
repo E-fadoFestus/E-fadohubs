@@ -599,7 +599,7 @@ const AffiliateMarketingModal: React.FC<{
   const [isCopied, setIsCopied] = useState(false);
   const [activePromoTab, setActivePromoTab] = useState<'CARD' | 'SOCIAL' | 'EMAIL'>('CARD');
 
-  const referralLink = `https://efado.com/join?ref=${affiliateCode.toUpperCase()}`;
+  const referralLink = `https://e-fado.com/join?ref=${affiliateCode.toUpperCase()}`;
 
   const copyRefLink = () => {
     navigator.clipboard.writeText(referralLink);

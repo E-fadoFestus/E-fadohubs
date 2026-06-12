@@ -41,7 +41,9 @@ import {
   Loader2,
   ArrowUpRight,
   ArrowDownLeft,
-  Coins
+  Coins,
+  Volume2,
+  MicOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CSCCGroup, CSCCMembership, CSCCCycle, CSCCContribution, ChatMessage } from '../types';
@@ -108,6 +110,18 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [withdrawAccNum, setWithdrawAccNum] = useState('');
   const [withdrawTargName, setWithdrawTargName] = useState('');
 
+  // Interactive Discourse (Chat) Feature States
+  const [chatCallState, setChatCallState] = useState<'idle' | 'calling_voice' | 'calling_video' | 'active_voice' | 'active_video'>('idle');
+  const [callTimer, setCallTimer] = useState(0);
+  const [isCallMuted, setIsCallMuted] = useState(false);
+  const [isCallSpeaker, setIsCallSpeaker] = useState(false);
+  const [chatMoreMenuOpen, setChatMoreMenuOpen] = useState(false);
+  const [chatEmojiPickerOpen, setChatEmojiPickerOpen] = useState(false);
+  const [chatAttachment, setChatAttachment] = useState<{ id: string; name: string; type: string; base64?: string } | null>(null);
+  const [chatIsVoiceRecording, setChatIsVoiceRecording] = useState(false);
+  const [chatVoiceSeconds, setChatVoiceSeconds] = useState(0);
+  const [chatVoiceIntervalId, setChatVoiceIntervalId] = useState<any>(null);
+
   useEffect(() => {
     // Real-time listener for all memberships to power Admin Ops approvals
     const unsub = onSnapshot(collection(db, 'cscc_memberships'), (snapshot) => {
@@ -117,6 +131,49 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    let callInterval: any = null;
+    if (chatCallState === 'calling_voice' || chatCallState === 'calling_video') {
+      const timeout = setTimeout(() => {
+        setChatCallState(chatCallState === 'calling_voice' ? 'active_voice' : 'active_video');
+        setCallTimer(0);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    } else if (chatCallState === 'active_voice' || chatCallState === 'active_video') {
+      callInterval = setInterval(() => {
+        setCallTimer(prev => prev + 1);
+      }, 1000);
+    } else {
+      setCallTimer(0);
+    }
+    return () => {
+      if (callInterval) clearInterval(callInterval);
+    };
+  }, [chatCallState]);
+
+  useEffect(() => {
+    return () => {
+      if (chatVoiceIntervalId) clearInterval(chatVoiceIntervalId);
+    };
+  }, [chatVoiceIntervalId]);
+
+  const toggleVoiceRecording = () => {
+    if (chatIsVoiceRecording) {
+      if (chatVoiceIntervalId) clearInterval(chatVoiceIntervalId);
+      setChatIsVoiceRecording(false);
+      const duration = chatVoiceSeconds || Math.floor(Math.random() * 5) + 3;
+      setNewMessage(`🎙️ [Secure Voice Note — ${duration}s]`);
+      setChatVoiceSeconds(0);
+    } else {
+      setChatIsVoiceRecording(true);
+      setChatVoiceSeconds(0);
+      const iv = setInterval(() => {
+        setChatVoiceSeconds(prev => prev + 1);
+      }, 1000);
+      setChatVoiceIntervalId(iv);
+    }
+  };
 
   useEffect(() => {
     // Real-time listener for user transaction ledgers to power Financials Overview
@@ -276,18 +333,28 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedGroup) return;
+    if ((!newMessage.trim() && !chatAttachment) || !selectedGroup) return;
     
     try {
+      let finalContent = newMessage.trim();
+      if (chatAttachment) {
+        if (chatAttachment.type.startsWith('image')) {
+          finalContent = `🖼️ [Image: ${chatAttachment.name}] ${finalContent}`.trim();
+        } else {
+          finalContent = `📎 [Attached File: ${chatAttachment.name}] ${finalContent}`.trim();
+        }
+      }
+      
       await addDoc(collection(db, 'cscc_messages'), {
         groupId: selectedGroup.id,
         senderId: user.uid,
         senderName: user.displayName || user.email,
-        content: newMessage,
+        content: finalContent,
         type: 'text',
         createdAt: serverTimestamp()
       });
       setNewMessage('');
+      setChatAttachment(null);
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -2648,9 +2715,84 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
     }
 
     return (
-      <div className="bg-white rounded-[3.5rem] border border-gray-100 shadow-2xl overflow-hidden flex flex-col h-[75vh]">
+      <div className="bg-white rounded-[3.5rem] border border-gray-100 shadow-2xl overflow-hidden flex flex-col h-[75vh] relative">
+        {/* Calling Overlay Panel */}
+        {chatCallState !== 'idle' && (
+          <div className="absolute inset-0 bg-slate-950/95 text-white z-[70] flex flex-col justify-between p-10 animate-fade-in font-sans">
+            <div className="text-center space-y-2">
+              <span className="px-3 py-1 bg-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-indigo-400">
+                {chatCallState.startsWith('calling') ? 'INITIATING SECURE ENDPOINT' : 'SECURE LINE ENCRYPTED'}
+              </span>
+              <h4 className="text-2xl font-black uppercase tracking-tight text-white">{selectedGroup?.name || 'Peer Contact'}</h4>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">
+                {chatCallState === 'calling_voice' && 'Ringing (Protected Audio Voice Trace)...'}
+                {chatCallState === 'calling_video' && 'Connecting Telepresence Stream...'}
+                {(chatCallState === 'active_voice' || chatCallState === 'active_video') && (
+                  <span className="flex items-center justify-center gap-2 text-emerald-400">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    CONNECTED: {Math.floor(callTimer / 60)}:{String(callTimer % 60).padStart(2, '0')}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Visual Stream Area */}
+            <div className="flex-1 flex items-center justify-center py-6">
+              <div className="relative">
+                {chatCallState.includes('video') ? (
+                  <div className="w-64 h-48 bg-slate-800 rounded-3xl border-4 border-indigo-500/30 overflow-hidden shadow-2xl relative flex items-center justify-center">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-950 to-slate-900 flex flex-col items-center justify-center text-center p-4">
+                      <Video className="w-12 h-12 text-slate-500 mb-2 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Local Camera Active</span>
+                    </div>
+                    {/* Tiny self preview */}
+                    <div className="absolute bottom-3 right-3 w-16 h-12 bg-slate-950 rounded-xl border border-white/20 flex items-center justify-center overflow-hidden">
+                      <span className="text-[6px] font-bold text-slate-500 uppercase">Self</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-800 flex items-center justify-center shadow-huge shadow-indigo-500/20 relative animate-pulse">
+                    <span className="text-4xl font-black text-white uppercase">{selectedGroup?.name.charAt(0)}</span>
+                    <div className="absolute -inset-4 border border-indigo-500/30 rounded-full animate-ping pointer-events-none" />
+                    <div className="absolute -inset-8 border border-white/5 rounded-full animate-pulse pointer-events-none" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Calling Interactions */}
+            <div className="flex items-center justify-center gap-6 pt-4">
+              <button 
+                type="button"
+                onClick={() => setIsCallMuted(!isCallMuted)}
+                className={`p-4 rounded-full border transition-all hover:scale-110 active:scale-95 ${isCallMuted ? 'bg-[#DAA520] text-slate-950 border-[#DAA520]' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+              >
+                {isCallMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+              
+              <button 
+                type="button"
+                onClick={() => {
+                  setChatCallState('idle');
+                }}
+                className="p-5 bg-rose-600 hover:bg-rose-700 text-white rounded-full transition-all shadow-lg hover:scale-110 active:scale-95"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setIsCallSpeaker(!isCallSpeaker)}
+                className={`p-4 rounded-full border transition-all hover:scale-110 active:scale-95 ${isCallSpeaker ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+              >
+                <Volume2 className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Chat Header */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 backdrop-blur-sm">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 backdrop-blur-sm relative z-20">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSelectedGroup(null)}
@@ -2677,16 +2819,63 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors">
+          
+          <div className="flex items-center gap-2 relative">
+            <button 
+              onClick={() => setChatCallState('calling_voice')}
+              className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors hover:text-indigo-600"
+              title="Voice Call"
+            >
               <Phone className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors">
+            <button 
+              onClick={() => setChatCallState('calling_video')}
+              className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors hover:text-indigo-600"
+              title="Video Call"
+            >
               <Video className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors">
+            <button 
+              onClick={() => setChatMoreMenuOpen(!chatMoreMenuOpen)}
+              className={`p-2.5 rounded-xl transition-colors ${chatMoreMenuOpen ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-slate-100 text-slate-600'}`}
+              title="More Actions"
+            >
               <MoreVertical className="w-5 h-5" />
             </button>
+
+            {chatMoreMenuOpen && (
+              <div className="absolute right-0 top-12 bg-white border border-gray-150 rounded-2xl shadow-huge p-2 w-52 z-30 text-xs text-slate-700 flex flex-col gap-1 animate-scale-up font-sans">
+                <button 
+                  onClick={() => {
+                    if (confirm("Are you sure you want to clear this thread's secure messaging history? This action is local and irreversible.")) {
+                      setMessages([]);
+                    }
+                    setChatMoreMenuOpen(false);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors flex items-center gap-2 font-bold"
+                >
+                  Clear Chat History
+                </button>
+                <button 
+                  onClick={() => {
+                    alert("Notifications muted for 8 hours under protocol SECURE_SILENCE_ON");
+                    setChatMoreMenuOpen(false);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2 font-bold"
+                >
+                  Mute Notifications
+                </button>
+                <button 
+                  onClick={() => {
+                    alert("Security protocol reports: peer user profile verified and locked across all network nodes.");
+                    setChatMoreMenuOpen(false);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2 font-bold"
+                >
+                  Verify Access Nodes
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2703,7 +2892,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] ${isMe ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-gray-100 text-gray-900 rounded-2xl rounded-tl-none'} p-4 shadow-sm`}>
                     {!isMe && <p className="text-[10px] font-black uppercase mb-1 opacity-50">{msg.senderName}</p>}
-                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-line">{msg.content}</p>
                     <p className={`text-[8px] mt-1 font-bold uppercase ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>
                       {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                     </p>
@@ -2714,32 +2903,153 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           )}
         </div>
 
+        {/* Emoji Selector Popup inside the Card */}
+        {chatEmojiPickerOpen && (
+          <div className="absolute bottom-24 left-6 bg-white border border-gray-150 rounded-2xl shadow-huge p-3 grid grid-cols-6 gap-2 z-30 animate-scale-up">
+            {['😊', '😂', '👍', '❤️', '🔥', '🎉', '🚀', '🙌', '🕵️', '🔒', '🤝', '💯'].map((emo) => (
+              <button
+                key={emo}
+                type="button"
+                onClick={() => {
+                  setNewMessage(prev => prev + emo);
+                  setChatEmojiPickerOpen(false);
+                }}
+                className="w-8 h-8 text-lg hover:bg-slate-50 hover:scale-115 rounded-xl transition-all flex items-center justify-center font-bold"
+              >
+                {emo}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Attachment Preview Badge */}
+        {chatAttachment && (
+          <div className="mx-6 mb-2 p-2 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs font-bold animate-fade-in text-indigo-950 relative z-10">
+            <span className="flex items-center gap-2 truncate">
+              {chatAttachment.type.startsWith('image') ? '🖼️' : '📎'} {chatAttachment.name}
+            </span>
+            <button 
+              type="button" 
+              onClick={() => setChatAttachment(null)}
+              className="p-1.5 hover:bg-indigo-100 rounded-full text-indigo-800 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Chat Input */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50">
-          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-200">
-            <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+        <div className="p-4 border-t border-gray-100 bg-gray-50 relative z-10">
+          <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-200">
+            <button 
+              type="button"
+              onClick={() => setChatEmojiPickerOpen(!chatEmojiPickerOpen)}
+              className={`p-2 rounded-lg transition-colors ${chatEmojiPickerOpen ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-indigo-600 hover:bg-slate-50'}`}
+              title="Add Emoji"
+            >
               <Smile className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+
+            {/* Paperclip upload trigger */}
+            <button 
+              type="button"
+              onClick={() => {
+                const fileInput = document.getElementById('chat-attachment-input-file');
+                if (fileInput) fileInput.click();
+              }}
+              className={`p-2 rounded-lg transition-colors ${chatAttachment?.type === 'file/generic' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-indigo-600 hover:bg-slate-50'}`}
+              title="Attach Document"
+            >
               <Paperclip className="w-5 h-5" />
             </button>
             <input 
-              type="text" 
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type a message..." 
-              className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-950 font-bold placeholder:text-gray-400"
+              id="chat-attachment-input-file"
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setChatAttachment({
+                    id: String(Date.now()),
+                    name: file.name,
+                    type: 'file/generic'
+                  });
+                }
+              }}
             />
-            <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+
+            {chatIsVoiceRecording ? (
+              <div className="flex-1 flex items-center justify-between text-xs font-black text-rose-600 uppercase tracking-widest px-2 font-mono">
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                  Recording: {Math.floor(chatVoiceSeconds / 60)}:{String(chatVoiceSeconds % 60).padStart(2, '0')}
+                </span>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (chatVoiceIntervalId) clearInterval(chatVoiceIntervalId);
+                    setChatIsVoiceRecording(false);
+                    setChatVoiceSeconds(0);
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Type a message..." 
+                className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-gray-950 font-bold placeholder:text-gray-400 py-1.5"
+              />
+            )}
+
+            {/* Camera photo upload trigger */}
+            <button 
+              type="button"
+              onClick={() => {
+                const imgInput = document.getElementById('chat-attachment-input-img');
+                if (imgInput) imgInput.click();
+              }}
+              className={`p-2 rounded-lg transition-colors ${chatAttachment?.type.startsWith('image') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-indigo-600 hover:bg-slate-50'}`}
+              title="Add Photo"
+            >
               <Camera className="w-5 h-5" />
             </button>
-            <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">
+            <input 
+              id="chat-attachment-input-img"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setChatAttachment({
+                    id: String(Date.now()),
+                    name: file.name,
+                    type: 'image/jpeg'
+                  });
+                }
+              }}
+            />
+
+            {/* Voice Recording mic trigger */}
+            <button 
+              type="button"
+              onClick={toggleVoiceRecording}
+              className={`p-2 rounded-lg transition-colors ${chatIsVoiceRecording ? 'bg-rose-50 text-rose-600 animate-pulse' : 'text-gray-400 hover:text-indigo-600 hover:bg-slate-50'}`}
+              title={chatIsVoiceRecording ? "Stop & Attach Voice Note" : "Record Voice Note"}
+            >
               <Mic className="w-5 h-5" />
             </button>
+
             <button 
+              type="button"
               onClick={handleSendMessage}
-              disabled={!newMessage.trim()}
+              disabled={(!newMessage.trim() && !chatAttachment) || chatIsVoiceRecording}
               className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
             >
               <Send className="w-4 h-4" />

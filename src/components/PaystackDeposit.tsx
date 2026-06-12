@@ -25,6 +25,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<'all' | 'card' | 'ussd' | 'transfer'>('all');
 
   // Dynamically load Paystack Inline JS script
   useEffect(() => {
@@ -74,6 +75,13 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     
     const reference = `EFD_PSTK_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
+    // Restrict Paystack channels dynamically based on user click
+    const paystackChannels = selectedMethod === 'all'
+      ? ['card', 'ussd', 'bank_transfer', 'bank']
+      : selectedMethod === 'transfer'
+        ? ['bank_transfer']
+        : [selectedMethod];
+
     try {
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -81,6 +89,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         amount: Math.round(numericAmount * 100), // convert to kobo
         currency: 'NGN',
         ref: reference,
+        channels: paystackChannels,
         callback: (response: any) => {
           setIsPaying(false);
           if (response && (response.status === 'success' || response.message === 'Approved')) {
@@ -148,19 +157,54 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
       {/* Section B: Payment Methods Grid */}
       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/50">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-2">
-          Payment Methods Covered
-        </span>
-        <div className="flex items-center gap-4 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
-          <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-            <CreditCard className="w-3.5 h-3.5 text-indigo-500" /> Card
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            Payment Methods Covered (Click to Select / Filter)
           </span>
-          <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+          {selectedMethod !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setSelectedMethod('all')}
+              className="text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-wider">
+          <button
+            type="button"
+            onClick={() => setSelectedMethod(selectedMethod === 'card' ? 'all' : 'card')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+              selectedMethod === 'card'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <CreditCard className={`w-3.5 h-3.5 ${selectedMethod === 'card' ? 'text-white' : 'text-indigo-500'}`} /> Card
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedMethod(selectedMethod === 'ussd' ? 'all' : 'ussd')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+              selectedMethod === 'ussd'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
             💬 USSD
-          </span>
-          <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedMethod(selectedMethod === 'transfer' ? 'all' : 'transfer')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+              selectedMethod === 'transfer'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
             🏦 Transfer
-          </span>
+          </button>
         </div>
       </div>
 
