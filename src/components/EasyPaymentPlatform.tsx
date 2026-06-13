@@ -450,6 +450,14 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   >
                     🚀 Launch Instant Deposit Popup
                   </button>
+                  <a
+                    href="https://paystack.shop/pay/oou1q0y05p"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-750 hover:scale-[1.01] transition-all text-white rounded-xl text-[9px] font-black uppercase tracking-[0.14em] shadow-md shadow-emerald-550/20 flex items-center justify-center gap-1.5 active:scale-95 duration-150 mt-1.5 text-center"
+                  >
+                    🛍️ Pay via Custom Paystack Shop Link
+                  </a>
                 </div>
 
                 <div className="relative flex items-center justify-center my-3">

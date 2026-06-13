@@ -242,6 +242,25 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         </button>
       </div>
 
+      {/* Section D: Direct Paystack Shop Custom Payment Link */}
+      <div className="pt-4 border-t border-slate-200/60 flex flex-col items-center space-y-2">
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest text-center">
+          Or Pay via Direct Web Link
+        </p>
+        <a
+          id="paystack-shop-link-btn"
+          href="https://paystack.shop/pay/oou1q0y05p"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-750 hover:to-teal-850 text-white rounded-2xl text-xs font-black uppercase tracking-widest text-center transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <span>🛍️ Go to EFADO Paystack Shop Page</span>
+        </a>
+        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center">
+          Instant Checkout via Secure Paystack Shop Link
+        </p>
+      </div>
+
       <div className="flex items-center justify-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
         <Shield className="w-3 h-3 text-emerald-500" />
         Funds reflect in 3-5 seconds. Powered by Paystack
