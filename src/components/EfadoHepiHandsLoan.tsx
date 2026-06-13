@@ -41,6 +41,8 @@ import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp
 import { useCurrency } from '../lib/CurrencyContext';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
 import { LoanVendorRegistration } from './LoanVendorRegistration';
+import { PaymentPlatform } from './PaymentPlatform';
+import { increment } from '../firebase';
 
 const FormField: React.FC<{
   label: string,
@@ -87,6 +89,13 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
   const [showVendorReg, setShowVendorReg] = useState(false);
   const [myVendorProfile, setMyVendorProfile] = useState<LoanVendor | null>(null);
   const [showSystemGuide, setShowSystemGuide] = useState(false);
+
+  // Robust Repayment States
+  const [selectedRepaymentMethod, setSelectedRepaymentMethod] = useState<'wallet' | 'paystack' | 'bank_transfer'>('wallet');
+  const [selectedLoanId, setSelectedLoanId] = useState<string>('');
+  const [payingRepayment, setPayingRepayment] = useState(false);
+  const [showPaymentPlatform, setShowPaymentPlatform] = useState(false);
+  const [repaymentFeedback, setRepaymentFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
   // Mock offers for now
   const loanOffers: LoanOffer[] = [
@@ -199,6 +208,90 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
     );
     return () => unsubVendor();
   }, [user.uid]);
+
+  const handlePerformRepayment = async (amountOverride?: number) => {
+    const activeLoan = activeLoans.find(l => l.id === selectedLoanId) || activeLoans[0];
+    if (!activeLoan) {
+      setRepaymentFeedback({ success: false, message: 'No active loan found to repay.' });
+      return;
+    }
+    
+    // Find next pending installment
+    const scheduleIndex = activeLoan.repaymentSchedule.findIndex(s => s.status === 'pending');
+    if (scheduleIndex === -1) {
+      setRepaymentFeedback({ success: false, message: 'You have no pending scheduled installments!' });
+      return;
+    }
+    
+    const installment = activeLoan.repaymentSchedule[scheduleIndex];
+    const amountToPay = amountOverride || installment.amount;
+    
+    setPayingRepayment(true);
+    setRepaymentFeedback(null);
+    try {
+      if (selectedRepaymentMethod === 'wallet') {
+        const currentBalance = user.playerWallet || 0;
+        if (currentBalance < amountToPay) {
+          setRepaymentFeedback({
+            success: false,
+            message: `Insufficient wallet balance. You need ${formatPrice(amountToPay)} but your wallet has ${formatPrice(currentBalance)}. Please fund your wallet first.`
+          });
+          setPayingRepayment(false);
+          return;
+        }
+        
+        await updateDoc(doc(db, 'users', user.uid), {
+          playerWallet: increment(-amountToPay)
+        });
+      }
+      
+      const updatedSchedule = [...activeLoan.repaymentSchedule];
+      updatedSchedule[scheduleIndex] = {
+        ...updatedSchedule[scheduleIndex],
+        status: 'paid'
+      };
+      
+      const newRemainingAmt = Math.max(0, activeLoan.remainingAmount - amountToPay);
+      const isClosed = newRemainingAmt <= 0;
+      
+      await updateDoc(doc(db, 'loans', activeLoan.id!), {
+        repaymentSchedule: updatedSchedule,
+        remainingAmount: newRemainingAmt,
+        status: isClosed ? 'closed' : activeLoan.status
+      });
+      
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'payment',
+        amount: amountToPay,
+        currency: selectedCurrency.code,
+        status: 'completed',
+        purpose: 'Loan Repayment',
+        description: `Installment repayment successfully settled via ${selectedRepaymentMethod === 'wallet' ? 'EFADO Wallet' : 'Paystack Core'}.`,
+        timestamp: serverTimestamp()
+      });
+      
+      await addDoc(collection(db, 'repayments'), {
+        userId: user.uid,
+        loanId: activeLoan.id,
+        amount: amountToPay,
+        method: selectedRepaymentMethod,
+        timestamp: serverTimestamp(),
+        installmentNumber: scheduleIndex + 1
+      });
+      
+      setRepaymentFeedback({
+        success: true,
+        message: `Success! Repayment of ${formatPrice(amountToPay)} was processed. Your loan balance has been reduced.`
+      });
+      
+    } catch (e: any) {
+      console.error(e);
+      setRepaymentFeedback({ success: false, message: e?.message || 'Failed to authorize repayment.' });
+    } finally {
+      setPayingRepayment(false);
+    }
+  };
 
   const renderDashboard = () => (
     <div className="space-y-8">
@@ -815,94 +908,245 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
     </div>
   );
 
-  const renderRepayment = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-            <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">Repayment Calendar</h3>
-            <div className="grid grid-cols-7 gap-2 mb-8">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-                <div key={d} className="text-center text-[10px] font-black text-gray-600 uppercase">{d}</div>
-              ))}
-              {Array.from({ length: 30 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className={`aspect-square rounded-xl flex items-center justify-center text-xs font-bold transition-all cursor-pointer ${
-                    i + 1 === 24 ? 'bg-orange-600 text-white shadow-lg shadow-orange-100' : 
-                    i + 1 < 11 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-                <span className="text-[10px] font-black text-gray-600 uppercase">Paid</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-orange-600 rounded-full" />
-                <span className="text-[10px] font-black text-gray-600 uppercase">Upcoming</span>
-              </div>
-            </div>
-          </div>
+  const renderRepayment = () => {
+    const activeLoan = activeLoans.find(l => l.id === selectedLoanId) || activeLoans[0];
+    const nextInstallment = activeLoan?.repaymentSchedule.find(s => s.status === 'pending');
+    const paymentAmount = nextInstallment?.amount || 0;
 
-          <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-            <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">Make a Payment</h3>
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-indigo-50 border-2 border-indigo-600 rounded-2xl cursor-pointer">
-                  <Wallet className="w-6 h-6 text-indigo-600 mb-2" />
-                  <h4 className="font-bold text-sm">EFADO Wallet</h4>
-                  <p className="text-[10px] text-indigo-600">Balance: {formatPrice(user.playerWallet)}</p>
-                </div>
-                <div className="p-4 bg-gray-50 border-2 border-transparent rounded-2xl cursor-pointer hover:border-gray-200">
-                  <CreditCard className="w-6 h-6 text-gray-400 mb-2" />
-                  <h4 className="font-bold text-sm">Debit Card</h4>
-                  <p className="text-[10px] text-gray-600 font-bold uppercase tracking-tight">Instant Payment</p>
-                </div>
-                <div className="p-4 bg-gray-50 border-2 border-transparent rounded-2xl cursor-pointer hover:border-gray-200">
-                  <History className="w-6 h-6 text-gray-400 mb-2" />
-                  <h4 className="font-bold text-sm">Bank Transfer</h4>
-                  <p className="text-[10px] text-gray-600 font-bold uppercase tracking-tight">1-2 Business Days</p>
-                </div>
-              </div>
-              <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                Confirm Payment
-              </button>
+    return (
+      <div className="space-y-8">
+        {activeLoans.length === 0 ? (
+          <div className="bg-white p-12 rounded-3xl border border-gray-100 shadow-sm text-center max-w-xl mx-auto space-y-4">
+            <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h4 className="font-black uppercase tracking-widest text-xs text-gray-900">Autopay</h4>
-              <div className="w-12 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
-              </div>
-            </div>
-            <p className="text-xs text-gray-500 leading-relaxed mb-6">
-              Autopay is enabled. We will automatically deduct your installments from your EFADO Wallet on the due date.
+            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">No Active Loans</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              You currently do not have any outstanding loans or upcoming payment installments. Your financial status is fully clear.
             </p>
-            <button className="w-full py-3 bg-gray-50 text-gray-900 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 transition-all">
-              Manage Autopay
+            <button
+              onClick={() => setActiveTab('APPLY')}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+            >
+              Get a Fast Loan
             </button>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Active Loan Selector if multiple */}
+              {activeLoans.length > 1 && (
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-gray-400">Select Loan Facility</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {activeLoans.map((l, i) => (
+                      <button
+                        key={l.id || i}
+                        onClick={() => setSelectedLoanId(l.id || '')}
+                        className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          (l.id === selectedLoanId || (!selectedLoanId && i === 0))
+                            ? 'border-indigo-600 bg-indigo-50/50 text-indigo-950 ring-2 ring-indigo-600/5'
+                            : 'border-gray-150 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-xs font-black uppercase">{l.tenor} Loan Facility</span>
+                        <span className="text-sm font-bold text-gray-800 mt-2">Remaining: {formatPrice(l.remainingAmount)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
-            <h4 className="font-black uppercase tracking-widest text-xs text-emerald-900 mb-4">Wallet Funding</h4>
-            <p className="text-xs text-emerald-800 mb-4">Top up your wallet instantly to ensure seamless repayments.</p>
-            <button className="w-full py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all">
-              Top Up Wallet
-            </button>
+              {/* Repayment Calendar */}
+              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Repayment Schedule</h3>
+                  <span className="text-xs font-black text-amber-600 uppercase bg-amber-50 px-3 py-1 rounded-full">
+                    {activeLoan.repaymentSchedule.filter(s => s.status === 'paid').length} / {activeLoan.repaymentSchedule.length} Settled
+                  </span>
+                </div>
+                
+                <div className="space-y-3 mt-6">
+                  {activeLoan.repaymentSchedule.map((s, index) => (
+                    <div 
+                      key={index}
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
+                        s.status === 'paid' 
+                          ? 'border-emerald-100 bg-emerald-50/40 text-emerald-900' 
+                          : s.status === 'overdue'
+                          ? 'border-rose-100 bg-rose-50/40 text-rose-900'
+                          : 'border-gray-100 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black uppercase ${
+                          s.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase text-gray-800">Installment #{index + 1}</p>
+                          <p className="text-[10px] text-gray-500 font-semibold uppercase">Due: 12 Days</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black">{formatPrice(s.amount)}</p>
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full inline-block mt-1 ${
+                          s.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Make a Payment Component */}
+              <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
+                <h3 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-tight">Perform Clear Payment</h3>
+                
+                {repaymentFeedback && (
+                  <div className={`p-4 rounded-2xl border mb-6 text-xs font-semibold leading-relaxed flex items-start gap-2.5 ${
+                    repaymentFeedback.success 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                      : 'bg-rose-50 border-rose-100 text-rose-800'
+                  }`}>
+                    {repaymentFeedback.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />}
+                    <p>{repaymentFeedback.message}</p>
+                  </div>
+                )}
+
+                {!nextInstallment ? (
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center space-y-2">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                    <p className="text-xs font-black text-emerald-900 uppercase">You are completely Paid Up!</p>
+                    <p className="text-[10px] text-emerald-700">All scheduled installments for this loan facility have been resolved.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-150 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Repayment Amount</span>
+                        <h4 className="text-lg font-black text-gray-900">Installment #{activeLoan.repaymentSchedule.filter(s => s.status === 'paid').length + 1}</h4>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-black text-indigo-600">{formatPrice(paymentAmount)}</span>
+                        <p className="text-[9px] text-gray-400 font-mono">No hidden interest additions</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* EFADO Balance Wallet */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRepaymentMethod('wallet')}
+                        className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          selectedRepaymentMethod === 'wallet'
+                            ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/5'
+                            : 'border-gray-100 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Wallet className="w-6 h-6 text-indigo-600 mb-2" />
+                        <h4 className="font-bold text-sm text-gray-900">EFADO Wallet</h4>
+                        <p className="text-[10px] text-indigo-600 font-bold mt-1">Balance: {formatPrice(user.playerWallet)}</p>
+                      </button>
+
+                      {/* Paystack instant */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRepaymentMethod('paystack')}
+                        className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          selectedRepaymentMethod === 'paystack'
+                            ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/5'
+                            : 'border-gray-100 hover:bg-gray-50'
+                        }`}
+                      >
+                        <CreditCard className="w-6 h-6 text-gray-400 mb-2" />
+                        <h4 className="font-bold text-sm text-gray-900">Debit Card / USSD</h4>
+                        <p className="text-[10px] text-gray-500 font-semibold mt-1">Instant Paystack</p>
+                      </button>
+
+                      {/* Bank transfer */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRepaymentMethod('bank_transfer')}
+                        className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          selectedRepaymentMethod === 'bank_transfer'
+                            ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/5'
+                            : 'border-gray-100 hover:bg-gray-50'
+                        }`}
+                      >
+                        <History className="w-6 h-6 text-gray-400 mb-2" />
+                        <h4 className="font-bold text-sm text-gray-900">Bank Transfer</h4>
+                        <p className="text-[10px] text-gray-500 font-semibold mt-1">DVA Instant Credit</p>
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        if (selectedRepaymentMethod === 'wallet') {
+                          handlePerformRepayment();
+                        } else {
+                          setShowPaymentPlatform(true);
+                        }
+                      }}
+                      disabled={payingRepayment}
+                      className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      {payingRepayment ? (
+                        <>
+                          <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          Processing Repayment...
+                        </>
+                      ) : (
+                        <>
+                          <span>Pay {formatPrice(paymentAmount)} Installment & Get Receipt</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className="font-black uppercase tracking-widest text-xs text-gray-900">Autopay Control</h4>
+                  <div className="w-12 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
+                    <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                  Autopay is active. We will automatically collect your upcoming installments from your EFADO Wallet precisely on the due date.
+                </p>
+                <button className="w-full py-3 bg-gray-50 text-gray-900 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 transition-all">
+                  Manage Autopay Terms
+                </button>
+              </div>
+
+              <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100">
+                <h4 className="font-black uppercase tracking-widest text-xs text-emerald-900 mb-4 font-black">Refuel Wallet Savings</h4>
+                <p className="text-xs text-emerald-800 mb-4 leading-normal">
+                  Refuel your main wallet instantly using card checkout or unique dedicated accounts so we autoexecute future installments.
+                </p>
+                <button 
+                  onClick={() => {
+                    setSelectedRepaymentMethod('paystack');
+                    setShowPaymentPlatform(true);
+                  }}
+                  className="w-full py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"
+                >
+                  Top Up Wallet Now
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderTrust = () => (
     <div className="space-y-8">
@@ -1152,6 +1396,25 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                 />
               </motion.div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Unified Payment Platform Modal for Repayments */}
+        <AnimatePresence>
+          {showPaymentPlatform && (
+            <PaymentPlatform
+              user={user}
+              type="deposit"
+              amount={(activeLoans.find(l => l.id === selectedLoanId) || activeLoans[0])?.repaymentSchedule.find(s => s.status === 'pending')?.amount || 1000}
+              purpose="Loan Facility Installment Repayment"
+              hub="HEPIHANDS_LOANS"
+              onSuccess={async () => {
+                setShowPaymentPlatform(false);
+                await handlePerformRepayment((activeLoans.find(l => l.id === selectedLoanId) || activeLoans[0])?.repaymentSchedule.find(s => s.status === 'pending')?.amount);
+              }}
+              onCancel={() => setShowPaymentPlatform(false)}
+              onClose={() => setShowPaymentPlatform(false)}
+            />
           )}
         </AnimatePresence>
       </div>

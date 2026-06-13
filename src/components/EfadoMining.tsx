@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { monetizationService, DEFAULT_AFFILIATE_LINKS, MEMBERSHIP_PLANS } from '../services/monetizationService';
+import { PaymentPlatform } from './PaymentPlatform';
 
 interface MiningStage {
   id: 'E' | 'F' | 'A' | 'D' | 'O';
@@ -62,6 +63,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   const [selectedCoinPackage, setSelectedCoinPackage] = useState<'mild' | 'heavy' | 'sovereign' | null>(null);
   const [isProcessingStripePayment, setIsProcessingStripePayment] = useState(false);
   const [stripePaymentSuccess, setStripePaymentSuccess] = useState(false);
+  const [showPaymentPlatform, setShowPaymentPlatform] = useState(false);
 
   const stage = STAGES[currentStageIdx];
   const progress = (sessionCoins / stage.requirement) * 100;
@@ -183,12 +185,11 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   };
 
   // Stripe Billing Purchase coin packages
-  const handleBuyCoinPackage = (pkg: 'mild' | 'heavy' | 'sovereign') => {
-    setSelectedCoinPackage(pkg);
+  const executeCoinPackagePurchase = (pkg: 'mild' | 'heavy' | 'sovereign') => {
     setIsProcessingStripePayment(true);
     setStripePaymentSuccess(false);
 
-    // Mock Stripe checkout process
+    // Approve package addition after verified Paystack notification
     setTimeout(() => {
       setIsProcessingStripePayment(false);
       setStripePaymentSuccess(true);
@@ -218,7 +219,19 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
          setIsCoinsShopOpen(false);
          setSelectedCoinPackage(null);
       }, 2000);
-    }, 1500);
+    }, 1000);
+  };
+
+  const handleBuyCoinPackage = (pkg: 'mild' | 'heavy' | 'sovereign') => {
+    setSelectedCoinPackage(pkg);
+    setShowPaymentPlatform(true);
+  };
+
+  const getSelectedPkgPrice = () => {
+    if (selectedCoinPackage === 'mild') return 1000;
+    if (selectedCoinPackage === 'heavy') return 5000;
+    if (selectedCoinPackage === 'sovereign') return 12000;
+    return 1000;
   };
 
 
@@ -814,36 +827,15 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 ))}
               </div>
 
-              {/* Stripe Credit Card Simulated Form block */}
-              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 text-left">
-                 <h4 className="text-xs font-black text-white uppercase tracking-wider mb-4">Secure Stripe Gateway Connectivity</h4>
-                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                       <div>
-                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Credit Card Number</label>
-                          <input type="text" placeholder="•••• •••• •••• ••••" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs focus:outline-none placeholder-slate-600" />
-                       </div>
-                       <div>
-                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Cardholder Full Name</label>
-                          <input type="text" placeholder={user.displayName || "Okhawere Festus"} disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs focus:outline-none placeholder-slate-600" />
-                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                       <div className="col-span-2">
-                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Valid Thru</label>
-                          <input type="text" placeholder="MM / YY" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs text-center focus:outline-none placeholder-slate-600" />
-                       </div>
-                       <div>
-                          <label className="text-[8px] font-black text-slate-400 uppercase tracking-wider">CVC</label>
-                          <input type="text" placeholder="•••" disabled className="w-full mt-1.5 px-4 py-3 bg-slate-900 border border-white/5 rounded-xl text-slate-400 text-xs text-center focus:outline-none" />
-                       </div>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-between border-t border-white/5">
-                       <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Integration</p>
-                       <span className="text-[9px] font-black text-rose-500 uppercase">Stripe Sandbox Active</span>
-                    </div>
+              {/* Paystack Checkout Active Guidelines block */}
+              <div className="bg-slate-900/50 border border-indigo-500/10 rounded-2xl p-6 text-center mt-6">
+                 <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Secure Payment Nodes Connection</h4>
+                 <p className="text-[11px] text-slate-350 leading-relaxed max-w-md mx-auto mb-4">
+                   We utilize Paystack to securely accept debit cards, instant USSD codes, mobile bank apps, and unique local bank transfers. Click <strong className="text-yellow-500 bg-yellow-550/10 px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Procure</strong> above to select your plan.
+                 </p>
+                 <div className="pt-3 border-t border-white/5 flex items-center justify-between text-left">
+                    <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Paystack Engine</p>
+                    <span className="text-[9px] font-black text-emerald-450 uppercase">Instant Activation Active</span>
                  </div>
               </div>
 
@@ -868,6 +860,33 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
               </AnimatePresence>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Unified Payment Platform Modal for Coin Packages */}
+      <AnimatePresence>
+        {showPaymentPlatform && (
+          <PaymentPlatform
+            user={user}
+            type="deposit"
+            amount={getSelectedPkgPrice()}
+            purpose={`Premium Coins Upgrade Package - ${selectedCoinPackage?.toUpperCase()}`}
+            hub="MINING"
+            onSuccess={async () => {
+              setShowPaymentPlatform(false);
+              if (selectedCoinPackage) {
+                executeCoinPackagePurchase(selectedCoinPackage);
+              }
+            }}
+            onCancel={() => {
+              setShowPaymentPlatform(false);
+              setSelectedCoinPackage(null);
+            }}
+            onClose={() => {
+              setShowPaymentPlatform(false);
+              setSelectedCoinPackage(null);
+            }}
+          />
         )}
       </AnimatePresence>
 

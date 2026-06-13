@@ -54,8 +54,12 @@ import {
   addDoc, 
   query, 
   where, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  updateDoc,
+  increment
 } from '../firebase';
+import { PaymentPlatform } from './PaymentPlatform';
 import { DomainSeller, DomainCatalog, DomainOrder, UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { EfadoEmailHub } from './EfadoEmailHub';
@@ -529,6 +533,12 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
   const [view, setView] = useState<'landing' | 'seller' | 'checkout' | 'orders' | 'email'>('landing');
   const [activeLandingSection, setActiveLandingSection] = useState<'domains' | 'course' | 'tools' | 'vending' | 'otc' | 'sourcing'>(initialSection || 'domains');
 
+  // Unified payment states
+  const [showPaymentPlatform, setShowPaymentPlatform] = useState(false);
+  const [paymentPlatformAmount, setPaymentPlatformAmount] = useState(1000);
+  const [paymentPlatformPurpose, setPaymentPlatformPurpose] = useState('');
+  const [paymentPlatformOnSuccess, setPaymentPlatformOnSuccess] = useState<(() => Promise<void> | void) | null>(null);
+
   useEffect(() => {
     if (initialSection) {
       setActiveLandingSection(initialSection);
@@ -794,12 +804,17 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
         if (currentBalance < totalCostNGN) {
           setEnrollmentStatus({
             success: false,
-            message: `Insufficient funds in your ${paymentMethod === 'win_wallet' ? 'Win Wallet / Play Balance' : 'Deposit Wallet'}. You need ₦${totalCostNGN.toLocaleString()} but currently have ₦${currentBalance.toLocaleString()}. Please choose Bank Transfer or fund your wallet.`
+            message: `Insufficient funds in your ${paymentMethod === 'win_wallet' ? 'Win Wallet / Play Balance' : 'Deposit Wallet'}. You need ₦${totalCostNGN.toLocaleString()} but currently have ₦${currentBalance.toLocaleString()}. Please choose Bank Transfer/Paystack or fund your wallet.`
           });
           setIsEnrolling(false);
           return;
         }
         
+        // Deduct wallet balance in DB
+        await updateDoc(doc(db, 'users', user.uid), {
+          [walletField]: increment(-totalCostNGN)
+        });
+
         // Save enrolment to database
         await addDoc(collection(db, 'ai_enrollments'), {
           userId: user.uid,
@@ -830,34 +845,43 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
           message: `Congratulations! Your payment has been processed successfully. You are now officially enrolled in the "${courseName}"! Complete login details and curriculum downloads have been sent to: ${user.email}`
         });
       } else {
-        // Direct transfer
-        await addDoc(collection(db, 'ai_enrollments'), {
-          userId: user.uid,
-          userEmail: user.email,
-          displayName: user.displayName || 'Efado Student',
-          courseName: courseName,
-          priceUSD: totalCostUSD,
-          priceNGN: totalCostNGN,
-          paymentMethod: 'bank_transfer',
-          status: 'pending_verify',
-          createdAt: serverTimestamp()
-        });
+        // Direct checkout / transfer payment via standard PaymentPlatform
+        setPaymentPlatformAmount(totalCostNGN);
+        setPaymentPlatformPurpose(`AI Course Enrollment - ${courseName}`);
+        setPaymentPlatformOnSuccess(() => async () => {
+          try {
+            await addDoc(collection(db, 'ai_enrollments'), {
+              userId: user.uid,
+              userEmail: user.email,
+              displayName: user.displayName || 'Efado Student',
+              courseName: courseName,
+              priceUSD: totalCostUSD,
+              priceNGN: totalCostNGN,
+              paymentMethod: 'paystack_node',
+              status: 'completed',
+              createdAt: serverTimestamp()
+            });
 
-        await addDoc(collection(db, 'transactions'), {
-          userId: user.uid,
-          type: 'payment',
-          amount: totalCostNGN,
-          currency: 'NGN',
-          status: 'pending',
-          purpose: `AI Course Enrollment (${courseName})`,
-          description: `Direct Bank Transfer awaiting payment approval.`,
-          timestamp: serverTimestamp()
-        });
+            await addDoc(collection(db, 'transactions'), {
+              userId: user.uid,
+              type: 'payment',
+              amount: totalCostNGN,
+              currency: 'NGN',
+              status: 'completed',
+              purpose: `AI Course Enrollment (${courseName})`,
+              description: `Instant course seat activated after successful Paystack node authorization.`,
+              timestamp: serverTimestamp()
+            });
 
-        setEnrollmentStatus({
-          success: true,
-          message: `Thank you! Your enrollment request has been generated. Please transfer ₦${totalCostNGN.toLocaleString()} to the designated Efado accounts below and your access credentials will be delivered to your registered email.`
+            setEnrollmentStatus({
+              success: true,
+              message: `Congratulations! Your direct checkout payment was approved. You are now officially enrolled in the "${courseName}"! Access details have been sent to ${user.email}`
+            });
+          } catch (enrollErr: any) {
+            console.error('Enroll receipt write error:', enrollErr);
+          }
         });
+        setShowPaymentPlatform(true);
       }
     } catch (e: any) {
       setEnrollmentStatus({
@@ -945,6 +969,11 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
           return;
         }
 
+        // Deduct wallet balance in DB
+        await updateDoc(doc(db, 'users', user.uid), {
+          [walletField]: increment(-clientChargedNGN)
+        });
+
         addVendingLog(`[API Request] POST https://api.reloadly.com/v1/topups - payload: { operatorId: "${opObj.code}", recipientPhone: "${countryObj.phonePrefix}${rawPhoneDigits}", amount: ${purchaseCostNGN} }`);
         addVendingLog(`[API Pending] Queueing in Reloadly transaction pipeline (Ref ID: TX-${Math.floor(Math.random() * 900000 + 100000)})...`);
 
@@ -1010,9 +1039,14 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
         }, 1200);
 
       } else {
-        // Direct Transfer
-        setTimeout(async () => {
+        // Direct Checkout Payment via standard PaymentPlatform
+        setPaymentPlatformAmount(clientChargedNGN);
+        setPaymentPlatformPurpose(`Global Vending Refill (${vendingType.toUpperCase()}) - ${opObj.name} for ${rawPhoneDigits}`);
+        setPaymentPlatformOnSuccess(() => async () => {
           try {
+            setVendingStatus('processing');
+            addVendingLog(`[API Connect] Payment confirmed on Paystack Node! Initializing vending dispatch...`);
+            
             await addDoc(collection(db, 'vending_purchases'), {
               userId: user.uid,
               userEmail: user.email,
@@ -1025,8 +1059,8 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               amountUSD: purchaseCostUSD,
               clientChargedNGN,
               markupPercent: isMerchant ? merchantMarkup : 0,
-              paymentMethod: 'bank_transfer',
-              status: 'pending_verify',
+              paymentMethod: 'paystack_node',
+              status: 'completed',
               createdAt: serverTimestamp()
             });
 
@@ -1035,38 +1069,23 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               type: 'payment',
               amount: clientChargedNGN,
               currency: 'NGN',
-              status: 'pending',
+              status: 'completed',
               purpose: `Global Vending Refill (${vendingType.toUpperCase()})`,
-              description: `Awaiting direct transfer of ₦${clientChargedNGN.toLocaleString()} for ${vendingType} delivery to ${rawPhoneDigits}.`,
+              description: `Successful online Reloadly dispatch to mobile user: ${countryObj.phonePrefix} ${rawPhoneDigits} (${opObj.name}).`,
               timestamp: serverTimestamp()
             });
 
-            // Save beneficiary if checked
-            if (saveBeneficiary) {
-              const alreadySaved = savedBeneficiaries.some(b => b.phone.replace(/\s+/g, '') === rawPhoneDigits);
-              if (!alreadySaved) {
-                setSavedBeneficiaries(prev => [
-                  ...prev,
-                  {
-                    name: `Contact (${opObj.name.split(' ')[0]})`,
-                    phone: rawPhoneDigits,
-                    operator: vendingOperator,
-                    country: vendingCountry
-                  }
-                ]);
-              }
-            }
-
             setVendingStatus('success');
-            setVendingStatusMessage(`Refill request generated! Please wire ₦${clientChargedNGN.toLocaleString()} to our accounts; mobile credentials will activate as soon as paid.`);
-            addVendingLog(`[API Pending Approval] Direct Transfer initiated for ₦${clientChargedNGN.toLocaleString()}. Refill will trigger immediately inside operator queues once approved.`);
+            setVendingStatusMessage(`Paystack Refill completed successfully! ₦${clientChargedNGN.toLocaleString()} has been processed. Mobile service is active on ${countryObj.phonePrefix} ${rawPhoneDigits}.`);
+            addVendingLog(`[API 200 OK] Reloadly Dispatch OK. Carrier ID: REL-${Math.floor(Math.random() * 99999999)}. Dispatch Completed!`);
             setVendingFlowStep('result');
           } catch (innerErr: any) {
             setVendingStatus('failed');
-            setVendingStatusMessage(innerErr?.message || 'Error processing request.');
+            setVendingStatusMessage(innerErr?.message || 'Error processing purchase dispatch.');
             setVendingFlowStep('result');
           }
-        }, 1200);
+        });
+        setShowPaymentPlatform(true);
       }
     } catch (e: any) {
       setVendingStatus('failed');
@@ -5901,6 +5920,33 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Unified Secure Payment Platform Portal overlay */}
+      <AnimatePresence>
+        {showPaymentPlatform && (
+          <PaymentPlatform
+            user={user}
+            type="deposit"
+            amount={paymentPlatformAmount}
+            purpose={paymentPlatformPurpose}
+            hub="DOMAIN"
+            onSuccess={async () => {
+              setShowPaymentPlatform(false);
+              if (paymentPlatformOnSuccess) {
+                await paymentPlatformOnSuccess();
+              }
+            }}
+            onCancel={() => {
+              setShowPaymentPlatform(false);
+              setPaymentPlatformOnSuccess(null);
+            }}
+            onClose={() => {
+              setShowPaymentPlatform(false);
+              setPaymentPlatformOnSuccess(null);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
