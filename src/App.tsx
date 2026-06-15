@@ -203,6 +203,7 @@ function AppContent() {
   const [otpMessage, setOtpMessage] = useState('');
   const [simulatedSmsCode, setSimulatedSmsCode] = useState('');
   const [showSmsPopup, setShowSmsPopup] = useState(false);
+  const [authorizedSmsRecipient, setAuthorizedSmsRecipient] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -766,9 +767,12 @@ function AppContent() {
     setOtpInput('');
     setOtpMessage(`A 6-digit secure key has been broadcasted to CEO secure terminal (08072456836).`);
     
-    // We will display a highly visible simulation modal of the SMS gateway
-    setSimulatedSmsCode(generatedOtp);
-    setShowSmsPopup(true);
+    // We will display a highly visible simulation modal of the SMS gateway ONLY if this is the authenticated sovereign admin
+    if (isSuperAdminEmail) {
+      setAuthorizedSmsRecipient(adminEmail.trim().toLowerCase());
+      setSimulatedSmsCode(generatedOtp);
+      setShowSmsPopup(true);
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -795,6 +799,7 @@ function AppContent() {
       localStorage.setItem('efado_session', JSON.stringify(sessionObj));
       localStorage.setItem('has_free_access', 'true');
       setShowSmsPopup(false);
+      setAuthorizedSmsRecipient('');
 
       // Now create / sync the profile document in Firestore
       const userRef = doc(db, 'users', 'efado_admin_ceo');
@@ -850,6 +855,7 @@ function AppContent() {
         setLoginMode('STANDARD');
         setError("Security lock activated. Multiple incorrect OTP entries. Access has been locked for 15 minutes.");
         setShowSmsPopup(false);
+        setAuthorizedSmsRecipient('');
       } else {
         setError(`Security code mismatch. Please check the code and re-enter. Try (${attempts}/3)`);
       }
@@ -2101,7 +2107,7 @@ function AppContent() {
               )}
 
               {/* Simulated SMS Gateway Floating Banner */}
-              {showSmsPopup && (
+              {showSmsPopup && authorizedSmsRecipient === 'festdanemh@gmail.com' && (
                 <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm p-5 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl shadow-2xl backdrop-blur-md animate-bounce">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl shrink-0">
@@ -2113,7 +2119,7 @@ function AppContent() {
                         Secure SMS to 08072456836: Your EFADO Verification Key is <span className="text-amber-400 font-mono font-black text-sm tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-white/5">{simulatedSmsCode}</span>. Valid for 10 minutes.
                       </p>
                     </div>
-                    <button onClick={() => setShowSmsPopup(false)} className="text-slate-400 hover:text-white shrink-0 p-1">
+                    <button onClick={() => { setShowSmsPopup(false); setAuthorizedSmsRecipient(''); }} className="text-slate-400 hover:text-white shrink-0 p-1">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
