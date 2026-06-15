@@ -194,7 +194,7 @@ service cloud.firestore {
     }
 
     function isValidWithdrawal(data) {
-      return hasOnlyAllowedFields(['userId', 'userEmail', 'amount', 'status', 'accountDetails', 'timestamp']) &&
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'amount', 'originalAmount', 'fee', 'status', 'accountDetails', 'timestamp']) &&
              data.userId is string && data.userEmail is string &&
              data.amount is number && data.amount > 0 &&
              data.status in ['pending', 'completed', 'failed'] &&

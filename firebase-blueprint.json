@@ -86,6 +86,8 @@
         "userId": { "type": "string" },
         "userEmail": { "type": "string" },
         "amount": { "type": "number" },
+        "originalAmount": { "type": "number", "description": "The requested gross amount before service fees." },
+        "fee": { "type": "number", "description": "The processing fee or surcharge rate." },
         "status": { "type": "string", "enum": ["pending", "completed", "failed"] },
         "accountDetails": { "type": "object" },
         "timestamp": { "type": "string", "format": "date-time" }

@@ -717,14 +717,20 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       // Register the withdrawal record
       await addDoc(collection(db, 'withdrawals'), {
         userId: user.uid,
+        userEmail: user.email,
         amount: amt,
-        currency: withdrawCur,
-        bankName: withdrawSelBank === 'Other' ? withdrawCustBank : withdrawSelBank,
-        accountNumber: withdrawAccNum,
-        accountName: withdrawTargName,
+        originalAmount: amt,
+        fee: 0,
         status: 'pending', // Pending Admin/CEO payout approval
-        createdAt: serverTimestamp(),
-        reference: `WD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+        timestamp: serverTimestamp(),
+        accountDetails: {
+          method: 'Community Dividends',
+          currency: withdrawCur,
+          bankName: withdrawSelBank === 'Other' ? withdrawCustBank : withdrawSelBank,
+          accountNumber: withdrawAccNum,
+          accountName: withdrawTargName,
+          reference: `WD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+        }
       });
 
       // Write a pending transaction log as well
