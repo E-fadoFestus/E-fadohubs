@@ -745,18 +745,23 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     try {
       await runTransaction(db, async (transaction) => {
         const withdrawalRef = doc(db, 'withdrawals', withdrawal.id!);
+        const txRef = doc(db, 'transactions', withdrawal.id!);
         const userRef = doc(db, 'users', withdrawal.userId);
         const adminRef = doc(db, 'adminStats', 'global');
         
         // READS FIRST
         const adminSnap = await transaction.get(adminRef);
         const userSnap = await transaction.get(userRef);
+        const txSnap = await transaction.get(txRef);
         
         const adminData = adminSnap.data() as AdminStats;
         const userData = userSnap.data() as UserProfile;
 
         // WRITES AFTER
         transaction.update(withdrawalRef, { status });
+        if (txSnap.exists()) {
+          transaction.update(txRef, { status });
+        }
 
         if (status === 'completed') {
           transaction.update(adminRef, {
@@ -765,9 +770,15 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             lastUpdated: serverTimestamp()
           });
         } else if (status === 'failed') {
-          // Refund the user if withdrawal failed
+          // Dynamic Refund Logic based on original source wallet details
+          const walletToRefund = (withdrawal.accountDetails?.sourceWallet === 'playerWallet' || withdrawal.accountDetails?.walletSource === 'playerWallet')
+            ? 'playerWallet'
+            : 'cashOutWallet';
+          
+          const refundValue = (withdrawal as any).originalAmount || withdrawal.amount;
+          
           transaction.update(userRef, {
-            cashOutWallet: userData.cashOutWallet + withdrawal.amount
+            [walletToRefund]: userData[walletToRefund] + refundValue
           });
           
           transaction.update(adminRef, {

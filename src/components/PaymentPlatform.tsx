@@ -38,7 +38,7 @@ import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
 import { CEO_BANK_ACCOUNTS, SUPPORT_EMAILS } from '../constants/businessProfile';
-import { db, doc, updateDoc } from '../firebase';
+import { db, doc, updateDoc, collection, runTransaction, serverTimestamp, increment } from '../firebase';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 
 export interface WorldBank {
@@ -538,6 +538,46 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 };
 
                 const txId = await TransactionService.recordTransaction(txData);
+                
+                if (type === 'withdraw') {
+                  try {
+                    const feeValue = fee;
+                    const netPayout = baseAmount - feeValue;
+                    
+                    await runTransaction(db, async (transaction) => {
+                      const adminRef = doc(db, 'adminStats', 'global');
+                      const adminSnap = await transaction.get(adminRef);
+                      
+                      if (adminSnap.exists()) {
+                        transaction.update(adminRef, {
+                          adminWallet: increment(feeValue),
+                          pendingPayouts: increment(netPayout),
+                          lastUpdated: serverTimestamp()
+                        });
+                      }
+                      
+                      const withdrawalRef = doc(collection(db, 'withdrawals'), txId);
+                      transaction.set(withdrawalRef, {
+                        userId: user.uid,
+                        userEmail: user.email,
+                        amount: netPayout,
+                        originalAmount: baseAmount,
+                        fee: feeValue,
+                        status: 'pending',
+                        timestamp: serverTimestamp(),
+                        accountDetails: {
+                          method: selectedMethod || 'Gateway Withdrawal',
+                          bankName: accountDetails.bankName || 'Nominated Bank',
+                          accountNumber: accountDetails.accountNumber || 'N/A',
+                          accountName: accountDetails.accountName || 'N/A',
+                          sourceWallet: 'playerWallet'
+                        }
+                      });
+                    });
+                  } catch (withdrawErr) {
+                    console.error('Failed to create mirror withdrawal request or sync adminStats:', withdrawErr);
+                  }
+                }
                 
                 if (!isMounted.current) return;
                 

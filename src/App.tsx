@@ -962,6 +962,7 @@ function AppContent() {
         });
       } else if (type === 'withdrawal') {
         const withdrawalRef = doc(collection(db, 'withdrawals'));
+        const txRef = doc(db, 'transactions', withdrawalRef.id);
 
         const fee = amount * 0.03;
         const netAmount = amount - fee;
@@ -993,6 +994,19 @@ function AppContent() {
               ...(withdrawalAccountDetails || { method: 'default' }),
               walletSource: walletToDeduct
             }
+          });
+
+          transaction.set(txRef, {
+            userId: user.uid,
+            userEmail: user.email,
+            type: 'withdrawal',
+            amount: netAmount,
+            fee: fee,
+            status: 'pending',
+            timestamp: serverTimestamp(),
+            currency: 'USD',
+            description: `Cashout withdrawal of ${amount} to ${withdrawalAccountDetails?.bankName || 'nominated account'}.`,
+            method: withdrawalAccountDetails?.method || 'Wallet Payout'
           });
         });
       } else if (type === 'game_bet') {
@@ -1066,9 +1080,9 @@ function AppContent() {
     try {
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', user.uid);
-        const txRef = doc(collection(db, 'transactions'));
-        const adminRef = doc(db, 'adminStats', 'global');
         const withdrawalRef = doc(collection(db, 'withdrawals'));
+        const txRef = doc(db, 'transactions', withdrawalRef.id);
+        const adminRef = doc(db, 'adminStats', 'global');
         
         const statsSnap = await transaction.get(adminRef);
         const stats = statsSnap.data() as AdminStats;
@@ -1084,19 +1098,27 @@ function AppContent() {
 
         const txData = {
           userId: user.uid,
-          type: 'withdrawal',
+          userEmail: user.email,
+          type: 'withdrawal' as const,
           amount: netAmount,
           fee: fee,
-          originalAmount: amount,
-          status: 'pending',
-          timestamp: serverTimestamp()
+          status: 'pending' as const,
+          timestamp: serverTimestamp(),
+          currency: 'USD',
+          description: 'Sovereign Account Wallet Cashout Request',
+          method: 'General Withdrawal'
         };
 
         transaction.set(txRef, txData);
         transaction.set(withdrawalRef, {
-          ...txData,
+          userId: user.uid,
           userEmail: user.email,
-          accountDetails: { method: 'default' } // Placeholder
+          amount: netAmount,
+          originalAmount: amount,
+          fee: fee,
+          status: 'pending' as const,
+          timestamp: serverTimestamp(),
+          accountDetails: { method: 'General Cashout' }
         });
       });
     } catch (e) {

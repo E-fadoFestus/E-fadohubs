@@ -40,8 +40,9 @@ export const TransactionService = {
         }
         await updateDoc(userRef, updateFields);
       } else if (data.type === 'withdrawal') {
+        const walletField = data.metadata?.sourceWallet || data.metadata?.walletField || data.metadata?.walletSource || 'cashOutWallet';
         await updateDoc(userRef, {
-          cashOutWallet: increment(-data.amount)
+          [walletField]: increment(-data.amount)
         });
       } else if (data.type === 'game_win') {
         await updateDoc(userRef, {
