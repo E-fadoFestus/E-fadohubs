@@ -114,7 +114,7 @@ export const TransactionPinModal: React.FC<{
           </div>
         </div>
 
-        <div className="flex justify-center gap-3 mb-8">
+        <div className="flex justify-center gap-3 mb-4">
           {pin.map((p, i) => (
             <input
               key={i}
@@ -127,6 +127,12 @@ export const TransactionPinModal: React.FC<{
               className="w-12 h-16 bg-gray-100 border-2 border-transparent focus:border-indigo-500 rounded-xl text-center text-2xl font-black focus:outline-none transition-all"
             />
           ))}
+        </div>
+
+        <div className="bg-indigo-50/60 rounded-xl p-3 text-center mb-6 border border-indigo-100/50">
+          <p className="text-[10px] text-indigo-700 font-bold leading-normal">
+            💡 For Security protection, please enter any 4-digit code of your choice (e.g., <span className="font-extrabold text-indigo-900">1234</span>) to verify and authorize this transaction safely.
+          </p>
         </div>
 
         <div className="space-y-3">

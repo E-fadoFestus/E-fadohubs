@@ -37,6 +37,7 @@ import { UserProfile, QuizQuestion, QuizSession, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { PaymentPlatform } from './PaymentPlatform';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
+import { CurrencySelector } from './CurrencySelector';
 
 interface EfadoMoneyQuizProps {
   user: UserProfile;
@@ -1123,15 +1124,18 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
                       <Zap className="w-3 h-3" /> New Game Mode
                     </div>
-                    {onClose && (
-                      <button 
-                        onClick={onClose}
-                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
-                        title="Exit Arena"
-                      >
-                        <ArrowLeft className="w-5 h-5" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <CurrencySelector />
+                      {onClose && (
+                        <button 
+                          onClick={onClose}
+                          className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Exit Arena"
+                        >
+                          <ArrowLeft className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <h1 className="text-5xl font-black text-slate-900 tracking-tighter">
                     EFADO <span className="text-indigo-600">Money Quiz</span>

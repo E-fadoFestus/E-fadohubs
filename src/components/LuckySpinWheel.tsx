@@ -33,6 +33,7 @@ import { UserProfile, AdminStats, Transaction } from '../types';
 import { db, doc, onSnapshot, updateDoc, increment } from '../firebase';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CurrencySelector } from './CurrencySelector';
 
 interface LuckySpinWheelProps {
   onClose: () => void;
@@ -325,6 +326,10 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
         <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-30">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] animate-pulse" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
+        </div>
+
+        <div className="absolute top-6 right-16 z-50">
+          <CurrencySelector />
         </div>
 
         <button 

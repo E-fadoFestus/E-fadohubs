@@ -21,6 +21,7 @@ import confetti from 'canvas-confetti';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
+import { CurrencySelector } from './CurrencySelector';
 
 interface EfadoEquilibriumProps {
   user: UserProfile;
@@ -320,6 +321,10 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
 
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-yellow-500/10 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-[100px] animate-pulse" />
+
+        <div className="absolute top-8 right-24 z-50">
+          <CurrencySelector />
+        </div>
 
         <button 
           onClick={onClose}

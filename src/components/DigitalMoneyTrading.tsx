@@ -50,6 +50,7 @@ import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { db, doc, updateDoc, increment } from '../firebase';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
+import { CurrencySelector } from './CurrencySelector';
 
 interface Trade {
   id: string;
@@ -486,6 +487,8 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Cash Out</span>
               </button>
             </div>
+
+            <CurrencySelector />
 
             <button 
               onClick={onClose}

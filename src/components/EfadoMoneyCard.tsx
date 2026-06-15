@@ -31,6 +31,7 @@ import confetti from 'canvas-confetti';
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
+import { CurrencySelector } from './CurrencySelector';
 
 interface Card {
   id: number;
@@ -380,6 +381,8 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
           </div>
 
           <div className="flex items-center gap-4 flex-shrink-0">
+            <CurrencySelector />
+
             <button 
               onClick={() => setIsMuted(!isMuted)}
               className="p-2 text-slate-400 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"

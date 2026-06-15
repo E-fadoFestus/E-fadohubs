@@ -168,7 +168,7 @@ service cloud.firestore {
     }
 
     function isValidTransaction(data) {
-      return hasOnlyAllowedFields(['userId', 'type', 'amount', 'status', 'timestamp', 'currency', 'paymentMethod', 'description', 'recipient', 'reference', 'fee', 'hub', 'purpose', 'method', 'metadata']) &&
+      return hasOnlyAllowedFields(['userId', 'userEmail', 'type', 'amount', 'status', 'timestamp', 'currency', 'paymentMethod', 'description', 'recipient', 'reference', 'fee', 'hub', 'purpose', 'method', 'metadata']) &&
              data.userId is string && data.userId.size() > 0 &&
              data.type in ['deposit', 'withdrawal', 'game_bet', 'game_win', 'payment', 'payout'] &&
              data.amount is number && data.amount > 0 &&
@@ -242,7 +242,7 @@ service cloud.firestore {
 
     match /adminStats/{settingId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow write: if isAuthenticated() && (isAdmin() || isValidAdminStats(request.resource.data));
     }
 
     match /announcements/{announcementId} {
