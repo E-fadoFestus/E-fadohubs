@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, Variants } from 'motion/react';
+import efadoLogo from '../assets/images/efado_logo_1781368963212.jpg';
 
 interface EfadoLogoProps {
   className?: string;
@@ -95,29 +96,13 @@ export const EfadoLogo: React.FC<EfadoLogoProps> = ({
         </svg>
 
         {/* Main Logo Body */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-amber-500 rounded-2xl shadow-lg border border-white/20 flex items-center justify-center overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
-          
-          <svg viewBox="0 0 100 100" className="w-2/3 h-2/3 text-white drop-shadow-lg">
-            {/* Minimalist 'E' and 'F' conceptual node */}
-            <path 
-              d="M30 30h40M30 50h30M30 70h40M30 30v40" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="10" 
-              strokeLinecap="round" 
-              className="opacity-40"
-            />
-            {/* Core Neural Element */}
-            <circle cx="50" cy="50" r="10" fill="white" />
-            <path 
-              d="M50 50 L80 20 M50 50 L80 80 M50 50 L20 50" 
-              fill="none" 
-              stroke="white" 
-              strokeWidth="4" 
-              strokeLinecap="round"
-            />
-          </svg>
+        <div className="absolute inset-0 rounded-full overflow-hidden shadow-xl border border-white/30 bg-indigo-950 flex items-center justify-center">
+          <img 
+            src={efadoLogo} 
+            alt="EFADO HUBS Logo" 
+            className="w-full h-full object-cover rounded-full"
+            referrerPolicy="no-referrer"
+          />
         </div>
       </div>
 

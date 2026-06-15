@@ -31,37 +31,37 @@ export default defineConfig(({mode}) => {
           start_url: '/',
           icons: [
             {
-              src: 'https://picsum.photos/seed/efado-icon-192/192/192',
+              src: '/efado_logo_192.jpg',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/jpeg'
             },
             {
-              src: 'https://picsum.photos/seed/efado-icon-512/512/512',
+              src: '/efado_logo_512.jpg',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/jpeg'
             },
             {
-              src: 'https://picsum.photos/seed/efado-icon-mask/512/512',
+              src: '/efado_logo_512.jpg',
               sizes: '512x512',
-              type: 'image/png',
+              type: 'image/jpeg',
               purpose: 'any maskable'
             }
           ],
           categories: ['business', 'finance', 'social'],
           shortcuts: [
             {
-              name: 'Advertising Hub',
-              short_name: 'Ads',
-              description: 'Place ads globally',
-              url: '/?hub=ADVERTISING',
-              icons: [{ src: 'https://picsum.photos/seed/ads-icon/96/96', sizes: '96x96' }]
+               name: 'Advertising Hub',
+               short_name: 'Ads',
+               description: 'Place ads globally',
+               url: '/?hub=ADVERTISING',
+               icons: [{ src: '/efado_logo_192.jpg', sizes: '96x96', type: 'image/jpeg' }]
             },
             {
-              name: 'Mining Core',
-              short_name: 'Mining',
-              description: 'Start mining now',
-              url: '/?hub=MINING',
-              icons: [{ src: 'https://picsum.photos/seed/mine-icon/96/96', sizes: '96x96' }]
+               name: 'Mining Core',
+               short_name: 'Mining',
+               description: 'Start mining now',
+               url: '/?hub=MINING',
+               icons: [{ src: '/efado_logo_192.jpg', sizes: '96x96', type: 'image/jpeg' }]
             }
           ]
         }
