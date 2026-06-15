@@ -25,7 +25,7 @@ import { useCurrency } from '../lib/CurrencyContext';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
-import { db, doc, updateDoc } from '../firebase';
+import { db, doc, updateDoc, collection, setDoc, serverTimestamp } from '../firebase';
 import { ReceiptTerminal } from './ReceiptTerminal';
 
 interface EasyPaymentPlatformProps {
@@ -314,6 +314,32 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       };
 
       const txId = await TransactionService.recordTransaction(txData);
+      
+      // If it's a cashout (withdrawal), also insert into the global departures 'withdrawals' collection
+      if (!isDeposit) {
+        try {
+          const withdrawalRef = doc(collection(db, 'withdrawals'), txId);
+          await setDoc(withdrawalRef, {
+            userId: user.uid,
+            userEmail: user.email,
+            amount: parsedAmt - (parsedAmt * 0.015), // net payout
+            originalAmount: parsedAmt,
+            fee: parsedAmt * 0.015,
+            status: 'pending',
+            timestamp: serverTimestamp(),
+            accountDetails: {
+              method: 'Easy Transfer',
+              bankName,
+              accountNumber,
+              accountName,
+              sourceWallet: 'playerWallet'
+            }
+          });
+        } catch (err) {
+          console.error('Failed to create mirror withdrawal request for CEO review:', err);
+        }
+      }
+
       setCreatedTxId(txId);
       setStep('success');
       
@@ -392,7 +418,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       </div>
 
       {/* Main Form Area */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-5 pb-16 space-y-4">
         {step === 'form' && (
           <AnimatePresence mode="wait">
             {activeTab === 'deposit' ? (
