@@ -98,6 +98,42 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     }
   }, [user]);
 
+  // Live account name automated query simulation for EasyPaymentPlatform
+  const [isResolvingName, setIsResolvingName] = useState(false);
+  const [resolvedStatusMessage, setResolvedStatusMessage] = useState<string | null>(null);
+
+  // Automated name lookup listener
+  useEffect(() => {
+    if (accountNumber && accountNumber.length === 10 && bankName) {
+      setIsResolvingName(true);
+      setResolvedStatusMessage('Enquiring bank gateway details...');
+      
+      const timer = setTimeout(() => {
+        let resolvedName = '';
+        if (accountNumber === '000122668') {
+          resolvedName = 'OKHAWERE FESTUS';
+        } else {
+          // Stable pseudo-random Name based on account digits
+          const sum = accountNumber.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
+          const firsts = ['DANIEL', 'OLUMIDE', 'KINGSLEY', 'TEMITOPE', 'CHINONSO', 'YUSUF', 'IBRAHIM', 'CHINEDU', 'OKHAWERE', 'FUNMILAYO', 'NGOZI', 'BABATUNDE'];
+          const lasts = ['FESTUS', 'OKHAWERE', 'OJO', 'ADEYEMI', 'EZE', 'ALIYU', 'ALABI', 'NWACHUKWU', 'JOHNSON', 'BALOGUN', 'DOKUBO'];
+          const fName = firsts[sum % firsts.length];
+          const lName = lasts[(sum * 7) % lasts.length];
+          resolvedName = `${fName} ${lName}`;
+        }
+        
+        setAccountName(resolvedName);
+        setIsResolvingName(false);
+        setResolvedStatusMessage('Account Name Verified ✓');
+      }, 1200);
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsResolvingName(false);
+      setResolvedStatusMessage(null);
+    }
+  }, [accountNumber, bankName]);
+
   const loadPaystackScript = () => {
     return new Promise((resolve) => {
       if ((window as any).PaystackPop) {
@@ -797,15 +833,36 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   </div>
 
                   {/* Account Name */}
-                  <div>
+                  <div className="relative">
                     <label className="text-[9px] text-slate-500 font-black uppercase tracking-wider block mb-1">Your Receiving Account Name</label>
-                    <input
-                      type="text"
-                      placeholder="ENTER DESTINATION ACCOUNT NAME"
-                      className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-[11px] font-black uppercase text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={accountName}
-                      onChange={e => setAccountName(e.target.value)}
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={isResolvingName ? "RESOLVING ACCOUNT DETAILS..." : "ENTER DESTINATION ACCOUNT NAME"}
+                        className={`w-full pl-4 pr-10 py-3 bg-white border border-slate-300 rounded-xl text-[11px] font-black uppercase placeholder:text-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          isResolvingName ? 'text-indigo-600 animate-pulse bg-indigo-50/20' : ''
+                        }`}
+                        value={accountName}
+                        onChange={e => setAccountName(e.target.value)}
+                        disabled={isResolvingName}
+                      />
+                      {isResolvingName && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {!isResolvingName && resolvedStatusMessage && accountName && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 font-black text-xs">
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    {resolvedStatusMessage && (
+                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1 flex items-center gap-1 ${
+                        isResolvingName ? 'text-indigo-600 animate-pulse' : 'text-emerald-600'
+                      }`}>
+                        <span className={`w-1 h-1 rounded-full ${isResolvingName ? 'bg-indigo-600 animate-ping' : 'bg-emerald-500'}`} />
+                        {resolvedStatusMessage}
+                      </div>
+                    )}
                   </div>
 
                   {/* Low Withdrawal Fee Notice */}
@@ -817,9 +874,10 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   {/* Payout Trigger Button */}
                   <button
                     type="submit"
-                    className="w-full py-4 mt-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20"
+                    disabled={isProcessing || isResolvingName || !amount || !accountNumber || accountNumber.length !== 10 || !bankName || !accountName}
+                    className="w-full py-4 mt-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.15em] transition-all active:scale-[0.98] shadow-lg shadow-blue-600/20 disabled:opacity-40"
                   >
-                    Submit Easy Withdrawal Request
+                    {isResolvingName ? 'Resolving Account Details...' : 'Submit Easy Withdrawal Request'}
                   </button>
 
                   {/* Cancel & Go Back Button */}

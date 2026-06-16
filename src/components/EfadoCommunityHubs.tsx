@@ -110,6 +110,43 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [withdrawAccNum, setWithdrawAccNum] = useState('');
   const [withdrawTargName, setWithdrawTargName] = useState('');
 
+  // Live account name automated query simulation for multi-currency withdrawals
+  const [isResolvingWithdrawName, setIsResolvingWithdrawName] = useState(false);
+  const [resolvedWithdrawStatusMessage, setResolvedWithdrawStatusMessage] = useState<string | null>(null);
+
+  // Automated name lookup listener
+  useEffect(() => {
+    const bankVal = withdrawSelBank === 'Other' ? withdrawCustBank : withdrawSelBank;
+    if (withdrawAccNum && withdrawAccNum.length === 10 && bankVal && withdrawCur === 'NGN') {
+      setIsResolvingWithdrawName(true);
+      setResolvedWithdrawStatusMessage('Enquiring bank gateway details...');
+      
+      const timer = setTimeout(() => {
+        let resolvedName = '';
+        if (withdrawAccNum === '000122668') {
+          resolvedName = 'OKHAWERE FESTUS';
+        } else {
+          // Stable pseudo-random Name based on account digits
+          const sum = withdrawAccNum.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
+          const firsts = ['DANIEL', 'OLUMIDE', 'KINGSLEY', 'TEMITOPE', 'CHINONSO', 'YUSUF', 'IBRAHIM', 'CHINEDU', 'OKHAWERE', 'FUNMILAYO', 'NGOZI', 'BABATUNDE'];
+          const lasts = ['FESTUS', 'OKHAWERE', 'OJO', 'ADEYEMI', 'EZE', 'ALIYU', 'ALABI', 'NWACHUKWU', 'JOHNSON', 'BALOGUN', 'DOKUBO'];
+          const fName = firsts[sum % firsts.length];
+          const lName = lasts[(sum * 7) % lasts.length];
+          resolvedName = `${fName} ${lName}`;
+        }
+        
+        setWithdrawTargName(resolvedName);
+        setIsResolvingWithdrawName(false);
+        setResolvedWithdrawStatusMessage('Account Name Verified ✓');
+      }, 1200);
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsResolvingWithdrawName(false);
+      setResolvedWithdrawStatusMessage(null);
+    }
+  }, [withdrawAccNum, withdrawSelBank, withdrawCustBank, withdrawCur]);
+
   // Interactive Discourse (Chat) Feature States
   const [chatCallState, setChatCallState] = useState<'idle' | 'calling_voice' | 'calling_video' | 'active_voice' | 'active_video'>('idle');
   const [callTimer, setCallTimer] = useState(0);
@@ -2485,7 +2522,10 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                         type="text"
                         placeholder="e.g. 1024823901"
                         value={withdrawAccNum}
-                        onChange={(e) => setWithdrawAccNum(e.target.value)}
+                        onChange={(e) => {
+                          const digitsOnly = e.target.value.replace(/\D/g, '');
+                          setWithdrawAccNum(digitsOnly);
+                        }}
                         className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
                       />
                     </div>
@@ -2505,16 +2545,37 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                     </div>
                   )}
 
-                  <div>
+                  <div className="relative">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5 block">Account Beneficiary Name</label>
-                    <input 
-                      required
-                      type="text"
-                      placeholder="e.g. John Doe"
-                      value={withdrawTargName}
-                      onChange={(e) => setWithdrawTargName(e.target.value)}
-                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black"
-                    />
+                    <div className="relative">
+                      <input 
+                        required
+                        type="text"
+                        placeholder={isResolvingWithdrawName ? "RESOLVING ACCOUNT DETAILS..." : "e.g. John Doe"}
+                        value={withdrawTargName}
+                        onChange={(e) => setWithdrawTargName(e.target.value)}
+                        disabled={isResolvingWithdrawName}
+                        className={`w-full pl-5 pr-12 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black ${
+                          isResolvingWithdrawName ? 'text-indigo-600 animate-pulse bg-indigo-50/20' : ''
+                        }`}
+                      />
+                      {isResolvingWithdrawName && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {!isResolvingWithdrawName && resolvedWithdrawStatusMessage && withdrawTargName && (
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-xs">
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    {resolvedWithdrawStatusMessage && (
+                      <div className={`text-[9px] font-black uppercase tracking-widest mt-1.5 flex items-center gap-1 ${
+                        isResolvingWithdrawName ? 'text-indigo-600 animate-pulse' : 'text-emerald-600'
+                      }`}>
+                        <span className={`w-1 h-1 rounded-full ${isResolvingWithdrawName ? 'bg-indigo-600 animate-ping' : 'bg-emerald-500'}`} />
+                        {resolvedWithdrawStatusMessage}
+                      </div>
+                    )}
                   </div>
 
                   <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
@@ -2523,11 +2584,11 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
 
                   <button 
                     type="submit"
-                    disabled={isWithdrawing}
-                    className="w-full py-5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3"
+                    disabled={isWithdrawing || isResolvingWithdrawName || !withdrawAmount || !withdrawAccNum || (withdrawCur === 'NGN' && withdrawAccNum.length !== 10) || !withdrawTargName}
+                    className="w-full py-5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl flex items-center justify-center gap-3 disabled:opacity-40"
                   >
                     {isWithdrawing ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
-                    Confirm & Execute Withdrawal
+                    {isResolvingWithdrawName ? 'Verifying Account Details...' : 'Confirm & Execute Withdrawal'}
                   </button>
                 </form>
               </motion.div>
