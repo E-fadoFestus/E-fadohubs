@@ -85,7 +85,8 @@ export const SUPPORT_EMAILS = {
 
 export const OFFICE_ADDRESSES = {
   HEAD_OFFICE: 'EFADO Technology Computer Engineering and Training services, No. 1, Usiefrun Junction, Orhuwhorun Town, Udu LGA, Warri, Delta State - Nigeria.',
-  BRANCH_OFFICE: 'EFADO Technology Computer Engineering and Training services, Opp. Permanent camp, DSC Steel Town 1, Udu LGA, Warri, Delta State - Nigeria.'
+  BRANCH_OFFICE: 'EFADO Technology Computer Engineering and Training services, Opp. Permanent camp, DSC Steel Town 1, Udu LGA, Warri, Delta State - Nigeria.',
+  DELIVERY_PICKUP_STATION: "HEAD OFFICE / DELIVERY PICK-UP STATION\nEFADO TECHNOLOGY\nComputer Engineering & Training Service\n\nOpposite Selta Steel Company Permanent Camp,\nBefore Tivo Super Market, through Mofor Junction,\nAfter Police Post,\nUdu Local Government Area,\nWarri,\nDelta State,\nNigeria.\n\n📞 Mobile Contact: 07055603958"
 };
 
 export const PHONE_NUMBERS = {

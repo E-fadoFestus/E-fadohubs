@@ -224,7 +224,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
           type="button"
           disabled={!scriptLoaded || isPaying}
           onClick={handlePaystackPayment}
-          className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/15"
+          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 animate-pulse"
         >
           {isPaying ? (
             <>

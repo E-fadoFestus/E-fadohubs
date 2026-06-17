@@ -49,6 +49,7 @@ import { CurrencySelector } from './CurrencySelector';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
+import { OFFICE_ADDRESSES } from '../constants/businessProfile';
 
 // Category Dataset (4-level taxonomy)
 const CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
@@ -191,6 +192,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     instructions: ''
   });
   const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [pickupLocationType, setPickupLocationType] = useState<'OFFICE' | 'VENDOR'>('OFFICE');
   const [addressError, setAddressError] = useState('');
   const [shippingMethod, setShippingMethod] = useState<'Standard' | 'Expedited' | 'Instant'>('Standard');
   const [paymentMethod, setPaymentMethod] = useState<string>('wallet');
@@ -365,6 +367,59 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
+  const [paystackInited, setPaystackInited] = useState(false);
+
+  // Dynamically load Paystack Inline JS script
+  useEffect(() => {
+    if ((window as any).PaystackPop) {
+      setPaystackInited(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => setPaystackInited(true);
+    document.body.appendChild(script);
+  }, []);
+
+  const handlePaystackCheckout = () => {
+    const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
+    // Exchange rate conversion: 1450 NGN per 1 USD
+    const ngnAmount = usdAmount * 1450;
+
+    if (!(window as any).PaystackPop) {
+      alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+      return;
+    }
+
+    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+    const reference = `EFD_MARK_USED_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+
+    try {
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackKey,
+        email: user.email,
+        amount: Math.round(ngnAmount * 100), // convert to kobo
+        currency: 'NGN',
+        ref: reference,
+        callback: (response: any) => {
+          if (response && (response.status === 'success' || response.message === 'Approved')) {
+            finalizePurchase(undefined, response.reference || reference);
+          } else {
+            alert("Payment approval was incomplete. Please verify details and retry.");
+          }
+        },
+        onClose: () => {
+          alert("Secure checkout closed by browser user.");
+        }
+      });
+      handler.openIframe();
+    } catch (err) {
+      console.error("Paystack launch error:", err);
+      alert("Could not load Paystack inline checkouts. Check network and refresh.");
+    }
+  };
+
   const handleCheckout = () => {
     setValidationErrors({});
     
@@ -395,6 +450,11 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       setCheckoutStep('payment');
     }
     else if (checkoutStep === 'payment') {
+      if (paymentMethod === 'paystack') {
+        handlePaystackCheckout();
+        return;
+      }
+
       if (['bank', 'opay', 'ussd'].includes(paymentMethod)) {
         const errors: Record<string, string> = {};
         if (!accountDetails.bankName) errors.bankName = "Source bank identification required.";
@@ -421,7 +481,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     return `EDADO${random}`;
   };
 
-  const finalizePurchase = async (pin?: string) => {
+  const finalizePurchase = async (pin?: string, paystackRef?: string) => {
     setIsProcessing(true);
     setPaymentStatusText('Initiating Secure Transaction...');
     setCheckoutStep('processing');
@@ -430,7 +490,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     // Simulated steps consistent with Modern Market Hub
     const steps = [
       'Verifying Fairly Used Item Condition...',
-      'Securing Escrow Payment...',
+      paystackRef ? 'Confirming Playstack Instant Reference...' : 'Securing Escrow Payment...',
       'Generating Digital Tracking Code...',
       'Finalizing Global Delivery Path...'
     ];
@@ -458,9 +518,16 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       deliveryDetails: {
         ...deliveryAddress,
         method: shippingMethod,
-        fulfillmentType: fulfillmentType
+        fulfillmentType: fulfillmentType,
+        pickupLocationType: fulfillmentType === 'PICKUP' ? pickupLocationType : undefined,
+        street: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp' : deliveryAddress.street,
+        city: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Warri' : deliveryAddress.city,
+        state: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Delta State' : deliveryAddress.state,
+        landmark: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp, Before Tivo Super Market' : deliveryAddress.landmark,
+        instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
       },
       paymentMethod: paymentMethod,
+      paystackRef: paystackRef || null,
       status: 'processing',
       trackingNumber: `TRK-FU-${Math.random().toString(36).substring(7).toUpperCase()}`,
       trackingHistory: [
@@ -468,7 +535,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
           status: 'Order Placed',
           location: 'EFADO Digital System',
           timestamp: new Date(),
-          description: 'Your fairly used item order has been received.'
+          description: paystackRef ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` : 'Your fairly used item order has been received.'
         }
       ],
       createdAt: serverTimestamp()
@@ -920,10 +987,17 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                   <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
                     <div className="flex items-center gap-2">
                       {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
-                        <>
-                          <Store className="w-4 h-4 text-indigo-400" />
-                          <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
-                        </>
+                        (selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION') ? (
+                          <>
+                            <Building2 className="w-4 h-4 text-indigo-400" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-wider">eFADO Corporate Pick-Up Station</span>
+                          </>
+                        ) : (
+                          <>
+                            <Store className="w-4 h-4 text-indigo-400" />
+                            <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
+                          </>
+                        )
                       ) : (
                         <>
                           <Truck className="w-4 h-4 text-blue-400" />
@@ -936,9 +1010,16 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                         <div className="space-y-1">
                           <p className="text-[10px] text-indigo-300">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
                           <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
-                          <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
-                            *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
-                          </p>
+                          {((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? (
+                            <div className="mt-2 text-[9.5px] text-slate-300 normal-case bg-slate-950 p-3 rounded-xl border border-white/5 font-mono">
+                              <span className="text-[9px] font-black text-indigo-400 block mb-1 uppercase">🏢 eFADO Pickup Coordinate:</span>
+                              {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
+                            </div>
+                          ) : (
+                            <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
+                              *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-1">
@@ -1252,45 +1333,93 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       </div>
                     ) : (
                       <div className="space-y-6">
-                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] space-y-2">
-                          <div className="flex items-center gap-2 text-amber-500">
-                            <Info className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-wider">Independent Pickup Protocol</span>
-                          </div>
-                          <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
-                            eFADO operates as a decentralized network and does not maintain designated corporate pickup stations.
-                            All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
-                          </p>
+                        {/* Selector for Pickup Location Type */}
+                        <div className="grid grid-cols-2 gap-4 bg-slate-900/60 p-2 rounded-[2rem] border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPickupLocationType('OFFICE');
+                            }}
+                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
+                              pickupLocationType === 'OFFICE'
+                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
+                                : 'bg-transparent text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Building2 className="w-4 h-4" />
+                            <span>🏫 eFADO Delivery Office</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPickupLocationType('VENDOR');
+                            }}
+                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
+                              pickupLocationType === 'VENDOR'
+                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
+                                : 'bg-transparent text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Store className="w-4 h-4" />
+                            <span>🏪 Vendor Direct Store</span>
+                          </button>
                         </div>
+
+                        {pickupLocationType === 'OFFICE' ? (
+                          <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-[2rem] space-y-3">
+                            <div className="flex items-center gap-2 text-indigo-400">
+                              <Building2 className="w-4 h-4" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">OFFICIAL CORPORATE PICK-UP STATION</span>
+                            </div>
+                            <div className="text-[11px] font-bold text-slate-200 mt-1 space-y-2 whitespace-pre-line bg-slate-1050 p-4 rounded-xl border border-white/5 font-mono">
+                              {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
+                            </div>
+                            <p className="text-[9.5px] text-indigo-300 font-bold uppercase leading-relaxed">
+                              Your products will be centrally delivered to this eFADO Head Office / Delivery Pick-Up Station in Warri, Delta State. Bring matching ID or verification liaison details for secured collection.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] space-y-2">
+                            <div className="flex items-center gap-2 text-amber-500">
+                              <Info className="w-4 h-4" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">Independent Pickup Protocol</span>
+                            </div>
+                            <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
+                              eFADO operates as a decentralized network. All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
+                            </p>
+                          </div>
+                        )}
 
                         {/* List coordinates for all items in cart */}
-                        <div className="space-y-4">
-                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Selected Location coordinates for Items:</label>
-                          {cart.map((item, idx) => {
-                            const p = item.product;
-                            const mainStr = p.vendorPickupLocation || 
-                                           `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
-                            return (
-                              <div key={idx} className="p-4 bg-slate-950/80 border border-white/5 rounded-[2rem] flex flex-col gap-2">
-                                <span className="text-xs font-black text-white uppercase tracking-tight">{p.title}</span>
-                                <div className="flex items-start gap-2 bg-slate-900/60 p-3 rounded-xl border border-white/5">
-                                  <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
-                                  <div>
-                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
-                                    <p className="text-[10.5px] font-bold text-slate-200 mt-1 whitespace-pre-line leading-relaxed">{mainStr}</p>
-                                    {(p.phone || p.whatsapp) && (
-                                      <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
-                                        Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
-                                      </p>
-                                    )}
+                        {pickupLocationType === 'VENDOR' && (
+                          <div className="space-y-4">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Selected Location coordinates for Items:</label>
+                            {cart.map((item, idx) => {
+                              const p = item.product;
+                              const mainStr = p.vendorPickupLocation || 
+                                             `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
+                              return (
+                                <div key={idx} className="p-4 bg-slate-950/80 border border-white/5 rounded-[2rem] flex flex-col gap-2">
+                                  <span className="text-xs font-black text-white uppercase tracking-tight">{p.title}</span>
+                                  <div className="flex items-start gap-2 bg-slate-900/60 p-3 rounded-xl border border-white/5">
+                                    <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
+                                      <p className="text-[10.5px] font-bold text-slate-200 mt-1 whitespace-pre-line leading-relaxed">{mainStr}</p>
+                                      {(p.phone || p.whatsapp) && (
+                                        <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
+                                          Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
 
-                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
+                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6 animate-fadeIn">
                           <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
                             <UserPlus className="w-4 h-4" /> Authorized Liaison Credentials
                           </h4>
@@ -1318,7 +1447,11 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                               className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
                             />
                           </FormField>
-                          <p className="text-[8.5px] text-slate-400 uppercase font-bold tracking-widest">⚠️ Present dynamic matching passport ID or matching confirmation code to ensure item handshaking security.</p>
+                          <p className="text-[8.5px] text-slate-400 uppercase font-bold tracking-widest">
+                            {pickupLocationType === 'OFFICE'
+                              ? '⚠️ Bring a valid ID or verification code to the eFADO Delivery Head Office matching the credentials above.'
+                              : '⚠️ Present dynamic matching passport ID or matching confirmation code to ensure item handshaking security.'}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1709,20 +1842,46 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       <span>{formatPrice((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)), true)}</span>
                     </div>
                   </div>
+
+                  {checkoutStep === 'address' && Object.keys(validationErrors).length > 0 && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-xs font-bold mb-4 space-y-1">
+                      <p className="font-black uppercase tracking-widest flex items-center gap-1.5 text-rose-300">
+                        <AlertCircle className="w-4 h-4 text-rose-400" /> Missing Required Coordinates:
+                      </p>
+                      <ul className="list-disc pl-5 space-y-0.5 text-[10px] opacity-90">
+                        {Object.entries(validationErrors).map(([field, err]) => err && (
+                          <li key={field}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   
-                  <button 
-                    disabled={cart.length === 0}
-                    onClick={handleCheckout}
-                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-3 animate-shimmer"
-                  >
-                    {checkoutStep === 'payment' ? <ShieldCheck className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
-                    <span className="uppercase tracking-[0.2em] text-xs">
-                      {checkoutStep === 'cart' && 'Proceed to Checkout'}
-                      {checkoutStep === 'address' && 'Confirm Delivery Address'}
-                      {checkoutStep === 'payment' && `Pay ${formatPrice((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)), true)} Now`}
-                    </span>
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
+                  {checkoutStep === 'payment' && paymentMethod === 'paystack' ? (
+                    <button 
+                      onClick={handlePaystackCheckout}
+                      className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-2xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      <span className="uppercase tracking-[0.2em] text-xs">
+                        Pay via Secure Paystack (NGN)
+                      </span>
+                      <ArrowRight className="w-5 h-5 animate-bounce" />
+                    </button>
+                  ) : (
+                    <button 
+                      disabled={cart.length === 0}
+                      onClick={handleCheckout}
+                      className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-3 animate-shimmer"
+                    >
+                      {checkoutStep === 'payment' ? <ShieldCheck className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
+                      <span className="uppercase tracking-[0.2em] text-xs">
+                        {checkoutStep === 'cart' && 'Proceed to Checkout'}
+                        {checkoutStep === 'address' && 'Confirm Delivery Address'}
+                        {checkoutStep === 'payment' && `Pay ${formatPrice((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)), true)} Now`}
+                      </span>
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               )}
             </motion.div>

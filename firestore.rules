@@ -421,5 +421,38 @@ service cloud.firestore {
     match /ad_listings/{listingId} {
       allow read, write: if isAuthenticated();
     }
+    match /subscribers/{subscriberId} {
+      allow read, write: if true;
+    }
+    match /gist_chat_messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /ai_enrollments/{enrollmentId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /cscc_contributions/{contributionId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /deposits/{depositId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /market_testimonies/{testimonyId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /receipts/{receiptId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /service_testimonies/{testimonyId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /repayments/{repaymentId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /sourcing_requests/{requestId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /vending_purchases/{purchaseId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

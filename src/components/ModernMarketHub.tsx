@@ -59,7 +59,7 @@ import { VendorRegistrationFlow } from './VendorRegistrationFlow';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
-import { SUPPORT_EMAILS } from '../constants/businessProfile';
+import { SUPPORT_EMAILS, OFFICE_ADDRESSES } from '../constants/businessProfile';
 
 // ... (MODERN_CATEGORIES stays same)
 const MODERN_CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
@@ -250,6 +250,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     instructions: ''
   });
   const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
+  const [pickupLocationType, setPickupLocationType] = useState<'OFFICE' | 'VENDOR'>('OFFICE');
   const [addressError, setAddressError] = useState('');
   const [shippingMethod, setShippingMethod] = useState<'Standard' | 'Expedited' | 'Instant'>('Standard');
   const [paymentMethod, setPaymentMethod] = useState<string>('wallet');
@@ -515,6 +516,59 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
+  const [paystackInited, setPaystackInited] = useState(false);
+
+  // Dynamically load Paystack Inline JS script
+  useEffect(() => {
+    if ((window as any).PaystackPop) {
+      setPaystackInited(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => setPaystackInited(true);
+    document.body.appendChild(script);
+  }, []);
+
+  const handlePaystackCheckout = () => {
+    const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
+    // Exchange rate conversion: 1450 NGN per 1 USD
+    const ngnAmount = usdAmount * 1450;
+
+    if (!(window as any).PaystackPop) {
+      alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+      return;
+    }
+
+    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+    const reference = `EFD_MARK_MODERN_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+
+    try {
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackKey,
+        email: user.email,
+        amount: Math.round(ngnAmount * 100), // convert kobo
+        currency: 'NGN',
+        ref: reference,
+        callback: (response: any) => {
+          if (response && (response.status === 'success' || response.message === 'Approved')) {
+            finalizePurchase(undefined, response.reference || reference);
+          } else {
+            alert("Payment approval was incomplete. Please verify details and retry.");
+          }
+        },
+        onClose: () => {
+          alert("Secure checkout closed by user.");
+        }
+      });
+      handler.openIframe();
+    } catch (err) {
+      console.error("Paystack launch error:", err);
+      alert("Could not load Paystack inline checkouts. Check network and refresh.");
+    }
+  };
+
   const handleCheckout = () => {
     if (checkoutStep === 'cart') {
       setAddressError('');
@@ -534,6 +588,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       setAddressError('');
       setCheckoutStep('payment');
     } else if (checkoutStep === 'payment') {
+      if (paymentMethod === 'paystack') {
+        handlePaystackCheckout();
+        return;
+      }
+
       if (paymentMethod === 'pod') {
         finalizePurchase();
       } else {
@@ -547,7 +606,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     return `EDADO${random}`;
   };
 
-  const finalizePurchase = async () => {
+  const finalizePurchase = async (pin?: string, paystackRef?: string) => {
     setIsProcessing(true);
     setPaymentStatusText('Initiating Secure Transaction...');
     setCheckoutStep('processing');
@@ -559,6 +618,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     } else if (paymentMethod === 'crypto') {
       await new Promise(r => setTimeout(r, 1500));
       setPaymentStatusText('Generating Unique Wallet Address...');
+    } else if (paystackRef) {
+      await new Promise(r => setTimeout(r, 1500));
+      setPaymentStatusText('Verifying Playstack Instant Reference...');
     } else {
       await new Promise(r => setTimeout(r, 1200));
       setPaymentStatusText('Verifying Payment Source...');
@@ -586,9 +648,16 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       deliveryDetails: {
         ...deliveryAddress,
         method: shippingMethod,
-        fulfillmentType: fulfillmentType
+        fulfillmentType: fulfillmentType,
+        pickupLocationType: fulfillmentType === 'PICKUP' ? pickupLocationType : undefined,
+        street: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp' : deliveryAddress.street,
+        city: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Warri' : deliveryAddress.city,
+        state: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Delta State' : deliveryAddress.state,
+        landmark: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp, Before Tivo Super Market' : deliveryAddress.landmark,
+        instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
       },
       paymentMethod: paymentMethod,
+      paystackRef: paystackRef || null,
       status: 'processing',
       trackingNumber: `TRK${Math.random().toString(36).substring(7).toUpperCase()}`,
       trackingHistory: [
@@ -596,7 +665,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
           status: 'Order Placed',
           location: 'EFADO Digital System',
           timestamp: new Date(),
-          description: 'Your order has been received and is being processed.'
+          description: paystackRef ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` : 'Your order has been received and is being processed.'
         }
       ],
       createdAt: serverTimestamp()
@@ -1160,10 +1229,17 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
                           <div className="flex items-center gap-2">
                             {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? (
-                              <>
-                                <Store className="w-4 h-4 text-indigo-400" />
-                                <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
-                              </>
+                              (selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION') ? (
+                                <>
+                                  <Building2 className="w-4 h-4 text-indigo-400" />
+                                  <span className="text-[10px] font-black text-white uppercase tracking-wider">eFADO Corporate Pick-Up Station</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Store className="w-4 h-4 text-indigo-400" />
+                                  <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
+                                </>
+                              )
                             ) : (
                               <>
                                 <Truck className="w-4 h-4 text-blue-400" />
@@ -1176,9 +1252,16 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               <div className="space-y-1">
                                 <p className="text-[10px] text-indigo-300">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
                                 <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
-                                <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
-                                  *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
-                                </p>
+                                {((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? (
+                                  <div className="mt-2 text-[9.5px] text-slate-300 normal-case bg-slate-950 p-3 rounded-xl border border-white/5 font-mono">
+                                    <span className="text-[9px] font-black text-indigo-400 block mb-1 uppercase">🏢 eFADO Pickup Coordinate:</span>
+                                    {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
+                                  </div>
+                                ) : (
+                                  <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
+                                    *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
+                                  </p>
+                                )}
                               </div>
                             ) : (
                               <div className="space-y-1">
@@ -1207,11 +1290,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                             <div className="absolute -left-10 top-0 w-6 h-6 rounded-full bg-blue-500 border-4 border-slate-900 z-10" />
                             <div>
                               <h5 className="text-xs font-black text-white uppercase tracking-widest mb-1">
-                                {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? 'Ready at Vendor Station' : 'Delivered to Point'}
+                                {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' ? (((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? 'Arrived at eFADO Delivery Point' : 'Ready at Vendor Station') : 'Delivered to Point'}
                               </h5>
                               <p className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-tighter">
                                 {selectedOrder.deliveryDetails.fulfillmentType === 'PICKUP' 
-                                  ? 'Manual Store Pickup Collection Point' 
+                                  ? (((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? 'eFADO Delivery Head Office / Delivery Station' : 'Manual Store Pickup Collection Point')
                                   : `${selectedOrder.deliveryDetails.street}, ${selectedOrder.deliveryDetails.city}`}
                               </p>
                               {selectedOrder.status === 'delivered' ? (
@@ -1506,46 +1589,94 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2">
-                          <div className="flex items-center gap-2 text-amber-500">
-                            <Info className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-wider">eFADO Independent Pickup Policy</span>
-                          </div>
-                          <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
-                            eFADO operates as a decentralized network and does not maintain designated corporate pickup stations.
-                            All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
-                          </p>
+                        {/* Selector for Pickup Location Type */}
+                        <div className="grid grid-cols-2 gap-4 bg-slate-900/60 p-2 rounded-2xl border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPickupLocationType('OFFICE');
+                            }}
+                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
+                              pickupLocationType === 'OFFICE'
+                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
+                                : 'bg-transparent text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Building2 className="w-4 h-4" />
+                            <span>🏫 eFADO Delivery Office</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPickupLocationType('VENDOR');
+                            }}
+                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
+                              pickupLocationType === 'VENDOR'
+                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
+                                : 'bg-transparent text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <Store className="w-4 h-4" />
+                            <span>🏪 Vendor Direct Store</span>
+                          </button>
                         </div>
 
+                        {pickupLocationType === 'OFFICE' ? (
+                          <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl space-y-3">
+                            <div className="flex items-center gap-2 text-indigo-400">
+                              <Building2 className="w-4 h-4" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">OFFICIAL CORPORATE PICK-UP STATION</span>
+                            </div>
+                            <div className="text-[11px] font-bold text-slate-200 mt-1 space-y-2 whitespace-pre-line bg-slate-950/60 p-4 rounded-xl border border-white/5 font-mono">
+                              {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
+                            </div>
+                            <p className="text-[9.5px] text-indigo-300 font-bold uppercase leading-relaxed">
+                              Your products will be centrally delivered to this eFADO Head Office / Delivery Pick-Up Station in Warri, Delta State. Bring matching ID or verification liaison details for secured collection.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2">
+                            <div className="flex items-center gap-2 text-amber-500">
+                              <Info className="w-4 h-4" />
+                              <span className="text-[10px] font-black uppercase tracking-wider">eFADO Independent Pickup Policy</span>
+                            </div>
+                            <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
+                              Collect your items directly from the individual vendor's declared private point-of-sale coordinates listed below.
+                            </p>
+                          </div>
+                        )}
+
                         {/* Point of Pickup Listing for each Cart Product */}
-                        <div className="space-y-3">
-                          <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-1">Your Selected Independent Pickup Coordinates:</label>
-                          {cart.map((item, idx) => {
-                            const p = item.product;
-                            const mainStr = p.vendorPickupLocation || 
-                                           `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
-                            return (
-                              <div key={idx} className="p-4 bg-slate-900/80 border border-white/5 rounded-2xl flex flex-col gap-2">
-                                <div className="flex justify-between items-start gap-2">
-                                  <span className="text-[10px] font-black text-white uppercase tracking-tight">{p.title}</span>
-                                  <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded-full outline-none">qty: {item.quantity}</span>
-                                </div>
-                                <div className="flex items-start gap-2 mt-1 bg-slate-950 p-3 rounded-xl border border-white/5">
-                                  <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
-                                  <div>
-                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
-                                    <p className="text-[11px] font-bold text-slate-200 mt-1 leading-relaxed whitespace-pre-line">{mainStr}</p>
-                                    {(p.phone || p.whatsapp) && (
-                                      <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
-                                        Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
-                                      </p>
-                                    )}
+                        {pickupLocationType === 'VENDOR' && (
+                          <div className="space-y-3">
+                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-1">Your Selected Independent Pickup Coordinates:</label>
+                            {cart.map((item, idx) => {
+                              const p = item.product;
+                              const mainStr = p.vendorPickupLocation || 
+                                             `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
+                              return (
+                                <div key={idx} className="p-4 bg-slate-900/80 border border-white/5 rounded-2xl flex flex-col gap-2">
+                                  <div className="flex justify-between items-start gap-2">
+                                    <span className="text-[10px] font-black text-white uppercase tracking-tight">{p.title}</span>
+                                    <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded-full">qty: {item.quantity}</span>
+                                  </div>
+                                  <div className="flex items-start gap-2 mt-1 bg-slate-950 p-3 rounded-xl border border-white/5">
+                                    <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
+                                      <p className="text-[11px] font-bold text-slate-200 mt-1 leading-relaxed whitespace-pre-line">{mainStr}</p>
+                                      {(p.phone || p.whatsapp) && (
+                                        <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
+                                          Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
 
                         <div className="space-y-3 pt-2">
                           <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-1">Authorized Pickup Handshaking Credentials:</label>
@@ -1563,7 +1694,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               onChange={e => setDeliveryAddress({...deliveryAddress, phone: e.target.value})}
                             />
                           </div>
-                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest px-1">⚠️ Bring a valid ID or verification key matching the name specified above to the vendor's address.</p>
+                          <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest px-1">
+                            {pickupLocationType === 'OFFICE' 
+                              ? '⚠️ Bring a valid ID or verification key to the eFADO Delivery Head Office matching the credentials above.' 
+                              : "⚠️ Bring a valid ID or verification key matching the name specified above to the vendor's address."}
+                          </p>
                         </div>
                       </div>
                     )}
@@ -1994,15 +2129,33 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                       </span>
                     </div>
                   </div>
+
+                  {checkoutStep === 'address' && addressError && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-xs font-bold mb-4 flex items-center gap-2">
+                      <Info className="w-5 h-5 text-rose-400 shrink-0" />
+                      <p className="leading-normal">{addressError}</p>
+                    </div>
+                  )}
                   
-                  <button 
-                    onClick={handleCheckout}
-                    disabled={cart.length === 0}
-                    className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-500/20 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                  >
-                    {checkoutStep === 'cart' ? 'Proceed to Address' : (checkoutStep === 'address' ? 'Proceed to Payment' : 'Complete Secure Order')}
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  {checkoutStep === 'payment' && paymentMethod === 'paystack' ? (
+                    <button 
+                      onClick={handlePaystackCheckout}
+                      className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-emerald-500/20 flex items-center justify-center gap-3 animate-pulse"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Pay via Secure Paystack (NGN)
+                      <ArrowRight className="w-4 h-4 animate-bounce" />
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handleCheckout}
+                      disabled={cart.length === 0}
+                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-500/20 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {checkoutStep === 'cart' ? 'Proceed to Address' : (checkoutStep === 'address' ? 'Proceed to Payment' : 'Complete Secure Order')}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               )}
             </motion.div>

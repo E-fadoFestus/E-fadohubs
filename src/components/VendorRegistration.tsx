@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2,
   Smartphone,
@@ -152,10 +152,23 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
     setStep('PAYMENT');
   };
 
-  const handlePayment = async () => {
-    if (!selectedPlan) return;
+  const [paystackInited, setPaystackInited] = useState(false);
+
+  // Dynamically load Paystack Inline JS script
+  useEffect(() => {
+    if ((window as any).PaystackPop) {
+      setPaystackInited(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => setPaystackInited(true);
+    document.body.appendChild(script);
+  }, []);
+
+  const completeRegistration = async (paystackRef?: string) => {
     setLoading(true);
-    
     try {
       const plan = PLANS.find(p => p.id === selectedPlan);
       
@@ -176,6 +189,7 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
         currency: 'USD',
         status: paymentMethod === 'CARD' ? 'completed' : 'pending',
         paymentMethod: paymentMethod,
+        paystackRef: paystackRef || null,
         description: `Vendor Registration - ${plan?.name} Plan`,
         timestamp: serverTimestamp()
       });
@@ -187,6 +201,7 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
         ...formData,
         plan: selectedPlan,
         paymentMethod: paymentMethod,
+        paystackRef: paystackRef || null,
         status: 'pending',
         createdAt: serverTimestamp()
       });
@@ -197,6 +212,52 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
       alert('Registration failed. Please check your connection.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPlan) return;
+    const plan = PLANS.find(p => p.id === selectedPlan);
+    const planPrice = plan?.price || 0;
+
+    if (paymentMethod === 'CARD') {
+      if (!(window as any).PaystackPop) {
+        alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+        return;
+      }
+      setLoading(true);
+      const ngnAmount = planPrice * 1450;
+      const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+      const reference = `EFD_VEND_REG_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+
+      try {
+        const handler = (window as any).PaystackPop.setup({
+          key: paystackKey,
+          email: user.email,
+          amount: Math.round(ngnAmount * 100), // convert kobo
+          currency: 'NGN',
+          ref: reference,
+          callback: async (response: any) => {
+            if (response && (response.status === 'success' || response.message === 'Approved')) {
+              await completeRegistration(response.reference || reference);
+            } else {
+              setLoading(false);
+              alert("Payment not approved. Please verify card details and try again.");
+            }
+          },
+          onClose: () => {
+            setLoading(false);
+            alert("Secure checkout closed by user.");
+          }
+        });
+        handler.openIframe();
+      } catch (err) {
+        setLoading(false);
+        console.error("Paystack launch error:", err);
+        alert("Could not initialize Paystack secure checkout. Verify network.");
+      }
+    } else {
+      await completeRegistration();
     }
   };
 
@@ -535,7 +596,11 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
                 <button 
                   onClick={handlePayment}
                   disabled={loading}
-                  className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                  className={`w-full py-5 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all flex items-center justify-center gap-2 ${
+                    paymentMethod === 'CARD' 
+                      ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-100 animate-pulse' 
+                      : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                  }`}
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 
                    paymentMethod === 'CARD' ? 'Confirm & Activate Hub' : 'I have completed the payment'}

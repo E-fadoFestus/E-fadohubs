@@ -184,10 +184,12 @@ export interface MarketOrder {
     zipCode: string;
     method: 'Standard' | 'Expedited' | 'Instant';
     fulfillmentType?: 'DELIVERY' | 'PICKUP';
+    pickupLocationType?: 'OFFICE' | 'VENDOR';
     landmark?: string;
     instructions?: string;
   };
   paymentMethod: string;
+  paystackRef?: string | null;
   status: 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';
   trackingNumber?: string;
   trackingHistory?: {
