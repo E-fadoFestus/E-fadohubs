@@ -40,8 +40,10 @@ import {
   Hash,
   Fingerprint,
   User,
-  AlertCircle
+  AlertCircle,
+  FileText
 } from 'lucide-react';
+import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -202,6 +204,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
   const [orders, setOrders] = useState<MarketOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<MarketOrder | null>(null);
   const [generatedOrderCode, setGeneratedOrderCode] = useState<string>('');
+  const [showSuccessReceipt, setShowSuccessReceipt] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
@@ -1876,31 +1879,37 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
                 {checkoutStep === 'success' && (
                   <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-500/20">
+                    <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-500/20 animate-bounce">
                        <CheckCircle className="w-10 h-10" />
                     </div>
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Order Confirmed!</h3>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-8 leading-relaxed">
+                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Order Confirmed!</h3>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 leading-relaxed max-w-sm">
                       Your fairly used product order has been successfully placed under the EFADO Guard escrow system.
                     </p>
-                    <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 w-full mb-8">
+                    <div className="bg-slate-100 p-6 rounded-[2rem] border border-slate-200/80 w-full mb-8 shadow-inner">
                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Your Order Code</p>
-                       <p className="text-3xl font-black text-white tracking-widest">{generatedOrderCode}</p>
+                       <p className="text-3xl font-black text-slate-800 tracking-widest font-mono">{generatedOrderCode}</p>
                     </div>
                     <div className="flex flex-col gap-3 w-full">
+                       <button 
+                         onClick={() => setShowSuccessReceipt(true)}
+                         className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg hover:bg-indigo-500 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-3"
+                       >
+                         <FileText className="w-4 h-4 text-emerald-400" /> Download & Print Receipt
+                       </button>
                        <button 
                          onClick={() => {
                            setActiveView('orders');
                            setShowCart(false);
                            setCheckoutStep('cart');
                          }}
-                         className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-500 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-3"
+                         className="w-full py-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-3 border border-slate-200"
                        >
                          <Truck className="w-4 h-4" /> Track My Order
                        </button>
                        <button 
                          onClick={() => { setShowCart(false); setCheckoutStep('cart'); }}
-                         className="w-full py-4 bg-white/5 text-slate-400 font-black rounded-2xl hover:bg-white/10 transition-all uppercase tracking-widest text-xs"
+                         className="w-full py-3 text-slate-500 hover:text-slate-700 font-bold hover:underline transition-all uppercase tracking-widest text-[10px]"
                        >
                          Continue Shopping
                        </button>
@@ -2021,6 +2030,29 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
               accentColor="indigo"
             />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Receipt Modal */}
+      <AnimatePresence>
+        {showSuccessReceipt && (
+          <StrategicReceipt 
+            transaction={{
+              id: generatedOrderCode,
+              userId: user.uid,
+              type: 'payment',
+              amount: (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)),
+              currency: 'USD',
+              status: paymentMethod === 'direct_bank_transfer' ? 'pending' : 'completed',
+              method: paymentMethod === 'direct_bank_transfer' ? 'Direct Bank' : 'Secured Escrow Wallet',
+              purpose: `Escrow Hub Purchase - Code: ${generatedOrderCode}`,
+              reference: generatedOrderCode,
+              timestamp: { seconds: Math.floor(Date.now() / 1000) },
+              description: `Fairly Used Market Escrow Order. Total includes shipping via ${shippingMethod} to ${deliveryAddress.city}, ${deliveryAddress.state || ''}.`
+            }}
+            userEmail={user.email}
+            onClose={() => setShowSuccessReceipt(false)}
+          />
         )}
       </AnimatePresence>
       </div>

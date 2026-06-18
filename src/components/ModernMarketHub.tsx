@@ -49,8 +49,10 @@ import {
   Mail,
   Star,
   Award,
-  ThumbsUp
+  ThumbsUp,
+  FileText
 } from 'lucide-react';
+import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -260,6 +262,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const [orders, setOrders] = useState<MarketOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<MarketOrder | null>(null);
   const [generatedOrderCode, setGeneratedOrderCode] = useState<string>('');
+  const [showSuccessReceipt, setShowSuccessReceipt] = useState(false);
   
   // Market testimonial state hooks
   const [showMarketReviewModal, setShowMarketReviewModal] = useState(false);
@@ -2183,16 +2186,22 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                     <p className="text-sm text-slate-400 mb-8">
                       Secure verification code has been sent to your email. You can track your goods in the "My Orders" tab.
                     </p>
-                    <div className="flex flex-col gap-3 w-full">
+                    <div className="flex flex-col gap-3 w-full animate-fade-in">
+                      <button 
+                        onClick={() => setShowSuccessReceipt(true)}
+                        className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-300 animate-pulse" /> Download & Print Receipt
+                      </button>
                       <button 
                         onClick={() => { setActiveView('orders'); setShowCart(false); setCheckoutStep('cart'); }}
-                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20"
+                        className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all"
                       >
                         Track Order Now
                       </button>
                       <button 
                         onClick={() => { setShowCart(false); setCheckoutStep('cart'); }}
-                        className="w-full py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/10 transition-all"
+                        className="w-full py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/10 active:scale-95 transition-all"
                       >
                         Continue Shopping
                       </button>
@@ -2398,6 +2407,29 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         amount={cartTotal}
         action="Marketplace Purchase"
       />
+
+      {/* Success Receipt Modal */}
+      <AnimatePresence>
+        {showSuccessReceipt && (
+          <StrategicReceipt 
+            transaction={{
+              id: generatedOrderCode,
+              userId: user.uid,
+              type: 'payment',
+              amount: (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)),
+              currency: 'USD',
+              status: paymentMethod === 'direct_bank_transfer' ? 'pending' : 'completed',
+              method: paymentMethod === 'direct_bank_transfer' ? 'Direct Bank' : 'Secured Escrow Wallet',
+              purpose: `Escrow Hub Purchase - Code: ${generatedOrderCode}`,
+              reference: generatedOrderCode,
+              timestamp: { seconds: Math.floor(Date.now() / 1000) },
+              description: `Escrow Hub Order. Total includes shipping via ${shippingMethod} to ${deliveryAddress.city}, ${deliveryAddress.state || ''}.`
+            }}
+            userEmail={user.email}
+            onClose={() => setShowSuccessReceipt(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

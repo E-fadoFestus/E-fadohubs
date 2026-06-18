@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Copy, Check, Upload, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Copy, Check, Upload, ArrowRight, ShieldCheck, AlertCircle, FileText } from 'lucide-react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { StrategicReceipt } from './StrategicReceipt';
 
 interface DirectBankDepositProps {
   user: UserProfile;
@@ -90,6 +91,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
+  const [showManualReceipt, setShowManualReceipt] = useState(false);
 
   // Re-generate Reference and sync country on Currency Change
   useEffect(() => {
@@ -233,8 +235,18 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
               🔔 Pending Admin Confirmation. You’ll get SMS + Email once confirmed. Usually 5-30 mins during business hours.
             </p>
           </div>
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              id="download-manual-receipt-btn"
+              type="button"
+              onClick={() => setShowManualReceipt(true)}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
+            >
+              <FileText className="w-4 h-4 text-emerald-300 animate-pulse" /> Download & Print Receipt
+            </button>
+          </div>
           <p className="text-[9px] text-slate-500 font-bold leading-none uppercase tracking-widest">
-            Redirecting to transaction ledger in 5 seconds...
+            Pending verification... You can reference this receipt anytime.
           </p>
         </div>
       ) : step === 1 ? (
@@ -502,6 +514,26 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             </button>
           </div>
         </form>
+      )}
+
+      {showManualReceipt && (
+        <StrategicReceipt 
+          transaction={{
+            id: reference || transactionId || 'REQ_' + Math.floor(1000 + Math.random() * 9000),
+            userId: user.uid,
+            type: 'deposit',
+            amount: parseFloat(amount) || 0,
+            currency: currency,
+            status: 'pending',
+            method: 'Direct Bank Transfer',
+            purpose: `Corporate Account Deposit - Reference: ${reference}`,
+            reference: reference || 'N/A',
+            timestamp: { seconds: Math.floor(Date.now() / 1000) },
+            description: `Manual submission awaiting administrator clearance. Sending Bank: ${selectedBank === 'Other' ? customBankName : selectedBank}. Reference generated code: ${reference}.`
+          }}
+          userEmail={user.email}
+          onClose={() => setShowManualReceipt(false)}
+        />
       )}
     </div>
   );

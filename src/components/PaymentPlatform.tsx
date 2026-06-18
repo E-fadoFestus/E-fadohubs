@@ -588,6 +588,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 });
 
                 setStep('success');
+                setShowReceipt(true);
                 if (onSuccess) onSuccess();
               }).catch((err) => {
                 console.error('Payment processing failed', err);

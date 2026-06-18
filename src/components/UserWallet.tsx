@@ -910,7 +910,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                             await onUpdateBalance(amt, 'deposit');
                             
                             // Generate transaction ledger log
-                            await TransactionService.recordTransaction({
+                            const txData: any = {
                               userId: user.uid,
                               type: 'deposit',
                               amount: amt,
@@ -926,6 +926,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                 paymentRef: reference,
                                 gateway: 'paystack'
                               }
+                            };
+                            await TransactionService.recordTransaction(txData);
+
+                            // Instantly pop receipt modal as requested by user
+                            setSelectedReceiptTx({
+                              ...txData,
+                              timestamp: { seconds: Math.floor(Date.now() / 1000) }
                             });
                           } catch (err: any) {
                             console.error("Ledger write failed but payment was success:", err);

@@ -51,6 +51,7 @@ import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp
 import { VendorRegistration } from './VendorRegistration';
 import { PaystackDeposit } from './PaystackDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
+import { StrategicReceipt } from './StrategicReceipt';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
@@ -92,6 +93,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
 
   // New Wallet Dashboard Modal States
   const [fundingModalOpen, setFundingModalOpen] = useState(false);
+  const [completedHubPayment, setCompletedHubPayment] = useState<any | null>(null);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [activeFundTab, setActiveFundTab] = useState<'paystack' | 'bank_transfer'>('paystack');
@@ -2410,9 +2412,44 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 </div>
 
                 {activeFundTab === 'paystack' ? (
-                  <PaystackDeposit user={user} onSuccess={() => setFundingModalOpen(false)} />
+                  <PaystackDeposit 
+                    user={user} 
+                    onSuccess={(paymentInfo) => {
+                      setFundingModalOpen(false);
+                      setCompletedHubPayment({
+                        id: paymentInfo.reference,
+                        userId: user.uid,
+                        type: 'deposit',
+                        amount: paymentInfo.amount,
+                        currency: 'NGN',
+                        status: 'completed',
+                        method: 'Paystack Gateways',
+                        purpose: 'Community Hub Deposit',
+                        reference: paymentInfo.reference,
+                        timestamp: { seconds: Math.floor(Date.now() / 1000) },
+                        description: `Deposit processed securely via custom Paystack inline channels.`
+                      });
+                    }} 
+                  />
                 ) : (
-                  <DirectBankDeposit user={user} onSuccess={() => setFundingModalOpen(false)} />
+                  <DirectBankDeposit 
+                    user={user} 
+                    onSuccess={() => {
+                      setFundingModalOpen(false);
+                      setCompletedHubPayment({
+                        id: 'MAN_' + Math.floor(10000 + Math.random() * 90000),
+                        userId: user.uid,
+                        type: 'deposit',
+                        amount: 1000,
+                        currency: 'NGN',
+                        status: 'pending',
+                        method: 'Direct Bank Transfer',
+                        purpose: 'Community Hub Deposit (Verification Pending)',
+                        timestamp: { seconds: Math.floor(Date.now() / 1000) },
+                        description: `Manual transfer submission logged. Reviewing upload screenshot proof.`
+                      });
+                    }} 
+                  />
                 )}
               </motion.div>
             </motion.div>
@@ -3340,6 +3377,14 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           </AnimatePresence>
         </div>
       </main>
+
+      {completedHubPayment && (
+        <StrategicReceipt 
+          transaction={completedHubPayment}
+          userEmail={user.email}
+          onClose={() => setCompletedHubPayment(null)}
+        />
+      )}
     </div>
   );
 };
