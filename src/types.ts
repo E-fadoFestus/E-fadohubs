@@ -190,7 +190,8 @@ export interface MarketOrder {
   };
   paymentMethod: string;
   paystackRef?: string | null;
-  status: 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';
+  directProof?: any;
+  status: 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'pending_manual_verification' | 'verifying';
   trackingNumber?: string;
   trackingHistory?: {
     status: string;

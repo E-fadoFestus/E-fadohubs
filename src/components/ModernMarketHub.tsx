@@ -272,6 +272,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   ]);
   const [submittingMarketReview, setSubmittingMarketReview] = useState(false);
   
+  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_paystack' | 'direct_bank'>('escrow_paystack');
+  const [senderBankName, setSenderBankName] = useState('');
+  const [senderAccountNumber, setSenderAccountNumber] = useState('');
+  const [senderAccountName, setSenderAccountName] = useState('');
+  const [senderTransferRef, setSenderTransferRef] = useState('');
+  const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
+
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [manualBankMode, setManualBankMode] = useState(false);
@@ -599,6 +606,21 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       setAddressError('');
       setCheckoutStep('payment');
     } else if (checkoutStep === 'payment') {
+      if (paymentStrategy === 'direct_bank') {
+        if (!senderBankName.trim() || !senderAccountNumber.trim() || senderAccountNumber.trim().length !== 10 || !senderAccountName.trim()) {
+          alert('Please enter valid manual transfer proof details (Your Sending Bank Name, 10-Digit Account Number, and Account Name) to proceed.');
+          return;
+        }
+        finalizePurchase(undefined, undefined, {
+          bankName: senderBankName,
+          accountNumber: senderAccountNumber,
+          accountName: senderAccountName,
+          ref: senderTransferRef,
+          amount: ((((cartTotal * (isCouponApplied ? 0.8 : 1)) * 1.013) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50))) * 1450).toString()
+        });
+        return;
+      }
+
       const paystackSupportedMethods = ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
       if (paystackSupportedMethods.includes(paymentMethod)) {
         handlePaystackCheckout();
@@ -618,13 +640,16 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     return `EDADO${random}`;
   };
 
-  const finalizePurchase = async (pin?: string, paystackRef?: string) => {
+  const finalizePurchase = async (pin?: string, paystackRef?: string, directProof?: any) => {
     setIsProcessing(true);
     setPaymentStatusText('Initiating Secure Transaction...');
     setCheckoutStep('processing');
 
     // Simulate Payment Processing Steps based on method
-    if (paymentMethod === 'bank') {
+    if (directProof) {
+      await new Promise(r => setTimeout(r, 1500));
+      setPaymentStatusText('Recording Direct Wire Transfer Details...');
+    } else if (paymentMethod === 'bank') {
       await new Promise(r => setTimeout(r, 1500));
       setPaymentStatusText('Generating Secure Account Number...');
     } else if (paymentMethod === 'crypto') {
@@ -668,16 +693,21 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         landmark: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp, Before Tivo Super Market' : deliveryAddress.landmark,
         instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
       },
-      paymentMethod: paymentMethod,
+      paymentMethod: directProof ? 'direct_bank_transfer' : paymentMethod,
       paystackRef: paystackRef || null,
-      status: 'processing',
+      directProof: directProof || null,
+      status: directProof ? 'verifying' : 'processing',
       trackingNumber: `TRK${Math.random().toString(36).substring(7).toUpperCase()}`,
       trackingHistory: [
         {
           status: 'Order Placed',
           location: 'EFADO Digital System',
           timestamp: new Date(),
-          description: paystackRef ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` : 'Your order has been received and is being processed.'
+          description: paystackRef 
+            ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` 
+            : directProof 
+              ? `Your Direct Bank Transfer proof was submitted (Sender Bank: ${directProof.bankName}, Sender A/C: ${directProof.accountNumber}) and is currently being verified.` 
+              : 'Your order has been received and is being processed.'
         }
       ],
       createdAt: serverTimestamp()
@@ -1719,8 +1749,47 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
                 {checkoutStep === 'payment' && (
                   <div className="space-y-6 overflow-y-auto no-scrollbar max-h-[50vh]">
-                    <div className="space-y-4 mb-6">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Strategic Selection</label>
+                    {/* Navigation Tab selection for Options */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStrategy('escrow_paystack')}
+                        className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                          paymentStrategy === 'escrow_paystack'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 border-t border-white/10'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+                        Option A: Escrow Paystack
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStrategy('direct_bank')}
+                        className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
+                          paymentStrategy === 'direct_bank'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 border-t border-white/10'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
+                        }`}
+                      >
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        Option B: Direct Transfer
+                      </button>
+                    </div>
+
+                    {paymentStrategy === 'escrow_paystack' ? (
+                      <div className="space-y-4">
+                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-1.5 text-left mb-4">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-400 font-bold" />
+                            <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Secured Intermediary Split Escrow</h5>
+                          </div>
+                          <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
+                            Buyer pays securely via Paystack on behalf of <strong>Efado Hubs</strong>. Paystack splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
+                          </p>
+                        </div>
+                        <div className="space-y-4 mb-6">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Strategic Selection</label>
                       <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto no-scrollbar pr-2">
                         {paymentCategories.map((cat) => (
                           <div 
@@ -1970,6 +2039,129 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </motion.div>
                       )}
                     </AnimatePresence>
+                    </div>
+                    ) : (
+                      /* Option B: Direct to Vendor */
+                      <div className="space-y-4 text-left">
+                        <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-2xl p-4 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-indigo-400 animate-pulse" />
+                            <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Manual Direct Wire Transfer</h5>
+                          </div>
+                          <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
+                            Choose an official collection account below, execute the manual bank transfer from your banking app, then type your payment execution proof details below to finalize order.
+                          </p>
+                        </div>
+
+                        {/* STEP 1: Bank list to copy */}
+                        <div className="space-y-3 font-sans">
+                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: SELECT & COPY CO-OPERATE ACCOUNT DETAILS</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {[
+                              { id: 'acc1', name: 'ACCESS BANK', num: '0001304979', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
+                              { id: 'acc2', name: 'UBA BANK', num: '2120742200', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
+                              { id: 'acc3', name: 'OPAY DIGITAL MFB', num: '8072456836', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Opay Business' },
+                              { id: 'acc4', name: 'GTBANK PLC', num: '3001964082', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Corporate NGN' }
+                            ].map(item => (
+                              <div key={item.id} className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col justify-between gap-3 hover:border-white/15 transition-all text-left">
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[9.5px] font-black text-indigo-400 uppercase tracking-wide">{item.name}</span>
+                                    <span className="text-[8px] font-sans font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 uppercase tracking-wider">{item.type}</span>
+                                  </div>
+                                  <p className="text-[11px] font-mono font-black text-white tracking-widest leading-none py-1">{item.num}</p>
+                                  <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-tight truncate max-w-full font-sans">{item.holder}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(item.num);
+                                    setCopiedBankId(item.id);
+                                    setTimeout(() => setCopiedBankId(null), 2000);
+                                  }}
+                                  className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all font-sans ${
+                                    copiedBankId === item.id 
+                                      ? 'bg-emerald-600 border border-emerald-400 text-white' 
+                                      : 'bg-slate-950 border border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
+                                  }`}
+                                >
+                                  {copiedBankId === item.id ? (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      Copied!
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3.5 h-3.5" />
+                                      Copy Account
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* STEP 2: Submit details */}
+                        <div className="space-y-3 pt-3 border-t border-white/5">
+                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 2: TYPE YOUR SENDER & AMOUNT PROOF DETAILS</label>
+                          <div className="space-y-3 font-sans">
+                            {/* NGN Grand Total Lock field */}
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-400">₦</span>
+                              <input 
+                                type="text"
+                                disabled
+                                className="w-full pl-10 pr-4 py-3 bg-slate-955/20 border border-white/5 rounded-xl text-xs font-mono font-bold text-slate-300 cursor-not-allowed select-none bg-slate-950"
+                                value={`${((((cartTotal * (isCouponApplied ? 0.8 : 1)) * 1.013) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50))) * 1450).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN`}
+                              />
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[7px] font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-widest">PRE-CHECKED NGN TOTAL</span>
+                            </div>
+
+                            <div className="relative">
+                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Your Sending Bank Name (e.g. Zenith Bank, Access Bank)*"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
+                                value={senderBankName}
+                                onChange={e => setSenderBankName(e.target.value)}
+                              />
+                            </div>
+
+                            <div className="relative">
+                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Your Sending 10-Digit Account Number*"
+                                maxLength={10}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
+                                value={senderAccountNumber}
+                                onChange={e => setSenderAccountNumber(e.target.value)}
+                              />
+                            </div>
+
+                            <div className="relative">
+                              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Your Sender Account Holder Name*"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
+                                value={senderAccountName}
+                                onChange={e => setSenderAccountName(e.target.value)}
+                              />
+                            </div>
+
+                            <div className="relative">
+                              <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Transfer Reference / Transaction note (Optional)"
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
+                                value={senderTransferRef}
+                                onChange={e => setSenderTransferRef(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="pt-6 border-t border-white/5">
                       <div className="flex items-center gap-3 mb-4">
