@@ -20,6 +20,28 @@
   }
 }
 
+@utility payment-scrollbar {
+  scrollbar-width: auto !important;
+  -ms-overflow-style: auto !important;
+  &::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    display: block !important;
+  }
+  &::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+    border-radius: 10px !important;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: #10b981 !important;
+    border-radius: 10px !important;
+    border: 2px solid #f1f5f9 !important;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: #059669 !important;
+  }
+}
+
 @utility custom-scrollbar {
   &::-webkit-scrollbar {
     width: 6px;

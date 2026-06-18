@@ -454,7 +454,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       </div>
 
       {/* Main Form Area */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-5 pb-16 space-y-4">
+      <div className="flex-1 overflow-y-auto payment-scrollbar p-5 pb-16 space-y-4">
         {step === 'form' && (
           <AnimatePresence mode="wait">
             {activeTab === 'deposit' ? (

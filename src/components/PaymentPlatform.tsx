@@ -705,7 +705,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
       </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6 md:p-10 flex flex-col relative bg-white overflow-y-auto max-h-[92vh] md:max-h-[750px] no-scrollbar">
+        <div className="flex-1 p-6 md:p-10 flex flex-col relative bg-white overflow-y-auto max-h-[92vh] md:max-h-[750px] payment-scrollbar">
           <div className="absolute top-8 right-8 flex items-center gap-3">
             <button 
               onClick={() => setShowGuide(true)}
@@ -733,7 +733,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 z-[120] bg-slate-950/95 backdrop-blur-xl p-8 flex flex-col justify-between"
               >
-                <div className="flex-1 overflow-y-auto no-scrollbar pr-2">
+                <div className="flex-1 overflow-y-auto payment-scrollbar pr-2">
                   <div className="flex items-center justify-between mb-6">
                     <div>
                       <h4 className="text-2xl font-display font-black text-white uppercase tracking-tighter">
@@ -824,7 +824,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 overflow-y-auto pr-2 no-scrollbar flex-1 pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 overflow-y-auto pr-2 payment-scrollbar flex-1 pb-6">
                   {paymentCategories.map((cat, idx) => (
                     <motion.div 
                       key={cat.id}
@@ -882,7 +882,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col overflow-y-auto no-scrollbar"
+                className="flex-1 flex flex-col overflow-y-auto payment-scrollbar"
               >
                 <button 
                   onClick={() => setStep('method')}
@@ -1056,7 +1056,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                         <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-full">Transfer to any account below</span>
                       </div>
                       
-                      <div className="space-y-4 max-h-64 overflow-y-auto pr-2 no-scrollbar">
+                      <div className="space-y-4 max-h-64 overflow-y-auto pr-2 payment-scrollbar">
                         {[...CEO_BANK_ACCOUNTS.savings, ...CEO_BANK_ACCOUNTS.current, ...CEO_BANK_ACCOUNTS.business].map((acc, i) => (
                           <div key={i} className="bg-slate-50 border border-slate-100 p-5 rounded-3xl hover:border-indigo-500/30 transition-all group relative">
                             <div className="flex items-center justify-between mb-3">
@@ -1509,7 +1509,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="flex-1 flex flex-col overflow-y-auto no-scrollbar"
+                className="flex-1 flex flex-col overflow-y-auto payment-scrollbar"
               >
                 <button 
                   onClick={() => setStep('details')}
@@ -1817,7 +1817,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
               </div>
 
               {/* Banks List Area */}
-              <div className="p-6 overflow-y-auto max-h-[40vh] space-y-2 no-scrollbar">
+              <div className="p-6 overflow-y-auto max-h-[40vh] space-y-2 payment-scrollbar">
                 {worldWideBanks
                   .filter(bank => {
                     const matchSearch = bank.name.toLowerCase().includes(worldBankSearch.toLowerCase()) || 

@@ -395,6 +395,16 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
     const reference = `EFD_MARK_USED_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
+    // Map selected payment method to corresponding Paystack channels
+    let channels = ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'];
+    if (['visa', 'mastercard', 'verve'].includes(paymentMethod)) {
+      channels = ['card'];
+    } else if (['zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod)) {
+      channels = ['bank_transfer', 'bank'];
+    } else if (['opay', 'palmpay', 'kuda'].includes(paymentMethod)) {
+      channels = ['mobile_money', 'bank_transfer', 'card'];
+    }
+
     try {
       const handler = (window as any).PaystackPop.setup({
         key: paystackKey,
@@ -402,6 +412,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         amount: Math.round(ngnAmount * 100), // convert to kobo
         currency: 'NGN',
         ref: reference,
+        channels: channels,
         callback: (response: any) => {
           if (response && (response.status === 'success' || response.message === 'Approved')) {
             finalizePurchase(undefined, response.reference || reference);
@@ -450,7 +461,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       setCheckoutStep('payment');
     }
     else if (checkoutStep === 'payment') {
-      if (paymentMethod === 'paystack') {
+      const paystackSupportedMethods = ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
+      if (paystackSupportedMethods.includes(paymentMethod)) {
         handlePaystackCheckout();
         return;
       }
@@ -1856,14 +1868,14 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </div>
                   )}
                   
-                  {checkoutStep === 'payment' && paymentMethod === 'paystack' ? (
+                  {checkoutStep === 'payment' && ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod) ? (
                     <button 
                       onClick={handlePaystackCheckout}
                       className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-2xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
                     >
                       <CreditCard className="w-5 h-5" />
                       <span className="uppercase tracking-[0.2em] text-xs">
-                        Pay via Secure Paystack (NGN)
+                        Complete Secure Order (Paystack)
                       </span>
                       <ArrowRight className="w-5 h-5 animate-bounce" />
                     </button>
