@@ -458,6 +458,29 @@ export const ExamSimulator: React.FC<{
             ABORT MISSION
           </button>
         </div>
+
+        <AnimatePresence>
+          {showMasterPayment && user && (
+            <PaymentPlatform
+              user={user}
+              type="deposit"
+              amount={4000}
+              purpose="JAMB Master Mode Full Deployment"
+              hub="EDUCATION"
+              onComplete={async () => {
+                setIsMasterPaid(true);
+                setShowMasterPayment(false);
+                setView('subjects');
+              }}
+              onSuccess={() => {
+                setIsMasterPaid(true);
+                setShowMasterPayment(false);
+                setView('subjects');
+              }}
+              onClose={() => setShowMasterPayment(false)}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }
@@ -955,6 +978,11 @@ export const ExamSimulator: React.FC<{
                 setShowMasterPayment(false);
                 setView('subjects');
               }}
+              onSuccess={() => {
+                setIsMasterPaid(true);
+                setShowMasterPayment(false);
+                setView('subjects');
+              }}
               onClose={() => setShowMasterPayment(false)}
             />
           )}
@@ -964,6 +992,10 @@ export const ExamSimulator: React.FC<{
               user={user}
               type="deposit"
               onComplete={async (amt) => {
+                setIsRegisteredForWebinar(true);
+                setShowPayment(false);
+              }}
+              onSuccess={() => {
                 setIsRegisteredForWebinar(true);
                 setShowPayment(false);
               }}

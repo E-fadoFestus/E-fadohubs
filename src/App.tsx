@@ -21,6 +21,7 @@ import {
   where,
   orderBy
 } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { UserProfile, Transaction, AdminStats, Announcement } from './types';
 import { WalletCard, WalletGrid } from './components/WalletCard';
 import { LuckySpinWheel } from './components/LuckySpinWheel';
@@ -64,6 +65,7 @@ import {
   ShieldCheck, 
   TrendingUp, 
   AlertCircle,
+  AlertTriangle,
   Coins,
   Zap,
   Dices,
@@ -194,6 +196,26 @@ function AppContent() {
 
   // Super Admin login states
   const [loginMode, setLoginMode] = useState<'STANDARD' | 'CEO'>('STANDARD');
+  
+  // Standard User email-based auth states (for fallback logins on WhatsApp / webview / custom domain errors)
+  const [standardEmailMode, setStandardEmailMode] = useState<'GOOGLE' | 'EMAIL_LOGIN' | 'EMAIL_REGISTER'>('GOOGLE');
+  const [standardEmail, setStandardEmail] = useState('');
+  const [standardPassword, setStandardPassword] = useState('');
+  const [standardDisplayName, setStandardDisplayName] = useState('');
+  const [standardRegisterSuccess, setStandardRegisterSuccess] = useState<string | null>(null);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+
+  useEffect(() => {
+    const isUserInAppBrowser = () => {
+      if (typeof navigator === 'undefined') return false;
+      const ua = navigator.userAgent || navigator.vendor || (window as any).opera || "";
+      return (
+        /FBAN|FBAV|Instagram|WhatsApp|Line|IABMV|wv|[\bwv\b]|gsa|Messenger/i.test(ua) ||
+        ( /iPhone|iPad|iPod/i.test(ua) && !/Safari/i.test(ua) && !/CriOS/i.test(ua) && !/FxiOS/i.test(ua) )
+      );
+    };
+    setIsInAppBrowser(isUserInAppBrowser());
+  }, []);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [otpStep, setOtpStep] = useState(false);
@@ -734,6 +756,86 @@ function AppContent() {
         setError(`Login failed: ${e.message}`);
       } else {
         setError('Login failed. Please try again.');
+      }
+    }
+  };
+
+  const handleStandardEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!standardEmail || !standardPassword) {
+      setError('Please enter both email and password.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, standardEmail, standardPassword);
+      setLoading(false);
+    } catch (e: any) {
+      setLoading(false);
+      console.error('Email login error:', e);
+      if (e?.code === 'auth/invalid-credential' || e?.code === 'auth/wrong-password' || e?.code === 'auth/user-not-found') {
+        setError('Incorrect email or password. Please verify your credentials or register a new account.');
+      } else if (e?.code === 'auth/invalid-email') {
+        setError('Invalid email address format.');
+      } else if (e?.message) {
+        setError(`Login failed: ${e.message}`);
+      } else {
+        setError('Login failed. Please try again.');
+      }
+    }
+  };
+
+  const handleStandardEmailRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setStandardRegisterSuccess(null);
+    if (!standardEmail || !standardPassword || !standardDisplayName) {
+      setError('Please fill out all fields.');
+      return;
+    }
+    if (standardPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, standardEmail, standardPassword);
+      if (cred.user) {
+        await updateProfile(cred.user, {
+          displayName: standardDisplayName
+        });
+        
+        const userRef = doc(db, 'users', cred.user.uid);
+        const newUser: UserProfile = {
+          uid: cred.user.uid,
+          email: cred.user.email || '',
+          displayName: standardDisplayName,
+          playerWallet: 100, // Starting bonus
+          depositWallet: 0,
+          cashOutWallet: 0,
+          miningWallet: 0,
+          miningProgress: { stage: 'E', collectedInStage: 0 },
+          role: cred.user.email === 'efado226@gmail.com' || cred.user.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
+          createdAt: new Date().toISOString()
+        };
+        await setDoc(userRef, newUser);
+        setStandardRegisterSuccess('Connection established! Loading your ecosystem portfolio...');
+      }
+      setLoading(false);
+    } catch (e: any) {
+      setLoading(false);
+      console.error('Email registration error:', e);
+      if (e?.code === 'auth/email-already-in-use') {
+        setError('This email address is already registered. Please sign in instead.');
+      } else if (e?.code === 'auth/invalid-email') {
+        setError('Invalid email address format.');
+      } else if (e?.code === 'auth/weak-password') {
+        setError('Security threshold not met: password must be at least 6 characters.');
+      } else if (e?.message) {
+        setError(`Registration failed: ${e.message}`);
+      } else {
+        setError('Registration failed. Please try again.');
       }
     }
   };
@@ -1285,31 +1387,164 @@ function AppContent() {
           )}
 
           {loginMode === 'STANDARD' ? (
-            <div className="space-y-3">
-              <button 
-                onClick={handleLogin}
-                className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
-                id="login-standard-btn"
-              >
-                <LogIn className="w-5 h-5" />
-                Establish Connection
-              </button>
+            <div className="space-y-4">
+              {/* In-app Browser Sandbox Alert Box */}
+              {isInAppBrowser && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col gap-2 text-left text-[11px] text-amber-400">
+                  <div className="flex items-center gap-2 font-black tracking-widest text-[9px]">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>IN-APP WEBVIEW RUNTIME</span>
+                  </div>
+                  <p className="leading-relaxed font-semibold">
+                    You opened this via WhatsApp, Instagram, or a social proxy. These browsers block Google Sign-In redirect cookies.
+                  </p>
+                  <p className="leading-relaxed font-bold text-amber-300">
+                    💡 Solution: Tap the <span className="font-mono text-xs">(···)</span> menu on your screen's top/bottom right and choose <span className="underline">"Open in Safari"</span> or <span className="underline">"Open in Chrome"</span>.
+                  </p>
+                  <div className="border-t border-amber-500/10 my-0.5"></div>
+                  <p className="leading-relaxed opacity-90">
+                    Alternatively, choose the <span className="font-bold underline">Email fallbacks</span> below to login directly!
+                  </p>
+                </div>
+              )}
 
-              <button
-                onClick={async () => {
-                  setError(null);
-                  try {
-                    console.log('User requested redirect login explicitly...');
-                    await signInWithRedirect(auth, googleProvider);
-                  } catch (e: any) {
-                    setError(`Redirect Connection failed: ${e.message || e}`);
-                  }
-                }}
-                className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
-                id="login-redirect-btn"
-              >
-                Having issues? Try Redirect Connection
-              </button>
+              {/* Sub-selector for Google vs Email Backup */}
+              <div className="flex bg-slate-950/40 p-1 rounded-xl border border-white/5 text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+                <button
+                  type="button"
+                  onClick={() => { setStandardEmailMode('GOOGLE'); setError(null); }}
+                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'GOOGLE' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                >
+                  Google Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStandardEmailMode('EMAIL_LOGIN'); setError(null); }}
+                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'EMAIL_LOGIN' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                >
+                  Email login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStandardEmailMode('EMAIL_REGISTER'); setError(null); }}
+                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'EMAIL_REGISTER' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                >
+                  Email signup
+                </button>
+              </div>
+
+              {standardEmailMode === 'GOOGLE' && (
+                <div className="space-y-3">
+                  <button 
+                    onClick={handleLogin}
+                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
+                    id="login-standard-btn"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    Establish Connection
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      setError(null);
+                      try {
+                        console.log('User requested redirect login explicitly...');
+                        await signInWithRedirect(auth, googleProvider);
+                      } catch (e: any) {
+                        setError(`Redirect Connection failed: ${e.message || e}`);
+                      }
+                    }}
+                    className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
+                    id="login-redirect-btn"
+                  >
+                    Having issues? Try Redirect Connection
+                  </button>
+                </div>
+              )}
+
+              {standardEmailMode === 'EMAIL_LOGIN' && (
+                <form onSubmit={handleStandardEmailLogin} className="space-y-3 text-left">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Email address</label>
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="e.g. name@domain.com"
+                      value={standardEmail}
+                      onChange={(e) => setStandardEmail(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Password</label>
+                    <input 
+                      type="password" 
+                      required
+                      placeholder="••••••••••••••"
+                      value={standardPassword}
+                      onChange={(e) => setStandardPassword(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 transition-all"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl active:scale-95 mt-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Secure Login
+                  </button>
+                </form>
+              )}
+
+              {standardEmailMode === 'EMAIL_REGISTER' && (
+                <form onSubmit={handleStandardEmailRegister} className="space-y-3 text-left">
+                  {standardRegisterSuccess && (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-semibold leading-relaxed mb-2">
+                      {standardRegisterSuccess}
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Choose Username / Display Name</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="e.g. Tactician11"
+                      value={standardDisplayName}
+                      onChange={(e) => setStandardDisplayName(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Email address</label>
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="e.g. name@domain.com"
+                      value={standardEmail}
+                      onChange={(e) => setStandardEmail(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Password</label>
+                    <input 
+                      type="password" 
+                      required
+                      placeholder="At least 6 characters"
+                      value={standardPassword}
+                      onChange={(e) => setStandardPassword(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-xl active:scale-95 mt-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Register Account
+                  </button>
+                </form>
+              )}
             </div>
           ) : (
             <div className="space-y-4 text-left">
