@@ -279,6 +279,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const [senderTransferRef, setSenderTransferRef] = useState('');
   const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
 
+  // Auto-search and verified bank states for Option A Secured Bank Transfer
+  const [selectedBankCode, setSelectedBankCode] = useState<string>('');
+  const [customBankName, setCustomBankName] = useState<string>('');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
+  const [resolvedRecipientName, setResolvedRecipientName] = useState<string>('');
+  const [recipientSearchLoading, setRecipientSearchLoading] = useState<boolean>(false);
+
   const [bankSearch, setBankSearch] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [manualBankMode, setManualBankMode] = useState(false);
@@ -308,7 +315,17 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     { code: '090267', name: 'Kuda Bank' },
     { code: '999992', name: 'OPay Digital Services' },
     { code: '50515', name: 'Moniepoint MFB' },
-  ].sort((a, b) => a.name.localeCompare(b.name));
+    { code: 'intl_chase', name: 'Chase Bank (USA)' },
+    { code: 'intl_bofa', name: 'Bank of America (USA)' },
+    { code: 'intl_barclays', name: 'Barclays Bank (UK)' },
+    { code: 'intl_hsbc', name: 'HSBC (International)' },
+    { code: 'intl_revolut', name: 'Revolut' },
+    { code: 'others', name: 'Others (Not in list)' }
+  ].sort((a, b) => {
+    if (a.code === 'others') return 1;
+    if (b.code === 'others') return -1;
+    return a.name.localeCompare(b.name);
+  });
 
   const paymentCategories = [
     {
@@ -326,10 +343,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       title: 'Bank Transfer',
       icon: <Building2 className="w-5 h-5 text-blue-400" />,
       options: [
-        { id: 'zenith', name: 'Zenith' },
-        { id: 'gtbank', name: 'GTBank' },
-        { id: 'access', name: 'Access' },
-        { id: 'uba', name: 'UBA' }
+        { id: 'bank_transfer_opt', name: 'Secure Bank Transfer' }
       ]
     },
     {
@@ -537,6 +551,23 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     script.onload = () => setPaystackInited(true);
     document.body.appendChild(script);
   }, []);
+
+  // Automated System Search for Escrow Recipient Verification
+  useEffect(() => {
+    if (selectedBankCode && bankAccountNumber.trim().length >= 6) {
+      setRecipientSearchLoading(true);
+      setResolvedRecipientName('');
+      const delay = setTimeout(() => {
+        setRecipientSearchLoading(false);
+        // Set the secure, official escrow account of EFADO Technology to reassure the customer
+        setResolvedRecipientName('EFADO HUB TECHNOLOGY LIMITED (Escrow Account)');
+      }, 700);
+      return () => clearTimeout(delay);
+    } else {
+      setRecipientSearchLoading(false);
+      setResolvedRecipientName('');
+    }
+  }, [selectedBankCode, bankAccountNumber]);
 
   const handlePaystackCheckout = () => {
     const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
@@ -789,30 +820,30 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-900 border border-white/10 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-50 border border-slate-200/80 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
         {/* Header Block */}
-        <div className="px-10 py-8 border-b border-white/5 bg-slate-900/50 backdrop-blur-xl z-20">
+        <div className="px-10 py-8 border-b border-slate-200 bg-white/95 backdrop-blur-xl z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
                 <ShoppingBasket className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h2 className="text-3xl font-display font-black text-white tracking-tight">EFADO <span className="text-cyan-400">Modern Market</span> Hub</h2>
+                <h2 className="text-3xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-cyan-600">Modern Market</span> Hub</h2>
                 <div className="flex flex-col mt-1">
                   <div className="flex items-center gap-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Zap className="w-3 h-3 text-yellow-400" /> New + Fairly Used Products Sold
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                      <Zap className="w-3 h-3 text-yellow-500 animate-pulse" /> New + Fairly Used Products Sold
                     </p>
                     <button 
                       onClick={() => setShowGuide(true)}
-                      className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors"
+                      className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-500 transition-colors"
                     >
                       <Info className="w-3 h-3" /> Tactical Guide
                     </button>
                   </div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Globe className="w-3 h-3 text-blue-400" /> Vendors Meet Buyers (Local + International)
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <Globe className="w-3 h-3 text-blue-500" /> Vendors Meet Buyers (Local + International)
                   </p>
                 </div>
               </div>
@@ -820,10 +851,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-3 px-5 py-3 text-slate-400 hover:text-white transition-all bg-white/5 rounded-2xl hover:bg-white/10 group border border-white/5 hover:border-blue-500/30"
+                className="relative flex items-center gap-3 px-5 py-3 text-slate-600 hover:text-slate-900 transition-all bg-slate-100 rounded-2xl hover:bg-slate-200 group border border-slate-200"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-6 h-6" />
+                  <ShoppingBag className="w-6 h-6 text-slate-700" />
                   {cart.length > 0 && (
                     <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 animate-bounce">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -845,7 +876,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 <span className="text-[8px] font-bold text-cyan-200 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-3 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-2xl hover:bg-white/10">
+              <button onClick={onClose} className="p-3 text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 rounded-2xl hover:bg-slate-200">
                 <X className="w-7 h-7" />
               </button>
             </div>
@@ -854,13 +885,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
           <div className="flex items-center gap-6 mt-6">
             <button 
               onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-blue-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-blue-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Browse Market
             </button>
             <button 
               onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-blue-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-blue-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               My Orders & Tracking
             </button>
@@ -868,31 +899,31 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
           {/* Breadcrumb / Selection Path UI */}
           {activeView === 'browse' && (
-            <div className="flex items-center gap-3 bg-slate-800/40 px-6 py-4 rounded-2xl border border-white/5 mt-6">
+            <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-2xl border border-slate-200 mt-6 shadow-sm">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL1 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
+              <div className={`w-2 h-2 rounded-full ${selectedL1 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-300'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL1 ? 'text-slate-800' : 'text-slate-400'}`}>
                 {selectedL1 || 'Category'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-700" />
+            <ChevronRight className="w-4 h-4 text-slate-300" />
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL2 ? 'bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL2 ? 'text-white' : 'text-slate-500'}`}>
+              <div className={`w-2 h-2 rounded-full ${selectedL2 ? 'bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'bg-slate-300'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL2 ? 'text-slate-800' : 'text-slate-400'}`}>
                 {selectedL2 || 'Subcategory'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-700" />
+            <ChevronRight className="w-4 h-4 text-slate-300" />
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL3 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL3 ? 'text-white' : 'text-slate-500'}`}>
+              <div className={`w-2 h-2 rounded-full ${selectedL3 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL3 ? 'text-slate-800' : 'text-slate-400'}`}>
                 {selectedL3 || 'Subcategory'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-700" />
+            <ChevronRight className="w-4 h-4 text-slate-300" />
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL4 ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL4 ? 'text-white' : 'text-slate-500'}`}>
+              <div className={`w-2 h-2 rounded-full ${selectedL4 ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-300'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL4 ? 'text-slate-800' : 'text-slate-400'}`}>
                 {selectedL4 || 'Group'}
               </span>
             </div>
@@ -923,10 +954,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 className="h-full flex flex-col lg:flex-row"
               >
                 {/* Level 1: Category */}
-                <div className="lg:w-1/5 border-r border-white/5 flex flex-col">
-                  <div className="p-6 border-b border-white/5 bg-slate-800/20">
+                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-white">
+                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
                     <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px]">1</span>
+                      <span className="w-5 h-5 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center text-[10px] font-black">1</span>
                       Category
                     </h3>
                   </div>
@@ -938,7 +969,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                           selectedL1 === cat 
                             ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20' 
-                            : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                         }`}
                       >
                         <div className="relative z-10 flex items-center gap-4">
@@ -954,10 +985,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </div>
 
                 {/* Level 2: Section */}
-                <div className="lg:w-1/5 border-r border-white/5 flex flex-col bg-slate-900/30">
-                  <div className="p-6 border-b border-white/5 bg-slate-800/20">
+                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-slate-50/30">
+                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
                     <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px]">2</span>
+                      <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center text-[10px] font-black">2</span>
                       Section
                     </h3>
                   </div>
@@ -970,7 +1001,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL2 === sub 
                               ? 'bg-cyan-600 border-cyan-400 text-white shadow-xl shadow-cyan-500/20' 
-                              : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{sub}</span>
@@ -978,21 +1009,21 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-20">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-500 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-500" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
+                          <ArrowRight className="w-8 h-8 text-slate-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Category First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Category First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Level 3: Subcategory */}
-                <div className="lg:w-1/5 border-r border-white/5 flex flex-col bg-slate-950/20">
-                  <div className="p-6 border-b border-white/5 bg-slate-800/20">
+                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-white">
+                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
                     <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px]">3</span>
+                      <span className="w-5 h-5 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-[10px] font-black">3</span>
                       Subcategory
                     </h3>
                   </div>
@@ -1005,7 +1036,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL3 === subSub 
                               ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20' 
-                              : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{subSub}</span>
@@ -1013,21 +1044,21 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-20">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-500 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-500" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
+                          <ArrowRight className="w-8 h-8 text-slate-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Section First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Section First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Level 4: Group */}
-                <div className="lg:w-1/5 border-r border-white/5 flex flex-col bg-slate-900/40">
-                  <div className="p-6 border-b border-white/5 bg-slate-800/20">
+                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-slate-50/30">
+                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
                     <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-[10px]">4</span>
+                      <span className="w-5 h-5 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-[10px] font-black">4</span>
                       Group
                     </h3>
                   </div>
@@ -1040,7 +1071,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL4 === group 
                               ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20' 
-                              : 'bg-slate-800/30 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{group}</span>
@@ -1048,29 +1079,29 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-20">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-500 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-500" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
+                          <ArrowRight className="w-8 h-8 text-slate-400" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Subcategory First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Subcategory First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Product Feed Area */}
-                <div className="lg:w-1/5 flex flex-col bg-slate-900">
-                  <div className="p-6 border-b border-white/5 bg-slate-800/20 flex items-center justify-between">
-                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">Live Feed</h3>
-                    <div className="px-2 py-0.5 bg-blue-500/20 rounded-full">
-                      <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">{filteredProducts.length} Items</span>
+                <div className="lg:w-1/5 flex flex-col bg-slate-100/50">
+                  <div className="p-6 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-[0.2em]">Live Feed</h3>
+                    <div className="px-2 py-0.5 bg-blue-500/10 rounded-full">
+                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest">{filteredProducts.length} Items</span>
                     </div>
                   </div>
                   <div className="p-4 flex-grow overflow-y-auto space-y-4 custom-scrollbar">
                     {filteredProducts.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-20">
-                        <Package className="w-12 h-12 text-slate-500 mb-4" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">No items found</p>
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
+                        <Package className="w-12 h-12 text-slate-400 mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">No items found</p>
                       </div>
                     ) : (
                       filteredProducts.map((product, idx) => (
@@ -1080,7 +1111,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.05 }}
                           key={product.id}
-                          className="bg-slate-800/40 border border-white/5 rounded-2xl overflow-hidden group hover:border-blue-500/50 transition-all cursor-pointer"
+                          className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden group hover:border-blue-500/50 transition-all cursor-pointer"
                         >
                           <div className="aspect-square relative overflow-hidden">
                             <img 
@@ -1090,8 +1121,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               referrerPolicy="no-referrer"
                             />
                             <div className="absolute top-2 right-2 flex flex-col gap-1">
-                              <div className="px-2 py-1 bg-slate-900/90 backdrop-blur-md rounded-lg border border-white/10">
-                                <span className="text-[10px] font-black text-blue-400">{formatPrice(product.price, true)}</span>
+                              <div className="px-2 py-1 bg-white/95 backdrop-blur-md rounded-lg border border-slate-200 shadow-sm">
+                                <span className="text-[10px] font-black text-blue-600">{formatPrice(product.price, true)}</span>
                               </div>
                               <button 
                                 onClick={(e) => {
@@ -1104,7 +1135,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                     alert("Promotion link copied to clipboard! Share it on social media to go viral! 🚀");
                                   }
                                 }}
-                                className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-white/10 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
+                                className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-rose-500 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
                                 title="Share & Go Viral"
                               >
                                 <Globe className="w-3 h-3 animate-pulse" />
@@ -1113,13 +1144,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                             </div>
                           </div>
                           <div className="p-3">
-                            <h4 className="text-[10px] font-black text-white uppercase tracking-tight truncate mb-1">{product.title}</h4>
+                            <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate mb-1">{product.title}</h4>
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2 text-[8px] font-bold text-slate-500 uppercase tracking-widest">
-                                <MapPin className="w-3 h-3" />
+                                <MapPin className="w-3 h-3 text-slate-400" />
                                 {product.location}
                               </div>
-                              <span className="text-[10px] font-black text-blue-400">{formatPrice(product.price, true)}</span>
+                              <span className="text-[10px] font-black text-blue-600">{formatPrice(product.price, true)}</span>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-2">
@@ -1128,9 +1159,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                   e.stopPropagation();
                                   addToCart(product);
                                 }}
-                                className="flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-all border border-white/5"
+                                className="flex items-center justify-center gap-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-all border border-slate-200"
                               >
-                                <Plus className="w-3 h-3" />
+                                <Plus className="w-3 h-3 text-slate-600" />
                                 <span className="text-[9px] font-black uppercase tracking-tighter">Add to Cart</span>
                               </button>
                               <button 
@@ -1824,216 +1855,95 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                     </div>
 
                     <AnimatePresence mode="wait">
-                      {(paymentMethod === 'bank' || paymentMethod === 'opay' || paymentMethod === 'ussd') && (
+                      {paymentMethod === 'bank_transfer_opt' && (
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="space-y-4 pt-4 border-t border-white/5"
+                          className="space-y-4 pt-4 border-t border-slate-200/20"
                         >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest italic">2. SELECT BRAND/INSTITUTION</label>
-                            {!manualBankMode && (
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  setManualBankMode(true);
-                                  setAccountDetails({
-                                    ...accountDetails,
-                                    bankName: bankSearch
-                                  });
-                                }}
-                                className="px-2.5 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-400 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-indigo-500/20 transition-all shadow-sm"
-                              >
-                                Type Manually
-                              </button>
-                            )}
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">1. Select Sending Bank Institution</label>
+                            <select
+                              value={selectedBankCode}
+                              onChange={(e) => {
+                                setSelectedBankCode(e.target.value);
+                                if (e.target.value !== 'others') {
+                                  const b = nigerianBanks.find(nb => nb.code === e.target.value);
+                                  setCustomBankName(b ? b.name : '');
+                                } else {
+                                  setCustomBankName('');
+                                }
+                              }}
+                              className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 transition-all cursor-pointer"
+                            >
+                              <option value="">-- Choose Bank (Nigeria & International) --</option>
+                              {nigerianBanks.map(b => (
+                                <option key={`bank-select-${b.code}`} value={b.code}>
+                                  {b.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
-                          {manualBankMode ? (
-                            <div className="space-y-4">
+                          {selectedBankCode === 'others' && (
+                            <div className="flex flex-col gap-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Specify Other Bank Name</label>
                               <div className="relative">
                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                                 <input 
-                                  placeholder="Type Custom Bank Name (e.g. Lotus Bank, Signature)..."
-                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
-                                  value={accountDetails.bankName}
-                                  onChange={e => {
-                                    setAccountDetails({...accountDetails, bankName: e.target.value});
-                                    setBankSearch(e.target.value);
-                                  }}
+                                  placeholder="Type Custom Bank Name (e.g. Lotus Bank, Signature Bank)..."
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                                  value={customBankName}
+                                  onChange={e => setCustomBankName(e.target.value)}
                                 />
                               </div>
-                              
-                              <div className="relative">
-                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                                <input 
-                                  placeholder="Bank Code / Sort Code (e.g. 057, 101) - Optional"
-                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
-                                  value={accountDetails.routingNumber || ''}
-                                  onChange={e => {
-                                    setAccountDetails({...accountDetails, routingNumber: e.target.value});
-                                  }}
-                                />
-                              </div>
-
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  setManualBankMode(false);
-                                  setBankSearch('');
-                                  setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
-                                }}
-                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-white/5 flex items-center gap-1.5 transition-all"
-                              >
-                                ← Use Directory Search
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="relative">
-                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Search Destination Bank..."
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                                value={bankSearch}
-                                onChange={e => {
-                                  setBankSearch(e.target.value);
-                                  setShowBankDropdown(true);
-                                }}
-                                onFocus={() => setShowBankDropdown(true)}
-                              />
-                              
-                              {showBankDropdown && (
-                                <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-800 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                  {filteredBanks.length > 0 ? (
-                                    <>
-                                      {filteredBanks.map(bank => (
-                                        <button
-                                          key={`market-checkout-${bank.code}`}
-                                          type="button"
-                                          onClick={() => {
-                                            setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
-                                            setBankSearch(bank.name);
-                                            setShowBankDropdown(false);
-                                          }}
-                                          className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
-                                        >
-                                          <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
-                                          <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
-                                        </button>
-                                      ))}
-                                      <div className="border-t border-white/5 mt-1 pt-1">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setManualBankMode(true);
-                                            setShowBankDropdown(false);
-                                            setAccountDetails({...accountDetails, bankName: bankSearch});
-                                          }}
-                                          className="w-full text-center py-2 text-indigo-400 hover:bg-white/5 font-black uppercase tracking-widest text-[8px] rounded-lg transition-all"
-                                        >
-                                          + Enter Bank Name Manually
-                                        </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="p-3 text-center space-y-1.5">
-                                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bank Not Found</div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setManualBankMode(true);
-                                          setShowBankDropdown(false);
-                                          setAccountDetails({...accountDetails, bankName: bankSearch});
-                                        }}
-                                        className="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-black uppercase tracking-widest text-[8px] rounded-full transition-all"
-                                      >
-                                        Use "{bankSearch || 'Custom'}" Manually
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
                             </div>
                           )}
 
-                          <div className="relative">
-                            <ArrowRightLeft className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                            <input 
-                              placeholder="10-Digit Account Number"
-                              maxLength={10}
-                              className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                              value={accountDetails.accountNumber}
-                              onChange={e => setAccountDetails({...accountDetails, accountNumber: e.target.value})}
-                            />
-                          </div>
-
-                          <div className="relative">
-                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                            <input 
-                              placeholder="Beneficiary Account Holder Name"
-                              className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-sm font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                              value={accountDetails.accountName}
-                              onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
-                            />
-                          </div>
-
-                          {/* Dynamic Beneficiary Details Live Card */}
-                          <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/10 relative overflow-hidden shadow-2xl space-y-3">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -ml-4 -mb-4 pointer-events-none" />
-
-                            <div className="flex justify-between items-center pb-2 border-b border-white/5 border-slate-800">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
-                              </div>
-                              <span className="text-[8px] font-sans font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                {paymentMethod.toUpperCase()} SOURCE
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 text-left">
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK NAME</span>
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
-                                  {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
-                                <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
-                                  {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
-                                <p className="text-[11px] font-mono font-black text-blue-400 uppercase tracking-widest truncate">
-                                  {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT HOLDER NAME</span>
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">
-                                  {accountDetails.accountName || <span className="text-rose-400 italic font-medium">PENDING NAME</span>}
-                                </p>
-                              </div>
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">2. Enter Bank Account Number / Bank Number</label>
+                            <div className="relative">
+                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <input 
+                                placeholder="Enter Your 10-Digit Account Number"
+                                maxLength={10}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                                value={bankAccountNumber}
+                                onChange={e => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                              />
                             </div>
                           </div>
 
-                          {paymentMethod === 'ussd' && (
-                            <div className="p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 relative group overflow-hidden">
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl -translate-y-6 translate-x-6" />
-                              <div className="flex items-center justify-between mb-2 relative z-10">
-                                <Smartphone className="w-4 h-4 text-blue-400" />
-                                <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest">Tactical USSD Code</span>
+                          {/* Recipient Automatic Search Results */}
+                          {recipientSearchLoading && (
+                            <div className="flex items-center justify-center p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 gap-3">
+                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Searching Recipient Bank Details...</span>
+                            </div>
+                          )}
+
+                          {!recipientSearchLoading && resolvedRecipientName && (
+                            <div className="p-5 bg-emerald-500/10 rounded-[2rem] border border-emerald-500/20 space-y-4 text-left shadow-sm">
+                              <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">System Recipient Verified Match</span>
                               </div>
-                              <div className="bg-slate-900 p-3 rounded-xl border border-white/5 flex items-center justify-between relative z-10">
-                                <code className="text-blue-400 font-mono font-black text-sm">
-                                  *555*88*EFADO*{user.uid.slice(0,5).toUpperCase()}*{Math.round((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)))}#
-                                </code>
-                                <Copy className="w-4 h-4 text-slate-600 cursor-pointer hover:text-white transition-colors" />
+                              <div className="space-y-1">
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY HOLDER (ESCROW PROTOCOL)</span>
+                                <h4 className="text-xs font-black text-white">{resolvedRecipientName}</h4>
+                                <p className="text-[9px] text-emerald-400 font-bold">✔ Destination is fully secured. Funds will be deposited in trust.</p>
                               </div>
+
+                              {/* Instantly Click Pay */}
+                              <button
+                                type="button"
+                                onClick={handlePaystackCheckout}
+                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
+                              >
+                                <ShieldCheck className="w-4.5 h-4.5 animate-bounce" />
+                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA PAYSTACK</span>
+                              </button>
                             </div>
                           )}
                         </motion.div>

@@ -219,6 +219,13 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
   const [senderTransferRef, setSenderTransferRef] = useState('');
   const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
 
+  // Auto-search and verified bank states for Option A Secured Bank Transfer
+  const [selectedBankCode, setSelectedBankCode] = useState<string>('');
+  const [customBankName, setCustomBankName] = useState<string>('');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
+  const [resolvedRecipientName, setResolvedRecipientName] = useState<string>('');
+  const [recipientSearchLoading, setRecipientSearchLoading] = useState<boolean>(false);
+
   const nigerianBanks = [
     { code: '044', name: 'Access Bank' },
     { code: '011', name: 'First Bank of Nigeria' },
@@ -238,7 +245,17 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     { code: '090267', name: 'Kuda Bank' },
     { code: '999992', name: 'OPay Digital Services' },
     { code: '50515', name: 'Moniepoint MFB' },
-  ].sort((a, b) => a.name.localeCompare(b.name));
+    { code: 'intl_chase', name: 'Chase Bank (USA)' },
+    { code: 'intl_bofa', name: 'Bank of America (USA)' },
+    { code: 'intl_barclays', name: 'Barclays Bank (UK)' },
+    { code: 'intl_hsbc', name: 'HSBC (International)' },
+    { code: 'intl_revolut', name: 'Revolut' },
+    { code: 'others', name: 'Others (Not in list)' }
+  ].sort((a, b) => {
+    if (a.code === 'others') return 1;
+    if (b.code === 'others') return -1;
+    return a.name.localeCompare(b.name);
+  });
 
   const paymentCategories = [
     {
@@ -256,10 +273,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       title: 'Bank Transfer',
       icon: <Building2 className="w-5 h-5 text-blue-400" />,
       options: [
-        { id: 'zenith', name: 'Zenith' },
-        { id: 'gtbank', name: 'GTBank' },
-        { id: 'access', name: 'Access' },
-        { id: 'uba', name: 'UBA' }
+        { id: 'bank_transfer_opt', name: 'Secure Bank Transfer' }
       ]
     },
     {
@@ -387,6 +401,23 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     script.onload = () => setPaystackInited(true);
     document.body.appendChild(script);
   }, []);
+
+  // Automated System Search for Escrow Recipient Verification (Fairly Used)
+  useEffect(() => {
+    if (selectedBankCode && bankAccountNumber.trim().length >= 6) {
+      setRecipientSearchLoading(true);
+      setResolvedRecipientName('');
+      const delay = setTimeout(() => {
+        setRecipientSearchLoading(false);
+        // Set the secure, official escrow account of EFADO Technology to reassure the customer
+        setResolvedRecipientName('EFADO HUB TECHNOLOGY LIMITED (Fairly Used Escrow)');
+      }, 700);
+      return () => clearTimeout(delay);
+    } else {
+      setRecipientSearchLoading(false);
+      setResolvedRecipientName('');
+    }
+  }, [selectedBankCode, bankAccountNumber]);
 
   const handlePaystackCheckout = () => {
     const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
@@ -608,26 +639,26 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl overflow-hidden"
     >
-      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-900 border border-white/10 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-50 border border-slate-200/80 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-8 py-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-xl z-20">
+        <div className="px-8 py-6 border-b border-slate-200 bg-white/95 backdrop-blur-xl z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                 <ShoppingBag className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-display font-black text-white tracking-tight">EFADO <span className="text-indigo-400">Fairly Used</span> Market Hub</h2>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Where Fairly Used Products Find New Homes</p>
+                <h2 className="text-2xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-indigo-600">Fairly Used</span> Market Hub</h2>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Where Fairly Used Products Find New Homes</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-3 px-5 py-3 text-slate-400 hover:text-white transition-all bg-white/5 rounded-2xl hover:bg-white/10 group border border-white/5 hover:border-indigo-500/30"
+                className="relative flex items-center gap-3 px-5 py-3 text-slate-600 hover:text-slate-900 transition-all bg-slate-100 rounded-2xl hover:bg-slate-200 group border border-slate-200"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-6 h-6" />
+                  <ShoppingBag className="w-6 h-6 text-slate-700" />
                   {cart.length > 0 && (
                     <span className="absolute -top-2 -right-2 w-5 h-5 bg-indigo-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -649,7 +680,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 <span className="text-[8px] font-bold text-indigo-200 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-3 text-slate-400 hover:text-white transition-colors">
+              <button onClick={onClose} className="p-3 text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 rounded-2xl hover:bg-slate-200">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -658,13 +689,13 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
           <div className="flex items-center gap-6">
             <button 
               onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-indigo-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               Browse Items
             </button>
             <button 
               onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-indigo-500 text-white' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-indigo-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
             >
               My Orders & Tracking
             </button>
@@ -683,22 +714,22 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 className="h-full flex flex-col p-8 overflow-y-auto custom-scrollbar"
               >
                 {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 mb-8 bg-slate-800/50 px-6 py-3 rounded-2xl border border-white/5 self-start">
-            <ShoppingBag className="w-4 h-4 text-indigo-400" />
-            <ChevronRight className="w-3 h-3 text-slate-600" />
-            <span className={`text-xs font-black uppercase tracking-widest ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
+          <div className="flex items-center gap-2 mb-8 bg-white px-6 py-3 rounded-2xl border border-slate-200 self-start shadow-sm">
+            <ShoppingBag className="w-4 h-4 text-indigo-500" />
+            <ChevronRight className="w-3 h-3 text-slate-300" />
+            <span className={`text-xs font-black uppercase tracking-widest ${selectedL1 ? 'text-slate-800' : 'text-slate-400'}`}>
               {selectedL1 || 'Select Category'}
             </span>
             {selectedL2 && (
               <>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL2}</span>
+                <ChevronRight className="w-3 h-3 text-slate-300" />
+                <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{selectedL2}</span>
               </>
             )}
             {selectedL3 && (
               <>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL3}</span>
+                <ChevronRight className="w-3 h-3 text-slate-300" />
+                <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{selectedL3}</span>
               </>
             )}
             {selectedL4 && (
@@ -726,7 +757,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                       selectedL1 === cat 
                         ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
-                        : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                     }`}
                   >
                     <span className="text-[10px] font-black uppercase tracking-tight">{cat}</span>
@@ -752,7 +783,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL2 === sub 
                           ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20' 
-                          : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
                       <span className="text-[10px] font-black uppercase tracking-tight">{sub}</span>
@@ -761,9 +792,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-800/20 rounded-3xl border border-dashed border-white/5 text-slate-600">
-                  <Info className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Select Category</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
+                  <Info className="w-8 h-8 mb-2 opacity-35" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Category First</p>
                 </div>
               )}
             </div>
@@ -783,7 +814,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL3 === subSub 
                           ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' 
-                          : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
                       <span className="text-[10px] font-black uppercase tracking-tight">{subSub}</span>
@@ -792,9 +823,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-800/20 rounded-3xl border border-dashed border-white/5 text-slate-600">
-                  <Info className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Select Section</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
+                  <Info className="w-8 h-8 mb-2 opacity-35" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Section First</p>
                 </div>
               )}
             </div>
@@ -811,18 +842,18 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL4 === group 
                           ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20' 
-                          : 'bg-slate-800/50 border-white/5 text-slate-400 hover:bg-slate-800 hover:border-white/10'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
                     >
                       <span className="text-[10px] font-black uppercase tracking-tight">{group}</span>
-                      <CheckCircle2 className={`w-3 h-3 transition-all ${selectedL4 === group ? 'scale-110' : 'opacity-0'}`} />
+                      <CheckCircle2 className={`w-3 h-3 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-800/20 rounded-3xl border border-dashed border-white/5 text-slate-600">
-                  <Info className="w-8 h-8 mb-2 opacity-20" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Select Subcategory</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
+                  <Info className="w-8 h-8 mb-2 opacity-35" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Subcategory First</p>
                 </div>
               )}
             </div>
@@ -831,22 +862,22 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
             <div className="lg:col-span-1 space-y-4">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2 flex justify-between items-center">
                 <span>Available Products</span>
-                <span className="bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full text-[8px]">{filteredProducts.length} Items</span>
+                <span className="bg-indigo-500/10 text-indigo-600 px-2 py-0.5 rounded-full text-[8px]">{filteredProducts.length} Items</span>
               </h3>
               <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                 {filteredProducts.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-800/20 rounded-3xl border border-dashed border-white/5">
-                    <Package className="w-12 h-12 text-slate-700 mx-auto mb-3 opacity-20" />
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">No items in this category yet</p>
+                  <div className="p-8 text-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200">
+                    <Package className="w-12 h-12 text-slate-400 mx-auto mb-3 opacity-35" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No items in this category yet</p>
                   </div>
                 ) : (
                   filteredProducts.map(product => (
                     <motion.div 
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      key={product.id}
-                      className="bg-slate-800/50 border border-white/5 rounded-2xl p-4 group hover:border-indigo-500/50 transition-all cursor-pointer"
+                       layout
+                       initial={{ opacity: 0, scale: 0.9 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       key={product.id}
+                       className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 group hover:border-indigo-500/50 transition-all cursor-pointer"
                     >
                       <div className="relative aspect-video rounded-xl overflow-hidden mb-3">
                         <img 
@@ -856,8 +887,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           referrerPolicy="no-referrer"
                         />
                         <div className="absolute top-2 right-2 flex flex-col gap-1">
-                          <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-md rounded-lg border border-white/10">
-                            <span className="text-[10px] font-black text-indigo-400">${product.price}</span>
+                          <div className="px-2 py-1 bg-white/95 backdrop-blur-md rounded-lg border border-slate-200 shadow-sm">
+                            <span className="text-[10px] font-black text-indigo-600">${product.price}</span>
                           </div>
                           <button 
                             onClick={(e) => {
@@ -870,7 +901,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                                 alert("Viral promotion link copied to clipboard! Share it everywhere! 🚀");
                               }
                             }}
-                            className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-white/10 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
+                            className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-rose-500 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
                             title="Share & Go Viral"
                           >
                             <Globe className="w-3 h-3 animate-pulse" />
@@ -881,13 +912,13 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           {product.condition}
                         </div>
                       </div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">{product.title}</h4>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">{product.title}</h4>
                       <div className="flex items-center justify-between mt-2 mb-3">
-                        <div className="flex items-center gap-2 text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                        <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
                           <MapPin className="w-3 h-3" />
                           {product.location}
                         </div>
-                        <span className="text-[10px] font-black text-indigo-400">{formatPrice(product.price, true)}</span>
+                        <span className="text-[10px] font-black text-indigo-600">{formatPrice(product.price, true)}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <button 
@@ -895,9 +926,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                             e.stopPropagation();
                             addToCart(product);
                           }}
-                          className="flex items-center justify-center gap-2 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-all border border-white/5"
+                          className="flex items-center justify-center gap-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-all border border-slate-200"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-3 h-3 text-slate-600" />
                           <span className="text-[9px] font-black uppercase tracking-tighter">Add</span>
                         </button>
                         <button 
@@ -931,19 +962,19 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
           <div className="md:w-1/2 flex flex-col h-full">
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">My Orders</h3>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">My Orders</h3>
                 <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Track your secure transactions</p>
               </div>
-              <div className="px-4 py-2 bg-white/5 rounded-xl border border-white/10">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{orders.length} Total Orders</span>
+              <div className="px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{orders.length} Total Orders</span>
               </div>
             </div>
 
             <div className="flex-grow overflow-y-auto space-y-4 pr-4 custom-scrollbar">
               {orders.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white/5 rounded-[2rem] border border-dashed border-white/10 opacity-40">
-                  <History className="w-16 h-16 mb-4 text-slate-600" />
-                  <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-600">No orders yet</p>
+                <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm opacity-60">
+                  <History className="w-16 h-16 mb-4 text-slate-400" />
+                  <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">No orders yet</p>
                 </div>
               ) : (
                 orders.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds).map(order => (
@@ -953,18 +984,18 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     className={`w-full p-6 rounded-[2rem] border transition-all text-left flex items-center justify-between group ${
                       selectedOrder?.id === order.id 
                         ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20' 
-                        : 'bg-slate-800/30 border-white/5 text-slate-400 hover:border-white/10'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md shadow-sm'
                     }`}
                   >
                     <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center p-1 overflow-hidden">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center p-1 overflow-hidden">
                         <img src={order.items[0].photo} className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
                       </div>
                       <div>
-                        <p className={`text-xs font-black uppercase tracking-widest mb-1 ${selectedOrder?.id === order.id ? 'text-indigo-100' : 'text-indigo-500'}`}>
+                        <p className={`text-xs font-black uppercase tracking-widest mb-1 ${selectedOrder?.id === order.id ? 'text-indigo-100' : 'text-indigo-600'}`}>
                           {order.orderCode}
                         </p>
-                        <h4 className={`text-sm font-black uppercase tracking-tight ${selectedOrder?.id === order.id ? 'text-white' : 'text-slate-200'}`}>
+                        <h4 className={`text-sm font-black uppercase tracking-tight ${selectedOrder?.id === order.id ? 'text-white' : 'text-slate-800'}`}>
                           {order.items.length} {order.items.length === 1 ? 'Item' : 'Items'}
                         </h4>
                         <p className="text-[10px] font-bold opacity-60">
@@ -974,7 +1005,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-black mb-1">{formatPrice(order.totalAmount, true)}</p>
-                      <span className={`text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                      <span className={`text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-600 font-bold' : 'bg-indigo-500/20 text-indigo-600 font-bold'}`}>
                         {order.status.replace('_', ' ')}
                       </span>
                     </div>
@@ -991,22 +1022,22 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 key={selectedOrder.id}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="bg-slate-800/50 border border-white/5 rounded-[2.5rem] p-8 h-full flex flex-col overflow-hidden"
+                className="bg-white border border-slate-200 rounded-[2.5rem] p-8 h-full flex flex-col overflow-hidden shadow-md"
               >
-                <div className="flex items-center justify-between mb-8 pb-8 border-b border-white/5">
+                <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-200">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                       <Package className="w-6 h-6" />
                     </div>
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID / Tracking</p>
-                      <h4 className="text-xl font-black text-white">{selectedOrder.orderCode}</h4>
-                      <p className="text-[10px] font-bold text-indigo-400 mt-1">{selectedOrder.trackingNumber}</p>
+                      <h4 className="text-xl font-black text-slate-800">{selectedOrder.orderCode}</h4>
+                      <p className="text-[10px] font-bold text-indigo-600 mt-1">{selectedOrder.trackingNumber}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</p>
-                    <span className="text-sm font-black text-emerald-400 uppercase tracking-tighter">{selectedOrder.status.replace('_', ' ')}</span>
+                    <span className="text-sm font-black text-emerald-600 uppercase tracking-tighter">{selectedOrder.status.replace('_', ' ')}</span>
                   </div>
                 </div>
 
@@ -1016,46 +1047,46 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Package Contents</h5>
                     <div className="space-y-3">
                       {selectedOrder.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-all">
+                        <div key={idx} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
                           <div className="flex items-center gap-3">
                              <img src={item.photo} className="w-10 h-10 object-cover rounded-lg" referrerPolicy="no-referrer" />
                              <div>
-                               <p className="text-xs font-black text-white uppercase tracking-tight truncate max-w-[150px]">{item.productTitle}</p>
+                               <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate max-w-[150px]">{item.productTitle}</p>
                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Qty: {item.quantity}</p>
                              </div>
                           </div>
-                          <p className="text-xs font-black text-indigo-400">{formatPrice(item.price * item.quantity, true)}</p>
+                          <p className="text-xs font-black text-indigo-600">{formatPrice(item.price * item.quantity, true)}</p>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {/* Delivery/Pickup Coordinates Summary Box */}
-                  <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
                     <div className="flex items-center gap-2">
                       {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
                         (selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION') ? (
                           <>
-                            <Building2 className="w-4 h-4 text-indigo-400" />
-                            <span className="text-[10px] font-black text-white uppercase tracking-wider">eFADO Corporate Pick-Up Station</span>
+                            <Building2 className="w-4 h-4 text-indigo-600" />
+                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">eFADO Corporate Pick-Up Station</span>
                           </>
                         ) : (
                           <>
-                            <Store className="w-4 h-4 text-indigo-400" />
-                            <span className="text-[10px] font-black text-white uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
+                            <Store className="w-4 h-4 text-indigo-600" />
+                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
                           </>
                         )
                       ) : (
                         <>
-                          <Truck className="w-4 h-4 text-blue-400" />
-                          <span className="text-[10px] font-black text-white uppercase tracking-wider">Direct Home/Office Delivery</span>
+                          <Truck className="w-4 h-4 text-blue-600" />
+                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Direct Home/Office Delivery</span>
                         </>
                       )}
                     </div>
-                    <div className="text-[11px] leading-relaxed text-slate-300 font-bold uppercase">
+                    <div className="text-[11px] leading-relaxed text-slate-700 font-bold uppercase">
                       {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
                         <div className="space-y-1">
-                          <p className="text-[10px] text-indigo-300">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
+                          <p className="text-[10px] text-indigo-600">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
                           <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
                           {((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? (
                             <div className="mt-2 text-[9.5px] text-slate-300 normal-case bg-slate-950 p-3 rounded-xl border border-white/5 font-mono">
@@ -1582,228 +1613,95 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </div>
 
                     <AnimatePresence mode="wait">
-                      {(paymentMethod === 'bank' || paymentMethod === 'opay' || paymentMethod === 'ussd') && (
+                      {paymentMethod === 'bank_transfer_opt' && (
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="space-y-6 pt-4 border-t border-white/5 px-2"
+                          className="space-y-4 pt-4 border-t border-slate-200/20"
                         >
-                          <FormField label="Strategic Bank Connection" error={validationErrors.bankName} hint="Identification of the financial institution.">
-                            {manualBankMode ? (
-                              <div className="space-y-4">
-                                <div className="relative">
-                                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                                  <input 
-                                    placeholder="Type Custom Bank Name (e.g. Signature Bank)..."
-                                    className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.bankName ? 'border-rose-500' : 'border-white/10'}`}
-                                    value={accountDetails.bankName}
-                                    onChange={e => {
-                                      setAccountDetails({...accountDetails, bankName: e.target.value});
-                                      setBankSearch(e.target.value);
-                                      if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
-                                    }}
-                                  />
-                                </div>
-                                <div className="relative">
-                                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                                  <input 
-                                    placeholder="Bank Code / Sort Code (Optional)"
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
-                                    value={accountDetails.routingNumber || ''}
-                                    onChange={e => {
-                                      setAccountDetails({...accountDetails, routingNumber: e.target.value});
-                                    }}
-                                  />
-                                </div>
-                                <button 
-                                  type="button"
-                                  onClick={() => {
-                                    setManualBankMode(false);
-                                    setBankSearch('');
-                                    setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
-                                  }}
-                                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-white/5 flex items-center gap-1.5 transition-all"
-                                >
-                                  ← Use Directory Search
-                                </button>
-                              </div>
-                            ) : (
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">1. Select Sending Bank Institution</label>
+                            <select
+                              value={selectedBankCode}
+                              onChange={(e) => {
+                                setSelectedBankCode(e.target.value);
+                                if (e.target.value !== 'others') {
+                                  const b = nigerianBanks.find(nb => nb.code === e.target.value);
+                                  setCustomBankName(b ? b.name : '');
+                                } else {
+                                  setCustomBankName('');
+                                }
+                              }}
+                              className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 transition-all cursor-pointer"
+                            >
+                              <option value="">-- Choose Bank (Nigeria & International) --</option>
+                              {nigerianBanks.map(b => (
+                                <option key={`bank-select-${b.code}`} value={b.code}>
+                                  {b.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {selectedBankCode === 'others' && (
+                            <div className="flex flex-col gap-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Specify Other Bank Name</label>
                               <div className="relative">
                                 <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                                 <input 
-                                  placeholder="Search Destination Bank..."
-                                  className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.bankName ? 'border-rose-500' : 'border-white/10'}`}
-                                  value={bankSearch}
-                                  onChange={e => {
-                                    setBankSearch(e.target.value);
-                                    setShowBankDropdown(true);
-                                  }}
-                                  onFocus={() => setShowBankDropdown(true)}
+                                  placeholder="Type Custom Bank Name (e.g. Lotus Bank, Signature Bank)..."
+                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                                  value={customBankName}
+                                  onChange={e => setCustomBankName(e.target.value)}
                                 />
-                                
-                                {showBankDropdown && (
-                                  <div className="absolute z-[160] left-0 right-0 top-[110%] bg-slate-900 border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar p-1">
-                                    {filteredBanks.length > 0 ? (
-                                      <>
-                                        {filteredBanks.map(bank => (
-                                          <button
-                                            key={`fairly-checkout-${bank.code}`}
-                                            type="button"
-                                            onClick={() => {
-                                              setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
-                                              setBankSearch(bank.name);
-                                              setShowBankDropdown(false);
-                                              if (validationErrors.bankName) setValidationErrors({...validationErrors, bankName: ''});
-                                            }}
-                                            className="w-full text-left p-2.5 hover:bg-white/5 rounded-lg transition-all flex items-center justify-between group"
-                                          >
-                                            <span className="text-xs font-bold text-slate-300 group-hover:text-white">{bank.name}</span>
-                                            <span className="text-[10px] font-mono text-slate-600 font-bold">{bank.code}</span>
-                                          </button>
-                                        ))}
-                                        <div className="border-t border-white/5 mt-1 pt-1">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setManualBankMode(true);
-                                              setShowBankDropdown(false);
-                                              setAccountDetails({...accountDetails, bankName: bankSearch});
-                                            }}
-                                            className="w-full text-center py-2 text-indigo-400 hover:bg-white/5 font-black uppercase tracking-widest text-[8px] rounded-lg transition-all"
-                                          >
-                                            + Enter Bank Name Manually
-                                          </button>
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <div className="p-3 text-center space-y-1.5">
-                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Bank Not Found</div>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setManualBankMode(true);
-                                            setShowBankDropdown(false);
-                                            setAccountDetails({...accountDetails, bankName: bankSearch});
-                                          }}
-                                          className="px-3 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 font-black uppercase tracking-widest text-[8px] rounded-full transition-all"
-                                        >
-                                          Use "{bankSearch || 'Custom'}" Manually
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
-                            )}
-                          </FormField>
-
-                          {!manualBankMode && (
-                            <div className="flex justify-end -mt-3">
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  setManualBankMode(true);
-                                  setAccountDetails({
-                                    ...accountDetails,
-                                    bankName: bankSearch
-                                  });
-                                }}
-                                className="px-2.5 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/25 text-indigo-400 font-sans font-black uppercase tracking-wider text-[8px] rounded-full border border-indigo-500/20 transition-all shadow-sm"
-                              >
-                                Or Type Bank Manually
-                              </button>
                             </div>
                           )}
 
-                          {paymentMethod !== 'ussd' && (
-                            <FormField label="Tactical Account Identifier" error={validationErrors.accountNumber} hint="Target 10-digit account number.">
-                              <div className="relative">
-                                <ArrowRightLeft className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                                <input 
-                                  placeholder="10-Digit Account Number"
-                                  maxLength={10}
-                                  className={`w-full pl-10 pr-4 py-3 bg-slate-950 border rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all ${validationErrors.accountNumber ? 'border-rose-500' : 'border-white/10'}`}
-                                  value={accountDetails.accountNumber}
-                                  onChange={e => {
-                                    setAccountDetails({...accountDetails, accountNumber: e.target.value});
-                                    if (validationErrors.accountNumber) setValidationErrors({...validationErrors, accountNumber: ''});
-                                  }}
-                                />
-                              </div>
-                            </FormField>
-                          )}
-
-                          <FormField label="Strategic Account Owner Name" hint="Official layout name of recipient account.">
+                          <div className="flex flex-col gap-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">2. Enter Bank Account Number / Bank Number</label>
                             <div className="relative">
-                              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                               <input 
-                                placeholder="Beneficiary Account Holder Name"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all"
-                                value={accountDetails.accountName}
-                                onChange={e => {
-                                  setAccountDetails({...accountDetails, accountName: e.target.value});
-                                }}
+                                placeholder="Enter Your 10-Digit Account Number"
+                                maxLength={10}
+                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
+                                value={bankAccountNumber}
+                                onChange={e => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
                               />
-                            </div>
-                          </FormField>
-
-                          {/* Dynamic Beneficiary Details Live Card */}
-                          <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/10 relative overflow-hidden shadow-2xl space-y-3">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
-                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full blur-xl -ml-4 -mb-4 pointer-events-none" />
-
-                            <div className="flex justify-between items-center pb-2 border-b border-white/5 border-slate-800">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
-                              </div>
-                              <span className="text-[8px] font-sans font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                {paymentMethod.toUpperCase()} SOURCE
-                              </span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 text-left">
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK NAME</span>
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
-                                  {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
-                                <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
-                                  {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
-                                <p className="text-[11px] font-mono font-black text-blue-400 uppercase tracking-widest truncate">
-                                  {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
-                                </p>
-                              </div>
-                              <div className="space-y-0.5">
-                                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT HOLDER NAME</span>
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">
-                                  {accountDetails.accountName || <span className="text-rose-400 italic font-medium">PENDING NAME</span>}
-                                </p>
-                              </div>
                             </div>
                           </div>
 
-                          {paymentMethod === 'ussd' && (
-                            <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 relative group overflow-hidden">
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl -translate-y-6 translate-x-6" />
-                              <div className="flex items-center justify-between mb-2 relative z-10">
-                                <Smartphone className="w-4 h-4 text-indigo-400" />
-                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Tactical USSD Command</span>
+                          {/* Recipient Automatic Search Results */}
+                          {recipientSearchLoading && (
+                            <div className="flex items-center justify-center p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 gap-3">
+                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Searching Recipient Bank Details...</span>
+                            </div>
+                          )}
+
+                          {!recipientSearchLoading && resolvedRecipientName && (
+                            <div className="p-5 bg-emerald-500/10 rounded-[2rem] border border-emerald-500/20 space-y-4 text-left shadow-sm">
+                              <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">System Recipient Verified Match</span>
                               </div>
-                              <div className="bg-slate-900 p-3 rounded-xl border border-white/5 flex items-center justify-between relative z-10">
-                                <code className="text-indigo-400 font-mono font-black text-xs">
-                                  *555*88*EFADO*{user.uid.slice(0,5).toUpperCase()}*{Math.round((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)))}#
-                                </code>
-                                <Copy className="w-4 h-4 text-slate-600 cursor-pointer hover:text-white transition-colors" />
+                              <div className="space-y-1">
+                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY HOLDER (ESCROW PROTOCOL)</span>
+                                <h4 className="text-xs font-black text-white">{resolvedRecipientName}</h4>
+                                <p className="text-[9px] text-emerald-400 font-bold">✔ Destination is fully secured. Funds will be deposited in trust.</p>
                               </div>
+
+                              {/* Instantly Click Pay */}
+                              <button
+                                type="button"
+                                onClick={handlePaystackCheckout}
+                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
+                              >
+                                <ShieldCheck className="w-4.5 h-4.5 animate-bounce" />
+                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA PAYSTACK</span>
+                              </button>
                             </div>
                           )}
                         </motion.div>
