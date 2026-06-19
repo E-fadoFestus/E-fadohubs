@@ -49,6 +49,7 @@ import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
 import { PaystackDeposit } from './PaystackDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
+import { useCurrency } from '../lib/CurrencyContext';
 
 interface UserWalletProps {
   user: UserProfile;
@@ -58,6 +59,7 @@ interface UserWalletProps {
 }
 
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
+  const { selectedCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
   const [depositMethod, setDepositMethod] = useState<'paystack' | 'bank_transfer'>('paystack');
   const [amount, setAmount] = useState('');
@@ -319,6 +321,28 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     const withdrawAmount = Number(amount);
     const availableBalance = withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
     const walletLabel = withdrawSource === 'playerWallet' ? "Player's Win Wallet" : "Cash Out Wallet";
+    
+    // Minimum player withdrawal setting: 5,000 Naira scale proportionally based on active currency
+    const MOCK_FX_RATES: Record<string, number> = {
+      USD: 1,
+      EUR: 0.92,
+      GBP: 0.79,
+      JPY: 151,
+      NGN: 1450,
+      INR: 83,
+    };
+    const rate = MOCK_FX_RATES[selectedCurrency?.code || 'NGN'] || 1;
+    const minLimit = 5000 * (rate / 1450);
+
+    if (withdrawAmount < minLimit) {
+      setNotifications(prev => [...prev, {
+        id: Date.now().toString(),
+        message: `Payout threshold unmet. Minimum limit is ${selectedCurrency.symbol}${minLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (proportionate of ₦5,000 in ${selectedCurrency.code})`,
+        type: 'warning'
+      }]);
+      return;
+    }
+
     if (withdrawAmount > availableBalance) {
       setNotifications(prev => [...prev, { 
         id: Date.now().toString(), 

@@ -70,7 +70,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   purpose: intentPurpose,
   hub = 'WALLET'
 }) => {
-  const { formatPrice } = useCurrency();
+  const { formatPrice, selectedCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>(initialType);
   const [amount, setAmount] = useState(fixedAmount ? fixedAmount.toString() : '');
   const [bankName, setBankName] = useState(user.bankName || '');
@@ -250,9 +250,28 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       return;
     }
 
-    if (activeTab === 'withdraw' && parsedAmt > user.playerWallet) {
-      setError(`Insufficient earnings. Your maximum cashout balance is $${user.playerWallet.toLocaleString()}`);
-      return;
+    if (activeTab === 'withdraw') {
+      const MOCK_FX_RATES: Record<string, number> = {
+        USD: 1,
+        EUR: 0.92,
+        GBP: 0.79,
+        JPY: 151,
+        NGN: 1450,
+        INR: 83,
+      };
+      
+      const rate = MOCK_FX_RATES[selectedCurrency?.code || 'NGN'] || 1;
+      const minLimit = 5000 * (rate / 1450);
+
+      if (parsedAmt < minLimit) {
+        setError(`Payout threshold unmet. Minimum withdrawal is ${selectedCurrency?.symbol || '$'}${minLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (proportionate rate of ₦5,000 equivalent for ${selectedCurrency?.code || 'NGN'})`);
+        return;
+      }
+
+      if (parsedAmt > user.playerWallet) {
+        setError(`Insufficient earnings. Your maximum cashout balance is $${user.playerWallet.toLocaleString()}`);
+        return;
+      }
     }
 
     if (!bankName) {
