@@ -219,6 +219,7 @@ function AppContent() {
   }, []);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [dynamicCeoPassword, setDynamicCeoPassword] = useState<string>('EFADO_CEO_2026');
   const [otpStep, setOtpStep] = useState(false);
   const [otpInput, setOtpInput] = useState('');
   const [currentOtpCode, setCurrentOtpCode] = useState('');
@@ -227,6 +228,20 @@ function AppContent() {
   const [simulatedSmsCode, setSimulatedSmsCode] = useState('');
   const [showSmsPopup, setShowSmsPopup] = useState(false);
   const [authorizedSmsRecipient, setAuthorizedSmsRecipient] = useState('');
+
+  useEffect(() => {
+    // Keep dynamic CEO password synchronized from centralized system settings in Firestore
+    const unsub = onSnapshot(doc(db, 'adminStats', 'settings'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.ceoPassword) {
+          setDynamicCeoPassword(data.ceoPassword.trim());
+          console.log('Centralized CEO Authorization Credential synced safely.');
+        }
+      }
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -855,7 +870,10 @@ function AppContent() {
     }
 
     const isSuperAdminEmail = adminEmail.trim().toLowerCase() === 'festdanemh@gmail.com';
-    const isSuperAdminPassword = adminPassword.trim() === 'EFADO_CEO_2026' || adminPassword.trim() === '08072456836';
+    const isSuperAdminPassword = 
+      adminPassword.trim() === dynamicCeoPassword || 
+      adminPassword.trim() === 'EFADO_CEO_2026' || 
+      adminPassword.trim() === '08072456836';
 
     if (!isSuperAdminEmail || !isSuperAdminPassword) {
       setError("Invalid Administrative Credentials. Access Blocked.");

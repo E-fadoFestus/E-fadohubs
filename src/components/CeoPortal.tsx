@@ -71,7 +71,7 @@ import { PatronageTracker } from './PatronageTracker';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { monetizationService } from '../services/monetizationService';
 import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
-import { Landmark, ArrowRight, Eye, Sparkles } from 'lucide-react';
+import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff } from 'lucide-react';
 
 interface CeoPortalProps {
   onClose: () => void;
@@ -82,6 +82,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'players' | 'transactions' | 'withdrawals' | 'hubs' | 'monetization' | 'announcements' | 'settings' | 'detective' | 'support'>('dashboard');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showPatronageTracker, setShowPatronageTracker] = useState(false);
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [passwordSaveStatus, setPasswordSaveStatus] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({
     username: '',
     email: '',
@@ -869,6 +872,35 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       });
     } catch (e) {
       console.error("Error updating settings:", e);
+    }
+  };
+
+  const handleUpdateCeoPassword = async () => {
+    if (!newPasswordInput.trim()) {
+      setPasswordSaveStatus('Error: Password cannot be blank.');
+      setTimeout(() => setPasswordSaveStatus(null), 4000);
+      return;
+    }
+    if (newPasswordInput.trim().length < 6) {
+      setPasswordSaveStatus('Error: Password must be at least 6 characters long.');
+      setTimeout(() => setPasswordSaveStatus(null), 4000);
+      return;
+    }
+    try {
+      setIsProcessing(true);
+      await setDoc(doc(db, 'adminStats', 'settings'), {
+        ceoPassword: newPasswordInput.trim()
+      }, { merge: true });
+      
+      setPasswordSaveStatus('Success: CEO sovereign password override active!');
+      setNewPasswordInput('');
+      setTimeout(() => setPasswordSaveStatus(null), 5000);
+    } catch (error) {
+      console.error('Failed to write dynamic CEO security password:', error);
+      setPasswordSaveStatus('Failed to update. Verify connection.');
+      setTimeout(() => setPasswordSaveStatus(null), 5000);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1901,6 +1933,105 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                           <span>Easy (50%)</span>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sovereign Security Controls */}
+                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                    <div>
+                      <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+                        <Lock className="w-6 h-6 text-amber-500 animate-pulse" />
+                        Sovereign Portal Security
+                      </h3>
+                      <p className="text-xs text-slate-500 font-bold mt-1">Manage dynamic administrative password access overrides</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[9px] font-mono font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        Sovereign Link: Secure
+                      </span>
+                      <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-[9px] font-mono font-black text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        SMS Gateway: Up
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+                    {/* Left: View/Verify Key */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Sovereign Active Password</label>
+                        <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 flex items-center justify-between relative overflow-hidden group">
+                          {/* Ambient light glow */}
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-all pointer-events-none" />
+                          
+                          <div className="space-y-1 relative z-10">
+                            <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider leading-none">Console Key</span>
+                            <p className="text-lg font-mono font-black tracking-widest text-white">
+                              {showPasswordInput ? ((systemSettings as any).ceoPassword || 'EFADO_CEO_2026') : '••••••••••••'}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordInput(!showPasswordInput)}
+                            className="p-3 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-all relative z-10"
+                            title={showPasswordInput ? "Hide Active Key" : "Reveal Active Key"}
+                          >
+                            {showPasswordInput ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/50 rounded-2xl p-4 border border-white/5 space-y-1.5 text-[11px] text-slate-400 font-medium">
+                        <p className="text-slate-500 font-black uppercase text-[9px] tracking-wider mb-2 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Security Override Protocols
+                        </p>
+                        <p>• Setting a custom password automatically invalidates the original default keys.</p>
+                        <p>• In emergencies, local overrides <code className="text-amber-400 font-mono">EFADO_CEO_2026</code> and your registered phone are compiled as static fallbacks.</p>
+                      </div>
+                    </div>
+
+                    {/* Right: Change Key Card */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Configure Dynamic Override Key</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Type new secure key..."
+                            value={newPasswordInput}
+                            onChange={(e) => setNewPasswordInput(e.target.value)}
+                            className="flex-grow bg-slate-900 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-amber-500 outline-none transition-all font-mono text-base font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleUpdateCeoPassword}
+                        disabled={isProcessing || !newPasswordInput.trim()}
+                        className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl shadow-lg shadow-amber-500/10 hover:shadow-amber-400/20 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-slate-950 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>Deploy New Security Key</>
+                        )}
+                      </button>
+
+                      {passwordSaveStatus && (
+                        <div className={`p-3 rounded-xl text-center text-xs font-black uppercase tracking-wider ${
+                          passwordSaveStatus.startsWith('Error') || passwordSaveStatus.startsWith('Failed')
+                            ? 'bg-rose-500/10 border border-rose-500/20 text-rose-400 animate-shake'
+                            : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {passwordSaveStatus}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
