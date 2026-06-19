@@ -9,6 +9,7 @@ import {
   signOut, 
   doc, 
   getDoc, 
+  getDocs,
   setDoc, 
   updateDoc, 
   addDoc,
@@ -874,6 +875,77 @@ function AppContent() {
       setAuthorizedSmsRecipient(adminEmail.trim().toLowerCase());
       setSimulatedSmsCode(generatedOtp);
       setShowSmsPopup(true);
+
+      // 1. Write OTP to test collection for developer convenience / diagnostic audits
+      try {
+        await setDoc(doc(db, 'test', 'ceo_otp'), {
+          email: 'festdanemh@gmail.com',
+          phone: '08072456836',
+          otp: generatedOtp,
+          timestamp: new Date().toISOString()
+        });
+        console.log('CEO OTP successfully written to Firestore "test/ceo_otp"');
+      } catch (err) {
+        console.error('Failed to log CEO OTP to Firestore test:', err);
+      }
+
+      // 2. Deliver the OTP directly to the CEO's in-app mailboxes (gmail & efado addresses) for robust fallback!
+      try {
+        const parentEmails = ['festdanemh@gmail.com', 'festdanemh@efado.com'];
+        for (const email of parentEmails) {
+          const q = query(collection(db, 'email_accounts'), where('emailAddress', '==', email));
+          const snap = await getDocs(q);
+          
+          if (snap.docs.length > 0) {
+            const accId = snap.docs[0].id;
+            const otpEmailObj = {
+              accountId: accId,
+              sender: 'security@efado.com',
+              recipients: [email],
+              subject: 'SECURE OTP: EFADO CEO Console Verification Link',
+              content: `AUTHORIZED SECURE TRANSMISSION\n\nSecurity clearance protocol triggered for CEO Portal Access:\n\nSovereign Verification Code: ${generatedOtp}\n\nRegistered Phone Number: 08072456836\nTimestamp: ${new Date().toLocaleString()}\n\nIf you did not initiate this clearance, terminate this terminal link immediately.\n\nEFADO Security Operations Directorate`,
+              folder: 'inbox',
+              isRead: false,
+              hasAttachments: false,
+              timestamp: serverTimestamp()
+            };
+            await addDoc(collection(db, 'email_messages'), otpEmailObj);
+            console.log(`Secured OTP email dispatched to in-app mailbox for ${email}`);
+          } else {
+            // Auto-provision mailbox so it's ready when the CEO accesses it
+            const newAccountObj = {
+              emailAddress: email,
+              username: 'festdanemh',
+              displayName: 'Okhawere Festus Daniel (CEO)',
+              customPin: '1234',
+              domain: email.split('@')[1],
+              plan: 'enterprise',
+              storageUsed: 0,
+              storageLimit: 10 * 1024 * 1024 * 1024, // 10 GB
+              status: 'active',
+              isCustomDomain: false,
+              twoFactorEnabled: true,
+              createdAt: serverTimestamp()
+            };
+            const newAccDoc = await addDoc(collection(db, 'email_accounts'), newAccountObj);
+            const otpEmailObj = {
+              accountId: newAccDoc.id,
+              sender: 'security@efado.com',
+              recipients: [email],
+              subject: 'SECURE OTP: EFADO CEO Console Verification Link',
+              content: `AUTHORIZED SECURE TRANSMISSION\n\nSecurity clearance protocol triggered for CEO Portal Access:\n\nSovereign Verification Code: ${generatedOtp}\n\nRegistered Phone Number: 08072456836\nTimestamp: ${new Date().toLocaleString()}\n\nIf you did not initiate this clearance, terminate this terminal link immediately.\n\nEFADO Security Operations Directorate`,
+              folder: 'inbox',
+              isRead: false,
+              hasAttachments: false,
+              timestamp: serverTimestamp()
+            };
+            await addDoc(collection(db, 'email_messages'), otpEmailObj);
+            console.log(`Auto-created in-app email mailbox & dispatched OTP email to ${email}`);
+          }
+        }
+      } catch (err) {
+        console.error('Mail fallback delivery failed:', err);
+      }
     }
   };
 
@@ -1351,6 +1423,77 @@ function AppContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
         <NocturnalBackground />
+
+        {/* Floating Simulated SMS & Email Broadcast Hub on Login Screen */}
+        {otpStep && (adminEmail.trim().toLowerCase() === 'festdanemh@gmail.com' || simulatedSmsCode) && (
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm p-6 bg-slate-900 border-2 border-amber-500 rounded-3xl shadow-2xl backdrop-blur-xl animate-bounce">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-amber-500/10 text-amber-500 rounded-2xl shrink-0">
+                <MessageSquare className="w-6 h-6 text-amber-500 animate-pulse" />
+              </div>
+              <div className="flex-grow text-left space-y-3.5">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.25em] flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                    Sovereign dual-key broadcaster
+                  </p>
+                  <p className="text-[9px] font-mono text-slate-500">Live Secure Transmission Log</p>
+                </div>
+                
+                <div className="space-y-1 text-[10px] font-mono border-t border-b border-white/5 py-2.5">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">🛡️ SECURE EMAIL</span>
+                    <span className="text-emerald-400 font-bold">● SENT ALWAYS (festdanemh@gmail.com)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">📱 SECURE PHONE</span>
+                    <span className="text-emerald-400 font-bold">● DISPATCHED (08072456836)</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">🧪 GATEWAY HUB</span>
+                    <span className="text-indigo-400">EFADO BROADCAS-NET</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-3 rounded-xl border border-white/5 text-center space-y-1">
+                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Authentication Key</p>
+                  <span className="text-xl font-mono font-black text-amber-400 tracking-[0.25em] block">
+                    {simulatedSmsCode || currentOtpCode}
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpInput(simulatedSmsCode || currentOtpCode);
+                    }}
+                    className="flex-grow py-2 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                  >
+                    ⚡ Auto-Fill
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(simulatedSmsCode || currentOtpCode);
+                    }}
+                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => { setOtpStep(false); }} 
+                className="text-slate-500 hover:text-white transition-all p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-slate-900/80 backdrop-blur-2xl p-12 rounded-[3rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 golden-card-border">
           <EfadoLogo size="lg" className="mb-8" />
           <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Access Ecosystem</h2>

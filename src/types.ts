@@ -553,6 +553,10 @@ export interface EmailAccount {
   id?: string;
   userId: string;
   emailAddress: string; // e.g., username@efado.com or username@custom.com
+  displayName?: string;
+  recoveryEmail?: string;
+  customPin?: string;
+  signature?: string;
   domain: string;
   plan: 'free' | 'basic' | 'premium' | 'business' | 'express';
   storageUsed: number; // in bytes
