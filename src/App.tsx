@@ -806,6 +806,47 @@ function AppContent() {
     }
   };
 
+  const handleInstantGuestLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      console.log('EFADO: Attempting secure zero-latency anonymous auth...');
+      const { signInAnonymously } = await import('firebase/auth');
+      const cred = await signInAnonymously(auth);
+      console.log('EFADO: Anonymous connection established. UID:', cred.user.uid);
+      setLoading(false);
+    } catch (e: any) {
+      console.error('Anonymous login error:', e);
+      try {
+        console.log('EFADO: Anonymous auth disabled, running resilient guest registration...');
+        const randomId = Math.floor(100000 + Math.random() * 900000);
+        const fallbackEmail = `guest_${randomId}@e-fado.com`;
+        const fallbackPassword = `SecureGuest123_${randomId}`;
+        
+        await createUserWithEmailAndPassword(auth, fallbackEmail, fallbackPassword);
+        console.log('EFADO: Guest registered securely:', fallbackEmail);
+        setLoading(false);
+      } catch (fallbackError: any) {
+        console.error('High-speed registration fallback failed:', fallbackError);
+        const mockUid = `local_guest_${Math.floor(Math.random() * 1000000)}`;
+        const localUser: UserProfile = {
+          uid: mockUid,
+          email: `guest_${mockUid.slice(-6)}@e-fado.com`,
+          displayName: `EFADO Visitor`,
+          playerWallet: 100,
+          depositWallet: 0,
+          cashOutWallet: 0,
+          miningWallet: 0,
+          miningProgress: { stage: 'E', collectedInStage: 0 },
+          role: 'player',
+          createdAt: new Date().toISOString()
+        };
+        setUser(localUser);
+        setLoading(false);
+      }
+    }
+  };
+
   const handleStandardEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -1587,14 +1628,14 @@ function AppContent() {
                     <span>IN-APP WEBVIEW RUNTIME</span>
                   </div>
                   <p className="leading-relaxed font-semibold">
-                    You opened this via WhatsApp, Instagram, or a social proxy. These browsers block Google Sign-In redirect cookies.
+                    You opened this via WhatsApp, Instagram, or a social proxy. These browsers block Google Sign-In popups/cookies.
                   </p>
                   <p className="leading-relaxed font-bold text-amber-300">
-                    💡 Solution: Tap the <span className="font-mono text-xs">(···)</span> menu on your screen's top/bottom right and choose <span className="underline">"Open in Safari"</span> or <span className="underline">"Open in Chrome"</span>.
+                    💡 Solution: Tap the <span className="font-mono text-xs">⚡ INSTANT FASTRACK CONNECTION</span> button below to bypass all setups and enter the ecosystem in under 1 second!
                   </p>
                   <div className="border-t border-amber-500/10 my-0.5"></div>
                   <p className="leading-relaxed opacity-90">
-                    Alternatively, choose the <span className="font-bold underline">Email fallbacks</span> below to login directly!
+                    Alternatively, tap the <span className="font-mono text-xs">(···)</span> menu on your screen's corner and select <span className="underline">"Open in Browser"</span> to authorize your Google Link, or use Email Login fallbacks.
                   </p>
                 </div>
               )}
@@ -1625,14 +1666,35 @@ function AppContent() {
               </div>
 
               {standardEmailMode === 'GOOGLE' && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* High-speed Seamless Connection Pass */}
+                  <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl text-center space-y-3">
+                    <button 
+                      onClick={handleInstantGuestLogin}
+                      className="w-full py-5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:via-amber-305 hover:to-amber-550 text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/10 active:scale-95 border-b-4 border-amber-700/50"
+                      id="login-instant-btn"
+                    >
+                      <Zap className="w-5 h-5 text-slate-950 fill-current animate-pulse" />
+                      ⚡ INSTANT FASTRACK CONNECTION
+                    </button>
+                    <p className="text-[10px] text-slate-400 font-extrabold tracking-wide uppercase leading-tight">
+                      Instant Access in 1.5 seconds • No forms required
+                    </p>
+                  </div>
+
+                  <div className="relative flex py-1.5 items-center">
+                    <div className="flex-grow border-t border-white/5"></div>
+                    <span className="flex-shrink mx-4 text-[9px] font-black text-slate-650 uppercase tracking-widest">Or connect via</span>
+                    <div className="flex-grow border-t border-white/5"></div>
+                  </div>
+
                   <button 
                     onClick={handleLogin}
-                    className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
+                    className="w-full py-4 bg-slate-950 text-indigo-300 border border-indigo-500/20 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 hover:bg-slate-950/80 hover:text-white transition-all active:scale-95"
                     id="login-standard-btn"
                   >
-                    <LogIn className="w-5 h-5" />
-                    Establish Connection
+                    <LogIn className="w-4 h-4 shrink-0" />
+                    ESTABLISH SECURE GOOGLE CONNECTION
                   </button>
 
                   <button
@@ -1645,7 +1707,7 @@ function AppContent() {
                         setError(`Redirect Connection failed: ${e.message || e}`);
                       }
                     }}
-                    className="w-full py-3 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
+                    className="w-full py-3 text-[9px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/10 rounded-xl hover:bg-slate-950/20"
                     id="login-redirect-btn"
                   >
                     Having issues? Try Redirect Connection

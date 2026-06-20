@@ -108,6 +108,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
   
   // Custom Registration form states
   const [newEmailUsername, setNewEmailUsername] = useState('');
+  const [selectedDomain, setSelectedDomain] = useState<'efado.com' | 'e-fado.com'>('e-fado.com');
   const [selectedPlan, setSelectedPlan] = useState<EmailPlan>(EMAIL_PLANS[0]);
   const [formDisplayName, setFormDisplayName] = useState(user.displayName || '');
   const [formRecoveryEmail, setFormRecoveryEmail] = useState(user.email || '');
@@ -207,7 +208,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
     setCreationError(null);
 
     try {
-      const emailAddress = `${rawUsername}@efado.com`;
+      const emailAddress = `${rawUsername}@${selectedDomain}`;
       
       // Step 1: Check if emailAddress is already taken
       const existingQuery = query(collection(db, 'email_accounts'), where('emailAddress', '==', emailAddress));
@@ -227,12 +228,12 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
         recoveryEmail: formRecoveryEmail.trim(),
         customPin: formCustomPin.trim(),
         signature: formSignature.trim(),
-        domain: 'efado.com',
+        domain: selectedDomain,
         plan: selectedPlan.id,
         storageUsed: 0,
         storageLimit: selectedPlan.storageLimit,
         status: 'active',
-        isCustomDomain: false,
+        isCustomDomain: selectedDomain === 'e-fado.com',
         twoFactorEnabled: true,
         createdAt: serverTimestamp()
       };
@@ -882,6 +883,37 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
           />
         </div>
 
+        {/* Real Domain Hosting & Delivery Integration Helper Card */}
+        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200/60 mt-4">
+          <div className="flex items-start gap-3">
+            <Globe className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                Real Domain Email Routing Guidance (e-fado.com)
+              </h4>
+              <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">
+                The in-app <span className="text-indigo-650 font-bold">EFADO Mailbox</span> is a closed intra-ecosystem ledger. For real global email exchange (sending/receiving from standard services like Gmail):
+              </p>
+              
+              <div className="mt-3 space-y-2 border-t border-slate-200/50 pt-3">
+                <div className="text-[10px] text-slate-600 leading-relaxed">
+                  <span className="font-bold text-slate-800">1. Domain Hyphenation:</span> Your domain name is <span className="font-mono text-indigo-600 font-bold bg-indigo-50 px-1 py-0.5 rounded">e-fado.com</span>. When sending real messages from Google, always address them to <span className="font-mono text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">username@e-fado.com</span>. Avoid sending to <span className="font-mono text-rose-600 font-bold bg-rose-50 px-1.5 py-0.5 rounded">efado.com</span> (missing the hyphen) as that domain can't be found.
+                </div>
+                <div className="text-[10px] text-slate-600 leading-relaxed">
+                  <span className="font-bold text-slate-800">2. Configure MX DNS Records:</span> For real emails to be funneled to your inbox, you must update the domain registrar entry (Namecheap, GoDaddy, Cloudflare, etc.) for <span className="font-mono text-slate-800">e-fado.com</span> with an email hosting provider like <span className="font-bold">Google Workspace (GSuite)</span> or <span className="font-bold">Zoho Business Mail</span>:
+                </div>
+                
+                <div className="bg-slate-900 text-slate-300 p-3 rounded-lg text-[9px] font-mono space-y-1.5 overflow-x-auto mt-2 select-all leading-normal">
+                  <div># MX (Mail Exchange) DNS Settings</div>
+                  <div>Type: MX | Host: @ | Value: mx.zoho.com (or gmr-smtp-in.l.google.com) | Priority: 10</div>
+                  <div className="pt-1"># SPF (Sender Policy Framework) Settings</div>
+                  <div>Type: TXT | Host: @ | Value: v=spf1 include:zoho.com include:_spf.google.com ~all</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="pt-5 border-t border-slate-100 flex gap-3">
           <button
             onClick={handleSaveSettings}
@@ -1049,16 +1081,24 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">Desired Username address</label>
-                <div className="relative">
+                <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="e.g. daniel"
                     value={newEmailUsername}
                     onChange={(e) => setNewEmailUsername(e.target.value.replace(/[^a-zA-Z0-9_.-]/g, ''))}
-                    className="w-full pl-5 pr-28 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-md font-black text-slate-900 focus:border-indigo-500 outline-none transition-all"
+                    className="flex-grow px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-md font-black text-slate-900 focus:border-indigo-500 outline-none transition-all"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-extrabold text-sm lowercase">@efado.com</span>
+                  <select
+                    value={selectedDomain}
+                    onChange={(e) => setSelectedDomain(e.target.value as 'efado.com' | 'e-fado.com')}
+                    className="px-4 py-3.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs font-black text-indigo-700 outline-none transition-all cursor-pointer hover:bg-indigo-100"
+                  >
+                    <option value="e-fado.com">@e-fado.com</option>
+                    <option value="efado.com">@efado.com</option>
+                  </select>
                 </div>
+                <p className="text-[9px] text-slate-400 mt-1 pl-1">Select e-fado.com to align with your official core hyphenated brand domain!</p>
               </div>
 
               <div>
