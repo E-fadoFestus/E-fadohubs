@@ -746,13 +746,11 @@ function AppContent() {
   const handleLogin = async () => {
     setError(null);
     try {
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      if (isMobile) {
-        console.log('Mobile device detected, using redirect login...');
-        await signInWithRedirect(auth, googleProvider);
-      } else {
-        await signInWithPopup(auth, googleProvider);
-      }
+      // Prioritize popup for ALL devices because e-fado.com uses a custom domain,
+      // and redirect login (signInWithRedirect) loses storage states (ITP) / loops infinitely on
+      // iOS Safari and modern mobile browsers like Chrome & Edge on iOS/Android due to third-party cookie restrictions.
+      console.log('Initiating secure pop-up connection...');
+      await signInWithPopup(auth, googleProvider);
     } catch (e: any) {
       console.error('Login error details:', e);
       if (e?.code === 'auth/unauthorized-domain') {
@@ -760,10 +758,10 @@ function AppContent() {
         setError(
           `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
         );
-      } else if (e?.code === 'auth/popup-blocked' || e?.message?.includes('popup')) {
-        // If popup was blocked, fall back immediately to redirect
+      } else if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/cancelled-popup-request' || e?.message?.includes('popup')) {
+        // Fallback to redirect ONLY if popup is blocked by browser-level pop-up blocker
         try {
-          console.log('Popup blocked, falling back to redirect login...');
+          console.log('Popup blocked or cancelled by user, falling back securely to redirect login...');
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectError: any) {
           setError(`Login failed: ${redirectError.message || redirectError}`);
