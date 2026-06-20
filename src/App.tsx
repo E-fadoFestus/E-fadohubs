@@ -185,12 +185,34 @@ export default function App() {
 }
 
 function AppContent() {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    // Attempt to load from cache for instant zero-latency UI rendering on app mount
+    const cached = localStorage.getItem('efado_cached_user');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        console.log('E-FADO: Cache Hit! Instant workspace rendering active.');
+        return parsed;
+      } catch (e) {
+        console.error('Failed to parse cached profile:', e);
+        return null;
+      }
+    }
+    return null;
+  });
   const { selectedCurrency, formatPrice } = useCurrency();
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    // If we have a cached user, we can render the dashboard immediately (no spinner needed)
+    const cached = localStorage.getItem('efado_cached_user');
+    if (cached) return false;
+    
+    // If no cache, but they had an active session, show loading while verifying auth
+    const sessionExists = localStorage.getItem('efado_user_session_exists') === 'true';
+    return sessionExists;
+  });
   const [isSpinning, setIsSpinning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveUsers, setLiveUsers] = useState(1240);
@@ -217,6 +239,16 @@ function AppContent() {
     };
     setIsInAppBrowser(isUserInAppBrowser());
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('efado_cached_user', JSON.stringify(user));
+      localStorage.setItem('efado_user_session_exists', 'true');
+    } else {
+      localStorage.removeItem('efado_cached_user');
+      localStorage.removeItem('efado_user_session_exists');
+    }
+  }, [user]);
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [dynamicCeoPassword, setDynamicCeoPassword] = useState<string>('EFADO_CEO_2026');
