@@ -1054,7 +1054,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             { id: 'withdrawals', icon: ArrowUpRight, label: 'Withdrawals' },
             { id: 'hubs', icon: Zap, label: 'Hubs' },
             { id: 'monetization', icon: Coins, label: 'Monetization' },
-            { id: 'announcements', icon: Megaphone, label: 'Broadcast' },
+            { id: 'announcements', icon: Megaphone, label: 'Announcement Platform' },
             { id: 'settings', icon: ShieldCheck, label: 'System' },
             { id: 'detective', icon: ShieldAlert, label: 'Detective Engine' },
             { id: 'support', icon: MessageSquare, label: 'Support Hub' }
@@ -1851,7 +1851,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         </div>
                         <div>
                           <p className="text-white font-medium">{a.message}</p>
-                          <p className="text-[10px] text-slate-500 mt-1">{a.timestamp?.toDate().toLocaleString()}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            {a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : new Date().toLocaleString()}
+                          </p>
                         </div>
                       </div>
                       {a.active && (

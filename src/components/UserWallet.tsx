@@ -96,6 +96,32 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   const [filterType, setFilterType] = useState('all');
   const [withdrawSource, setWithdrawSource] = useState<'cashOutWallet' | 'playerWallet'>('playerWallet');
 
+  // Dynamic Payment Methods State
+  const [paymentsList, setPaymentsList] = useState<PaymentMethod[]>(() => {
+    const saved = localStorage.getItem(`payment_methods_${user.uid}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved payment methods", e);
+      }
+    }
+    return [
+      { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
+      { id: 'pm2', type: 'bank_transfer', name: 'GTBank Account', details: '0123456789', isDefault: false },
+      { id: 'pm3', type: 'crypto', name: 'Bitcoin Wallet', details: 'bc1qxy2kg...z7v', isDefault: false },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`payment_methods_${user.uid}`, JSON.stringify(paymentsList));
+  }, [paymentsList, user.uid]);
+
+  const [showAddMethodModal, setShowAddMethodModal] = useState(false);
+  const [addMethodType, setAddMethodType] = useState<'credit_card' | 'bank_transfer' | 'crypto'>('credit_card');
+  const [addMethodName, setAddMethodName] = useState('');
+  const [addMethodDetails, setAddMethodDetails] = useState('');
+
   // Live account name automated query simulation
   const [isResolvingName, setIsResolvingName] = useState(false);
   const [resolvedStatusMessage, setResolvedStatusMessage] = useState<string | null>(null);
@@ -207,11 +233,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     b.name.toLowerCase().includes(bankSearch.toLowerCase()) || 
     b.code.toLowerCase().includes(bankSearch.toLowerCase())
   );
-  const paymentMethods: PaymentMethod[] = [
-    { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
-    { id: 'pm2', type: 'bank_transfer', name: 'GTBank Account', details: '0123456789', isDefault: false },
-    { id: 'pm3', type: 'crypto', name: 'Bitcoin Wallet', details: 'bc1qxy2kg...z7v', isDefault: false },
-  ];
+  const paymentMethods = paymentsList;
 
   const paymentCategories = [
     {
@@ -1526,10 +1548,23 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                               <p className="text-[10px] text-gray-700 font-medium">{pm.details}</p>
                             </div>
                           </div>
-                          <button className="text-[10px] font-bold text-red-500 hover:underline">Remove</button>
+                          <button 
+                            onClick={() => setPaymentsList(prev => prev.filter(p => p.id !== pm.id))}
+                            className="text-[10px] font-bold text-red-500 hover:underline"
+                          >
+                            Remove
+                          </button>
                         </div>
                       ))}
-                      <button className="w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-bold text-gray-400 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setAddMethodName('');
+                          setAddMethodDetails('');
+                          setAddMethodType('credit_card');
+                          setShowAddMethodModal(true);
+                        }}
+                        className="w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-bold text-gray-400 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                      >
                         <Plus className="w-4 h-4" /> Add New Method
                       </button>
                     </div>
@@ -1556,6 +1591,108 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
             userEmail={user.email}
             onClose={() => setSelectedReceiptTx(null)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAddMethodModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-100 shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowAddMethodModal(false)}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+
+              <h4 className="text-lg font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 mb-2">
+                <CreditCard className="w-5 h-5 text-indigo-600" /> New Payment Method
+              </h4>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 border-b border-gray-100 pb-4">
+                Add a secure deposit or cashout pathway
+              </p>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Method Type</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'credit_card', label: 'Credit Card' },
+                      { id: 'bank_transfer', label: 'Bank Account' },
+                      { id: 'crypto', label: 'Crypto Wallet' }
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setAddMethodType(t.id as any)}
+                        className={`py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all border ${
+                          addMethodType === t.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Method Label / Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Visa ending in 9901, OPay Account..."
+                    value={addMethodName}
+                    onChange={(e) => setAddMethodName(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500 transition-all animate-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Details (Card #, Account #, or Address)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. **** **** **** 9901, 0123456789, bc1q..."
+                    value={addMethodDetails}
+                    onChange={(e) => setAddMethodDetails(e.target.value)}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500 transition-all animate-none"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!addMethodName.trim() || !addMethodDetails.trim()) {
+                      alert("Please fill in all details");
+                      return;
+                    }
+                    const newPm: PaymentMethod = {
+                      id: 'pm_' + Date.now(),
+                      type: addMethodType,
+                      name: addMethodName.trim(),
+                      details: addMethodDetails.trim(),
+                      isDefault: false
+                    };
+                    setPaymentsList(prev => [...prev, newPm]);
+                    setShowAddMethodModal(false);
+                  }}
+                  className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-indigo-700 transition-all"
+                >
+                  Confirm & Save Method
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

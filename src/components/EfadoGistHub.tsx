@@ -77,6 +77,7 @@ import {
 } from '../types';
 import { 
   db, 
+  auth,
   collection, 
   addDoc, 
   onSnapshot, 
@@ -90,6 +91,7 @@ import {
   arrayUnion,
   arrayRemove
 } from '../firebase';
+import { updatePassword } from 'firebase/auth';
 import { MiningMiniCard, EfadoMining, AdvertisingMiniCard } from './EfadoMining';
 import { CurrencySelector } from './CurrencySelector';
 
@@ -284,6 +286,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [interactiveCalendarOpen, setInteractiveCalendarOpen] = useState(false);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<string | null>(null);
 
+  // Gist creation & Password updates
+  const [newPostText, setNewPostText] = useState('');
+  const [newPostMediaUrl, setNewPostMediaUrl] = useState('');
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState({ text: '', type: '' });
+
   // Interaction Handlers
   const handleLikePost = async (id: string, currentlyLiked: boolean) => {
     try {
@@ -401,20 +411,82 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   ];
 
   useEffect(() => {
-    const postsQuery = query(collection(db, 'social_posts'), orderBy('createdAt', 'desc'), limit(20));
-    const reelsQuery = query(collection(db, 'reels'), orderBy('createdAt', 'desc'), limit(10));
+    // Index-free queries for maximum database resilience
+    const postsQuery = query(collection(db, 'social_posts'), limit(50));
+    const reelsQuery = query(collection(db, 'reels'), limit(30));
     const adsQuery = query(collection(db, 'ads'), where('status', '==', 'active'));
 
+    const DEFAULT_MOCK_POSTS: SocialPost[] = [
+      {
+        id: 'mock-1',
+        authorId: 'system-1',
+        authorName: 'Dr. Sarah (Lead Eng)',
+        authorPhoto: 'https://picsum.photos/seed/sarah/100/100',
+        content: "Deploying the sovereign EFADO digital architecture with 100% end-to-end encryption protocols. Welcome to the Gist Hub! Express your thoughts freely, connect in specialized hubs, and explore creator monetization channels! 🛡️🚀",
+        likes: ['user-1'],
+        comments: [],
+        category: 'TECH',
+        createdAt: { seconds: Math.floor(Date.now() / 1000) - 300 }
+      },
+      {
+        id: 'mock-2',
+        authorId: 'system-2',
+        authorName: 'Minister Caleb',
+        authorPhoto: 'https://picsum.photos/seed/caleb/100/100',
+        content: "Integrity is the chief cornerstone of community-building. In these modern spaces, we seek fruitful relationships, professional excellence, and wisdom. Join the Church Administration or Marriage and Courtship hubs for deep discourse! 📖✨",
+        likes: [],
+        comments: [],
+        category: 'RELIGIOUS',
+        createdAt: { seconds: Math.floor(Date.now() / 1000) - 1800 }
+      },
+      {
+        id: 'mock-3',
+        authorId: 'system-3',
+        authorName: 'Victoria (Business Head)',
+        authorPhoto: 'https://picsum.photos/seed/victoria/100/100',
+        content: "A professional network thrives on collaborative feedback and mutual mentorship. We are rolling out creator monetization payouts so active gisters can monetize their community traffic! Let's build together! 💼💰",
+        likes: ['user-2', 'user-3'],
+        comments: [],
+        category: 'BUSINESS',
+        createdAt: { seconds: Math.floor(Date.now() / 1000) - 3600 }
+      }
+    ];
+
     const unsubPosts = onSnapshot(postsQuery, (snap) => {
-      setPosts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPost)));
+      let fetched = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPost));
+      // Sort client-side by createdAt descending
+      fetched.sort((a, b) => {
+        const tA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime()/1000 : 0);
+        const tB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime()/1000 : 0);
+        return tB - tA;
+      });
+      if (fetched.length > 0) {
+        setPosts(fetched);
+      } else {
+        setPosts(DEFAULT_MOCK_POSTS);
+      }
+    }, (err) => {
+      console.error("Failed to load posts, using fallback posts:", err);
+      setPosts(DEFAULT_MOCK_POSTS);
     });
 
     const unsubReels = onSnapshot(reelsQuery, (snap) => {
-      setReels(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reel)));
+      let fetched = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reel));
+      // Sort client-side by createdAt descending
+      fetched.sort((a, b) => {
+        const tA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime()/1000 : 0);
+        const tB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime()/1000 : 0);
+        return tB - tA;
+      });
+      setReels(fetched);
+    }, (err) => {
+      console.error("Failed to load reels:", err);
     });
 
     const unsubAds = onSnapshot(adsQuery, (snap) => {
       setAds(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Advertisement)));
+    }, (err) => {
+      console.error("Failed to load ads:", err);
     });
 
     setLoading(false);
@@ -425,13 +497,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     };
   }, []);
 
-  // Synchronise Live Chat Room Messages from Firestore
+  // Synchronise Live Chat Room Messages from Firestore (Index-Free Client-Side Sorted Query)
   useEffect(() => {
     if (activeView !== 'CHAT') return;
     const messagesQuery = query(
       collection(db, 'gist_chat_messages'),
       where('roomId', '==', activeChatRoomId),
-      orderBy('timestamp', 'asc'),
       limit(100)
     );
 
@@ -440,9 +511,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         id: doc.id,
         ...doc.data()
       }));
+      // Sort client-side by timestamp (safe for server timestamp and Date objects)
+      dbMsgs.sort((a: any, b: any) => {
+        const tA = a.timestamp?.seconds || (a.timestamp instanceof Date ? a.timestamp.getTime()/1000 : 0);
+        const tB = b.timestamp?.seconds || (b.timestamp instanceof Date ? b.timestamp.getTime()/1000 : 0);
+        return tA - tB;
+      });
       setMessages(dbMsgs as any);
     }, (err) => {
-      console.error("Error loading Gist Hub live messages:", err);
+      console.error("Error loading Gist Hub live messages (Index-free fallback active):", err);
     });
 
     return unsubscribe;
@@ -1047,25 +1124,80 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
                         <textarea 
                           placeholder={`What's the viral gist today, ${user.displayName?.split(' ')[0] || 'Friend'}?`}
-                          className="flex-grow py-4 px-0 bg-transparent border-none focus:ring-0 text-xl font-bold text-white placeholder:text-slate-500 resize-none h-24"
+                          value={newPostText}
+                          onChange={(e) => setNewPostText(e.target.value)}
+                          className="flex-grow py-4 px-0 bg-transparent border-none focus:ring-0 text-xl font-bold text-white placeholder:text-slate-500 resize-none h-24 whitespace-pre-wrap outline-none"
                         />
                       </div>
+
+                      {showMediaInput && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="mb-6 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4"
+                        >
+                          <input 
+                            type="text"
+                            placeholder="Paste image or video URL (supports direct links)..."
+                            value={newPostMediaUrl}
+                            onChange={(e) => setNewPostMediaUrl(e.target.value)}
+                            className="bg-transparent border-none text-xs text-white focus:ring-0 flex-grow outline-none font-semibold"
+                          />
+                          {newPostMediaUrl && (
+                            <button 
+                              onClick={() => setNewPostMediaUrl('')}
+                              className="text-[9px] font-black text-rose-400 hover:text-rose-300 uppercase tracking-widest"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </motion.div>
+                      )}
+
                       <div className="flex items-center justify-between pt-6 border-t border-white/5">
                         <div className="flex items-center gap-1 sm:gap-3">
-                          <button className="p-3 text-indigo-400 hover:bg-white/5 rounded-xl transition-all group/tool">
+                          <button 
+                            type="button"
+                            onClick={() => setShowMediaInput(!showMediaInput)}
+                            className={`p-3 rounded-xl transition-all group/tool ${showMediaInput ? 'bg-indigo-600/20 text-indigo-400' : 'text-indigo-400 hover:bg-white/5'}`}
+                            title="Add Image URL"
+                          >
                             <ImageIcon className="w-5 h-5" />
                           </button>
-                          <button className="p-3 text-rose-400 hover:bg-white/5 rounded-xl transition-all group/tool">
+                          <button 
+                            type="button"
+                            onClick={() => setShowMediaInput(!showMediaInput)}
+                            className={`p-3 rounded-xl transition-all group/tool ${showMediaInput ? 'bg-indigo-600/20 text-rose-400' : 'text-rose-400 hover:bg-white/5'}`}
+                            title="Add Video URL"
+                          >
                             <VideoIcon className="w-5 h-5" />
                           </button>
-                          <button className="p-3 text-emerald-400 hover:bg-white/5 rounded-xl transition-all group/tool">
+                          <button type="button" className="p-3 text-emerald-400 hover:bg-white/5 rounded-xl transition-all group/tool">
                             <BarChart3 className="w-5 h-5" />
                           </button>
-                          <button className="p-3 text-amber-400 hover:bg-white/5 rounded-xl transition-all group/tool">
+                          <button type="button" className="p-3 text-amber-400 hover:bg-white/5 rounded-xl transition-all group/tool">
                             <Plus className="w-5 h-5" />
                           </button>
                         </div>
-                        <button className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all">
+                        <button 
+                          onClick={async () => {
+                            if (!newPostText.trim()) return;
+                            const mediaArr = [];
+                            if (newPostMediaUrl.trim()) {
+                              // Auto detect format or default to image
+                              const isVideo = newPostMediaUrl.match(/\.(mp4|webm|ogg|mov)/i);
+                              mediaArr.push({
+                                type: isVideo ? 'video' : 'image' as const,
+                                url: newPostMediaUrl.trim()
+                              });
+                            }
+                            await handleCreatePost(newPostText, mediaArr);
+                            setNewPostText('');
+                            setNewPostMediaUrl('');
+                            setShowMediaInput(false);
+                          }}
+                          className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+                        >
                           Post Gist
                         </button>
                       </div>
@@ -1939,6 +2071,82 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Gists</p>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Security Credentials Card */}
+                  <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[3.5rem] p-12 overflow-hidden shadow-2xl relative group mt-8">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-white/5 pb-8">
+                      <div>
+                        <h4 className="text-xl font-black text-white uppercase tracking-tight italic flex items-center gap-2">
+                          <Lock className="w-5 h-5 text-amber-400" /> Security Credentials
+                        </h4>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                          Manage account security and update passcodes instantly under threat
+                        </p>
+                      </div>
+                      <div className="px-4 py-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-xl flex items-center gap-2 self-start md:self-auto">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Connection Safe</span>
+                      </div>
+                    </div>
+
+                    <div className="max-w-md space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">New Secret Password</label>
+                        <div className="relative">
+                          <input 
+                            type="password"
+                            placeholder="Enter new strong passcode..."
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/50"
+                          />
+                        </div>
+                      </div>
+
+                      {passwordStatus.text && (
+                        <div className={`p-4 rounded-xl text-xs font-bold uppercase tracking-widest border ${
+                          passwordStatus.type === 'SUCCESS' 
+                            ? 'bg-emerald-500/15 border-emerald-500/20 text-emerald-400' 
+                            : 'bg-rose-500/15 border-rose-500/20 text-rose-400'
+                        }`}>
+                          {passwordStatus.text}
+                        </div>
+                      )}
+
+                      <button 
+                        disabled={isUpdatingPassword}
+                        onClick={async () => {
+                          if (!newPassword || newPassword.length < 6) {
+                            setPasswordStatus({ text: 'Password must be at least 6 characters long.', type: 'ERROR' });
+                            return;
+                          }
+                          setIsUpdatingPassword(true);
+                          setPasswordStatus({ text: '', type: '' });
+                          try {
+                            if (auth.currentUser) {
+                              await updatePassword(auth.currentUser, newPassword);
+                              setPasswordStatus({ text: 'Sovereign passcode updated successfully. Keep this credential safe!', type: 'SUCCESS' });
+                              setNewPassword('');
+                            } else {
+                              setPasswordStatus({ text: 'No active user found. Please authenticate.', type: 'ERROR' });
+                            }
+                          } catch (err: any) {
+                            console.error("Error updating password:", err);
+                            setPasswordStatus({ 
+                              text: err?.message || 'Failed to update passcode. Try logging out and back in to refresh credentials.', 
+                              type: 'ERROR' 
+                            });
+                          } finally {
+                            setIsUpdatingPassword(false);
+                          }
+                        }}
+                        className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-50 active:scale-[0.98] rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isUpdatingPassword ? 'Synchronising Key...' : 'Update Security Passcode'}
+                      </button>
                     </div>
                   </div>
                 </motion.div>
