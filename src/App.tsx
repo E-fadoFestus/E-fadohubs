@@ -1620,26 +1620,6 @@ function AppContent() {
 
           {loginMode === 'STANDARD' ? (
             <div className="space-y-4">
-              {/* In-app Browser Sandbox Alert Box */}
-              {isInAppBrowser && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col gap-2 text-left text-[11px] text-amber-400">
-                  <div className="flex items-center gap-2 font-black tracking-widest text-[9px]">
-                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>IN-APP WEBVIEW RUNTIME</span>
-                  </div>
-                  <p className="leading-relaxed font-semibold">
-                    You opened this via WhatsApp, Instagram, or a social proxy. These browsers block Google Sign-In popups/cookies.
-                  </p>
-                  <p className="leading-relaxed font-bold text-amber-300">
-                    💡 Solution: Tap the <span className="font-mono text-xs">⚡ INSTANT FASTRACK CONNECTION</span> button below to bypass all setups and enter the ecosystem in under 1 second!
-                  </p>
-                  <div className="border-t border-amber-500/10 my-0.5"></div>
-                  <p className="leading-relaxed opacity-90">
-                    Alternatively, tap the <span className="font-mono text-xs">(···)</span> menu on your screen's corner and select <span className="underline">"Open in Browser"</span> to authorize your Google Link, or use Email Login fallbacks.
-                  </p>
-                </div>
-              )}
-
               {/* Sub-selector for Google vs Email Backup */}
               <div className="flex bg-slate-950/40 p-1 rounded-xl border border-white/5 text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-2">
                 <button
