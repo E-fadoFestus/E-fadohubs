@@ -236,6 +236,24 @@ import { ReelCreator } from './ReelCreator';
 import { ReelFeed } from './ReelFeed';
 import { SovereignGroupArena } from './SovereignGroupArena';
 
+const PRESET_EMOJIS = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+  '🙂', '😉', '😍', '🥰', '😘', '🤪', '😜', '🤑', '😎', '🤓',
+  '🧐', '🚀', '🔥', '💻', '💡', '📈', '💎', '🙌', '💯', '🤝',
+  '👏', '🥳', '😱', '🤫', '👀', '✨', '🎉', '🌟', '👍', '❤️'
+];
+
+const PRESET_GIFS = [
+  { name: 'Mind Blown', url: 'https://media.giphy.com/media/2rqEdFksE5gUo/giphy.gif' },
+  { name: 'Clapping', url: 'https://media.giphy.com/media/nbvFV5D3Adc6fceduU/giphy.gif' },
+  { name: 'Excited', url: 'https://media.giphy.com/media/lz02c8ctM99BC8L671/giphy.gif' },
+  { name: 'Popcorn', url: 'https://media.giphy.com/media/hVTouqNmVKiNa/giphy.gif' },
+  { name: 'Coding', url: 'https://media.giphy.com/media/QuxqWk7m9g3gRC5gss/giphy.gif' },
+  { name: 'Celebrate', url: 'https://media.giphy.com/media/26tPplGWjN0x96D6g/giphy.gif' },
+  { name: 'Shocked', url: 'https://media.giphy.com/media/vQqeT3AYg8S5O/giphy.gif' },
+  { name: 'Success', url: 'https://media.giphy.com/media/l0HlIDueXmc89pCC4/giphy.gif' }
+];
+
 interface EfadoGistHubProps {
   user: UserProfile;
   onClose: () => void;
@@ -290,6 +308,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [newPostText, setNewPostText] = useState('');
   const [newPostMediaUrl, setNewPostMediaUrl] = useState('');
   const [showMediaInput, setShowMediaInput] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showEmojiPickerChat, setShowEmojiPickerChat] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showGifPickerChat, setShowGifPickerChat] = useState(false);
+  const [chatAttachedMediaUrl, setChatAttachedMediaUrl] = useState('');
+  const [showPollSetup, setShowPollSetup] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptionA, setPollOptionA] = useState('');
+  const [pollOptionB, setPollOptionB] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState({ text: '', type: '' });
@@ -334,18 +361,154 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   };
 
   const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER') => {
-    if (file.size > 1.5 * 1024 * 1024) {
-      alert("Image size must be smaller than 1.5MB to save securely.");
-      return;
-    }
     const reader = new FileReader();
     reader.onloadend = () => {
       if (reader.result) {
-        if (type === 'AVATAR') {
-          setEditPhotoURL(reader.result as string);
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Constraints for ultra-fast, Firestore-friendly image footprints
+          const maxWidth = type === 'AVATAR' ? 300 : 800;
+          const maxHeight = type === 'AVATAR' ? 300 : 450;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Downsample with a quality rating of 0.65 to ensure high density but tiny bytes size
+            const compressed = canvas.toDataURL('image/jpeg', 0.65);
+            if (type === 'AVATAR') {
+              setEditPhotoURL(compressed);
+            } else {
+              setEditCoverPhotoURL(compressed);
+            }
+          }
+        };
+        img.onerror = () => {
+          alert("Selected file could not be loaded as a valid image. Please select a PNG or JPEG.");
+        };
+      }
+    };
+    reader.onerror = () => {
+      alert("Error reading file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFeedMediaUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'video' && file.size > 2 * 1024 * 1024) {
+      alert("This video file is too massive for Firestore direct embedding (Max 2MB). Direct video links are recommend!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        if (type === 'image') {
+          const img = new Image();
+          img.src = reader.result as string;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const maxWidth = 800;
+            const maxHeight = 600;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressed = canvas.toDataURL('image/jpeg', 0.65);
+              setNewPostMediaUrl(compressed);
+              setShowMediaInput(true);
+            }
+          };
+          img.onerror = () => {
+            alert("Error rendering image upload. Try a standard JPEG or PNG.");
+          };
         } else {
-          setEditCoverPhotoURL(reader.result as string);
+          setNewPostMediaUrl(reader.result as string);
+          setShowMediaInput(true);
         }
+      }
+    };
+    reader.onerror = () => {
+      alert("Error reading file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleChatMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxWidth = 500;
+          const maxHeight = 400;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', 0.6);
+            setChatAttachedMediaUrl(compressed);
+          }
+        };
       }
     };
     reader.readAsDataURL(file);
@@ -606,10 +769,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!newMessageText.trim() || isSendingMessage) return;
+    if (!newMessageText.trim() && !chatAttachedMediaUrl.trim()) return;
+    if (isSendingMessage) return;
 
     const text = newMessageText.trim();
+    const media = chatAttachedMediaUrl.trim();
     setNewMessageText('');
+    setChatAttachedMediaUrl('');
     setIsSendingMessage(true);
 
     try {
@@ -619,12 +785,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         senderName: user.displayName || user.email.split('@')[0],
         senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
         content: text,
+        mediaUrl: media || null,
         timestamp: serverTimestamp()
       });
 
       // Simulate live tactical reply
       setTimeout(async () => {
-        let reply = "Affirmative. Command received.";
+        let reply = "Affirmative. Command received with high status integrity.";
         let senderName = "System";
         let senderPhoto = "https://picsum.photos/seed/system/100/100";
         
@@ -667,9 +834,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     }
   };
 
-  const handleCreatePost = async (content: string, media?: any) => {
+  const handleCreatePost = async (content: string, media?: any, poll?: any) => {
     try {
-      await addDoc(collection(db, 'social_posts'), {
+      const postData: any = {
         authorId: user.uid,
         authorName: user.displayName || user.email,
         authorPhoto: user.photoURL,
@@ -678,9 +845,55 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         likes: [],
         comments: [],
         createdAt: serverTimestamp()
-      });
+      };
+      if (poll) {
+        postData.poll = poll;
+      }
+      await addDoc(collection(db, 'social_posts'), postData);
     } catch (err) {
       console.error("Error creating post:", err);
+    }
+  };
+
+  const handleFollowUser = async (authorId: string) => {
+    if (authorId === user.uid) return;
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const isFollowing = user.following?.includes(authorId);
+      await updateDoc(userRef, {
+        following: isFollowing ? arrayRemove(authorId) : arrayUnion(authorId)
+      });
+      console.log("Follow toggled for", authorId);
+    } catch (err) {
+      console.error("Error toggling follow:", err);
+    }
+  };
+
+  const handleVotePoll = async (postId: string, optionIndex: number) => {
+    try {
+      const postRef = doc(db, 'social_posts', postId);
+      const post = posts.find(p => p.id === postId);
+      if (!post || !post.poll) return;
+
+      const updatedPoll = { ...post.poll };
+      updatedPoll.options = updatedPoll.options.map((opt, idx) => {
+        const hasVoted = opt.votes.includes(user.uid);
+        let nextVotes = [...opt.votes];
+        if (hasVoted) {
+          nextVotes = nextVotes.filter(uid => uid !== user.uid);
+        }
+        if (idx === optionIndex) {
+          nextVotes.push(user.uid);
+        }
+        return {
+          ...opt,
+          votes: nextVotes
+        };
+      });
+
+      await updateDoc(postRef, { poll: updatedPoll });
+    } catch (err) {
+      console.error("Error voting on poll:", err);
     }
   };
 
@@ -1175,6 +1388,22 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                     {/* Create Post Social Style */}
                     <div className="bg-slate-900/60 border border-white/10 p-8 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+                      {/* Hidden input structures for post file uploads */}
+                      <input 
+                        type="file" 
+                        id="feed-post-image-uploader" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => handleFeedMediaUpload(e, 'image')} 
+                      />
+                      <input 
+                        type="file" 
+                        id="feed-post-video-uploader" 
+                        accept="video/*" 
+                        className="hidden" 
+                        onChange={(e) => handleFeedMediaUpload(e, 'video')} 
+                      />
+
                       <div className="flex gap-4 mb-6">
                         <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 overflow-hidden flex-shrink-0 border-2 border-indigo-500/30">
                           <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -1187,7 +1416,25 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         />
                       </div>
 
-                      {showMediaInput && (
+                      {/* Attached Media Preview Frame */}
+                      {newPostMediaUrl && (
+                        <div className="relative rounded-[2.5rem] overflow-hidden mb-6 border border-white/10 max-h-80 max-w-md mx-auto group/preview shadow-2xl">
+                          {newPostMediaUrl.startsWith('data:video') || newPostMediaUrl.includes('.mp4') || newPostMediaUrl.includes('.webm') ? (
+                            <video src={newPostMediaUrl} controls className="w-full h-auto object-contain max-h-80" />
+                          ) : (
+                            <img src={newPostMediaUrl} alt="Attached Media Preview" className="w-full h-auto object-cover max-h-80" />
+                          )}
+                          <button 
+                            type="button"
+                            onClick={() => setNewPostMediaUrl('')}
+                            className="absolute top-4 right-4 p-3 bg-slate-950/80 hover:bg-rose-600 rounded-full text-white transition-all shadow-lg"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+
+                      {showMediaInput && !newPostMediaUrl && (
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
@@ -1195,7 +1442,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         >
                           <input 
                             type="text"
-                            placeholder="Paste image or video URL (supports direct links)..."
+                            placeholder="Paste image or video URL (or click upload icon below)..."
                             value={newPostMediaUrl}
                             onChange={(e) => setNewPostMediaUrl(e.target.value)}
                             className="bg-transparent border-none text-xs text-white focus:ring-0 flex-grow outline-none font-semibold"
@@ -1211,47 +1458,198 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </motion.div>
                       )}
 
+                      {/* Interactive Poll Creator Component Panel */}
+                      {showPollSetup && (
+                        <div className="mb-6 p-6 bg-slate-950/80 border border-white/10 rounded-[2rem] space-y-4 shadow-xl">
+                          <h5 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4" /> Create Interactive Gist Poll
+                          </h5>
+                          <input 
+                            type="text" 
+                            placeholder="Type Poll Question / Prompt..." 
+                            value={pollQuestion}
+                            onChange={(e) => setPollQuestion(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <input 
+                              type="text" 
+                              placeholder="Choice A" 
+                              value={pollOptionA}
+                              onChange={(e) => setPollOptionA(e.target.value)}
+                              className="bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                            />
+                            <input 
+                              type="text" 
+                              placeholder="Choice B" 
+                              value={pollOptionB}
+                              onChange={(e) => setPollOptionB(e.target.value)}
+                              className="bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                            />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                if (!pollQuestion.trim() || !pollOptionA.trim() || !pollOptionB.trim()) {
+                                  alert("Please specify a question and both poll options!");
+                                  return;
+                                }
+                                setShowPollSetup(false);
+                              }}
+                              className="px-5 py-2.5 bg-emerald-600 text-white font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-emerald-500 transition-all"
+                            >
+                              Attach Poll
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setPollQuestion('');
+                                setPollOptionA('');
+                                setPollOptionB('');
+                                setShowPollSetup(false);
+                              }}
+                              className="px-5 py-2.5 bg-slate-800 text-slate-400 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Inline Emoji Picker Panel */}
+                      {showEmojiPicker && (
+                        <div className="absolute z-50 bottom-24 left-4 right-4 p-4 bg-slate-950 border border-white/15 rounded-3xl grid grid-cols-8 gap-2 shadow-2xl">
+                          {PRESET_EMOJIS.map(emo => (
+                            <button 
+                              type="button"
+                              key={emo}
+                              onClick={() => {
+                                setNewPostText(prev => prev + emo);
+                                setShowEmojiPicker(false);
+                              }}
+                              className="text-2xl p-2 hover:bg-white/10 rounded-xl transition-all"
+                            >
+                              {emo}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Inline Preset GIF Picker Trays */}
+                      {showGifPicker && (
+                        <div className="absolute z-50 bottom-24 left-4 right-4 p-6 bg-slate-950 border border-white/15 rounded-3xl shadow-2xl">
+                          <div className="flex justify-between items-center mb-4">
+                            <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Select Reaction GIF Attachment</h6>
+                            <button type="button" onClick={() => setShowGifPicker(false)} className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400">Close</button>
+                          </div>
+                          <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar">
+                            {PRESET_GIFS.map((gif, index) => (
+                              <button 
+                                type="button"
+                                key={index}
+                                onClick={() => {
+                                  setNewPostMediaUrl(gif.url);
+                                  setShowGifPicker(false);
+                                }}
+                                className="relative rounded-xl overflow-hidden hover:scale-105 transition-all aspect-video border border-white/5 active:ring-2 active:ring-indigo-500"
+                              >
+                                <img src={gif.url} alt={gif.name} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 flex items-end p-2">
+                                  <span className="text-[8px] font-black text-white uppercase">{gif.name}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between pt-6 border-t border-white/5">
                         <div className="flex items-center gap-1 sm:gap-3">
                           <button 
                             type="button"
-                            onClick={() => setShowMediaInput(!showMediaInput)}
-                            className={`p-3 rounded-xl transition-all group/tool ${showMediaInput ? 'bg-indigo-600/20 text-indigo-400' : 'text-indigo-400 hover:bg-white/5'}`}
-                            title="Add Image URL"
+                            onClick={() => {
+                              document.getElementById('feed-post-image-uploader')?.click();
+                            }}
+                            className="p-3 rounded-xl transition-all text-indigo-400 hover:bg-white/5"
+                            title="Upload Custom Image"
                           >
                             <ImageIcon className="w-5 h-5" />
                           </button>
                           <button 
                             type="button"
-                            onClick={() => setShowMediaInput(!showMediaInput)}
-                            className={`p-3 rounded-xl transition-all group/tool ${showMediaInput ? 'bg-indigo-600/20 text-rose-400' : 'text-rose-400 hover:bg-white/5'}`}
-                            title="Add Video URL"
+                            onClick={() => {
+                              document.getElementById('feed-post-video-uploader')?.click();
+                            }}
+                            className="p-3 rounded-xl transition-all text-rose-400 hover:bg-white/5"
+                            title="Upload Custom Video"
                           >
                             <VideoIcon className="w-5 h-5" />
                           </button>
-                          <button type="button" className="p-3 text-emerald-400 hover:bg-white/5 rounded-xl transition-all group/tool">
+                          <button 
+                            type="button"
+                            onClick={() => setShowPollSetup(!showPollSetup)}
+                            className={`p-3 rounded-xl transition-all ${showPollSetup ? 'bg-emerald-600/20 text-emerald-400' : 'text-emerald-400 hover:bg-white/5'}`}
+                            title="Create Interactive Poll"
+                          >
                             <BarChart3 className="w-5 h-5" />
                           </button>
-                          <button type="button" className="p-3 text-amber-400 hover:bg-white/5 rounded-xl transition-all group/tool">
-                            <Plus className="w-5 h-5" />
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setShowEmojiPicker(!showEmojiPicker);
+                              setShowGifPicker(false);
+                            }}
+                            className={`p-3 rounded-xl transition-all ${showEmojiPicker ? 'bg-amber-600/20 text-amber-400' : 'text-amber-400 hover:bg-white/5'}`}
+                            title="Insert Emoji"
+                          >
+                            <Smile className="w-5 h-5" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setShowGifPicker(!showGifPicker);
+                              setShowEmojiPicker(false);
+                            }}
+                            className={`p-2.5 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${showGifPicker ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
+                            title="Share reaction GIF"
+                          >
+                            GIF
                           </button>
                         </div>
                         <button 
                           onClick={async () => {
-                            if (!newPostText.trim()) return;
+                            if (!newPostText.trim() && !newPostMediaUrl.trim() && !pollQuestion.trim()) return;
                             const mediaArr = [];
                             if (newPostMediaUrl.trim()) {
-                              // Auto detect format or default to image
-                              const isVideo = newPostMediaUrl.match(/\.(mp4|webm|ogg|mov)/i);
+                              const isVideo = newPostMediaUrl.match(/\.(mp4|webm|ogg|mov)/i) || newPostMediaUrl.startsWith('data:video');
                               mediaArr.push({
-                                type: isVideo ? 'video' : 'image' as const,
+                                type: (isVideo ? 'video' : 'image') as any,
                                 url: newPostMediaUrl.trim()
                               });
                             }
-                            await handleCreatePost(newPostText, mediaArr);
+                            
+                            let attachedPoll = undefined;
+                            if (pollQuestion.trim() && pollOptionA.trim() && pollOptionB.trim()) {
+                              attachedPoll = {
+                                question: pollQuestion.trim(),
+                                options: [
+                                  { text: pollOptionA.trim(), votes: [] },
+                                  { text: pollOptionB.trim(), votes: [] }
+                                ]
+                              };
+                            }
+
+                            await handleCreatePost(newPostText, mediaArr, attachedPoll);
                             setNewPostText('');
                             setNewPostMediaUrl('');
+                            setPollQuestion('');
+                            setPollOptionA('');
+                            setPollOptionB('');
                             setShowMediaInput(false);
+                            setShowPollSetup(false);
+                            setShowEmojiPicker(false);
+                            setShowGifPicker(false);
                           }}
                           className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
                         >
@@ -1281,7 +1679,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button className="px-5 py-2 bg-white/5 text-white rounded-full text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-sm">Follow</button>
+                                {post.authorId !== user.uid && (
+                                  <button 
+                                    onClick={() => handleFollowUser(post.authorId)}
+                                    className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                                      user.following?.includes(post.authorId) 
+                                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30' 
+                                        : 'bg-white/5 text-white hover:bg-indigo-600'
+                                    }`}
+                                  >
+                                    {user.following?.includes(post.authorId) ? '✓ Following' : 'Follow'}
+                                  </button>
+                                )}
                                 <button className="p-2 text-slate-500 hover:text-white transition-colors">
                                   <MoreVertical className="w-5 h-5" />
                                 </button>
@@ -1291,6 +1700,46 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             <p className="text-white text-lg leading-relaxed mb-8 font-black">
                               {post.content}
                             </p>
+
+                            {/* Render attached interactive Gist Poll */}
+                            {post.poll && (
+                              <div className="mb-8 p-6 bg-slate-950/40 border border-white/5 rounded-3xl space-y-4">
+                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  📊 Gist Poll: {post.poll.question}
+                                </h6>
+                                <div className="space-y-3">
+                                  {post.poll.options.map((opt, oIdx) => {
+                                    const totalVotes = post.poll.options.reduce((sum, o) => sum + o.votes.length, 0);
+                                    const pct = totalVotes > 0 ? Math.round((opt.votes.length / totalVotes) * 100) : 0;
+                                    const hasVoted = opt.votes.includes(user.uid);
+                                    return (
+                                      <button 
+                                        type="button"
+                                        key={oIdx}
+                                        onClick={() => post.id && handleVotePoll(post.id, oIdx)}
+                                        className={`w-full relative p-4 rounded-2xl flex items-center justify-between overflow-hidden border transition-all text-xs font-bold ${
+                                          hasVoted 
+                                            ? 'bg-emerald-600/10 border-emerald-500/50 text-emerald-400' 
+                                            : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                                        }`}
+                                      >
+                                        <div 
+                                          className="absolute left-0 top-0 bottom-0 bg-indigo-600/10 transition-all duration-700" 
+                                          style={{ width: `${pct}%` }}
+                                        />
+                                        <span className="relative z-10 flex items-center gap-2">
+                                          {hasVoted && <span className="text-emerald-500 font-extrabold">✓</span>}
+                                          {opt.text}
+                                        </span>
+                                        <span className="relative z-10 font-mono text-[10px] text-slate-400">
+                                          {pct}% ({opt.votes.length} votes)
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
 
                             {post.media && post.media.length > 0 && (
                               <div className="rounded-[2.5rem] overflow-hidden mb-8 border border-white/5 shadow-inner group-hover:scale-[1.01] transition-transform duration-700">
@@ -1654,9 +2103,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               const isSelf = msg.senderId === user.uid;
                               if (isSelf) {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[70%] ml-auto">
+                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[70%] ml-auto animate-fade-in animate-duration-300">
                                     <div className="p-5 bg-indigo-600 text-white rounded-3xl rounded-tr-none shadow-2xl border border-indigo-500">
-                                      <p className="text-sm leading-relaxed text-indigo-50">{msg.content}</p>
+                                      {msg.content && <p className="text-sm leading-relaxed text-indigo-50">{msg.content}</p>}
+                                      {msg.mediaUrl && (
+                                        <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10 hover:scale-[1.02] transition-transform duration-300">
+                                          <img src={msg.mediaUrl} alt="Secure link attachment" className="w-full h-auto object-cover max-h-48" />
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="flex items-center gap-2 mr-4">
                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
@@ -1670,9 +2124,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 );
                               } else {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[70%]">
+                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[70%] animate-fade-in animate-duration-300">
                                     <div className="p-5 bg-slate-900 border border-white/10 text-slate-100 rounded-3xl rounded-tl-none shadow-xl">
-                                      <p className="text-sm leading-relaxed">{msg.content}</p>
+                                      {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
+                                      {msg.mediaUrl && (
+                                        <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10">
+                                          <img src={msg.mediaUrl} alt="Received link attachment" className="w-full h-auto object-cover max-h-48" />
+                                        </div>
+                                      )}
                                     </div>
                                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                       {msg.senderName} • {msg.timestamp?.seconds 
@@ -1686,52 +2145,149 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           </div>
 
                           {/* Chat Input Area */}
-                          <form 
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              handleSendMessage();
-                            }}
-                            className="p-6 bg-slate-900 border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.2)]"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center bg-white/5 rounded-2xl p-1">
-                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><Paperclip className="w-5 h-5" /></button>
-                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl"><ImageIcon className="w-5 h-5" /></button>
-                              </div>
-                              <div className="flex-grow relative group">
-                                <input 
-                                  type="text" 
-                                  value={newMessageText}
-                                  onChange={(e) => setNewMessageText(e.target.value)}
-                                  placeholder={`Message ${activeRoomDef.name}...`}
-                                  className="w-full pl-6 pr-14 py-4 bg-white/5 border border-white/10 rounded-3xl text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner placeholder:text-slate-500"
-                                />
-                                <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-indigo-400 transition-all">
-                                  <Smile className="w-5 h-5" />
+                          <div className="relative">
+                            <input 
+                              type="file" 
+                              id="chat-media-loader" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={handleChatMediaUpload} 
+                            />
+
+                            {/* Chat Attached Media Preview */}
+                            {chatAttachedMediaUrl && (
+                              <div className="mx-6 mb-3 p-4 bg-slate-950 border border-white/10 rounded-2xl flex items-center justify-between shadow-lg">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-16 h-12 bg-slate-900 rounded-lg overflow-hidden border border-white/10">
+                                    <img src={chatAttachedMediaUrl} alt="Attached Preview" className="w-full h-full object-cover" />
+                                  </div>
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gist media attached</span>
+                                </div>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setChatAttachedMediaUrl('')}
+                                  className="text-[9px] font-black text-rose-500 hover:text-rose-400 uppercase tracking-widest"
+                                >
+                                  Remove
                                 </button>
                               </div>
-                              <button 
-                                type="submit"
-                                className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-                              >
-                                <Send className="w-6 h-6" />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
-                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                <Contact className="w-3.5 h-3.5" /> Share Intels
-                              </button>
-                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                <Download className="w-3.5 h-3.5" /> Transmit Ledger
-                              </button>
-                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                <Zap className="w-3.5 h-3.5" /> Flash Buzz
-                              </button>
-                              <button type="button" className="flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-all whitespace-nowrap ml-auto">
-                                <Shield className="w-3.5 h-3.5" /> Verification Req
-                              </button>
-                            </div>
-                          </form>
+                            )}
+
+                            {/* Chat Emoji Picker */}
+                            {showEmojiPickerChat && (
+                              <div className="absolute z-50 bottom-24 left-6 right-6 p-4 bg-slate-950 border border-white/15 rounded-3xl grid grid-cols-8 gap-2 shadow-2xl">
+                                {PRESET_EMOJIS.map(emo => (
+                                  <button 
+                                    type="button"
+                                    key={emo}
+                                    onClick={() => {
+                                      setNewMessageText(prev => prev + emo);
+                                      setShowEmojiPickerChat(false);
+                                    }}
+                                    className="text-2xl p-2 hover:bg-white/10 rounded-xl transition-all"
+                                  >
+                                    {emo}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Chat GIF Picker */}
+                            {showGifPickerChat && (
+                              <div className="absolute z-50 bottom-24 left-6 right-6 p-6 bg-slate-950 border border-white/15 rounded-3xl shadow-2xl">
+                                <div className="flex justify-between items-center mb-4">
+                                  <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Transmit Reaction GIF</h6>
+                                  <button type="button" onClick={() => setShowGifPickerChat(false)} className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400">Close</button>
+                                </div>
+                                <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar">
+                                  {PRESET_GIFS.map((gif, index) => (
+                                    <button 
+                                      type="button"
+                                      key={index}
+                                      onClick={() => {
+                                        setChatAttachedMediaUrl(gif.url);
+                                        setShowGifPickerChat(false);
+                                      }}
+                                      className="relative rounded-xl overflow-hidden hover:scale-105 transition-all aspect-video border border-white/5"
+                                    >
+                                      <img src={gif.url} alt={gif.name} className="w-full h-full object-cover" />
+                                      <div className="absolute inset-0 bg-black/40 flex items-end p-2">
+                                        <span className="text-[8px] font-black text-white uppercase">{gif.name}</span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <form 
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSendMessage();
+                              }}
+                              className="p-6 bg-slate-900 border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.2)]"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center bg-white/5 rounded-2xl p-1">
+                                  <button 
+                                    type="button" 
+                                    onClick={() => setShowGifPickerChat(!showGifPickerChat)}
+                                    className={`px-3 py-2 border font-black text-[9px] uppercase tracking-widest rounded-xl transition-all mr-1 ${showGifPickerChat ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/20' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
+                                    title="Choose a reaction GIF"
+                                  >
+                                    GIF
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => document.getElementById('chat-media-loader')?.click()} 
+                                    className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl animate-pulse"
+                                    title="Attach custom photo file"
+                                  >
+                                    <ImageIcon className="w-5 h-5" />
+                                  </button>
+                                </div>
+                                <div className="flex-grow relative group">
+                                  <input 
+                                    type="text" 
+                                    value={newMessageText}
+                                    onChange={(e) => setNewMessageText(e.target.value)}
+                                    placeholder={`Message ${activeRoomDef.name}...`}
+                                    className="w-full pl-6 pr-14 py-4 bg-white/5 border border-white/10 rounded-3xl text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner placeholder:text-slate-500"
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      setShowEmojiPickerChat(!showEmojiPickerChat);
+                                      setShowGifPickerChat(false);
+                                    }}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-amber-400 transition-all"
+                                  >
+                                    <Smile className="w-5 h-5" />
+                                  </button>
+                                </div>
+                                <button 
+                                  type="submit"
+                                  className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                                >
+                                  <Send className="w-6 h-6" />
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
+                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                  <Contact className="w-3.5 h-3.5" /> Share Intels
+                                </button>
+                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                  <Download className="w-3.5 h-3.5" /> Transmit Ledger
+                                </button>
+                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
+                                  <Zap className="w-3.5 h-3.5" /> Flash Buzz
+                                </button>
+                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-all whitespace-nowrap ml-auto">
+                                  <Shield className="w-3.5 h-3.5" /> Verification Req
+                                </button>
+                              </div>
+                            </form>
+                          </div>
                         </div>
                       </>
                     );

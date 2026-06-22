@@ -224,6 +224,13 @@ export interface SocialPost {
   comments: SocialComment[];
   category?: string;
   createdAt: any;
+  poll?: {
+    question: string;
+    options: {
+      text: string;
+      votes: string[];
+    }[];
+  };
 }
 
 export interface SocialComment {

@@ -31,6 +31,7 @@ interface Reel {
   comments: any[];
   shares: number;
   tags?: string[];
+  createdAt?: any;
 }
 
 interface ReelFeedProps {
@@ -51,9 +52,17 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({ user, onOpenCreator, onLike,
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'reels'), orderBy('createdAt', 'desc'), limit(10));
+    const q = query(collection(db, 'reels'), limit(50));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reel));
+      
+      // Sort client-side by createdAt descending
+      data.sort((a, b) => {
+        const tA = a.createdAt?.seconds || (a.createdAt instanceof Date ? a.createdAt.getTime()/1000 : 0);
+        const tB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime()/1000 : 0);
+        return tB - tA;
+      });
+
       if (data.length > 0) {
         setReels(data);
       } else {
@@ -85,6 +94,8 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({ user, onOpenCreator, onLike,
           }
         ]);
       }
+    }, (error) => {
+      console.warn("Index query issue, loading local presets:", error);
     });
     return unsub;
   }, []);
