@@ -294,6 +294,63 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordStatus, setPasswordStatus] = useState({ text: '', type: '' });
 
+  // Edit Profile Modal States
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState(user?.displayName || '');
+  const [editFullName, setEditFullName] = useState(user?.fullName || '');
+  const [editBio, setEditBio] = useState(user?.bio || '');
+  const [editPhotoURL, setEditPhotoURL] = useState(user?.photoURL || '');
+  const [editCoverPhotoURL, setEditCoverPhotoURL] = useState(user?.coverPhotoURL || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setEditDisplayName(user.displayName || '');
+      setEditFullName(user.fullName || '');
+      setEditBio(user.bio || '');
+      setEditPhotoURL(user.photoURL || '');
+      setEditCoverPhotoURL(user.coverPhotoURL || '');
+    }
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        displayName: editDisplayName.trim(),
+        fullName: editFullName.trim(),
+        bio: editBio.trim(),
+        photoURL: editPhotoURL.trim(),
+        coverPhotoURL: editCoverPhotoURL.trim()
+      });
+      setShowEditProfileModal(false);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+      alert("Failed to save profile updates. Please try again.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleImageUpload = (file: File, type: 'AVATAR' | 'COVER') => {
+    if (file.size > 1.5 * 1024 * 1024) {
+      alert("Image size must be smaller than 1.5MB to save securely.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (reader.result) {
+        if (type === 'AVATAR') {
+          setEditPhotoURL(reader.result as string);
+        } else {
+          setEditCoverPhotoURL(reader.result as string);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Interaction Handlers
   const handleLikePost = async (id: string, currentlyLiked: boolean) => {
     try {
@@ -2029,8 +2086,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   className="max-w-4xl mx-auto p-8 space-y-8"
                 >
                   <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[3.5rem] overflow-hidden shadow-2xl golden-card-border">
-                    <div className="h-48 bg-gradient-to-r from-indigo-600 via-rose-500 to-amber-500 relative">
-                      <button className="absolute bottom-4 right-4 p-3 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all">
+                    <div 
+                      className="h-48 bg-slate-800 bg-cover bg-center relative"
+                      style={{ 
+                        backgroundImage: user.coverPhotoURL 
+                          ? `url(${user.coverPhotoURL})` 
+                          : `linear-gradient(to right, #4f46e5, #f43f5e, #f59e0b)` 
+                      }}
+                    >
+                      <button 
+                        onClick={() => setShowEditProfileModal(true)}
+                        className="absolute bottom-4 right-4 p-3 bg-white/10 backdrop-blur-md text-white rounded-xl hover:bg-white/20 transition-all"
+                      >
                         <Camera className="w-5 h-5" />
                       </button>
                     </div>
@@ -2042,14 +2109,28 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       </div>
                       <div className="pt-20 flex items-center justify-between">
                         <div>
-                          <h3 className="text-3xl font-black text-white uppercase tracking-tight">{user.displayName || user.email.split('@')[0]}</h3>
+                          <h3 className="text-3xl font-black text-white uppercase tracking-tight">
+                            {user.fullName || user.displayName || user.email.split('@')[0]}
+                          </h3>
+                          {user.fullName && user.displayName && (
+                            <p className="text-xs font-semibold text-indigo-400">@{user.displayName}</p>
+                          )}
                           <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">{user.email}</p>
                         </div>
                         <div className="flex gap-4">
-                          <button className="px-8 py-3 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-xs border border-white/5 hover:bg-white/10 transition-all">
+                          <button 
+                            onClick={() => setShowEditProfileModal(true)}
+                            className="px-8 py-3 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-xs border border-white/5 hover:bg-white/10 transition-all"
+                          >
                             Edit Profile
                           </button>
-                          <button className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(window.location.href);
+                              alert("Profile link copied to clipboard!");
+                            }}
+                            className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all"
+                          >
                             Share Profile
                           </button>
                         </div>
@@ -2837,6 +2918,225 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
                      </div>
                    </div>
+              </motion.div>
+            </div>
+          )}
+
+          {showEditProfileModal && (
+            <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl overflow-y-auto">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-2xl bg-slate-900 border border-white/10 rounded-[3rem] p-10 relative shadow-infinite max-h-[90vh] overflow-y-auto no-scrollbar space-y-6"
+              >
+                <button 
+                  onClick={() => setShowEditProfileModal(false)} 
+                  className="absolute top-8 right-8 p-3 bg-white/5 text-gray-400 hover:text-white rounded-2xl border border-white/5 hover:bg-white/10 transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="text-center">
+                  <span className="text-[9px] font-black tracking-[0.3em] text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-full uppercase">Tactical Setup</span>
+                  <h4 className="text-2xl font-black text-white uppercase tracking-tighter italic mt-3">Refine Social Profile</h4>
+                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mt-1">Customize your Gist Hub identity across all channels</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column: Avatar & Banner Upload */}
+                  <div className="space-y-6 border-r border-white/5 pr-0 md:pr-6">
+                    {/* Avatar Customization */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Profile Avatar</label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 rounded-[1.5rem] border-2 border-indigo-500 bg-slate-800 overflow-hidden relative group shrink-0">
+                          <img src={editPhotoURL || `https://picsum.photos/seed/${user.uid}/200/200`} alt="Avatar Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="relative">
+                            <input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(file, 'AVATAR');
+                              }}
+                              className="hidden" 
+                              id="avatar-file-input" 
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => document.getElementById('avatar-file-input')?.click()}
+                              className="w-full py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Camera className="w-4 h-4" /> Upload Avatar
+                            </button>
+                          </div>
+                          <input 
+                            type="text"
+                            placeholder="Or paste Avatar Image URL"
+                            value={editPhotoURL}
+                            onChange={(e) => setEditPhotoURL(e.target.value)}
+                            className="w-full px-3 py-2 bg-slate-950 border border-white/5 rounded-xl text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Avatar presets */}
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Or Select Preset Avatar</p>
+                        <div className="flex gap-2">
+                          {[
+                            'https://api.dicebear.com/7.x/bottts/svg?seed=efado1',
+                            'https://api.dicebear.com/7.x/bottts/svg?seed=efado2',
+                            'https://api.dicebear.com/7.x/identicon/svg?seed=efado3',
+                            'https://api.dicebear.com/7.x/avataaars/svg?seed=efado4',
+                            'https://api.dicebear.com/7.x/micah/svg?seed=ef01'
+                          ].map((preset, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setEditPhotoURL(preset)}
+                              className={`w-8 h-8 rounded-lg overflow-hidden border ${editPhotoURL === preset ? 'border-indigo-500 scale-105' : 'border-white/10'} hover:border-indigo-400 bg-slate-950 p-0.5 transition-all`}
+                            >
+                              <img src={preset} alt="" className="w-full h-full object-contain" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cover Banner Customization */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Cover Banner</label>
+                      <div 
+                        className="h-20 rounded-2xl bg-indigo-900 bg-cover bg-center border border-white/5 relative overflow-hidden"
+                        style={{ 
+                          backgroundImage: editCoverPhotoURL 
+                            ? `url(${editCoverPhotoURL})` 
+                            : `linear-gradient(to right, #4f46e5, #f43f5e, #f59e0b)` 
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <span className="text-[8px] font-black text-white uppercase tracking-widest">Banner Preview</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file, 'COVER');
+                          }}
+                          className="hidden" 
+                          id="cover-file-input" 
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => document.getElementById('cover-file-input')?.click()}
+                          className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Camera className="w-4 h-4" /> Upload Custom Cover
+                        </button>
+                      </div>
+
+                      <input 
+                        type="text"
+                        placeholder="Paste Cover Image URL"
+                        value={editCoverPhotoURL}
+                        onChange={(e) => setEditCoverPhotoURL(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-950 border border-white/5 rounded-xl text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                      />
+
+                      {/* Cover presets */}
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Or Select Preset Cover Gradient</p>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80',
+                            'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?auto=format&fit=crop&w=300&q=80',
+                            'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?auto=format&fit=crop&w=300&q=80',
+                            'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=300&q=80',
+                            'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=300&q=80'
+                          ].map((preset, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setEditCoverPhotoURL(preset)}
+                              className={`h-8 rounded-lg overflow-hidden border ${editCoverPhotoURL === preset ? 'border-indigo-500 scale-105' : 'border-white/10'} hover:border-indigo-400 bg-slate-950 p-0.5 transition-all`}
+                            >
+                              <img src={preset} alt="" className="w-full h-full object-cover rounded" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Text Inputs */}
+                  <div className="space-y-5 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Full Name</label>
+                        <input 
+                          type="text" 
+                          value={editFullName}
+                          onChange={(e) => setEditFullName(e.target.value)}
+                          placeholder="Sovereign Leader"
+                          className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-2xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Username / Display Name</label>
+                        <input 
+                          type="text" 
+                          value={editDisplayName}
+                          onChange={(e) => setEditDisplayName(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                          placeholder="e.g. general_ceo"
+                          className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-2xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                        />
+                        <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Alphanumeric & lowercase only</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Personal Bio / Pitch</label>
+                        <textarea 
+                          value={editBio}
+                          onChange={(e) => setEditBio(e.target.value)}
+                          placeholder="Welcome to my tactical space..."
+                          className="w-full h-24 px-4 py-3 bg-slate-950 border border-white/5 rounded-3xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-6 md:pt-0">
+                      <button 
+                        type="button"
+                        onClick={handleSaveProfile}
+                        disabled={isSavingProfile || !editDisplayName.trim()}
+                        className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-indigo-500/20 disabled:opacity-50 hover:bg-indigo-500 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                        {isSavingProfile ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+                        {isSavingProfile ? 'Deploying Changes...' : 'Save & Publish Identity'}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowEditProfileModal(false)}
+                        className="w-full py-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all text-center block"
+                      >
+                        Keep Current Identity
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </div>
           )}

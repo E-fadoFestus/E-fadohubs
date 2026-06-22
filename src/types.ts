@@ -3,6 +3,7 @@ export interface UserProfile {
   email: string;
   displayName?: string;
   photoURL?: string;
+  coverPhotoURL?: string;
   bio?: string;
   followers?: string[];
   following?: string[];

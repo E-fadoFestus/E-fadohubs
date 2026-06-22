@@ -16,7 +16,8 @@ import {
   Disc,
   CheckCircle2,
   AlertCircle,
-  TrendingUp
+  TrendingUp,
+  Link2
 } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
@@ -26,13 +27,14 @@ interface ReelCreatorProps {
   onPost: (content: string, mediaUrl: string) => void;
 }
 
-type Mode = 'SELECT' | 'CAMERA' | 'UPLOAD' | 'EDIT' | 'SUBMITTING' | 'AI_GEN' | 'TEMPLATES';
+type Mode = 'SELECT' | 'CAMERA' | 'UPLOAD' | 'EDIT' | 'SUBMITTING' | 'AI_GEN' | 'TEMPLATES' | 'LINK';
 
 export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost }) => {
   const [mode, setMode] = useState<Mode>('SELECT');
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [directVideoUrl, setDirectVideoUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -97,10 +99,15 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
 
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const url = URL.createObjectURL(blob);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          setVideoUrl(reader.result as string);
+          setMode('EDIT');
+        }
+      };
+      reader.readAsDataURL(blob);
       setRecordedBlob(blob);
-      setVideoUrl(url);
-      setMode('EDIT');
       stopStream();
     };
 
@@ -118,9 +125,18 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setVideoUrl(url);
-      setMode('EDIT');
+      if (file.size > 2 * 1024 * 1024) {
+        alert("This video file is too massive for direct embedded host (Max 2MB). Direct video links are recommended for longer/larger format videos!");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          setVideoUrl(reader.result as string);
+          setMode('EDIT');
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -291,18 +307,28 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
 
                   <button 
                     onClick={() => setMode('TEMPLATES')}
-                    className="col-span-2 p-6 bg-white/5 border border-white/5 hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-3xl transition-all flex items-center justify-between px-8 group"
+                    className="p-6 bg-white/5 border border-white/5 hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-3xl transition-all flex flex-col items-center gap-4 group"
                   >
-                    <div className="flex items-center gap-6">
-                      <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all">
-                        <Video className="w-6 h-6" />
-                      </div>
-                      <div className="text-left">
-                        <h5 className="text-sm font-black text-white uppercase tracking-tight">Hub Templates</h5>
-                        <p className="text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-1">Pre-built viral structures</p>
-                      </div>
+                    <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all">
+                      <Video className="w-6 h-6" />
                     </div>
-                    <TrendingUp className="w-5 h-5 text-emerald-500" />
+                    <div className="text-center">
+                      <h5 className="text-sm font-black text-white uppercase tracking-tight">Hub Templates</h5>
+                      <p className="text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-1">Preset B-Roll</p>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setMode('LINK')}
+                    className="p-6 bg-white/5 border border-white/5 hover:border-violet-500/50 hover:bg-violet-500/10 rounded-3xl transition-all flex flex-col items-center gap-4 group"
+                  >
+                    <div className="w-12 h-12 bg-violet-600 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all">
+                      <Link2 className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <h5 className="text-sm font-black text-white uppercase tracking-tight">Paste Link</h5>
+                      <p className="text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-1">Direct Video URL</p>
+                    </div>
                   </button>
                 </div>
 
@@ -355,6 +381,50 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
                 <p className="text-center text-[7px] text-slate-500 font-black uppercase tracking-widest mt-auto">
                   Powered by EFADO Neural Network & Gemini AI
                 </p>
+              </motion.div>
+            )}
+
+            {mode === 'LINK' && (
+              <motion.div 
+                key="link"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="p-8 space-y-6 flex flex-col h-full"
+              >
+                <div className="text-center space-y-2">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Direct Video URL</h3>
+                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em]">Paste an online video link</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Video Source Link</label>
+                    <input 
+                      type="text" 
+                      value={directVideoUrl}
+                      onChange={(e) => setDirectVideoUrl(e.target.value)}
+                      placeholder="e.g., https://example.com/movie.mp4"
+                      className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder-slate-600"
+                    />
+                  </div>
+
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-relaxed leading-relaxed">
+                    Pro-tip: Paste any direct link to an `.mp4`, `.mov`, `.webm`, or direct streaming video. This bypasses upload wait times and lets you broadcast crystal clear, high-definition reels immediately! Note: Imgur, Pexels, and custom CDN direct video links are highly recommended.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    if (!directVideoUrl.trim()) return;
+                    setVideoUrl(directVideoUrl.trim());
+                    setMode('EDIT');
+                  }}
+                  disabled={!directVideoUrl.trim()}
+                  className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-indigo-500/20 disabled:opacity-50 hover:bg-indigo-500 hover:scale-[1.01] active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="w-5 h-5" /> Proceed to Editing
+                </button>
               </motion.div>
             )}
 
