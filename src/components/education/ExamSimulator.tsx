@@ -33,7 +33,15 @@ import {
   Coins,
   ShieldCheck,
   Users,
-  Plus
+  Plus,
+  Lock,
+  Unlock,
+  Share2,
+  Send,
+  Calendar,
+  UserCheck,
+  LogOut,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PaymentPlatform } from '../PaymentPlatform';
@@ -122,8 +130,95 @@ export const ExamSimulator: React.FC<{
   const [view, setView] = useState<'mode' | 'seminar' | 'subjects' | 'instructions' | 'exam' | 'results' | 'corrections'>(initialView);
   const [seminarSubView, setSeminarSubView] = useState<'PRESENTATION' | 'MATERIALS' | 'AGENDA'>('PRESENTATION');
   const [agendaText, setAgendaText] = useState('');
-  const [uploadedMaterials, setUploadedMaterials] = useState<{name: string, type: string, size: string}[]>([]);
-  const [isRegisteredForWebinar, setIsRegisteredForWebinar] = useState(false);
+  const [uploadedMaterials, setUploadedMaterials] = useState<{name: string, type: string, size: string}[]>(() => {
+    const saved = localStorage.getItem('efado_uploaded_materials');
+    return saved ? JSON.parse(saved) : [
+      { name: 'EFADO_JAMB_Tactical_Briefing_Package.pdf', type: 'PDF', size: '4.8 MB' },
+      { name: 'JAMB_Speed_Dominance_Algorithms.pptx', type: 'PPTX', size: '12.4 MB' },
+      { name: 'CBT_Interface_Shortcut_Memorization_Grid.xlsx', type: 'Excel', size: '1.2 MB' },
+    ];
+  });
+  const [isRegisteredForWebinar, setIsRegisteredForWebinar] = useState(() => {
+    return localStorage.getItem(`efado_webinar_registered_${examType}`) === 'true';
+  });
+  const [isUserVerified, setIsUserVerified] = useState(() => {
+    return localStorage.getItem('efado_user_verified') !== 'false'; // defaults to true for login but can toggle
+  });
+  const [isWebinarLive, setIsWebinarLive] = useState(false);
+  const [webinarCountdown, setWebinarCountdown] = useState(124); // 2 mins warning
+  const [referralCode, setReferralCode] = useState(() => {
+    return 'EFADO-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+  });
+  const [referralsCount, setReferralsCount] = useState(() => {
+    return Math.floor(Math.random() * 4);
+  });
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [credentialsCode, setCredentialsCode] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [downloadSuccessToast, setDownloadSuccessToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('efado_uploaded_materials', JSON.stringify(uploadedMaterials));
+  }, [uploadedMaterials]);
+
+  useEffect(() => {
+    localStorage.setItem(`efado_webinar_registered_${examType}`, isRegisteredForWebinar ? 'true' : 'false');
+  }, [isRegisteredForWebinar, examType]);
+
+  useEffect(() => {
+    localStorage.setItem('efado_user_verified', isUserVerified ? 'true' : 'false');
+  }, [isUserVerified]);
+
+  // Countdown ticking effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setWebinarCountdown(prev => {
+        if (prev <= 1) {
+          setIsWebinarLive(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCountdown = (sec: number) => {
+    if (sec <= 0) return "Webinar is active & streaming!";
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleVerifyCredentials = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!credentialsCode.trim()) {
+      setVerificationError("Verification code or email cannot be empty.");
+      return;
+    }
+    setIsUserVerified(true);
+    setVerificationError('');
+    alert("Credentials verified successfully! Access status updated to VERIFIED.");
+  };
+
+  const handleSimulatedDownload = (fileName: string) => {
+    if (!isUserVerified) {
+      setShowGuestWarning(true);
+      return;
+    }
+    if (!isRegisteredForWebinar) {
+      alert("Please upgrade to custom strategic duration plan to unlock study materials.");
+      return;
+    }
+    setDownloadSuccessToast(`Secure Link Generated: Downloading ${fileName}...`);
+    setTimeout(() => {
+      setDownloadSuccessToast(null);
+    }, 4000);
+  };
+
   const [showBooking, setShowBooking] = useState(false);
   const [selectedTier, setSelectedTier] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -487,9 +582,116 @@ export const ExamSimulator: React.FC<{
 
   if (view === 'seminar') {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0F172A] p-6 flex flex-col items-center overflow-y-auto no-scrollbar">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0F172A] p-4 md:p-8 flex flex-col items-center overflow-y-auto no-scrollbar relative">
+        
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {downloadSuccessToast && (
+            <motion.div 
+              initial={{ opacity: 0, y: -50 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              exit={{ opacity: 0, y: -50 }}
+              className="fixed top-6 z-[1000] px-6 py-4 bg-emerald-600 text-white rounded-2xl shadow-2xl border border-emerald-400/30 text-xs font-black uppercase tracking-widest flex items-center gap-3"
+            >
+              <CheckCircle2 className="w-5 h-5 text-white" />
+              {downloadSuccessToast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="max-w-5xl w-full">
-          <div className="flex items-center justify-between mb-12">
+          
+          {/* Top Banner: Verification Status & Access Level Control */}
+          <div className="mb-8 p-4 rounded-3xl bg-slate-900/40 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${isUserVerified ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-bounce'}`} />
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Access Authenticator: </span>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${isUserVerified ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {isUserVerified ? `VERIFIED STUDENT (${user?.email || 'EFADO-CANDIDATE'})` : 'GUEST STATUS (LIMITED TRIAL)'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowGuideModal(true)}
+                className="px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+              >
+                Candidate Operational Guide
+              </button>
+              
+              {isUserVerified ? (
+                <button 
+                  onClick={() => setIsUserVerified(false)}
+                  className="px-4 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                >
+                  Continue As Guest
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-white/5">
+                  <input 
+                    type="text" 
+                    placeholder="Enter Student PIN or Email..." 
+                    value={credentialsCode}
+                    onChange={(e) => setCredentialsCode(e.target.value)}
+                    className="bg-transparent border-none text-[10px] font-black text-white uppercase placeholder:text-slate-700 w-44 tracking-widest focus:ring-0 p-1"
+                  />
+                  <button 
+                    onClick={(e) => {
+                      setIsUserVerified(true);
+                      alert("Webinar Student Credentials Authorized! Full access granted.");
+                    }}
+                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Verify PIN
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Countdown & Live Status Block */}
+          <div className="mb-10 w-full p-8 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600/20 rounded-2xl flex items-center justify-center border border-indigo-500/30">
+                <Clock className="w-7 h-7 text-indigo-400 animate-spin" style={{ animationDuration: '60s' }} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black tracking-widest text-[#a5b4fc] uppercase">EFADO LIVE WEBINAR POOL</span>
+                <h3 className="text-xl font-black text-white uppercase tracking-tighter mt-1">
+                  {isWebinarLive ? 'STATION STREAM IS ONLINE' : 'Strategic Broadcast Briefing Pending'}
+                </h3>
+              </div>
+            </div>
+
+            <div className="text-center md:text-right">
+              {isWebinarLive ? (
+                <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/30 px-5 py-3 rounded-2xl text-emerald-400 uppercase text-[10px] font-black tracking-widest">
+                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" /> Live Streaming Active!
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Countdown to Live Segment</p>
+                  <p className="text-3xl font-mono font-black text-indigo-300 tracking-wider">
+                    {formatCountdown(webinarCountdown)}
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setIsWebinarLive(true);
+                      setWebinarCountdown(0);
+                    }}
+                    className="text-[8px] font-black text-emerald-400 hover:text-emerald-300 uppercase underline tracking-widest block text-right w-full"
+                  >
+                    (Simulate Countdown Trigger Done)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setView('mode')}
@@ -505,7 +707,7 @@ export const ExamSimulator: React.FC<{
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-900 border border-white/5 p-1 rounded-2xl">
+            <div className="flex items-center gap-2 bg-slate-900 border border-white/5 p-1.5 rounded-2xl">
               <button 
                 onClick={() => setSeminarSubView('PRESENTATION')}
                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${seminarSubView === 'PRESENTATION' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}
@@ -533,14 +735,14 @@ export const ExamSimulator: React.FC<{
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     onClick={handleJoinWebinar}
-                    className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
+                    className="px-8 py-3.5 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95"
                   >
                     <Video className="w-4 h-4" /> Join Live EFADO Zoom Terminal
                   </motion.button>
                 ) : (
-                  <div className="hidden md:flex items-center gap-3 px-6 py-3 bg-slate-900 border border-white/5 rounded-2xl">
+                  <div className="hidden md:flex items-center gap-3 px-6 py-3 bg-rose-600/10 border border-rose-500/25 rounded-2xl">
                     <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-lg shadow-rose-500/50" />
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Live Webinar Pending</span>
+                    <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest italic">Duration Selection Required</span>
                   </div>
                 )}
               </AnimatePresence>
@@ -745,7 +947,12 @@ export const ExamSimulator: React.FC<{
                     </div>
 
                     <div className="space-y-4">
-                       <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Deployed Materials</h4>
+                       <div className="flex items-center justify-between px-1">
+                          <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Deployed Materials</h4>
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${isRegisteredForWebinar ? 'text-emerald-400' : 'text-amber-500'}`}>
+                            {isRegisteredForWebinar ? '✓ All Resources Unlocked' : '🔒 Registered Duration Access Only'}
+                          </span>
+                       </div>
                        {uploadedMaterials.length === 0 ? (
                          <div className="py-20 text-center bg-slate-950 rounded-[2.5rem] border border-white/5">
                             <BookOpen className="w-12 h-12 text-slate-800 mx-auto mb-4" />
@@ -760,7 +967,10 @@ export const ExamSimulator: React.FC<{
                                     {mat.type}
                                   </div>
                                   <div>
-                                    <p className="text-sm font-black text-white italic tracking-tighter mb-1">{mat.name}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-black text-white italic tracking-tighter mb-1">{mat.name}</p>
+                                      {!isRegisteredForWebinar && <Lock className="w-3.5 h-3.5 text-rose-500" />}
+                                    </div>
                                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{mat.size}</p>
                                   </div>
                                 </div>
@@ -855,14 +1065,67 @@ export const ExamSimulator: React.FC<{
                 )}
               </motion.div>
 
-              <div className="p-8 bg-slate-900/50 border border-white/5 rounded-[2.5rem] space-y-4">
+              <div className="p-8 bg-slate-900/50 border border-indigo-500/15 rounded-[2.5rem] space-y-6">
                  <div className="flex items-center gap-3">
-                    <Mic className="w-4 h-4 text-indigo-400" />
-                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Live Audio Signal</span>
+                    <Share2 className="w-4 h-4 text-indigo-400" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Share & Invite Tracker</span>
                  </div>
-                 <p className="text-[10px] text-slate-500 font-bold uppercase leading-relaxed italic">
-                    Real-time audio feed enabled during live webinar sessions. High-fidelity instructional protocol active.
-                 </p>
+                 
+                 <div className="space-y-4">
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider block mb-1">Your Personal Invitation Link</span>
+                      <div className="flex items-center gap-2 bg-slate-950 p-2 rounded-xl border border-white/5">
+                        <span className="text-[10px] font-mono text-indigo-300 select-all overflow-hidden text-ellipsis truncate w-full">
+                          https://efado.com/seminar?ref={referralCode}
+                        </span>
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`https://efado.com/seminar?ref=${referralCode}`);
+                            alert("Copied custom candidate registration link with reference code: " + referralCode + "!");
+                          }}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[8px] uppercase tracking-widest rounded-lg transition-colors"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-950 p-3 rounded-2xl border border-white/5 text-center">
+                        <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Candidates Joined</span>
+                        <div className="flex items-center justify-center gap-1.5 mt-1">
+                          <Users className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="text-sm font-black text-white">{referralsCount}</span>
+                        </div>
+                      </div>
+                      <div className="bg-slate-950 p-3 rounded-2xl border border-white/5 text-center">
+                        <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Discount Gained</span>
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <Coins className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-sm font-black text-emerald-400">₦{(referralsCount * 1000).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <a 
+                        href={`https://wa.me/?text=Hi%2C%20I%20am%20preparing%20for%20the%20upcoming%20JAMB%2FWAEC%20Webinar%20Class%20on%20EFADO%20Education%20Hub.%20Join%20using%20my%20link%20to%20get%20access%3A%20https%3A%2F%2Fefado.com%2Fseminar%3Fref%3D${referralCode}`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex-1 py-1.5 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 text-[8px] font-black uppercase tracking-widest text-center transition-all"
+                      >
+                        WhatsApp
+                      </a>
+                      <a 
+                        href={`https://t.me/share/url?url=https%3A%2F%2Fefado.com%2Fseminar%3Fref%3D${referralCode}&text=Join%20the%20upcoming%20EFADO%20strategic%20CBT%20seminar!`}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex-1 py-1.5 rounded-xl bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-indigo-500/20 text-[8px] font-black uppercase tracking-widest text-center transition-all"
+                      >
+                        Telegram
+                      </a>
+                    </div>
+                 </div>
               </div>
             </div>
           </div>
@@ -1011,6 +1274,163 @@ export const ExamSimulator: React.FC<{
               onClose={() => setShowZoomHub(false)}
               mode="STAGE"
             />
+          )}
+
+          {/* Candidate Operational Guide Modal */}
+          {showGuideModal && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 30 }} 
+                animate={{ scale: 1, y: 0 }} 
+                className="bg-slate-900 border-2 border-indigo-500/20 rounded-[2.5rem] p-8 max-w-2xl w-full max-h-[85vh] overflow-y-auto no-scrollbar shadow-2xl relative"
+              >
+                <button 
+                  onClick={() => setShowGuideModal(false)}
+                  className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-all"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/30">
+                     <HelpCircle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Candidate Operational Guide</h3>
+                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">How to Operate & Deploy Webinar Protocols</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <p className="text-xs text-slate-400 uppercase leading-relaxed font-bold">
+                    Follow this tactical roadmap to verify your candidacy, unlock premium content, and step into the live interactive zoom broadcast.
+                  </p>
+
+                  <div className="space-y-4">
+                    {[
+                      {
+                        step: "Step 1: Student Verification",
+                        desc: "Verify your email or registration credentials at the top 'Access Authenticator' bar. Guests have limited trial views, while Verified Candidates unlock real-time live queues.",
+                        ico: <UserCheck className="w-4 h-4 text-indigo-400" />
+                      },
+                      {
+                        step: "Step 2: Pricing Selection",
+                        desc: "Choose from our pricing plan sidebar based on your desired interactive duration (ranging from 30 Mins up to 3 Hours premium briefing).",
+                        ico: <Coins className="w-4 h-4 text-emerald-400" />
+                      },
+                      {
+                        step: "Step 3: Secure EasyPayment Gate",
+                        desc: "Click to book a plan. A payment pop-up will launch. Complete the deposit. Our strategic ledger validates your payment status instantly.",
+                        ico: <DollarSign className="w-4 h-4 text-indigo-400" />
+                      },
+                      {
+                        step: "Step 4: Unlock Strategic Materials",
+                        desc: "Once payment status is verified, the locked PDF briefings, PPTX speed algorithms, and shortcut spreadsheet tools under the 'Materials' tab immediately unlock for direct download.",
+                        ico: <Unlock className="w-4 h-4 text-amber-400" />
+                      },
+                      {
+                        step: "Step 5: Jump into the Zoom Terminal",
+                        desc: "When the live event starts (use the simulation toggle to bypass wait timer), the glowing button 'Join Live EFADO Zoom Terminal' will become active. Click it to launch the live video stream, live Q&A feed, and patron sending mechanisms.",
+                        ico: <Video className="w-4 h-4 text-rose-400" />
+                      }
+                    ].map((road, idx) => (
+                      <div key={idx} className="p-5 bg-slate-950 border border-white/5 rounded-2xl flex items-start gap-4">
+                        <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center border border-white/10 shrink-0 mt-0.5">
+                          {road.ico}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-white uppercase tracking-wider">{road.step}</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed mt-1">{road.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowGuideModal(false)}
+                  className="w-full mt-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-indigo-600/20"
+                >
+                  Understood Strategic Manual
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* Guest Warning Modal */}
+          {showGuestWarning && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 30 }} 
+                animate={{ scale: 1, y: 0 }} 
+                className="bg-slate-900 border-2 border-rose-500/20 rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl relative"
+              >
+                <button 
+                  onClick={() => setShowGuestWarning(false)}
+                  className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl transition-all"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+
+                <div className="text-center p-2">
+                   <Lock className="w-14 h-14 text-rose-500 mx-auto mb-4 animate-bounce" />
+                   <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Guest Access Blocked</h3>
+                   <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest block mt-1">Full Student Credentials Required</span>
+                   
+                   <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed mt-4">
+                     You are viewing as a guest. Connecting to live Zoom streams, asking host questions, and downloading study packages require verification or upgrading.
+                   </p>
+
+                   <div className="mt-6 bg-slate-950 p-4 rounded-2xl border border-white/5 text-left">
+                     <span className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Authorize Now</span>
+                     <form onSubmit={handleVerifyCredentials} className="mt-2 flex gap-2">
+                       <input 
+                         type="text" 
+                         placeholder="Enter Student PIN..." 
+                         value={credentialsCode}
+                         onChange={(e) => setCredentialsCode(e.target.value)}
+                         className="flex-grow bg-slate-900 border border-white/10 rounded-xl text-xs font-black p-2 text-white placeholder:opacity-40 uppercase"
+                       />
+                       <button
+                         type="submit"
+                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
+                       >
+                         Verify
+                       </button>
+                     </form>
+                     {verificationError && <span className="text-[9px] text-rose-500 font-bold block mt-2 uppercase">{verificationError}</span>}
+                   </div>
+
+                   <div className="mt-4 flex gap-4">
+                     <button 
+                       onClick={() => {
+                         setShowGuestWarning(false);
+                         alert("Proceeding to select custom plans in the sidebar.");
+                       }}
+                       className="flex-1 py-3 bg-white text-slate-950 rounded-xl text-[9px] font-black uppercase tracking-widest"
+                     >
+                       Choose Plan
+                     </button>
+                     <button 
+                       onClick={() => setShowGuestWarning(false)}
+                       className="flex-1 py-3 bg-slate-800 text-white rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5"
+                     >
+                       Stay Guest
+                     </button>
+                   </div>
+                </div>
+              </motion.div>
+            </motion.div>
           )}
         </AnimatePresence>
       </motion.div>

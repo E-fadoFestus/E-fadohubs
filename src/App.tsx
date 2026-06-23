@@ -94,7 +94,12 @@ import {
   Share2,
   Handshake,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  Search,
+  Filter,
+  ArrowUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
@@ -203,6 +208,112 @@ function AppContent() {
   const { selectedCurrency, formatPrice } = useCurrency();
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // Transaction Table UX Enhancements (Collapsible details, search/filter, pagination, scrolling)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const [filterMinAmount, setFilterMinAmount] = useState('');
+  const [filterMaxAmount, setFilterMaxAmount] = useState('');
+  const [filterSender, setFilterSender] = useState('');
+  const [filterReceiver, setFilterReceiver] = useState('');
+  const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const filteredTransactions = transactions.filter(tx => {
+    // 1. Text Search Query matching multiple fields
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const hasMatch = 
+        (tx.type && tx.type.toLowerCase().includes(q)) ||
+        (tx.purpose && tx.purpose.toLowerCase().includes(q)) ||
+        (tx.description && tx.description.toLowerCase().includes(q)) ||
+        (tx.reference && tx.reference.toLowerCase().includes(q)) ||
+        (tx.hub && tx.hub.toLowerCase().includes(q)) ||
+        (tx.status && tx.status.toLowerCase().includes(q)) ||
+        (tx.amount && String(tx.amount).includes(q)) ||
+        (tx.metadata?.senderName && tx.metadata.senderName.toLowerCase().includes(q)) ||
+        (tx.metadata?.receiverName && tx.metadata.receiverName.toLowerCase().includes(q));
+      if (!hasMatch) return false;
+    }
+
+    // 2. Sender Name Filter
+    if (filterSender.trim()) {
+      const s = filterSender.toLowerCase();
+      const matchSender = 
+        (tx.metadata?.senderName && tx.metadata.senderName.toLowerCase().includes(s)) ||
+        (tx.purpose && tx.purpose.toLowerCase().includes(s)) ||
+        (tx.description && tx.description.toLowerCase().includes(s));
+      if (!matchSender) return false;
+    }
+
+    // 3. Receiver Name Filter
+    if (filterReceiver.trim()) {
+      const r = filterReceiver.toLowerCase();
+      const matchReceiver = 
+        (tx.metadata?.receiverName && tx.metadata.receiverName.toLowerCase().includes(r)) ||
+        (tx.purpose && tx.purpose.toLowerCase().includes(r)) ||
+        (tx.description && tx.description.toLowerCase().includes(r));
+      if (!matchReceiver) return false;
+    }
+
+    // 4. Type Filter
+    if (filterType !== 'ALL') {
+      if (tx.type.toLowerCase() !== filterType.toLowerCase()) return false;
+    }
+
+    // 5. Status Filter
+    if (filterStatus !== 'ALL') {
+      if (tx.status.toLowerCase() !== filterStatus.toLowerCase()) return false;
+    }
+
+    // 6. Min Amount Filter
+    if (filterMinAmount) {
+      const minAm = parseFloat(filterMinAmount);
+      if (!isNaN(minAm) && (tx.amount || 0) < minAm) return false;
+    }
+
+    // 7. Max Amount Filter
+    if (filterMaxAmount) {
+      const maxAm = parseFloat(filterMaxAmount);
+      if (!isNaN(maxAm) && (tx.amount || 0) > maxAm) return false;
+    }
+
+    // 8. Date Range Filter
+    if (filterStartDate) {
+      const start = new Date(filterStartDate);
+      const txDate = tx.timestamp?.toDate ? tx.timestamp.toDate() : new Date();
+      start.setHours(0,0,0,0);
+      if (txDate < start) return false;
+    }
+    if (filterEndDate) {
+      const end = new Date(filterEndDate);
+      const txDate = tx.timestamp?.toDate ? tx.timestamp.toDate() : new Date();
+      end.setHours(23,59,59,999);
+      if (txDate > end) return false;
+    }
+
+    return true;
+  });
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(() => {
     // If we have a cached user, we can render the dashboard immediately (no spinner needed)
@@ -2923,11 +3034,239 @@ function AppContent() {
             )}
 
             {/* Transaction History */}
-            <section>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                <History className="w-5 h-5 text-gray-400" />
-                Recent Transactions
-              </h2>
+            <section className="relative">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <History className="w-5 h-5 text-gray-400" />
+                  Recent Transactions
+                </h2>
+
+                {/* Search & Collapse Toggle Actions */}
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Search transactions..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setCurrentPage(1); // Reset page to 1
+                      }}
+                      className="w-48 sm:w-64 pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold placeholder:text-gray-400"
+                    />
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button
+                    onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+                    className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-bold transition-all ${
+                      isFilterExpanded 
+                        ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/10' 
+                        : 'bg-white hover:bg-gray-50 text-gray-600 border-gray-200'
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Filters</span>
+                    {isFilterExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible search/filter menu section */}
+              {isFilterExpanded && (
+                <div className="mb-6 p-5 bg-gray-50 border border-gray-100 rounded-2xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in animate-duration-300 shadow-inner">
+                  {/* Date ranges */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Start Date</label>
+                    <input 
+                      type="date"
+                      value={filterStartDate}
+                      onChange={(e) => {
+                        setFilterStartDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">End Date</label>
+                    <input 
+                      type="date"
+                      value={filterEndDate}
+                      onChange={(e) => {
+                        setFilterEndDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    />
+                  </div>
+
+                  {/* Sender & Receiver search parameters */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Sender Name</label>
+                    <input 
+                      type="text"
+                      placeholder="Sender field keyword..."
+                      value={filterSender}
+                      onChange={(e) => {
+                        setFilterSender(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 pr-2 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold placeholder:text-gray-300"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Receiver Name</label>
+                    <input 
+                      type="text"
+                      placeholder="Receiver field keyword..."
+                      value={filterReceiver}
+                      onChange={(e) => {
+                        setFilterReceiver(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold placeholder:text-gray-300"
+                    />
+                  </div>
+
+                  {/* Type drop down */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Transaction Type</label>
+                    <select
+                      value={filterType}
+                      onChange={(e) => {
+                        setFilterType(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    >
+                      <option value="ALL">All Types</option>
+                      <option value="deposit">Deposit</option>
+                      <option value="withdrawal">Withdrawal</option>
+                      <option value="game_win">Game Win</option>
+                      <option value="game_bet">Game Bet</option>
+                      <option value="payment">Payment</option>
+                      <option value="payout font-bold">Payout</option>
+                    </select>
+                  </div>
+
+                  {/* Status drop down */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => {
+                        setFilterStatus(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    >
+                      <option value="ALL">All Status</option>
+                      <option value="completed">Completed</option>
+                      <option value="pending">Pending</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                  </div>
+
+                  {/* Amount Ranges */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Min Amount</label>
+                    <input 
+                      type="number"
+                      placeholder="Min $"
+                      value={filterMinAmount}
+                      onChange={(e) => {
+                        setFilterMinAmount(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider">Max Amount</label>
+                    <input 
+                      type="number"
+                      placeholder="Max $"
+                      value={filterMaxAmount}
+                      onChange={(e) => {
+                        setFilterMaxAmount(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    />
+                  </div>
+
+                  {/* Reset Filters button */}
+                  <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterStartDate('');
+                        setFilterEndDate('');
+                        setFilterSender('');
+                        setFilterReceiver('');
+                        setFilterType('ALL');
+                        setFilterStatus('ALL');
+                        setFilterMinAmount('');
+                        setFilterMaxAmount('');
+                        setSearchQuery('');
+                        setCurrentPage(1);
+                      }}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-gray-300 transition-colors"
+                    >
+                      Clear All Filter Parameters
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Direct Jump Suggestions Tray (Required smooth scroll and highlight trigger) */}
+              {searchQuery.trim() && filteredTransactions.length > 0 && (
+                <div className="mb-4 p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+                  <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest block mb-2">
+                    🎯 Quick Select Search Results ({filteredTransactions.length} Matches Found)
+                  </span>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar">
+                    {filteredTransactions.slice(0, 10).map((tx, idx) => {
+                      const uniqueId = tx.id || String(tx.timestamp?.seconds || idx);
+                      return (
+                        <button
+                          key={`suggestion-${uniqueId}`}
+                          onClick={() => {
+                            const indexInFiltered = filteredTransactions.findIndex(t => (t.id && t.id === tx.id) || t.timestamp?.seconds === tx.timestamp?.seconds);
+                            if (indexInFiltered !== -1) {
+                              const pageNum = Math.floor(indexInFiltered / 20) + 1;
+                              setCurrentPage(pageNum);
+                              setHighlightedTxId(uniqueId);
+                              setTimeout(() => {
+                                const rowEl = document.getElementById(`tx-row-${uniqueId}`);
+                                if (rowEl) {
+                                  rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                              }, 150);
+                              setTimeout(() => setHighlightedTxId(null), 3000);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-white border border-gray-200 hover:border-amber-500 rounded-xl text-left text-[10px] font-bold text-gray-600 hover:text-amber-600 flex items-center gap-1.5 transition-all shadow-sm max-w-xs truncate"
+                        >
+                          <span className="capitalize text-amber-500">{tx.type.replace('_', ' ')}:</span>
+                          <span>${(tx.amount || 0).toFixed(2)}</span>
+                          <span className="text-[8px] text-gray-400 truncate max-w-[80px]">({tx.purpose || tx.id || 'Operation'})</span>
+                        </button>
+                      );
+                    })}
+                    {filteredTransactions.length > 10 && (
+                      <span className="text-[8.5px] font-bold text-gray-400 self-center leading-none pl-1">
+                        + {filteredTransactions.length - 10} more matches
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction Main Table List Component Wrapper */}
               <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -2940,45 +3279,133 @@ function AppContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {transactions.length === 0 ? (
+                      {filteredTransactions.length === 0 ? (
                         <tr>
                           <td colSpan={4} className="px-6 py-12 text-center text-gray-400 text-sm italic">
-                            No transactions yet. Start playing to see your history!
+                            {transactions.length === 0 
+                              ? "No transactions yet. Start playing to see your history!" 
+                              : "No transactions match your active filter details."}
                           </td>
                         </tr>
                       ) : (
-                        transactions.map((tx, idx) => (
-                          <tr key={`${tx.id || idx}-${idx}`} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4">
-                              <span className={`text-sm font-bold capitalize ${
-                                tx.type === 'game_win' ? 'text-green-600' : 
-                                tx.type === 'game_bet' ? 'text-red-600' : 
-                                tx.type === 'deposit' ? 'text-blue-600' : 'text-orange-600'
-                              }`}>
-                                {tx.type.replace('_', ' ')}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 font-mono font-bold text-sm">
-                              ${(tx.amount || 0).toFixed(2)}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                tx.status === 'completed' ? 'bg-green-100 text-green-700' : 
-                                tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                              }`}>
-                                {tx.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-xs text-gray-400">
-                              {tx.timestamp?.toDate().toLocaleString() || 'Just now'}
-                            </td>
-                          </tr>
-                        ))
+                        filteredTransactions.slice((Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) - 1) * 20, Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) * 20).map((tx, idx) => {
+                          const realIdx = (Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) - 1) * 20 + idx;
+                          const uniqueId = tx.id || String(tx.timestamp?.seconds || realIdx);
+                          const isHighlighted = highlightedTxId === uniqueId;
+                          return (
+                            <tr 
+                              key={`${uniqueId}-${idx}`} 
+                              id={`tx-row-${uniqueId}`}
+                              className={`transition-all duration-500 ${
+                                isHighlighted 
+                                  ? 'bg-amber-100/50 hover:bg-amber-100 ring-2 ring-amber-400 scale-[1.005]' 
+                                  : 'hover:bg-gray-50'
+                              } transition-colors`}
+                            >
+                              <td className="px-6 py-4">
+                                <span className={`text-sm font-bold capitalize ${
+                                  tx.type === 'game_win' ? 'text-green-600' : 
+                                  tx.type === 'game_bet' ? 'text-red-600' : 
+                                  tx.type === 'deposit' ? 'text-blue-600' : 'text-orange-600'
+                                }`}>
+                                  {tx.type.replace('_', ' ')}
+                                </span>
+                                {tx.purpose && (
+                                  <span className="block text-[10px] text-gray-400 uppercase tracking-tighter mt-0.5">
+                                    {tx.purpose}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-mono font-bold text-sm">
+                                ${(tx.amount || 0).toFixed(2)}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                  tx.status === 'completed' ? 'bg-green-100 text-green-700' : 
+                                  tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {tx.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-xs text-gray-400">
+                                {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleString() : 'Just now'}
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Elegant Pagination controls */}
+                {filteredTransactions.length > 20 && (
+                  <div className="bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
+                    <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">
+                      Showing {((Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) - 1) * 20) + 1} - {Math.min(Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) * 20, filteredTransactions.length)} of {filteredTransactions.length} Entries
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) === 1}
+                        className="p-2 border border-gray-200 bg-white rounded-xl text-gray-500 disabled:opacity-40 transition-colors hover:bg-gray-50"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      
+                      {/* Render direct page indices */}
+                      {Array.from({ length: Math.ceil(filteredTransactions.length / 20) }).map((_, pIdx) => {
+                        const pageNum = pIdx + 1;
+                        const activePage = Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20)));
+                        const isCurrent = pageNum === activePage;
+                        // For large list, compress
+                        if (Math.ceil(filteredTransactions.length / 20) > 5 && Math.abs(pageNum - activePage) > 1 && pageNum !== 1 && pageNum !== Math.ceil(filteredTransactions.length / 20)) {
+                          if (pageNum === 2 || pageNum === Math.ceil(filteredTransactions.length / 20) - 1) {
+                            return <span key={pageNum} className="px-1 text-xs text-gray-400">...</span>;
+                          }
+                          return null;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            type="button"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 flex items-center justify-center text-xs font-black rounded-xl border transition-all ${
+                              isCurrent 
+                                ? 'bg-amber-500 border-amber-500 text-white shadow-sm' 
+                                : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-600'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredTransactions.length / 20), prev + 1))}
+                        disabled={Math.min(currentPage, Math.max(1, Math.ceil(filteredTransactions.length / 20))) === Math.ceil(filteredTransactions.length / 20)}
+                        className="p-2 border border-gray-200 bg-white rounded-xl text-gray-500 disabled:opacity-40 transition-colors hover:bg-gray-50"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Scroll to top floating action helper button */}
+              {showScrollTop && (
+                <button
+                  type="button"
+                  onClick={scrollToTop}
+                  className="fixed bottom-6 right-6 z-50 p-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all text-xs flex items-center justify-center align-middle focus:ring-4 focus:ring-amber-500/20 shadow-amber-500/40"
+                  title="Scroll back to top"
+                >
+                  <ArrowUp className="w-5 h-5" />
+                </button>
+              )}
             </section>
           </div>
 

@@ -611,7 +611,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
       {useEasyPlatform ? (
-        <div className="w-full max-w-[500px]">
+        <div className="w-full max-w-[500px] max-h-[92vh] flex flex-col">
           {/* Quick toggle banner */}
           <div className="flex items-center justify-between p-3 bg-slate-900 border border-indigo-500/30 text-white rounded-3xl mb-2.5 shadow-lg">
             <span className="text-[10px] uppercase font-black tracking-widest text-[#a5b4fc] pl-0.5">Payment Mode: Easy-Pay</span>

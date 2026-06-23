@@ -17,7 +17,12 @@ import {
   Fingerprint,
   RotateCcw,
   AlertTriangle,
-  Info
+  Info,
+  ChevronUp,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction } from '../types';
@@ -71,6 +76,33 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   hub = 'WALLET'
 }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToSection = (section: 'top' | 'step1' | 'step2' | 'bottom') => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    
+    if (section === 'top') {
+      el.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (section === 'bottom') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else if (section === 'step1') {
+      const target = el.querySelector('[data-scroll-anchor="step1"]');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        el.scrollTo({ top: 220, behavior: 'smooth' });
+      }
+    } else if (section === 'step2') {
+      const target = el.querySelector('[data-scroll-anchor="step2"]');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        el.scrollTo({ top: el.scrollHeight * 0.55, behavior: 'smooth' });
+      }
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>(initialType);
   const [amount, setAmount] = useState(fixedAmount ? fixedAmount.toString() : '');
   const [bankName, setBankName] = useState(user.bankName || '');
@@ -473,7 +505,10 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       </div>
 
       {/* Main Form Area */}
-      <div className="flex-1 overflow-y-auto payment-scrollbar p-5 pb-16 space-y-4">
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto payment-scrollbar p-5 pb-20 space-y-4 relative scroll-smooth"
+      >
         {step === 'form' && (
           <AnimatePresence mode="wait">
             {activeTab === 'deposit' ? (
@@ -557,7 +592,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 </div>
 
                 {/* CEO Accounts List Dashboard */}
-                <div className="space-y-2">
+                <div data-scroll-anchor="step1" className="space-y-2">
                   <label className="text-[9px] font-black tracking-widest text-[#047857] uppercase block">
                     STEP 1: SELECT & COPY CO-ORPORATE PAYMENT DETAILS
                   </label>
@@ -647,7 +682,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
                 {/* Form Input fields */}
                 <form onSubmit={handleActionSubmit} className="space-y-3 pt-2">
-                  <label className="text-[9px] font-black tracking-widest text-[#0f172a] uppercase block border-b pb-1">
+                  <label data-scroll-anchor="step2" className="text-[9px] font-black tracking-widest text-[#0f172a] uppercase block border-b pb-1">
                     STEP 2: TYPE YOUR SENDER & AMOUNT PROOF DETAILS
                   </label>
 
@@ -1065,6 +1100,67 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
           }}
           onClose={() => setShowPrinterOverlay(false)}
         />
+      )}
+
+      {/* Floating Modern Inside Scroll Navigation Controls */}
+      {step === 'form' && (
+        <div className="absolute right-4 bottom-20 z-40 flex flex-col items-center gap-1.5 p-1.5 bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 animate-fade-in sm:right-6">
+          {/* Scroll to Top */}
+          <button
+            type="button"
+            onClick={() => scrollToSection('top')}
+            className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all select-none shadow-sm active:scale-90 relative group"
+            title="Scroll to Top"
+          >
+            <ChevronUp className="w-4 h-4" />
+            <span className="absolute right-10 bg-slate-950 text-white text-[8px] font-black px-2 py-1.5 rounded-lg tracking-wider opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md">
+              SCROLL TO TOP
+            </span>
+          </button>
+
+          {activeTab === 'deposit' && (
+            <>
+              {/* Scroll to Step 1: Corporate bank accounts */}
+              <button
+                type="button"
+                onClick={() => scrollToSection('step1')}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all select-none shadow-sm active:scale-90 relative group"
+                title="Scroll to Corporate Details"
+              >
+                <Building2 className="w-4 h-4" />
+                <span className="absolute right-10 bg-slate-950 text-white text-[8px] font-black px-2 py-1.5 rounded-lg tracking-wider opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md">
+                  STEP 1: BANK DETAILS
+                </span>
+              </button>
+
+              {/* Scroll to Step 2: Proof form details */}
+              <button
+                type="button"
+                onClick={() => scrollToSection('step2')}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all select-none shadow-sm active:scale-90 relative group"
+                title="Scroll to Sender Proof Form"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="absolute right-10 bg-slate-950 text-white text-[8px] font-black px-2 py-1.5 rounded-lg tracking-wider opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md">
+                  STEP 2: UPLOAD PROOF
+                </span>
+              </button>
+            </>
+          )}
+
+          {/* Scroll to Bottom */}
+          <button
+            type="button"
+            onClick={() => scrollToSection('bottom')}
+            className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold transition-all select-none shadow-sm active:scale-90 relative group"
+            title="Scroll to Bottom"
+          >
+            <ChevronDown className="w-4 h-4" />
+            <span className="absolute right-10 bg-slate-950 text-white text-[8px] font-black px-2 py-1.5 rounded-lg tracking-wider opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md">
+              SCROLL TO BOTTOM
+            </span>
+          </button>
+        </div>
       )}
     </div>
   );
