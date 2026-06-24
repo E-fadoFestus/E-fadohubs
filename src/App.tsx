@@ -512,6 +512,11 @@ function AppContent() {
   const [showTechHub, setShowTechHub] = useState(false);
 
   const handleNavigate = (hub: any, subview?: any) => {
+    if (hub !== 'GIST') setShowGistHub(false);
+    if (hub !== 'ADVERTISING') setShowAdvertisingHub(false);
+    if (hub !== 'DOMAIN_HUB') setShowDomainHub(false);
+    if (hub !== 'ZOOM') setShowZoomPlans(false);
+
     if (hub === 'COMMUNITY_HUBS') {
       if (user && !user.csccRegistered) {
         setShowCSCCRegistration(true);

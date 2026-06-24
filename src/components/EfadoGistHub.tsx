@@ -295,6 +295,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [privateRoomCode, setPrivateRoomCode] = useState('');
   const [trendingRevealed, setTrendingRevealed] = useState(false);
   const [suggestionsRevealed, setSuggestionsRevealed] = useState(false);
+  
+  // Custom states for interactive chat tools
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [ledgerAmount, setLedgerAmount] = useState('50000');
+  const [ledgerMemo, setLedgerMemo] = useState('Tactical Project Escrow');
+  const [ledgerCurrency, setLedgerCurrency] = useState('NGN');
+  const [buzzActive, setBuzzActive] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [userVerifiedRooms, setUserVerifiedRooms] = useState<string[]>([]);
 
   const handleJoinPrivateRoom = (code: string) => {
     const cleanCode = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -870,6 +879,57 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     }
   };
 
+  const handleTransmitLedgerAction = async (currency: string, amount: string, memo: string) => {
+    try {
+      await addDoc(collection(db, 'gist_chat_messages'), {
+        roomId: activeChatRoomId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email.split('@')[0],
+        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        content: `[LEDGER_TX] currency:${currency}|amount:${amount}|memo:${memo}`,
+        mediaUrl: null,
+        timestamp: serverTimestamp()
+      });
+      setShowLedgerModal(false);
+    } catch (err) {
+      console.error("Error transmitting ledger:", err);
+    }
+  };
+
+  const handleFlashBuzzAction = async () => {
+    try {
+      setBuzzActive(true);
+      setTimeout(() => setBuzzActive(false), 1200);
+      await addDoc(collection(db, 'gist_chat_messages'), {
+        roomId: activeChatRoomId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email.split('@')[0],
+        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        content: `[FLASH_BUZZ]`,
+        mediaUrl: null,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Error sending flash buzz:", err);
+    }
+  };
+
+  const handleVerificationReqAction = async () => {
+    try {
+      await addDoc(collection(db, 'gist_chat_messages'), {
+        roomId: activeChatRoomId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email.split('@')[0],
+        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        content: `[VERIFICATION_REQ]`,
+        mediaUrl: null,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Error sending verification request:", err);
+    }
+  };
+
   const handleCreatePost = async (content: string, media?: any, poll?: any) => {
     try {
       const postData: any = {
@@ -1135,7 +1195,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
           </header>
 
           {/* View Content */}
-          <div className="flex-grow overflow-y-auto custom-scrollbar bg-gray-50/30">
+          <div className={`flex-grow ${['CHAT', 'REELS'].includes(activeView) ? 'overflow-hidden' : 'overflow-y-auto'} custom-scrollbar bg-gray-50/30`}>
             <AnimatePresence mode="wait">
               {activeView === 'BLOG' && (
                 <motion.div 
@@ -2158,11 +2218,121 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             
                             {shownMessages.map((msg: any, idx: number) => {
                               const isSelf = msg.senderId === user.uid;
+                              
+                              const renderSpecialMessageContent = (content: string, self: boolean) => {
+                                if (content.startsWith('[LEDGER_TX]')) {
+                                  const parts = content.replace('[LEDGER_TX] ', '').split('|');
+                                  const data: any = {};
+                                  parts.forEach(part => {
+                                    const [key, value] = part.split(':');
+                                    if (key && value) data[key.trim()] = value.trim();
+                                  });
+                                  
+                                  return (
+                                    <div className="p-5 bg-slate-950/90 border border-emerald-500/30 rounded-2xl text-left w-full sm:w-80 shadow-xl space-y-4">
+                                      <div className="flex items-center justify-between gap-4 border-b border-emerald-500/20 pb-3">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                                            <Download className="w-4 h-4 text-emerald-400" />
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">LEDGER TRANSMITTED</p>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Sovereign Proof Validated</p>
+                                          </div>
+                                        </div>
+                                        <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider">SECURE</span>
+                                      </div>
+                                      
+                                      <div className="space-y-1">
+                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">TRANSMISSION SIZE</p>
+                                        <p className="text-xl font-black text-white tracking-tight">{(data.amount ? Number(data.amount) : 50000).toLocaleString()} <span className="text-emerald-400 font-extrabold">{data.currency || 'NGN'}</span></p>
+                                      </div>
+
+                                      <div className="space-y-1 border-t border-white/5 pt-3">
+                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SECURE MEMO / PURPOSE</p>
+                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">{data.memo || 'Tactical Ledger Sync'}</p>
+                                      </div>
+
+                                      <div className="bg-white/5 border border-white/5 p-3 rounded-xl flex items-center justify-between">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">LEDGER BRIDGE ID</span>
+                                        <span className="text-[8px] font-mono text-emerald-400 font-bold">TX-EFADO-{100000 + (idx * 4321) % 899999}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+
+                                if (content.startsWith('[FLASH_BUZZ]')) {
+                                  return (
+                                    <div className="p-5 bg-slate-950/90 border border-amber-500/30 rounded-2xl text-left w-full sm:w-80 shadow-xl space-y-3">
+                                      <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20 animate-pulse">
+                                          <Zap className="w-4 h-4 text-amber-400" />
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase text-amber-400 tracking-wider">🚨 FLASH BUZZ PROTOCOL</p>
+                                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Immediate Alert Active</p>
+                                        </div>
+                                      </div>
+                                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-relaxed">
+                                        Co-agent has triggered a direct Flash Buzz. Immediate priority attention is requested on this terminal node.
+                                      </p>
+                                      <div className="h-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 rounded-full overflow-hidden" />
+                                    </div>
+                                  );
+                                }
+
+                                if (content.startsWith('[VERIFICATION_REQ]')) {
+                                  const isVerified = userVerifiedRooms.includes(activeChatRoomId);
+                                  return (
+                                    <div className="p-5 bg-slate-950/90 border border-indigo-500/30 rounded-2xl text-left w-full sm:w-80 shadow-xl space-y-4">
+                                      <div className="flex items-center justify-between gap-4 border-b border-indigo-500/20 pb-3">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-8 h-8 bg-indigo-500/10 rounded-lg flex items-center justify-center border border-indigo-500/20">
+                                            <Shield className="w-4 h-4 text-indigo-400" />
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">SECURE VERIFICATION CHALLENGE</p>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Enclave challenge active</p>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-relaxed">
+                                        To maintain 100% secure signal integrity on this cross-device tunnel, please verify your sovereign node credentials.
+                                      </p>
+
+                                      {isVerified ? (
+                                        <div className="py-2.5 bg-emerald-500/15 border border-emerald-500/20 rounded-xl flex items-center justify-center gap-2 text-emerald-400">
+                                          <Shield className="w-3.5 h-3.5" />
+                                          <span className="text-[9px] font-black uppercase tracking-widest">🟢 ACCESS FULLY VERIFIED</span>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          <div className="py-2.5 bg-rose-500/15 border border-rose-500/20 rounded-xl flex items-center justify-center gap-2 text-rose-400">
+                                            <Lock className="w-3.5 h-3.5 animate-pulse" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest">🔴 CHALLENGE ACTIVE</span>
+                                          </div>
+                                          <button 
+                                            type="button"
+                                            onClick={() => setShowVerificationModal(true)}
+                                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] shadow transition-all active:scale-95 cursor-pointer"
+                                          >
+                                            Verify Node Identity
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return <p className={`text-sm leading-relaxed ${self ? 'text-indigo-50' : 'text-slate-100'}`}>{content}</p>;
+                              };
+
                               if (isSelf) {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[70%] ml-auto animate-fade-in animate-duration-300">
-                                    <div className="p-5 bg-indigo-600 text-white rounded-3xl rounded-tr-none shadow-2xl border border-indigo-500">
-                                      {msg.content && <p className="text-sm leading-relaxed text-indigo-50">{msg.content}</p>}
+                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[75%] ml-auto animate-fade-in animate-duration-300">
+                                    <div className={`p-5 text-white rounded-3xl rounded-tr-none shadow-2xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/5 p-1' : 'bg-indigo-600 border border-indigo-500'}`}>
+                                      {msg.content && renderSpecialMessageContent(msg.content, true)}
                                       {msg.mediaUrl && (
                                         <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10 hover:scale-[1.02] transition-transform duration-300">
                                           <img src={msg.mediaUrl} alt="Secure link attachment" className="w-full h-auto object-cover max-h-48" />
@@ -2181,9 +2351,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 );
                               } else {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[70%] animate-fade-in animate-duration-300">
-                                    <div className="p-5 bg-slate-900 border border-white/10 text-slate-100 rounded-3xl rounded-tl-none shadow-xl">
-                                      {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
+                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[75%] animate-fade-in animate-duration-300">
+                                    <div className={`p-5 text-slate-100 rounded-3xl rounded-tl-none shadow-xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/5 p-1' : 'bg-slate-900 border border-white/10'}`}>
+                                      {msg.content && renderSpecialMessageContent(msg.content, false)}
                                       {msg.mediaUrl && (
                                         <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10">
                                           <img src={msg.mediaUrl} alt="Received link attachment" className="w-full h-auto object-cover max-h-48" />
@@ -2330,16 +2500,32 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 </button>
                               </div>
                               <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
-                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                  <Contact className="w-3.5 h-3.5" /> Share Intels
+                                <button 
+                                  type="button" 
+                                  onClick={() => document.getElementById('chat-media-loader')?.click()}
+                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                >
+                                  <Contact className="w-3.5 h-3.5 text-indigo-400" /> Share Intels
                                 </button>
-                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                  <Download className="w-3.5 h-3.5" /> Transmit Ledger
+                                <button 
+                                  type="button" 
+                                  onClick={() => setShowLedgerModal(true)}
+                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                >
+                                  <Download className="w-3.5 h-3.5 text-emerald-400" /> Transmit Ledger
                                 </button>
-                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-all whitespace-nowrap">
-                                  <Zap className="w-3.5 h-3.5" /> Flash Buzz
+                                <button 
+                                  type="button" 
+                                  onClick={handleFlashBuzzAction}
+                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                >
+                                  <Zap className="w-3.5 h-3.5 text-amber-400 animate-bounce" /> Flash Buzz
                                 </button>
-                                <button type="button" className="flex items-center gap-2 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-emerald-400 transition-all whitespace-nowrap ml-auto">
+                                <button 
+                                  type="button" 
+                                  onClick={handleVerificationReqAction}
+                                  className="flex items-center gap-2 text-[9px] font-black text-emerald-500 hover:text-emerald-400 transition-all whitespace-nowrap ml-auto cursor-pointer"
+                                >
                                   <Shield className="w-3.5 h-3.5" /> Verification Req
                                 </button>
                               </div>
@@ -3102,15 +3288,30 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             )}
           </section>
 
-          <section className="bg-indigo-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/40 golden-card-border">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -mr-24 -mt-24" />
-            <div className="relative z-10">
-               <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-6">
-                 <Shield className="w-6 h-6" />
+          <section className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-3xl p-5 text-white relative overflow-hidden shadow-xl shadow-indigo-500/5">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-16 -mt-16" />
+            <div className="relative z-10 flex items-center justify-between gap-4">
+               <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
+                   <Shield className="w-5 h-5 text-indigo-400" />
+                 </div>
+                 <div>
+                   <h5 className="text-xs font-black tracking-tight uppercase italic flex items-center gap-1.5">
+                     EFADO™ Elite
+                     <span className="bg-amber-500/20 text-amber-300 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border border-amber-500/10">PRO</span>
+                   </h5>
+                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Zero-latency security priority support</p>
+                 </div>
                </div>
-               <h5 className="text-xl font-black tracking-tighter mb-2 uppercase italic">EFADO™ Elite</h5>
-               <p className="text-[10px] text-indigo-100 font-bold uppercase tracking-widest mb-8 leading-relaxed">Unlock sovereign badges, zero-latency experience, and tactical priority support.</p>
-               <button className="w-full py-4 bg-white text-indigo-950 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:scale-105 active:scale-95 transition-all">Synchronise Now</button>
+               <button 
+                 type="button"
+                 onClick={() => {
+                   alert("EFADO™ Elite Synchronisation initiated. Handshaking secure terminal node...");
+                 }}
+                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-500/20 cursor-pointer flex-shrink-0"
+               >
+                 Sync Now
+               </button>
             </div>
           </section>
         </div>
@@ -3193,75 +3394,77 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         </AnimatePresence>
 
         {/* Floating Widgets & Support */}
-        <div className="fixed bottom-12 left-12 z-[110] flex flex-col items-start gap-4 pointer-events-none">
-           <AnimatePresence>
-             {showNewsletter && (
-               <motion.div 
-                 initial={{ opacity: 0, y: 50, scale: 0.9 }}
-                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                 exit={{ opacity: 0, y: 50, scale: 0.9 }}
-                 className="relative w-80 bg-slate-900 border border-white/10 shadow-3xl p-8 rounded-[2.5rem] golden-card-border pointer-events-auto"
-               >
-                 <button onClick={() => setShowNewsletter(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors">
-                   <X className="w-4 h-4" />
-                 </button>
-                 {isNewsletterSubscribed ? (
-                   <div className="text-center py-4 space-y-3">
-                     <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
-                       <Check className="w-5 h-5 text-emerald-400" />
+        {!['CHAT', 'REELS'].includes(activeView) && (
+          <div className="fixed bottom-12 left-12 z-[110] flex flex-col items-start gap-4 pointer-events-none">
+             <AnimatePresence>
+               {showNewsletter && (
+                 <motion.div 
+                   initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                   animate={{ opacity: 1, y: 0, scale: 1 }}
+                   exit={{ opacity: 0, y: 50, scale: 0.9 }}
+                   className="relative w-80 bg-slate-900 border border-white/10 shadow-3xl p-8 rounded-[2.5rem] golden-card-border pointer-events-auto"
+                 >
+                   <button onClick={() => setShowNewsletter(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors">
+                     <X className="w-4 h-4" />
+                   </button>
+                   {isNewsletterSubscribed ? (
+                     <div className="text-center py-4 space-y-3">
+                       <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+                         <Check className="w-5 h-5 text-emerald-400" />
+                       </div>
+                       <p className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Transmission Sync'd</p>
+                       <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">
+                         Sovereign node verified. Monthly roadmaps will be routed to your endpoint.
+                       </p>
                      </div>
-                     <p className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Transmission Sync'd</p>
-                     <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">
-                       Sovereign node verified. Monthly roadmaps will be routed to your endpoint.
-                     </p>
-                   </div>
-                 ) : (
-                   <>
-                     <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
-                        <Mail className="w-5 h-5 text-white" />
-                     </div>
-                     <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">Tactical Intelligence</h5>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join 124K+ strategists receiving monthly industry roadmaps.</p>
-                     <form onSubmit={handleSubscribeNewsletter} className="space-y-3">
-                       <input 
-                         type="email" 
-                         value={newsletterEmail}
-                         onChange={(e) => setNewsletterEmail(e.target.value)}
-                         placeholder="YOUR EMAIL..." 
-                         required
-                         className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none" 
-                       />
-                       <button 
-                         type="submit"
-                         disabled={isNewsletterSubmitting}
-                         className="w-full py-3 bg-indigo-600 disabled:bg-indigo-600/50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all"
-                       >
-                         {isNewsletterSubmitting ? 'Syncing...' : 'Subscribe'}
-                       </button>
-                     </form>
-                   </>
-                 )}
-               </motion.div>
-             )}
-           </AnimatePresence>
+                   ) : (
+                     <>
+                       <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
+                          <Mail className="w-5 h-5 text-white" />
+                       </div>
+                       <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">Tactical Intelligence</h5>
+                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join 124K+ strategists receiving monthly industry roadmaps.</p>
+                       <form onSubmit={handleSubscribeNewsletter} className="space-y-3">
+                         <input 
+                           type="email" 
+                           value={newsletterEmail}
+                           onChange={(e) => setNewsletterEmail(e.target.value)}
+                           placeholder="YOUR EMAIL..." 
+                           required
+                           className="w-full px-5 py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none" 
+                         />
+                         <button 
+                           type="submit"
+                           disabled={isNewsletterSubmitting}
+                           className="w-full py-3 bg-indigo-600 disabled:bg-indigo-600/50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all"
+                         >
+                           {isNewsletterSubmitting ? 'Syncing...' : 'Subscribe'}
+                         </button>
+                       </form>
+                     </>
+                   )}
+                 </motion.div>
+               )}
+             </AnimatePresence>
 
-           <div className="flex items-center gap-3 pointer-events-auto">
-             <button 
-               onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat'))}
-               className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group"
-             >
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Connect Support</span>
-                <MessageSquareIcon className="w-5 h-5 text-indigo-600 group-hover:rotate-12 transition-transform" />
-             </button>
-             <button 
-               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-               className="p-5 bg-slate-900 text-white rounded-full shadow-2xl border border-white/5 hover:bg-indigo-600 transition-all group"
-             >
-               <ChevronUp className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
-             </button>
-           </div>
-        </div>
+             <div className="flex items-center gap-3 pointer-events-auto">
+               <button 
+                 onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat'))}
+                 className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group"
+               >
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Connect Support</span>
+                  <MessageSquareIcon className="w-5 h-5 text-indigo-600 group-hover:rotate-12 transition-transform" />
+               </button>
+               <button 
+                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                 className="p-5 bg-slate-900 text-white rounded-full shadow-2xl border border-white/5 hover:bg-indigo-600 transition-all group"
+               >
+                 <ChevronUp className="w-6 h-6 group-hover:-translate-y-1 transition-transform" />
+               </button>
+             </div>
+          </div>
+        )}
 
         {/* Custom Private Room Modal */}
         <AnimatePresence>
@@ -3317,6 +3520,158 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-2"
                   >
                     Open Secure Tunnel
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Transmit Ledger Modal */}
+        <AnimatePresence>
+          {showLedgerModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
+              >
+                <button 
+                  type="button"
+                  onClick={() => setShowLedgerModal(false)} 
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="text-center mb-8">
+                  <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
+                    <Download className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Transmit Secure Ledger</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sovereign Asset Transfer Protocol</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Currency</label>
+                      <select 
+                        value={ledgerCurrency}
+                        onChange={(e) => setLedgerCurrency(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white uppercase focus:ring-1 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value="NGN" className="bg-slate-900">NGN (₦)</option>
+                        <option value="USD" className="bg-slate-900">USD ($)</option>
+                        <option value="GBP" className="bg-slate-900">GBP (£)</option>
+                        <option value="EUR" className="bg-slate-900">EUR (€)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Amount</label>
+                      <input 
+                        type="number"
+                        value={ledgerAmount}
+                        onChange={(e) => setLedgerAmount(e.target.value)}
+                        placeholder="50000"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Secure Memo / Reference</label>
+                    <input 
+                      type="text"
+                      value={ledgerMemo}
+                      onChange={(e) => setLedgerMemo(e.target.value)}
+                      placeholder="e.g. Project Escrow Settlement"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => handleTransmitLedgerAction(ledgerCurrency, ledgerAmount, ledgerMemo)}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-4 cursor-pointer"
+                  >
+                    Transmit Ledger Now
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Node Verification Modal */}
+        <AnimatePresence>
+          {showVerificationModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
+              >
+                <button 
+                  type="button"
+                  onClick={() => setShowVerificationModal(false)} 
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="text-center mb-8">
+                  <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10">
+                    <Shield className="w-6 h-6 text-indigo-400 animate-pulse" />
+                  </div>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Verify Node Identity</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Enclave Encryption Verification</p>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
+                    An automated secure token challenge has been sent to your primary mobile node authenticator. Please input your 6-digit node secret key to finalize connection verification.
+                  </p>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Node Passkey / Authentication Code</label>
+                    <input 
+                      type="text"
+                      maxLength={6}
+                      placeholder="e.g. 777777"
+                      className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-center text-lg font-mono tracking-[0.5em] font-black text-indigo-400 focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-700"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setUserVerifiedRooms(prev => [...prev, activeChatRoomId]);
+                          setShowVerificationModal(false);
+                          alert("🟢 Sovereign identity node connection fully verified with 100% security clearance!");
+                        }
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setUserVerifiedRooms(prev => [...prev, activeChatRoomId]);
+                      setShowVerificationModal(false);
+                      alert("🟢 Sovereign identity node connection fully verified with 100% security clearance!");
+                    }}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 cursor-pointer"
+                  >
+                    Authorize Node Enclave
                   </button>
                 </div>
               </motion.div>
