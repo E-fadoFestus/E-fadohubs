@@ -2062,7 +2062,7 @@ function AppContent() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Hero Carousel - Shifted to Top for immediate visibility */}
-        {activeHub !== 'HOME' && (
+        {activeHub === 'HOME' && (
           <div className="mb-8">
             <HubHeroCarousel hubType={activeHub} onAction={handleNavigate} />
           </div>

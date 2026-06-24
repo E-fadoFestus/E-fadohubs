@@ -283,6 +283,42 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
   const [isNewsletterSubscribed, setIsNewsletterSubscribed] = useState(false);
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>('sarah');
+  const [customRooms, setCustomRooms] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('efado_custom_chat_rooms');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [showPrivateRoomModal, setShowPrivateRoomModal] = useState(false);
+  const [privateRoomCode, setPrivateRoomCode] = useState('');
+  const [trendingRevealed, setTrendingRevealed] = useState(false);
+  const [suggestionsRevealed, setSuggestionsRevealed] = useState(false);
+
+  const handleJoinPrivateRoom = (code: string) => {
+    const cleanCode = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!cleanCode) return;
+    
+    if (!customRooms.some(r => r.id === cleanCode)) {
+      const newRoom = {
+        id: cleanCode,
+        name: `Room: ${cleanCode.toUpperCase()}`,
+        status: 'Private Secure Tunnel',
+        time: 'Just Now',
+        msg: 'Ready for real-time sync.',
+        unread: 0,
+        type: 'DIRECT'
+      };
+      const updated = [...customRooms, newRoom];
+      setCustomRooms(updated);
+      localStorage.setItem('efado_custom_chat_rooms', JSON.stringify(updated));
+    }
+    
+    setActiveChatRoomId(cleanCode);
+    setPrivateRoomCode('');
+    setShowPrivateRoomModal(false);
+  };
   const [newMessageText, setNewMessageText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
@@ -1038,9 +1074,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         {/* Main Content Area */}
         <div className="flex-grow flex flex-col bg-slate-950 relative overflow-hidden">
           {/* Top Header */}
-          <header className={`px-8 py-6 border-b border-white/5 flex items-center justify-between ${activeView === 'REELS' ? 'bg-slate-950' : 'bg-slate-950/80 backdrop-blur-3xl'} z-20`}>
-            <div className="flex items-center gap-4">
-              <h3 className="text-2xl font-black text-white tracking-tighter uppercase italic">
+          <header className={`px-4 sm:px-8 py-3 sm:py-6 border-b border-white/5 flex items-center justify-between ${activeView === 'REELS' ? 'bg-slate-950' : 'bg-slate-950/80 backdrop-blur-3xl'} z-20`}>
+            <div className="flex items-center gap-2 max-w-[50%] overflow-hidden">
+              <h3 className="text-xs xs:text-sm sm:text-2xl font-black text-white tracking-tighter uppercase italic truncate">
                 {activeView === 'MONETIZATION' && 'Creator Monetization Terminal'}
                 {activeView === 'BLOG' && 'Knowledge Hub'}
                 {activeView === 'TOOLS' && 'Tactical Industry Tools'}
@@ -1054,7 +1090,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               </h3>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <div className="relative hidden lg:block">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
@@ -1065,9 +1101,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <button className="p-3 bg-gray-50 text-gray-400 hover:text-indigo-600 rounded-full border border-gray-100 transition-all relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+              <button className="hidden xs:flex p-2 sm:p-3 bg-gray-50 text-gray-400 hover:text-indigo-600 rounded-full border border-gray-100 transition-all relative">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
               </button>
               <button 
                 onClick={() => {
@@ -1085,9 +1121,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 <Globe className="w-4 h-4" />
                 Invite & Promote Globally
               </button>
-              <CurrencySelector />
-              <button onClick={onClose} className="p-3 text-gray-400 hover:text-gray-900 transition-colors">
-                <X className="w-6 h-6" />
+              <div className="hidden md:block">
+                <CurrencySelector />
+              </div>
+              <button 
+                onClick={onClose} 
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl border border-rose-500/20 transition-all font-black text-[10px] sm:text-xs uppercase tracking-widest cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
+                <span>Exit</span>
               </button>
             </div>
           </header>
@@ -1959,8 +2001,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     const CHAT_ROOM_DEFS = [
                       { id: 'tactical-hq', name: 'Tactical HQ', status: '8 members', time: '12:45', msg: 'System check complete.', unread: 0, type: 'GROUP' },
                       { id: 'sarah', name: 'Dr. Sarah (Lead Eng)', status: 'Active', time: '11:20', msg: 'The encryption keys are synced.', unread: 0, type: 'DIRECT' },
-                      { id: 'global', name: 'Global Outreach', status: 'Public Bridge', time: 'Yesterday', msg: 'Welcome to the Hub!', unread: 0, type: 'GROUP' },
-                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' }
+                      { id: 'global', name: 'Global Chat (Real-time with Colleague)', status: 'Live Cross-Device Bridge', time: 'Yesterday', msg: 'Active real-time public bridge.', unread: 0, type: 'GROUP' },
+                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' },
+                      ...customRooms
                     ];
                     const activeRoomDef = CHAT_ROOM_DEFS.find(r => r.id === activeChatRoomId) || CHAT_ROOM_DEFS[1];
 
@@ -1988,8 +2031,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         dummy.push({
                           id: 'init-global',
                           senderId: 'global',
-                          senderName: 'Global Outreach',
-                          content: 'Welcome to the Hub! This is our public communication bridge for global discourse.',
+                          senderName: 'Global Chat',
+                          content: 'Welcome to the Live Global Chat Room! Anyone on any phone or computer can chat here in real-time. Try sending a message and have your colleague open Gist Hub -> Messages -> Global Chat on their phone!',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else if (activeChatRoomId === 'bishop') {
@@ -1998,6 +2041,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           senderId: 'bishop',
                           senderName: 'Bishop T. (Spiritual)',
                           content: 'Blessings for the project. Wisdom is the principal thing, so get wisdom and understanding.',
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
+                      } else if (customRooms.some(r => r.id === activeChatRoomId)) {
+                        dummy.push({
+                          id: `init-${activeChatRoomId}`,
+                          senderId: activeChatRoomId,
+                          senderName: `Private Room: ${activeChatRoomId}`,
+                          content: `Welcome to your private room "${activeChatRoomId}"! Tell your colleague to enter this exact room code on their phone to connect. Your conversation is secure and synced in real-time.`,
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       }
@@ -2018,7 +2069,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                              </div>
                           </div>
                           
-                          <div className="p-6 border-b border-white/5">
+                          <div className="p-6 border-b border-white/5 flex flex-col gap-3">
                             <div className="relative">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                               <input 
@@ -2027,6 +2078,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/30"
                               />
                             </div>
+                            <button 
+                              onClick={() => setShowPrivateRoomModal(true)}
+                              className="w-full py-2.5 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                            >
+                              <Plus className="w-4 h-4 animate-pulse" /> Connect Private Room
+                            </button>
                           </div>
 
                           <div className="flex-grow overflow-y-auto custom-scrollbar">
@@ -2963,52 +3020,86 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         {/* Right Sidebar - Trending & Suggestions */}
         <div className="hidden xl:flex w-80 flex-shrink-0 bg-slate-900/50 backdrop-blur-3xl border-l border-white/5 flex-col p-8 space-y-10 overflow-y-auto no-scrollbar">
           <section>
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 pl-1">Tactical Trending</h4>
-            <div className="space-y-6">
-              {GIST_CATEGORIES.slice(0, 4).map((cat) => (
-                <div 
-                  key={cat.id} 
-                  onClick={() => {
-                    setSelectedGroup(null);
-                    setSelectedSubCategory(null);
-                    setSelectedCategory(cat);
-                    setActiveView('CATEGORIES');
-                  }}
-                  className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all"
-                >
-                  <div className={`w-12 h-12 rounded-2xl bg-${cat.color}-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-${cat.color}-500/20 transition-all shadow-lg`}>
-                    <cat.icon className={`w-6 h-6 text-${cat.color}-400`} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">{cat.title}</p>
-                    <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2 mt-0.5">
-                      <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                      4.2K Active Units
-                    </p>
-                  </div>
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 pl-1">Tactical Trending</h4>
+            {!trendingRevealed ? (
+              <button 
+                onClick={() => setTrendingRevealed(true)}
+                className="w-full py-4 bg-indigo-600/10 hover:bg-indigo-600/25 border border-indigo-500/20 hover:border-indigo-500/50 text-indigo-400 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+              >
+                <TrendingUp className="w-4 h-4" /> Reveal Trending Nodes
+              </button>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-6">
+                  {GIST_CATEGORIES.slice(0, 4).map((cat) => (
+                    <div 
+                      key={cat.id} 
+                      onClick={() => {
+                        setSelectedGroup(null);
+                        setSelectedSubCategory(null);
+                        setSelectedCategory(cat);
+                        setActiveView('CATEGORIES');
+                      }}
+                      className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all"
+                    >
+                      <div className={`w-12 h-12 rounded-2xl bg-${cat.color}-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-${cat.color}-500/20 transition-all shadow-lg`}>
+                        <cat.icon className={`w-6 h-6 text-${cat.color}-400`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">{cat.title}</p>
+                        <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2 mt-0.5">
+                          <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                          4.2K Active Units
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <button 
+                  onClick={() => setTrendingRevealed(false)}
+                  className="w-full text-center py-2 text-[9px] font-black text-slate-500 hover:text-slate-400 uppercase tracking-widest transition-all"
+                >
+                  Hide Trending
+                </button>
+              </div>
+            )}
           </section>
 
           <section>
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8 pl-1">Suggested Connections</h4>
-            <div className="space-y-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden ring-2 ring-white/5 group-hover:ring-indigo-500/50 transition-all">
-                      <img src={`https://picsum.photos/seed/${i + 50}/100/100`} alt="User" referrerPolicy="no-referrer" />
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 pl-1">Suggested Connections</h4>
+            {!suggestionsRevealed ? (
+              <button 
+                onClick={() => setSuggestionsRevealed(true)}
+                className="w-full py-4 bg-emerald-600/10 hover:bg-emerald-600/25 border border-emerald-500/20 hover:border-emerald-500/50 text-emerald-400 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
+              >
+                <Users className="w-4 h-4" /> Reveal Suggested Intel
+              </button>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-6">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden ring-2 ring-white/5 group-hover:ring-indigo-500/50 transition-all">
+                          <img src={`https://picsum.photos/seed/${i + 50}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-white uppercase tracking-tight">Agent {i + 10}</p>
+                          <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Mutual Intel</p>
+                        </div>
+                      </div>
+                      <button className="text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-white transition-colors">Sync</button>
                     </div>
-                    <div>
-                      <p className="text-xs font-black text-white uppercase tracking-tight">Agent {i + 10}</p>
-                      <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Mutual Intel</p>
-                    </div>
-                  </div>
-                  <button className="text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-white transition-colors">Sync</button>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <button 
+                  onClick={() => setSuggestionsRevealed(false)}
+                  className="w-full text-center py-2 text-[9px] font-black text-slate-500 hover:text-slate-400 uppercase tracking-widest transition-all"
+                >
+                  Hide Suggestions
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="bg-indigo-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-500/40 golden-card-border">
@@ -3102,7 +3193,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         </AnimatePresence>
 
         {/* Floating Widgets & Support */}
-        <div className="fixed bottom-12 right-12 z-[110] flex flex-col items-end gap-4 pointer-events-none">
+        <div className="fixed bottom-12 left-12 z-[110] flex flex-col items-start gap-4 pointer-events-none">
            <AnimatePresence>
              {showNewsletter && (
                <motion.div 
@@ -3171,6 +3262,67 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
              </button>
            </div>
         </div>
+
+        {/* Custom Private Room Modal */}
+        <AnimatePresence>
+          {showPrivateRoomModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
+              >
+                <button 
+                  onClick={() => setShowPrivateRoomModal(false)} 
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="text-center mb-8">
+                  <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10">
+                    <MessageSquare className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Connect Private Room</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cross-Device Synchronized Bridge</p>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
+                    Enter any room name or code below. Have your colleague enter the exact same code on their device to instantly join the same private, real-time secure chat room!
+                  </p>
+                  
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Room Code / Name</label>
+                    <input 
+                      type="text"
+                      value={privateRoomCode}
+                      onChange={(e) => setPrivateRoomCode(e.target.value)}
+                      placeholder="e.g. colleague-private-123"
+                      className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleJoinPrivateRoom(privateRoomCode);
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    onClick={() => handleJoinPrivateRoom(privateRoomCode)}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-2"
+                  >
+                    Open Secure Tunnel
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Call Modal Mock */}
         <AnimatePresence>
