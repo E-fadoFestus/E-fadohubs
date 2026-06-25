@@ -100,6 +100,11 @@ export interface Announcement {
   message: string;
   timestamp: any;
   active: boolean;
+  type?: 'banner' | 'modal' | 'toast';
+  tier?: 'info' | 'success' | 'warning' | 'urgent';
+  actionText?: string;
+  actionUrl?: string;
+  title?: string;
 }
 
 export interface WithdrawalRequest {

@@ -136,6 +136,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
   const [searchQuery, setSearchQuery] = useState('');
   const [newAnnouncement, setNewAnnouncement] = useState('');
+  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
+  const [newAnnouncementType, setNewAnnouncementType] = useState<'banner' | 'modal' | 'toast'>('banner');
+  const [newAnnouncementTier, setNewAnnouncementTier] = useState<'info' | 'success' | 'warning' | 'urgent'>('info');
+  const [newAnnouncementActionText, setNewAnnouncementActionText] = useState('');
+  const [newAnnouncementActionUrl, setNewAnnouncementActionUrl] = useState('');
   const [creditAmount, setCreditAmount] = useState<number>(0);
   const [creditType, setCreditType] = useState<'playerWallet' | 'cashOutWallet'>('playerWallet');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -846,11 +851,21 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     if (!newAnnouncement.trim()) return;
     try {
       await addDoc(collection(db, 'announcements'), {
-        message: newAnnouncement,
+        message: newAnnouncement.trim(),
+        title: newAnnouncementTitle.trim() || null,
+        type: newAnnouncementType,
+        tier: newAnnouncementTier,
+        actionText: newAnnouncementActionText.trim() || null,
+        actionUrl: newAnnouncementActionUrl.trim() || null,
         timestamp: serverTimestamp(),
         active: true
       });
       setNewAnnouncement('');
+      setNewAnnouncementTitle('');
+      setNewAnnouncementType('banner');
+      setNewAnnouncementTier('info');
+      setNewAnnouncementActionText('');
+      setNewAnnouncementActionUrl('');
     } catch (e) {
       console.error("Error posting announcement:", e);
     }
@@ -1240,6 +1255,29 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                        <p className="text-2xl font-black text-white">+24.5%</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Ecosystem Announcement Platform Quick Launch Gate */}
+                <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border-2 border-indigo-500/30 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
+                  <div className="flex items-center gap-4 text-left relative z-10">
+                    <div className="p-3 bg-indigo-500/15 border border-indigo-500/25 rounded-2xl text-indigo-400">
+                      <Megaphone className="w-8 h-8 animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded text-[7.5px] font-black uppercase tracking-widest inline-block mb-1.5">Active Ecosystem Dispatcher</span>
+                      <h4 className="text-lg font-black text-white uppercase italic tracking-tight">Ecosystem Announcement Platform</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-relaxed mt-1">
+                        Place, format, and push broadcast alerts, warning banners, priority overlays, or clickable news toasts to all connected digital hubs.
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('announcements')}
+                    className="px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-[10px] uppercase tracking-[0.15em] flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-600/30 relative z-10 shrink-0"
+                  >
+                    <Megaphone className="w-4 h-4" /> Place Announcement
+                  </button>
                 </div>
 
                 {/* Game Wallets */}
@@ -1820,52 +1858,295 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="bg-slate-800/50 p-8 rounded-[2.5rem] border border-white/5 shadow-xl">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3">
-                    <Megaphone className="w-6 h-6 text-indigo-400" />
-                    SEND NEW ANNOUNCEMENT
-                  </h3>
-                  <div className="flex flex-col gap-4">
-                    <textarea 
-                      placeholder="Type your message here..."
-                      value={newAnnouncement}
-                      onChange={(e) => setNewAnnouncement(e.target.value)}
-                      className="w-full bg-slate-900 border border-white/10 rounded-3xl p-6 text-white focus:border-indigo-500 outline-none transition-all h-32 resize-none"
-                    />
-                    <button 
-                      onClick={handlePostAnnouncement}
-                      className="self-end px-12 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20"
-                    >
-                      Broadcast Message
-                    </button>
+                {/* Visual Header Banner */}
+                <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl -mr-40 -mt-40" />
+                  <div className="space-y-2 relative z-10 text-left">
+                    <span className="px-3 py-1 bg-indigo-500/15 border border-indigo-500/25 rounded-full text-[8.5px] font-black uppercase text-indigo-400 tracking-wider">ECOSYSTEM DISPATCH</span>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight font-display">Active Announcement Platform</h3>
+                    <p className="text-xs text-slate-300 font-medium leading-relaxed max-w-2xl">
+                      Craft, format, and push broadcast modules to the eFADO ecosystem in real-time. Target all live digital hubs with custom warning banners, priority modals, or clickable action links.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/25 rounded-3xl text-indigo-400 shrink-0">
+                    <Megaphone className="w-10 h-10 animate-bounce" />
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-4">Recent Announcements</h4>
-                  {announcements.map((a) => (
-                    <div key={a.id} className={`bg-slate-800/30 p-6 rounded-3xl border border-white/5 flex items-center justify-between ${!a.active ? 'opacity-50 grayscale' : ''}`}>
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-indigo-500/10 rounded-lg">
-                          <Megaphone className="w-4 h-4 text-indigo-400" />
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                  {/* Left Column: Form Controls */}
+                  <div className="lg:col-span-3 bg-slate-900/60 p-8 rounded-[2.5rem] border border-white/5 shadow-xl space-y-6">
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+                      <Plus className="w-5 h-5 text-indigo-400" />
+                      Configure Broadcast Payload
+                    </h3>
+
+                    <div className="space-y-5 text-left">
+                      {/* Title input */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Announcement Title (Optional)</label>
+                        <input 
+                          type="text"
+                          placeholder="e.g. Critical Node Maintenance Alert"
+                          value={newAnnouncementTitle}
+                          onChange={(e) => setNewAnnouncementTitle(e.target.value)}
+                          className="w-full px-4 py-3 bg-slate-950/60 border border-white/5 rounded-xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                        />
+                      </div>
+
+                      {/* Message textarea */}
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Broadcast Message Body (Required)</label>
+                        <textarea 
+                          placeholder="Compose your main announcement content here..."
+                          value={newAnnouncement}
+                          onChange={(e) => setNewAnnouncement(e.target.value)}
+                          className="w-full bg-slate-950/60 border border-white/5 rounded-2xl p-4 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-600 outline-none transition-all h-28 resize-none"
+                        />
+                      </div>
+
+                      {/* Type and Style (Tier) Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Notification Format</label>
+                          <select 
+                            value={newAnnouncementType}
+                            onChange={(e) => setNewAnnouncementType(e.target.value as any)}
+                            className="w-full px-4 py-3 bg-slate-950/60 border border-white/5 rounded-xl text-xs font-bold text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                          >
+                            <option value="banner">Banner Alert (Inline header banner)</option>
+                            <option value="modal">Priority Modal (Full overlay roadblock)</option>
+                            <option value="toast">Floating Toast (Bottom-right popup)</option>
+                          </select>
                         </div>
-                        <div>
-                          <p className="text-white font-medium">{a.message}</p>
-                          <p className="text-[10px] text-slate-500 mt-1">
-                            {a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : new Date().toLocaleString()}
-                          </p>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Urgency & Styling Tier</label>
+                          <select 
+                            value={newAnnouncementTier}
+                            onChange={(e) => setNewAnnouncementTier(e.target.value as any)}
+                            className="w-full px-4 py-3 bg-slate-950/60 border border-white/5 rounded-xl text-xs font-bold text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                          >
+                            <option value="info">Info / Neutral (Standard Indigo/Slate)</option>
+                            <option value="success">Success / Event (Vibrant Emerald/Green)</option>
+                            <option value="warning">Warning / Notice (Cautionary Amber/Orange)</option>
+                            <option value="urgent">Urgent / Critical (Immediate action Rose/Red)</option>
+                          </select>
                         </div>
                       </div>
-                      {a.active && (
-                        <button 
-                          onClick={() => handleDeleteAnnouncement(a.id!)}
-                          className="p-2 text-slate-500 hover:text-rose-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+
+                      {/* Call to Action Button URL and Text */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Action Link URL (Optional)</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. #community or https://..."
+                            value={newAnnouncementActionUrl}
+                            onChange={(e) => setNewAnnouncementActionUrl(e.target.value)}
+                            className="w-full px-4 py-3 bg-slate-950/60 border border-white/5 rounded-xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[9.5px] font-black text-slate-400 uppercase tracking-widest block pl-1">Action Button Text (Optional)</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. Open Community Hub"
+                            value={newAnnouncementActionText}
+                            onChange={(e) => setNewAnnouncementActionText(e.target.value)}
+                            className="w-full px-4 py-3 bg-slate-950/60 border border-white/5 rounded-xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Submit Broadcast button */}
+                      <button 
+                        onClick={handlePostAnnouncement}
+                        className="w-full py-4.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
+                      >
+                        <Megaphone className="w-4 h-4" />
+                        Push Broadcast payload
+                      </button>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Right Column: Live Mockup Preview */}
+                  <div className="lg:col-span-2 bg-slate-900/30 p-8 rounded-[2.5rem] border border-white/5 flex flex-col justify-between space-y-6">
+                    <div className="text-left">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5 pl-1 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                        Live Device Mockup Preview
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-6 leading-normal">
+                        This is an exact sovereign simulation of how the broadcast will render on general user interfaces.
+                      </p>
+
+                      {/* Realistic phone wrapper mockup */}
+                      <div className="w-full bg-slate-950/80 rounded-3xl border border-white/10 p-5 relative min-h-[300px] overflow-hidden flex flex-col justify-between">
+                        {/* Status bar */}
+                        <div className="flex justify-between items-center text-[8px] font-mono text-slate-600 mb-4 pb-2 border-b border-white/5">
+                          <span>EFADO CELLULAR 5G</span>
+                          <div className="flex items-center gap-1.5">
+                            <span>100% 🔋</span>
+                            <span>02:26 AM </span>
+                          </div>
+                        </div>
+
+                        {/* Middle/Content preview of selected notification */}
+                        <div className="flex-grow flex flex-col justify-center">
+                          {newAnnouncementType === 'banner' && (
+                            <div className={`p-4 rounded-xl text-left border ${
+                              newAnnouncementTier === 'info' ? 'bg-indigo-950/30 border-indigo-500/20 text-indigo-200' :
+                              newAnnouncementTier === 'success' ? 'bg-emerald-950/30 border-emerald-500/20 text-emerald-200' :
+                              newAnnouncementTier === 'warning' ? 'bg-amber-950/30 border-amber-500/20 text-amber-200' :
+                              'bg-rose-950/30 border-rose-500/20 text-rose-200'
+                            }`}>
+                              <div className="flex items-start gap-2.5">
+                                <Megaphone className="w-4 h-4 mt-0.5 shrink-0" />
+                                <div className="space-y-1">
+                                  {newAnnouncementTitle && <h5 className="font-extrabold text-[10.5px] uppercase tracking-wider leading-none">{newAnnouncementTitle}</h5>}
+                                  <p className="text-[10px] font-bold leading-relaxed">{newAnnouncement || 'Provide message content to view preview...'}</p>
+                                  {newAnnouncementActionText && (
+                                    <button className="mt-2 px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-[8px] font-black uppercase tracking-widest block">
+                                      {newAnnouncementActionText}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {newAnnouncementType === 'modal' && (
+                            <div className="bg-slate-900 border border-white/10 rounded-2xl p-4.5 shadow-2xl relative">
+                              <div className="absolute top-2.5 right-2.5 p-1 bg-white/5 rounded-full text-slate-500">
+                                <X className="w-3 h-3" />
+                              </div>
+                              <div className="flex flex-col items-center text-center">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${
+                                  newAnnouncementTier === 'info' ? 'bg-indigo-500/10 text-indigo-400' :
+                                  newAnnouncementTier === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
+                                  newAnnouncementTier === 'warning' ? 'bg-amber-500/10 text-amber-400' :
+                                  'bg-rose-500/10 text-rose-400'
+                                }`}>
+                                  <ShieldCheck className="w-5 h-5" />
+                                </div>
+                                <h5 className="font-black text-white text-[11px] uppercase tracking-wider mb-1">{newAnnouncementTitle || 'PRIORITY ANNOUNCEMENT'}</h5>
+                                <p className="text-[9.5px] text-slate-300 font-bold leading-relaxed mb-4">{newAnnouncement || 'Provide message content to view preview...'}</p>
+                                <div className="flex w-full gap-2">
+                                  {newAnnouncementActionText && (
+                                    <button className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-[8px] font-black uppercase tracking-widest">
+                                      {newAnnouncementActionText}
+                                    </button>
+                                  )}
+                                  <button className="flex-1 py-2 bg-slate-850 text-slate-400 rounded-lg text-[8px] font-black uppercase tracking-widest">
+                                    Dismiss
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {newAnnouncementType === 'toast' && (
+                            <div className="flex justify-end pt-12">
+                              <div className={`p-3 rounded-xl border flex items-center gap-2 shadow-lg max-w-[90%] text-left ${
+                                newAnnouncementTier === 'info' ? 'bg-indigo-950/60 border-indigo-500/30 text-indigo-200' :
+                                newAnnouncementTier === 'success' ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-200' :
+                                newAnnouncementTier === 'warning' ? 'bg-amber-950/60 border-amber-500/30 text-amber-200' :
+                                'bg-rose-950/60 border-rose-500/30 text-rose-200'
+                              }`}>
+                                <Megaphone className="w-3.5 h-3.5 shrink-0" />
+                                <div className="leading-tight">
+                                  {newAnnouncementTitle && <h5 className="font-extrabold text-[9px] uppercase tracking-wider leading-none mb-0.5">{newAnnouncementTitle}</h5>}
+                                  <p className="text-[8.5px] font-black leading-tight">{newAnnouncement || 'Provide message...'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom bar indicator */}
+                        <div className="w-16 h-1 bg-white/10 rounded-full mx-auto mt-4" />
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-900/50 border border-white/5 rounded-2xl text-left">
+                      <p className="text-[9px] font-bold text-slate-400 leading-normal">
+                        ⚠️ **ECOSYSTEM PROTOCOL**: Modals block active trading and hubs participation. Only deploy Modal formats for critical upgrades, financial announcements, or maintenance periods.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Recent Announcements dispatch history logs list */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest px-4 text-left">Ecosystem Broadcast Registry Logs</h4>
+                  {announcements.length === 0 ? (
+                    <div className="p-8 bg-slate-900/30 rounded-[2rem] border border-white/5 text-center text-slate-500 text-xs font-semibold">
+                      No announcements posted in the digital registry ledger yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {announcements.map((a) => {
+                        const styleConfig = 
+                          a.tier === 'success' ? { border: 'border-emerald-500/20 bg-emerald-950/10 text-emerald-400', label: 'Success Event' } :
+                          a.tier === 'warning' ? { border: 'border-amber-500/20 bg-amber-950/10 text-amber-400', label: 'Warning notice' } :
+                          a.tier === 'urgent' ? { border: 'border-rose-500/20 bg-rose-950/10 text-rose-400', label: 'Critical alert' } :
+                          { border: 'border-indigo-500/20 bg-indigo-950/10 text-indigo-400', label: 'Standard Info' };
+
+                        return (
+                          <div 
+                            key={a.id} 
+                            className={`p-6 rounded-3xl border flex flex-col justify-between gap-4 text-left transition-all ${styleConfig.border} ${
+                              !a.active ? 'opacity-40 grayscale scale-95' : 'hover:scale-[1.01]'
+                            }`}
+                          >
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-white/5 text-[7.5px] font-black uppercase tracking-widest rounded text-slate-300">
+                                    {a.type || 'banner'}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-white/5 text-[7.5px] font-black uppercase tracking-widest rounded text-slate-300">
+                                    {styleConfig.label}
+                                  </span>
+                                </div>
+                                <span className="text-[8.5px] font-bold text-slate-500">
+                                  {a.timestamp?.toDate ? a.timestamp.toDate().toLocaleString() : new Date().toLocaleString()}
+                                </span>
+                              </div>
+
+                              <div>
+                                {a.title && <h5 className="font-extrabold text-white text-xs uppercase tracking-wider mb-0.5">{a.title}</h5>}
+                                <p className="text-[11.5px] font-bold leading-relaxed text-slate-200">{a.message}</p>
+                              </div>
+
+                              {(a.actionText || a.actionUrl) && (
+                                <div className="flex flex-wrap gap-2 pt-1 border-t border-white/5 text-[9px] font-mono text-slate-400">
+                                  {a.actionText && <span>**Label**: {a.actionText}</span>}
+                                  {a.actionUrl && <span>**Target**: {a.actionUrl}</span>}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex justify-between items-center border-t border-white/5 pt-3">
+                              <span className={`text-[8.5px] font-black uppercase tracking-wider ${a.active ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                ● {a.active ? 'Broadcasting live' : 'Inert / deactivated'}
+                              </span>
+                              {a.active && (
+                                <button 
+                                  onClick={() => handleDeleteAnnouncement(a.id!)}
+                                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Deactivate
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
