@@ -77,7 +77,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'coverPhotoURL', 'bio', 'followers', 'following', 'playerWallet', 'depositWallet', 'cashOutWallet', 'miningWallet', 'miningProgress', 'role', 'createdAt', 'fullName', 'phoneNumber', 'country', 'language', 'csccRegistered', 'updatedAt', 'vendorStatus', 'vendorPlan', 'vendorId', 'isDeveloper', 'termsAccepted', 'emailVerified', 'adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts', 'bankName', 'accountNumber', 'accountName', 'externalWallet', 'mobileMoneyNumber', 'mobileMoneyProvider', 'is_super_admin', 'admin_otp_phone']) &&
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'coverPhotoURL', 'bio', 'followers', 'following', 'playerWallet', 'depositWallet', 'cashOutWallet', 'miningWallet', 'miningProgress', 'role', 'createdAt', 'fullName', 'phoneNumber', 'country', 'language', 'csccRegistered', 'updatedAt', 'vendorStatus', 'vendorPlan', 'vendorId', 'isDeveloper', 'termsAccepted', 'emailVerified', 'adminWallet', 'totalHouseGain', 'gameWallets', 'lastUpdated', 'totalPlayers', 'pendingPayouts', 'bankName', 'accountNumber', 'accountName', 'externalWallet', 'mobileMoneyNumber', 'mobileMoneyProvider', 'is_super_admin', 'admin_otp_phone', 'usd_balance', 'gbp_balance', 'eur_balance', 'creatorEarnings', 'wallet', 'loanBalance', 'activeLoan', 'creditScore', 'loanLimit', 'interestRate', 'repaymentTerm', 'loanStatus', 'domain_portfolio', 'domain_credits', 'rentHistory', 'activeBid']) &&
              data.uid is string && data.uid.size() > 0 &&
              data.email is string &&
              data.role in ['player', 'admin', 'user', 'vendor'];
@@ -425,6 +425,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
     match /gist_chat_messages/{messageId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /gist_groups/{groupId} {
       allow read, write: if isAuthenticated();
     }
     match /ai_enrollments/{enrollmentId} {

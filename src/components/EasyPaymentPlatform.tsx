@@ -301,7 +301,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       }
 
       if (parsedAmt > user.playerWallet) {
-        setError(`Insufficient earnings. Your maximum cashout balance is $${user.playerWallet.toLocaleString()}`);
+        setError(`Insufficient earnings. Your maximum cashout balance is ${formatPrice(user.playerWallet)}`);
         return;
       }
     }
@@ -811,7 +811,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 <div className="bg-gradient-to-r from-blue-900 to-indigo-950 text-white p-5 rounded-3xl border border-blue-500/10 shadow flex items-center justify-between">
                   <div>
                     <p className="text-[9px] text-[#93c5fd] uppercase tracking-widest font-black">Authorized Earnings Account Balance</p>
-                    <p className="text-2xl font-black font-mono mt-1">${user.playerWallet.toLocaleString()}</p>
+                    <p className="text-2xl font-black font-mono mt-1">{formatPrice(user.playerWallet)}</p>
                     <p className="text-[8px] text-indigo-300 uppercase tracking-widest mt-0.5">Win Stake Cashout Active</p>
                   </div>
                   <Coins className="w-10 h-10 text-blue-400 shrink-0 opacity-40" />
@@ -831,13 +831,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
                   {/* Cashout Payout amount */}
                   <div>
-                    <label className="text-[9px] text-slate-500 font-black uppercase tracking-wider block mb-1">Amount to Payout ($)</label>
+                    <label className="text-[9px] text-slate-500 font-black uppercase tracking-wider block mb-1">Amount to Payout ({selectedCurrency?.symbol || '$'})</label>
                     <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-500">$</div>
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-500">{selectedCurrency?.symbol || '$'}</div>
                       <input
                         type="text"
                         pattern="[0-9]*"
-                        placeholder="ENTER USD AMOUNT TO CASHOUT"
+                        placeholder={`ENTER ${selectedCurrency?.code || 'USD'} AMOUNT TO CASHOUT`}
                         className="w-full pl-8 pr-4 py-3 bg-white border border-slate-300 rounded-xl text-[11px] font-mono font-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                         value={amount}
                         onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
@@ -1087,15 +1087,15 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         <ReceiptTerminal
           receipt={{
             transactionId: createdTxId || reference,
-            amount: activeTab === 'deposit' ? `₦${Number(amount).toLocaleString()}` : `$${Number(amount).toLocaleString()}`,
-            currency: activeTab === 'deposit' ? 'NGN' : 'USD',
+            amount: activeTab === 'deposit' ? `₦${Number(amount).toLocaleString()}` : `${selectedCurrency?.symbol || '$'}${Number(amount).toLocaleString()}`,
+            currency: activeTab === 'deposit' ? 'NGN' : (selectedCurrency?.code || 'USD'),
             date: new Date().toLocaleDateString(),
             type: activeTab === 'deposit' ? 'deposit' : 'withdrawal',
             method: activeTab === 'deposit' ? 'Easy Transfer' : 'Direct PayOut',
             status: 'pending',
             sender: activeTab === 'deposit' ? accountName : 'EFADO CORPORATE',
             recipient: activeTab === 'deposit' ? 'EFADO CORPORATE' : accountName,
-            description: activeTab === 'deposit' ? `Naira Topup Proof - ${proofNote}` : `USD Withdrawal to ${bankName}`,
+            description: activeTab === 'deposit' ? `Naira Topup Proof - ${proofNote}` : `${selectedCurrency?.code || 'USD'} Withdrawal to ${bankName}`,
             reference: reference
           }}
           onClose={() => setShowPrinterOverlay(false)}

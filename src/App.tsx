@@ -22,7 +22,7 @@ import {
   where,
   orderBy
 } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
 import { UserProfile, Transaction, AdminStats, Announcement } from './types';
 import { WalletCard, WalletGrid } from './components/WalletCard';
 import { LuckySpinWheel } from './components/LuckySpinWheel';
@@ -658,13 +658,14 @@ function AppContent() {
             const newUser: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
-              playerWallet: 100, // Starting bonus
+              playerWallet: 0, // No starting bonus until first deposit
               depositWallet: 0,
               cashOutWallet: 0,
               miningWallet: 0,
               miningProgress: { stage: 'E', collectedInStage: 0 },
               role: firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              hasReceivedSignupBonus: false
             };
             
             try {
@@ -972,7 +973,16 @@ function AppContent() {
     }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, standardEmail, standardPassword);
+      const cred = await signInWithEmailAndPassword(auth, standardEmail, standardPassword);
+      if (cred.user) {
+        const isCEO = cred.user.email === 'efado226@gmail.com' || cred.user.email === 'efadofestus@gmail.com';
+        if (!cred.user.emailVerified && !isCEO) {
+          await auth.signOut();
+          setError('Your email address is not verified yet. Please check your inbox for the verification link.');
+          setLoading(false);
+          return;
+        }
+      }
       setLoading(false);
     } catch (e: any) {
       setLoading(false);
@@ -1005,6 +1015,7 @@ function AppContent() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, standardEmail, standardPassword);
       if (cred.user) {
+        await sendEmailVerification(cred.user);
         await updateProfile(cred.user, {
           displayName: standardDisplayName
         });
@@ -1014,16 +1025,18 @@ function AppContent() {
           uid: cred.user.uid,
           email: cred.user.email || '',
           displayName: standardDisplayName,
-          playerWallet: 100, // Starting bonus
+          playerWallet: 0, // No starting bonus until first deposit
           depositWallet: 0,
           cashOutWallet: 0,
           miningWallet: 0,
           miningProgress: { stage: 'E', collectedInStage: 0 },
           role: cred.user.email === 'efado226@gmail.com' || cred.user.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          hasReceivedSignupBonus: false
         };
         await setDoc(userRef, newUser);
-        setStandardRegisterSuccess('Connection established! Loading your ecosystem portfolio...');
+        await auth.signOut();
+        setStandardRegisterSuccess('Ecosystem portfolio initialized! A verification email has been sent. Please verify your email before logging in.');
       }
       setLoading(false);
     } catch (e: any) {
@@ -1250,11 +1263,13 @@ function AppContent() {
 
   const handleDeposit = async (amount: number) => {
     if (!user) return;
+    const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
     if (DEVELOPMENT_MODE) {
       setUser({
         ...user,
         depositWallet: user.depositWallet + amount,
-        playerWallet: user.playerWallet + amount
+        playerWallet: user.playerWallet + amount + bonusToApply,
+        hasReceivedSignupBonus: true
       });
       setTransactions([
         { id: Math.random().toString(), userId: user.uid, type: 'deposit', amount, status: 'completed', timestamp: { toDate: () => new Date() } as any, currency: 'NGN' },
@@ -1268,8 +1283,9 @@ function AppContent() {
         const txRef = doc(collection(db, 'transactions'));
         
         transaction.update(userRef, {
-          depositWallet: user.depositWallet + amount,
-          playerWallet: user.playerWallet + amount
+          depositWallet: increment(amount),
+          playerWallet: increment(amount + bonusToApply),
+          hasReceivedSignupBonus: true
         });
 
         transaction.set(txRef, {
@@ -1289,9 +1305,12 @@ function AppContent() {
     if (!user) return;
     if (DEVELOPMENT_MODE) {
       if (type === 'deposit') {
+        const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
         setUser({
           ...user,
-          depositWallet: user.depositWallet + amount
+          depositWallet: user.depositWallet + amount,
+          playerWallet: user.playerWallet + bonusToApply,
+          hasReceivedSignupBonus: true
         });
       } else if (type === 'withdrawal') {
         const fee = amount * 0.03;
@@ -1336,8 +1355,11 @@ function AppContent() {
       const adminRef = doc(db, 'adminStats', 'global');
 
       if (type === 'deposit') {
+        const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
         await updateDoc(userRef, {
-          depositWallet: increment(amount)
+          depositWallet: increment(amount),
+          playerWallet: increment(bonusToApply),
+          hasReceivedSignupBonus: true
         });
       } else if (type === 'withdrawal') {
         const withdrawalRef = doc(collection(db, 'withdrawals'));
@@ -2505,30 +2527,48 @@ function AppContent() {
               <motion.section
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
               >
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
-                    <MessageSquare className="w-8 h-8 text-indigo-500" />
-                    Intelligence Network
+                <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+                  <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
+                    <MessageSquare className="w-6 h-6 text-indigo-500" />
+                    Sovereign Intelligence Network
                   </h2>
                 </div>
-                <div className="max-w-3xl mx-auto">
-                  {/* EFADO Gist Hub Card */}
-                  <div className="glass-card-ultra golden-card-border p-12 rounded-[3rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/5 to-purple-500/5" />
-                    <div className="relative z-10">
-                      <div className="w-24 h-24 bg-indigo-500/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:shadow-[0_0_50px_rgba(79,70,229,0.5)] transition-all duration-700">
-                        <MessageSquare className="w-12 h-12 text-indigo-400 group-hover:text-white" />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
+                  {/* Left explanation card */}
+                  <div className="md:col-span-2 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                          <MessageSquare className="w-5 h-5 text-indigo-400" />
+                        </div>
+                        <h4 className="text-sm font-black text-white uppercase tracking-wider">What is Synchronise Now?</h4>
                       </div>
-                      <h3 className="text-3xl font-black text-white mb-4 tracking-tight">Gist Hub</h3>
-                      <p className="text-slate-400 mb-12 text-lg font-medium leading-relaxed max-w-xl mx-auto">Synthetic intelligence layer for community synchronisation. Careers, sports, and deep-tech mentorship.</p>
-                      <button 
-                        onClick={() => setShowGistHub(true)}
-                        className="px-12 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-[0_10px_40px_rgba(79,70,229,0.3)] hover:scale-105 transition-all uppercase tracking-[0.3em] text-[11px] border border-indigo-500/50"
-                      >
-                        Synchronize Now
-                      </button>
+                      <p className="text-xs text-slate-300 leading-relaxed uppercase tracking-wide">
+                        The <span className="text-indigo-400 font-extrabold">Synchronise Now</span> node establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, and user profiles across all systems with 100% data integrity.
+                      </p>
                     </div>
+                    <div className="pt-4 border-t border-white/5 mt-4 flex items-center justify-between">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">● System Status: Secure & Encrypted</span>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Protocol: V3.4</span>
+                    </div>
+                  </div>
+
+                  {/* Right small, strategic Action card */}
+                  <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-center items-center text-center">
+                    <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4">
+                      <MessageSquare className="w-6 h-6 text-indigo-400" />
+                    </div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect Gist Hub</h4>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats & reels</p>
+                    <button 
+                      onClick={() => setShowGistHub(true)}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[9px] border border-indigo-500/30"
+                    >
+                      Synchronize Now
+                    </button>
                   </div>
                 </div>
               </motion.section>

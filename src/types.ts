@@ -38,6 +38,10 @@ export interface UserProfile {
   externalWallet?: string;
   mobileMoneyNumber?: string;
   mobileMoneyProvider?: string;
+  activeTradingGameBet?: {
+    expiry: number;
+  };
+  hasReceivedSignupBonus?: boolean;
 }
 
 export interface UserWallet {

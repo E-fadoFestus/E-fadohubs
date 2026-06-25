@@ -87,6 +87,7 @@ import {
   where,
   limit,
   updateDoc,
+  setDoc,
   doc,
   arrayUnion,
   arrayRemove
@@ -293,6 +294,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   });
   const [showPrivateRoomModal, setShowPrivateRoomModal] = useState(false);
   const [privateRoomCode, setPrivateRoomCode] = useState('');
+  const [chatSubTab, setChatSubTab] = useState<'DIRECT' | 'GROUPS' | 'BRIDGES'>('DIRECT');
+  const [groups, setGroups] = useState<any[]>([]);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDescription, setNewGroupDescription] = useState('');
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [trendingRevealed, setTrendingRevealed] = useState(false);
   const [suggestionsRevealed, setSuggestionsRevealed] = useState(false);
   
@@ -389,13 +396,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     setIsSavingProfile(true);
     try {
       const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
+      await setDoc(userRef, {
         displayName: editDisplayName.trim(),
         fullName: editFullName.trim(),
         bio: editBio.trim(),
         photoURL: editPhotoURL.trim(),
-        coverPhotoURL: editCoverPhotoURL.trim()
-      });
+        coverPhotoURL: editCoverPhotoURL.trim(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
       setShowEditProfileModal(false);
     } catch (err) {
       console.error("Failed to save profile:", err);
@@ -761,6 +769,50 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       unsubAds();
     };
   }, []);
+
+  // Synchronise Live Chat Groups from Firestore
+  useEffect(() => {
+    const groupsQuery = query(collection(db, 'gist_groups'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(groupsQuery, (snap) => {
+      const loaded = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setGroups(loaded);
+    }, (err) => {
+      console.error("Error loading Gist Hub groups:", err);
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleCreateGroup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    setIsCreatingGroup(true);
+    try {
+      const groupCode = newGroupName.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+      const groupRef = doc(db, 'gist_groups', groupCode);
+      await setDoc(groupRef, {
+        id: groupCode,
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim() || 'Active Gist Hub Group',
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        status: 'Active Group',
+        msg: 'Ready for real-time sync.',
+        type: 'GROUP'
+      });
+      setActiveChatRoomId(groupCode);
+      setNewGroupName('');
+      setNewGroupDescription('');
+      setShowCreateGroupModal(false);
+    } catch (err) {
+      console.error("Failed to create group:", err);
+      alert("Failed to create group. Please try again.");
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  };
 
   // Synchronise Live Chat Room Messages from Firestore (Index-Free Client-Side Sorted Query)
   useEffect(() => {
@@ -2058,13 +2110,38 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 >
                   {/* Chat List - Style Tabs */}
                   {(() => {
-                    const CHAT_ROOM_DEFS = [
+                    const defaultRooms = [
                       { id: 'tactical-hq', name: 'Tactical HQ', status: '8 members', time: '12:45', msg: 'System check complete.', unread: 0, type: 'GROUP' },
                       { id: 'sarah', name: 'Dr. Sarah (Lead Eng)', status: 'Active', time: '11:20', msg: 'The encryption keys are synced.', unread: 0, type: 'DIRECT' },
                       { id: 'global', name: 'Global Chat (Real-time with Colleague)', status: 'Live Cross-Device Bridge', time: 'Yesterday', msg: 'Active real-time public bridge.', unread: 0, type: 'GROUP' },
-                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' },
-                      ...customRooms
+                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' }
                     ];
+
+                    const dynamicGroupsList = groups.map(g => ({
+                      id: g.id,
+                      name: g.name,
+                      status: g.status || 'Active Group',
+                      time: 'Just Now',
+                      msg: g.msg || 'Ready for real-time sync.',
+                      unread: 0,
+                      type: 'GROUP'
+                    }));
+
+                    const CHAT_ROOM_DEFS = [
+                      ...defaultRooms,
+                      ...customRooms.map(r => ({ ...r, type: r.type || 'DIRECT' })),
+                      ...dynamicGroupsList
+                    ];
+
+                    const filteredRooms = CHAT_ROOM_DEFS.filter(room => {
+                      if (chatSubTab === 'DIRECT') {
+                        return room.type === 'DIRECT';
+                      } else if (chatSubTab === 'GROUPS') {
+                        return room.type === 'GROUP';
+                      }
+                      return false;
+                    });
+
                     const activeRoomDef = CHAT_ROOM_DEFS.find(r => r.id === activeChatRoomId) || CHAT_ROOM_DEFS[1];
 
                     // Helper to get fallback messages if Firestore list is empty
@@ -2111,6 +2188,16 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           content: `Welcome to your private room "${activeChatRoomId}"! Tell your colleague to enter this exact room code on their phone to connect. Your conversation is secure and synced in real-time.`,
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
+                      } else {
+                        // Dynamic groups fallback description message
+                        const matchingGroup = groups.find(g => g.id === activeChatRoomId);
+                        dummy.push({
+                          id: `init-${activeChatRoomId}`,
+                          senderId: activeChatRoomId,
+                          senderName: matchingGroup ? matchingGroup.name : 'Group Chat',
+                          content: `Welcome to the custom secure group "${matchingGroup ? matchingGroup.name : activeChatRoomId}". Describe your tactical plan or share insights with team members!`,
+                          timestamp: { seconds: Date.now() / 1000 - 120 }
+                        });
                       }
                       return dummy;
                     };
@@ -2123,9 +2210,30 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <div className="p-6 border-b border-white/5 bg-indigo-600">
                              <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Secure Comms</h4>
                              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-2xl">
-                                <button className="flex-grow py-3 px-4 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl">Direct</button>
-                                <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Groups</button>
-                                <button className="flex-grow py-3 px-4 text-white hover:bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest">Bridges</button>
+                                <button 
+                                  onClick={() => {
+                                    setChatSubTab('DIRECT');
+                                    setActiveChatRoomId('sarah');
+                                  }}
+                                  className={`flex-grow py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${chatSubTab === 'DIRECT' ? 'bg-white text-indigo-600 shadow-xl' : 'text-white hover:bg-white/5'}`}
+                                >
+                                  Direct
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    setChatSubTab('GROUPS');
+                                    setActiveChatRoomId('tactical-hq');
+                                  }}
+                                  className={`flex-grow py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${chatSubTab === 'GROUPS' ? 'bg-white text-indigo-600 shadow-xl' : 'text-white hover:bg-white/5'}`}
+                                >
+                                  Groups
+                                </button>
+                                <button 
+                                  onClick={() => setChatSubTab('BRIDGES')}
+                                  className={`flex-grow py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${chatSubTab === 'BRIDGES' ? 'bg-white text-indigo-600 shadow-xl' : 'text-white hover:bg-white/5'}`}
+                                >
+                                  Bridges
+                                </button>
                              </div>
                           </div>
                           
@@ -2138,40 +2246,97 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/30"
                               />
                             </div>
-                            <button 
-                              onClick={() => setShowPrivateRoomModal(true)}
-                              className="w-full py-2.5 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                            >
-                              <Plus className="w-4 h-4 animate-pulse" /> Connect Private Room
-                            </button>
+                            {chatSubTab === 'DIRECT' && (
+                              <button 
+                                onClick={() => setShowPrivateRoomModal(true)}
+                                className="w-full py-2.5 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600 hover:border-indigo-500 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-4 h-4 animate-pulse" /> Connect Private Room
+                              </button>
+                            )}
+                            {chatSubTab === 'GROUPS' && (
+                              <button 
+                                onClick={() => setShowCreateGroupModal(true)}
+                                className="w-full py-2.5 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-4 h-4 animate-pulse" /> Create Sovereign Group
+                              </button>
+                            )}
+                            {chatSubTab === 'BRIDGES' && (
+                              <div className="py-2 px-3 bg-indigo-950/40 border border-indigo-500/10 rounded-xl text-center">
+                                <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest block animate-pulse">
+                                  ● Tactical Cross-System Hyper-Links Active
+                                </span>
+                              </div>
+                            )}
                           </div>
 
-                          <div className="flex-grow overflow-y-auto custom-scrollbar">
-                            {CHAT_ROOM_DEFS.map((chat) => (
-                              <button 
-                                key={chat.id} 
-                                onClick={() => setActiveChatRoomId(chat.id)}
-                                className={`w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 ${activeChatRoomId === chat.id ? 'border-l-indigo-600 bg-indigo-600/5' : 'border-l-transparent'}`}
-                              >
-                                <div className="relative flex-shrink-0">
-                                  <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 overflow-hidden border border-white/10 shadow-sm">
-                                    <img src={`https://picsum.photos/seed/${chat.id}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                          {chatSubTab === 'BRIDGES' ? (
+                            <div className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-4">
+                              {[
+                                { id: 'bridge-community', name: 'Community Hub Bridge', desc: 'Secure connection line to CSCC registry and shared community boards.', hub: 'COMMUNITY_HUBS', status: 'Online' },
+                                { id: 'bridge-domains', name: 'Domain Portfolio Bridge', desc: 'Active strategic pipeline for premium domains and bidding negotiations.', hub: 'DOMAIN_HUB', status: 'Online' },
+                                { id: 'bridge-education', name: 'Education Hub Interconnect', desc: 'Dedicated line for professional learning curriculum and certifications.', hub: 'EDUCATION', status: 'Online' },
+                                { id: 'bridge-zoom', name: 'Tactical Zoom Bridge', desc: 'High-integrity secure teleconferencing & virtual team meetings.', hub: 'ZOOM', status: 'Online' }
+                              ].map((bridge) => (
+                                <div 
+                                  key={bridge.id}
+                                  className="p-5 bg-slate-950/60 border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all flex flex-col justify-between gap-3 group"
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <h5 className="text-xs font-black text-white uppercase tracking-wider">{bridge.name}</h5>
+                                      <span className="text-[8px] font-black bg-indigo-500/10 text-indigo-400 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                                        {bridge.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] font-medium text-slate-400 leading-relaxed uppercase tracking-wider">
+                                      {bridge.desc}
+                                    </p>
                                   </div>
-                                  {chat.status.includes('Active') && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />}
+                                  <button 
+                                    onClick={() => {
+                                      if (onNavigate) {
+                                        onNavigate(bridge.hub);
+                                      } else {
+                                        alert(`Connecting tactical bridge: ${bridge.name}`);
+                                      }
+                                    }}
+                                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
+                                  >
+                                    <Link2 className="w-3.5 h-3.5" /> Initialize Bridge
+                                  </button>
                                 </div>
-                                <div className="flex-grow text-left overflow-hidden">
-                                  <div className="flex items-center gap-2">
-                                     {chat.type === 'GROUP' && <Users className="w-3 h-3 text-indigo-400" />}
-                                     <h5 className="text-sm font-black text-white uppercase tracking-tight truncate">{chat.name}</h5>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex-grow overflow-y-auto custom-scrollbar">
+                              {filteredRooms.map((chat) => (
+                                <button 
+                                  key={chat.id} 
+                                  onClick={() => setActiveChatRoomId(chat.id)}
+                                  className={`w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 ${activeChatRoomId === chat.id ? 'border-l-indigo-600 bg-indigo-600/5' : 'border-l-transparent'}`}
+                                >
+                                  <div className="relative flex-shrink-0">
+                                    <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 overflow-hidden border border-white/10 shadow-sm">
+                                      <img src={`https://picsum.photos/seed/${chat.id}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                                    </div>
+                                    {chat.status.includes('Active') && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />}
                                   </div>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mt-1">{chat.msg}</p>
-                                </div>
-                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{chat.time}</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
+                                  <div className="flex-grow text-left overflow-hidden">
+                                    <div className="flex items-center gap-2">
+                                       {chat.type === 'GROUP' && <Users className="w-3 h-3 text-indigo-400" />}
+                                       <h5 className="text-sm font-black text-white uppercase tracking-tight truncate">{chat.name}</h5>
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mt-1">{chat.msg}</p>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{chat.time}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Chat Window */}
@@ -3522,6 +3687,81 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     Open Secure Tunnel
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Create Sovereign Group Modal */}
+        <AnimatePresence>
+          {showCreateGroupModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
+              >
+                <button 
+                  onClick={() => setShowCreateGroupModal(false)} 
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="text-center mb-8">
+                  <div className="w-14 h-14 bg-emerald-600/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
+                    <Users className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Create Sovereign Group</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Deploy New Community Channel</p>
+                </div>
+
+                <form onSubmit={handleCreateGroup} className="space-y-4">
+                  <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
+                    Launch a synchronized room where colleagues and users can hold group discussions. Group IDs are instantly registered in our secure Firestore database!
+                  </p>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Group Name</label>
+                    <input 
+                      type="text"
+                      required
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="e.g. EFADO Strategic Thinkers"
+                      className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Group Description / Purpose</label>
+                    <textarea 
+                      value={newGroupDescription}
+                      onChange={(e) => setNewGroupDescription(e.target.value)}
+                      placeholder="e.g. Discussion panel for marketing, trading nodes, and tactical projects."
+                      className="w-full h-24 px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-600 resize-none"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={isCreatingGroup || !newGroupName.trim()}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isCreatingGroup ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Plus className="w-4 h-4" />
+                    )}
+                    {isCreatingGroup ? 'Deploying Channel...' : 'Deploy Sovereign Group'}
+                  </button>
+                </form>
               </motion.div>
             </motion.div>
           )}

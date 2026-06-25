@@ -52,6 +52,13 @@ import { db, doc, updateDoc, increment } from '../firebase';
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { CurrencySelector } from './CurrencySelector';
 
+function randomGauss(mean = 0, stdDev = 1): number {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v) * stdDev + mean;
+}
+
 interface Trade {
   id: string;
   type: 'BUY' | 'SELL';
@@ -156,13 +163,11 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
     let lastPrice = 24500.50;
     const now = Date.now();
     
-    // More natural initial data generation
-    let mockTrend = (Math.random() - 0.5) * 2;
+    // Zero-mean random walk with a tiny negative drift
     for (let i = 50; i >= 0; i--) {
-      const noise = (Math.random() - 0.5) * 8;
-      mockTrend = mockTrend * 0.95 + (Math.random() - 0.5) * 0.5;
-      lastPrice += mockTrend + noise;
-      initialData.push({ time: now - i * 1000, price: lastPrice });
+      const step = randomGauss(0, 1) - 0.005; // tiny negative drift
+      lastPrice = lastPrice + (step * 5);
+      initialData.push({ time: now - i * 1000, price: Number(lastPrice.toFixed(2)) });
     }
     setPriceData(initialData);
     chartDataRef.current = initialData;
@@ -256,37 +261,17 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
     const interval = setInterval(() => {
       const state = marketState.current;
 
-      // Update Market Regime (Bull, Bear, Sideways)
+      // Update Market Regime (Bull, Bear, Sideways) for visual decoration
       if (state.regimeCountdown <= 0) {
-        // More volatile regime selection
         const regimes: ('BULL' | 'BEAR' | 'SIDEWAYS')[] = ['BULL', 'BEAR', 'SIDEWAYS', 'SIDEWAYS', 'SIDEWAYS'];
         state.regime = regimes[Math.floor(Math.random() * regimes.length)];
-        state.regimeCountdown = 5 + Math.floor(Math.random() * 15); // Shorter cycles (5-20s)
-        state.macroTrend = state.regime === 'BULL' ? (1.5 + Math.random() * 3) : state.regime === 'BEAR' ? (-1.5 - Math.random() * 3) : 0;
-        state.volatility = 3 + Math.random() * 8; // Higher baseline volatility
+        state.regimeCountdown = 5 + Math.floor(Math.random() * 15);
       }
       state.regimeCountdown--;
 
-      // Stochastic Chaos Calculations
-      // 1. High-Frequency Fractal Noise (Spiky movement)
-      const microJitter = (Math.random() - 0.5) * (state.volatility * 1.5);
-      
-      // 2. Momentum with Decay and Chaos Injection
-      state.trend = (state.trend * 0.7) + (state.macroTrend * 0.3) + (Math.random() - 0.5) * 2;
-      
-      // 3. Anticipatory Reversals (Sudden flips to prevent predictability)
-      if (Math.abs(state.trend) > 5 && Math.random() > 0.85) {
-        state.trend *= -1.2; // Aggressive reversal
-        state.macroTrend *= -0.5;
-      }
-
-      // 4. "Earthquake" Corrections (Large sudden spikes as seen in the image)
-      let correction = 0;
-      if (Math.random() > 0.94) { // Increased to 6% chance
-        correction = (Math.random() - 0.5) * 35;
-      }
-
-      const totalChange = state.trend + microJitter + correction;
+      // Zero-mean random walk with a tiny negative drift
+      const step = randomGauss(0, 1) - 0.005; // tiny negative drift
+      const totalChange = step * 5;
       const newPrice = Number((priceRef.current + totalChange).toFixed(2));
       
       priceRef.current = newPrice;
@@ -381,8 +366,26 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
       return;
     }
 
+    // Enforce "One active bet per player" - check both local state and Firestore (synced in real-time)
+    const activeDbBet = user?.activeTradingGameBet;
+    if (activeTrades.length > 0 || (activeDbBet && activeDbBet.expiry > Date.now())) {
+      setError("Active round in progress. One active bet per player allowed.");
+      setTimeout(() => setError(null), 3550);
+      return;
+    }
+
     playSound('trade');
     setIsProcessing(true);
+    
+    const expiryTimestamp = Date.now() + expiry * 1000;
+
+    // Sync bet lock to Firestore immediately to prevent multi-tab exploits
+    if (user?.uid) {
+      const userRef = doc(db, 'users', user.uid);
+      updateDoc(userRef, {
+        activeTradingGameBet: { expiry: expiryTimestamp }
+      }).catch(err => console.error('Failed to sync bet state:', err));
+    }
     
     const newTrade: Trade = {
       id: Math.random().toString(36).substring(7),
@@ -391,7 +394,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
       stake,
       status: 'OPEN',
       timestamp: Date.now(),
-      expiryTime: Date.now() + expiry * 1000
+      expiryTime: expiryTimestamp
     };
 
     setTrades(prev => [newTrade, ...prev]);
@@ -446,6 +449,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
+            {/* Trading Wallet Card */}
             <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-2xl border border-white/5 relative overflow-hidden">
               <AnimatePresence mode="wait">
                 {lastResult?.status === 'WON' && (
@@ -459,7 +463,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               </AnimatePresence>
               <Wallet className="w-4 h-4 text-blue-400" />
               <div className="text-right relative z-10">
-                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Balance</p>
+                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Trading Wallet</p>
                 <motion.p 
                   key={balance}
                   initial={{ scale: 1.1, color: '#4ade80' }}
@@ -467,6 +471,22 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                   className="text-lg font-display font-black text-white"
                 >
                   {formatPrice(balance)}
+                </motion.p>
+              </div>
+            </div>
+
+            {/* Win Wallet Card */}
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-2xl border border-emerald-500/20 relative overflow-hidden">
+              <Trophy className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <div className="text-right relative z-10">
+                <p className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Win Wallet</p>
+                <motion.p 
+                  key={user.playerWallet}
+                  initial={{ scale: 1.1, color: '#10b981' }}
+                  animate={{ scale: 1, color: '#ffffff' }}
+                  className="text-lg font-display font-black text-white"
+                >
+                  {formatPrice(user.playerWallet || 0)}
                 </motion.p>
               </div>
             </div>
