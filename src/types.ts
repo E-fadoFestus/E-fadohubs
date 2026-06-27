@@ -447,16 +447,21 @@ export interface Loan {
 export interface LoanApplication {
   id?: string;
   userId: string;
+  userName?: string;
   amount: number;
   tenor: string;
   purpose?: string;
-  status: 'submitted' | 'under_review' | 'approved' | 'disbursed' | 'rejected';
-  kycStatus: 'pending' | 'verified' | 'failed';
-  eligibilitySignals: {
+  interest?: number;
+  totalRepayment?: number;
+  monthlyInstallment?: number;
+  status: 'submitted' | 'under_review' | 'approved' | 'disbursed' | 'rejected' | 'pending';
+  kycStatus?: 'pending' | 'verified' | 'failed';
+  eligibilitySignals?: {
     walletBalance: number;
     creditScore: number;
     repaymentHistory: string;
   };
+  kyc?: any;
   createdAt: any;
 }
 
@@ -482,18 +487,31 @@ export interface LoanOffer {
 export interface LoanVendor {
   id?: string;
   userId: string;
+  userName?: string;
   businessName: string;
+  vendorType?: string;
   registrationNumber: string;
   licenseNumber: string;
   issuingAuthority: string;
   contactEmail: string;
   contactPhone: string;
   address: string;
+  subscriptionTier?: string;
+  subscriptionPrice?: number;
+  settlement?: {
+    bank: string;
+    accountName: string;
+    accountNumber: string;
+    escrowOptIn: boolean;
+  };
   lendingParameters: {
     minAmount: number;
     maxAmount: number;
     interestRange: string;
     supportedTenors: string[];
+    capacity?: number;
+    targetAudience?: string;
+    webhookUrl?: string;
   };
   status: 'pending' | 'verified' | 'suspended';
   verifiedAt?: any;

@@ -1420,6 +1420,22 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       animate={{ opacity: 1, y: 0 }}
       className="space-y-12"
     >
+      {/* Under Construction Banner */}
+      <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/25 rounded-[1.5rem] p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-amber-500/15 rounded-2xl flex items-center justify-center shrink-0 border border-amber-500/30">
+            <AlertCircle className="w-6 h-6 text-amber-600" />
+          </div>
+          <div>
+            <h4 className="font-black text-sm text-amber-800 uppercase tracking-widest">Under Construction — Pending Accredited Vendors' Registration</h4>
+            <p className="text-xs font-bold text-amber-700/90 mt-0.5">CSCC Savings Cycle deposits and group initializations are temporarily on hold until the accreditation cycle concludes.</p>
+          </div>
+        </div>
+        <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-amber-800 shrink-0 select-none animate-pulse">
+          System Locked
+        </div>
+      </div>
+
       <div className="group relative bg-gray-900 p-12 rounded-[3.5rem] text-white overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-600/20 to-transparent pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-600/20 blur-[100px] rounded-full pointer-events-none" />

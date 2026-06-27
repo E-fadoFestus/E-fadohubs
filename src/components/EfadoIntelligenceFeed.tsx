@@ -105,7 +105,6 @@ interface IntelligenceFeedProps {
 }
 
 export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 'full' }) => {
-  const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [tickerIndex, setTickerIndex] = useState(0);
 
   useEffect(() => {
@@ -115,164 +114,50 @@ export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 
     return () => clearInterval(timer);
   }, []);
 
-  const categories = ['ALL', 'EXAMS', 'ADMISSIONS', 'SCHOLARSHIPS', 'SYSTEM', 'MARKET'];
-  const groups = ['ALL', 'NATIONAL', 'INTERNATIONAL', 'HUB-SPECIFIC'];
-
-  const [activeGroup, setActiveGroup] = useState<string>('ALL');
-
-  const filteredData = FEED_DATA.filter(item => {
-    const categoryMatch = activeCategory === 'ALL' || item.category === activeCategory;
-    const groupMatch = activeGroup === 'ALL' || item.group === activeGroup;
-    return categoryMatch && groupMatch;
-  });
-
   return (
-    <div className="w-full space-y-6">
-      {/* Dynamic Ticker - The "Always Displayed" part */}
-      <div className={`bg-slate-900 border-y border-white/5 py-3 overflow-hidden relative group ${mode === 'ticker-only' ? 'sticky top-0 z-[100] backdrop-blur-md bg-slate-950/80 shadow-2xl' : ''}`}>
-        <div className="max-w-7xl mx-auto px-6 flex items-center gap-6">
-          <div className="flex items-center gap-2 shrink-0 bg-indigo-600 px-3 py-1 rounded-lg shadow-lg shadow-indigo-500/20">
-            <Zap className="w-3 h-3 text-white animate-pulse" />
-            <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Live Update</span>
+    <div className="w-full">
+      {/* Dynamic Ticker - Broader, bolder, and more eye-catching */}
+      <div className="bg-slate-900/90 backdrop-blur-xl border-y border-indigo-500/15 py-6 sm:py-8 overflow-hidden relative group shadow-[0_0_50px_rgba(99,102,241,0.1)] rounded-[2.5rem] my-4">
+        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-8 flex flex-col md:flex-row items-center gap-6 justify-between">
+          <div className="flex items-center gap-3 shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 rounded-xl shadow-lg shadow-indigo-500/30 border border-indigo-400/20">
+            <Zap className="w-4 h-4 text-white animate-pulse" />
+            <span className="text-xs font-black text-white uppercase tracking-widest italic">Live updates</span>
           </div>
           
-          <div className="flex-1 overflow-hidden h-6 relative">
+          <div className="flex-1 overflow-hidden h-8 relative w-full flex items-center">
             <AnimatePresence mode="wait">
               <motion.div
                 key={tickerIndex}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="flex items-center gap-4 whitespace-nowrap"
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex items-center gap-4 w-full"
               >
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">[{FEED_DATA[tickerIndex].category}] {FEED_DATA[tickerIndex].group}</span>
-                <p className="text-sm font-bold text-white uppercase tracking-tight italic truncate">
+                <span className="text-xs font-black text-indigo-400 bg-indigo-950/50 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest shrink-0">
+                  [{FEED_DATA[tickerIndex].category}]
+                </span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 hidden sm:inline">
+                  {FEED_DATA[tickerIndex].group}
+                </span>
+                <div className="h-4 w-px bg-white/10 hidden sm:inline shrink-0" />
+                <p className="text-base font-black text-white uppercase tracking-tight italic truncate flex-1">
                   {FEED_DATA[tickerIndex].title}
                 </p>
-                <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full shrink-0" />
-                <span className="text-[10px] text-slate-500 font-mono tracking-tighter italic">{FEED_DATA[tickerIndex].timestamp}</span>
+                <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0 animate-ping" />
+                <span className="text-xs text-slate-500 font-mono tracking-tighter italic shrink-0">{FEED_DATA[tickerIndex].timestamp}</span>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          <div className="hidden md:flex items-center gap-4 text-slate-500 border-l border-white/10 pl-6">
-            <Globe className="w-4 h-4" />
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Efado Global Network</span>
+          <div className="hidden lg:flex items-center gap-4 text-slate-400 border-l border-white/15 pl-6 shrink-0">
+            <Globe className="w-4 h-4 text-indigo-400" />
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Efado Academic Node Active</span>
           </div>
         </div>
       </div>
-
-      {mode === 'full' && (
-        <>
-          {/* Intelligence Hub Grid */}
-          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm overflow-hidden relative group">
-         <div className="absolute top-0 right-0 p-8 opacity-5">
-            <Rss className="w-24 h-24 text-indigo-600" />
-         </div>
-
-         <div className="flex flex-col gap-8 mb-10">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-               <div>
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic underline decoration-indigo-500 decoration-4 underline-offset-8">Intelligence Hub</h3>
-                  <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-4">Automated strategic updates across all Efado nodes.</p>
-               </div>
-               
-               <div className="flex flex-wrap gap-2">
-                  {categories.map(cat => (
-                     <button
-                        key={cat}
-                        onClick={() => setActiveCategory(cat)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                        activeCategory === cat 
-                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                           : 'bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white'
-                        }`}
-                     >
-                        {cat}
-                     </button>
-                  ))}
-               </div>
-            </div>
-
-            <div className="flex items-center gap-4 border-t border-slate-50 pt-6">
-               <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Filter Group:</span>
-               <div className="flex flex-wrap gap-2">
-                  {groups.map(grp => (
-                     <button
-                        key={grp}
-                        onClick={() => setActiveGroup(grp)}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                        activeGroup === grp 
-                           ? 'bg-slate-900 text-white' 
-                           : 'text-slate-400 hover:bg-slate-100'
-                        }`}
-                     >
-                        {grp}
-                     </button>
-                  ))}
-               </div>
-            </div>
-         </div>
-
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnimatePresence mode="popLayout">
-               {filteredData.map((item, idx) => (
-                  <motion.div
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:bg-white hover:shadow-xl transition-all group/card relative overflow-hidden"
-                  >
-                    <div className={`absolute top-0 left-0 w-1 h-full ${
-                      item.priority === 'high' ? 'bg-rose-500' : 
-                      item.priority === 'medium' ? 'bg-indigo-500' : 'bg-emerald-500'
-                    }`} />
-                    
-                    <div className="flex justify-between items-start mb-4">
-                       <span className="px-3 py-1 bg-white border border-slate-100 rounded-lg text-[9px] font-black text-slate-400 uppercase tracking-widest italic group-hover/card:bg-slate-900 group-hover/card:text-white transition-colors">
-                          {item.group}
-                       </span>
-                       <Clock className="w-4 h-4 text-slate-200" />
-                    </div>
-
-                    <h4 className="text-sm font-black text-slate-900 uppercase italic tracking-tighter mb-4 leading-tight group-hover/card:text-indigo-600 transition-colors">
-                       {item.title}
-                    </h4>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
-                       <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${item.priority === 'high' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">{item.timestamp}</span>
-                       </div>
-                       <button className="p-2 bg-white border border-slate-100 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition-all shrink-0">
-                          <ChevronRight className="w-4 h-4" />
-                       </button>
-                    </div>
-                  </motion.div>
-               ))}
-            </AnimatePresence>
-         </div>
-
-         <div className="mt-10 p-6 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between group-hover:bg-indigo-600 transition-all">
-            <div className="flex items-center gap-4">
-               <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                  <Bell className="w-5 h-5 text-white" />
-               </div>
-               <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/60">Subscription Protocol</p>
-                  <p className="text-xs font-black italic uppercase tracking-tighter">Enable neural desktop notifications for instant alerts</p>
-               </div>
-            </div>
-            <button className="px-6 py-3 bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">
-               Activate Alerts
-            </button>
-         </div>
-      </div>
-        </>
-      )}
     </div>
   );
 };

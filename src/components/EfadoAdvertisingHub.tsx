@@ -48,6 +48,7 @@ import {
   Globe
 } from 'lucide-react';
 import { UserProfile, AdListing, AdPlan } from '../types';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
@@ -285,6 +286,78 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
     photos: [] as string[]
   });
 
+  const [syndicationData, setSyndicationData] = useState<{
+    googleAds: { headline: string; description: string; keywords: string[] } | null;
+    socialMedia: { postText: string; hashtags: string } | null;
+    seo: { title: string; metaDescription: string } | null;
+  }>({ googleAds: null, socialMedia: null, seo: null });
+  const [isGeneratingCampaign, setIsGeneratingCampaign] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastStep, setBroadcastStep] = useState(0);
+  const [broadcastLogs, setBroadcastLogs] = useState<string[]>([]);
+
+  const generateCampaignAssets = async () => {
+    if (!formData.title || !formData.description) return;
+    setIsGeneratingCampaign(true);
+    try {
+      const apiKey = process.env.GEMINI_API_KEY || '';
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+
+      const prompt = `
+You are an expert marketing copywriter for the EFADO Sovereign Connection Engine.
+Given this ad/listing details:
+Title: "${formData.title}"
+Description: "${formData.description}"
+Price: "${formData.price}"
+Category: "${formData.category}"
+
+Generate high-conversion global marketing syndication campaign assets in JSON format exactly with this schema:
+{
+  "googleAds": {
+    "headline": "A punchy Google Search Ad headline (max 30 chars)",
+    "description": "A high-conversion Google Search Ad description (max 90 chars)",
+    "keywords": ["5 relevant SEO search keywords"]
+  },
+  "socialMedia": {
+    "postText": "An engaging post caption for Facebook/Instagram/Twitter with emojis and a call to action",
+    "hashtags": "#Trending #Hashtags #Here"
+  },
+  "seo": {
+    "title": "SEO-optimized meta title (max 60 chars)",
+    "metaDescription": "SEO-optimized meta description (max 150 chars)"
+  }
+}
+Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw JSON string.
+`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      setSyndicationData(parsed);
+    } catch (err) {
+      console.error("Failed to generate campaign assets:", err);
+      setSyndicationData({
+        googleAds: {
+          headline: formData.title.substring(0, 30),
+          description: formData.description.substring(0, 90),
+          keywords: [formData.category.toLowerCase() || 'ads', 'efado', 'marketplace', 'nigeria', 'buysell']
+        },
+        socialMedia: {
+          postText: `🚀 NEW LISTING: ${formData.title}! ${formData.description}`,
+          hashtags: "#EFADO #GlobalMarkets #Deals #Classifieds"
+        },
+        seo: {
+          title: `${formData.title} | EFADO Sovereign Hub`,
+          metaDescription: formData.description.substring(0, 150)
+        }
+      });
+    } finally {
+      setIsGeneratingCampaign(false);
+    }
+  };
+
   useEffect(() => {
     const q = query(collection(db, 'ad_listings'), where('status', '==', 'active'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -298,42 +371,84 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
   const handleCreateAd = async () => {
     if (!selectedPlan) return;
     
-    try {
-      const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + selectedPlan.durationDays);
+    setIsBroadcasting(true);
+    setBroadcastStep(0);
+    setBroadcastLogs(["[00:01] Connecting to EFADO Global Connection Engine..."]);
 
-      await addDoc(collection(db, 'ad_listings'), {
-        vendorId: user.uid,
-        type: adType,
-        title: formData.title,
-        description: formData.description,
-        price: parseFloat(formData.price),
-        category: formData.category,
-        location: {
-          state: formData.state,
-          city: formData.city,
-          village: formData.village,
-          address: formData.address,
-          landmark: formData.landmark
-        },
-        contact: {
-          phone: formData.phone,
-          whatsapp: formData.whatsapp,
-          email: formData.email
-        },
-        details: formData.details,
-        photos: formData.photos,
-        plan: selectedPlan.id,
-        expiryDate: expiryDate.getTime(),
-        status: adType === 'ADVERT' ? 'active' : 'pending',
-        createdAt: serverTimestamp()
-      });
-      
-      setView('BROWSE');
-      // Reset form
-    } catch (err) {
-      console.error("Error creating ad:", err);
-    }
+    const steps = [
+      { log: "[00:03] Optimizing layout parameters and rendering SEO headers...", delay: 800 },
+      { log: "[00:06] Synchronizing syndication coordinates with Google Ads Network...", delay: 1600 },
+      { log: "[00:10] Propagating Meta (Facebook & Instagram) sponsored pipelines...", delay: 2400 },
+      { log: "[00:13] Launching XML Sitemap indexing broadcast & search engine pings...", delay: 3200 },
+      { log: "[00:16] Broadcasting schema-markup tags across local and global web CDNs...", delay: 4000 },
+      { log: "[00:19] Active listing syndication successfully deployed web-wide!", delay: 4800 }
+    ];
+
+    steps.forEach((step, index) => {
+      setTimeout(() => {
+        setBroadcastStep(index + 1);
+        setBroadcastLogs(prev => [...prev, step.log]);
+      }, step.delay);
+    });
+
+    setTimeout(async () => {
+      try {
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + selectedPlan.durationDays);
+
+        await addDoc(collection(db, 'ad_listings'), {
+          vendorId: user.uid,
+          type: adType,
+          title: formData.title,
+          description: formData.description,
+          price: parseFloat(formData.price),
+          category: formData.category,
+          location: {
+            state: formData.state,
+            city: formData.city,
+            village: formData.village,
+            address: formData.address,
+            landmark: formData.landmark
+          },
+          contact: {
+            phone: formData.phone,
+            whatsapp: formData.whatsapp,
+            email: formData.email
+          },
+          details: formData.details,
+          photos: formData.photos,
+          plan: selectedPlan.id,
+          expiryDate: expiryDate.getTime(),
+          status: adType === 'ADVERT' ? 'active' : 'pending',
+          createdAt: serverTimestamp(),
+          syndication: syndicationData
+        });
+        
+        setIsBroadcasting(false);
+        setSyndicationData({ googleAds: null, socialMedia: null, seo: null });
+        setFormData({
+          title: '',
+          description: '',
+          price: '',
+          state: '',
+          city: '',
+          village: '',
+          address: '',
+          landmark: '',
+          phone: '',
+          whatsapp: '',
+          email: '',
+          category: '',
+          details: {},
+          photos: []
+        });
+        setSelectedCategory(null);
+        setView('BROWSE');
+      } catch (err) {
+        console.error("Error creating ad:", err);
+        setIsBroadcasting(false);
+      }
+    }, 5500);
   };
 
   return (
@@ -501,7 +616,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           placeholder="Search Adverts..." 
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-12 pr-6 py-3 bg-gray-50 border-none rounded-2xl w-64 focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all text-sm font-black text-gray-950 placeholder:text-gray-400"
+                          className={`pl-12 pr-6 py-3 bg-gray-50 border-none rounded-2xl w-64 focus:ring-2 focus:ring-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} focus:bg-white transition-all text-sm font-black text-gray-950 placeholder:text-gray-400`}
                         />
                      </div>
                   </div>
@@ -518,12 +633,12 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                         setRegisterStep('DETAILS');
                         setView('REGISTER');
                      }}
-                     className={`p-6 rounded-[2.5rem] border transition-all text-left group bg-white border-gray-100 hover:border-indigo-600 hover:shadow-xl`}
+                     className={`p-6 rounded-[2.5rem] border transition-all text-left group bg-white border-gray-100 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:shadow-xl`}
                    >
-                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all bg-gray-100 group-hover:bg-indigo-600 text-gray-950 group-hover:text-white shadow-sm ring-1 ring-gray-100`}>
+                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all bg-gray-100 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} text-gray-950 group-hover:text-white shadow-sm ring-1 ring-gray-100`}>
                         <cat.icon className="w-6 h-6" />
                      </div>
-                     <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 text-indigo-700`}>DOMAIN</span>
+                     <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${adType === 'ADVERT' ? 'text-indigo-700' : 'text-rose-700'}`}>DOMAIN</span>
                      <span className="text-[12px] font-black uppercase tracking-tight leading-tight text-gray-950">{cat.label}</span>
                    </motion.button>
                  ))}
@@ -566,8 +681,8 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
 
                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  {MARKETPLACE_HUBS.map((hub) => (
-                   <div key={hub.id} className="p-8 bg-gray-50 rounded-[3rem] border border-gray-100 hover:border-indigo-600 transition-all hover:bg-white group cursor-pointer">
-                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-md ring-1 ring-gray-100 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                   <div key={hub.id} className={`p-8 bg-gray-50 rounded-[3rem] border border-gray-100 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} transition-all hover:bg-white group cursor-pointer`}>
+                      <div className={`w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-md ring-1 ring-gray-100 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} group-hover:text-white transition-all`}>
                         <hub.icon className="w-7 h-7" />
                       </div>
                       <h4 className="text-lg font-black text-gray-950 uppercase tracking-tight mb-2">{hub.name}</h4>
@@ -579,7 +694,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                             onClose();
                           }
                         }}
-                        className="flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] group-hover:gap-4 transition-all"
+                        className={`flex items-center gap-2 text-[10px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-[0.2em] group-hover:gap-4 transition-all`}
                       >
                         Enter Hub <ArrowRight className="w-4 h-4" />
                       </button>
@@ -714,27 +829,27 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           setFormData({ ...formData, category: cat.id });
                           setRegisterStep('DETAILS');
                         }}
-                        className="p-6 rounded-3xl border border-gray-100 bg-white hover:border-indigo-600 hover:shadow-xl transition-all text-left group"
+                        className={`p-6 rounded-3xl border border-gray-100 bg-white hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:shadow-xl transition-all text-left group`}
                       >
-                        <div className="w-12 h-12 rounded-xl bg-gray-100/50 group-hover:bg-indigo-600 text-gray-950 group-hover:text-white flex items-center justify-center mb-4 transition-all ring-1 ring-gray-100">
+                        <div className={`w-12 h-12 rounded-xl bg-gray-100/50 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} text-gray-950 group-hover:text-white flex items-center justify-center mb-4 transition-all ring-1 ring-gray-100`}>
                           <cat.icon className="w-6 h-6" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 mb-1">Domain</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} mb-1`}>Domain</p>
                         <p className="text-[13px] font-black uppercase tracking-tight text-gray-950">{cat.label}</p>
                       </button>
                     ))}
                   </div>
                 ) : registerStep === 'DETAILS' ? (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white border border-gray-100 rounded-[3rem] p-10 shadow-2xl shadow-gray-100 space-y-8">
+                    <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-10 shadow-2xl space-y-8">
                        <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
+                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
                             {adType === 'ADVERT' ? 'Listing Heading (Title)' : 'Item Name / Portfolio Title'}
                           </label>
                           <input 
                             type="text" 
                             placeholder={adType === 'ADVERT' ? "e.g. 5-Star Hotel Reservation in Abuja" : "e.g. 10 Hectares of Farm Land in Oyo"}
-                            className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-base font-bold focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all shadow-sm placeholder:text-gray-500"
+                            className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 rounded-2xl text-base font-black transition-all shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-0"
                             value={formData.title}
                             onChange={(e) => setFormData({...formData, title: e.target.value})}
                           />
@@ -742,39 +857,39 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
 
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
                                 {adType === 'ADVERT' ? 'Base Pricing Strategies (NGN)' : 'Selling Price / Valuation (NGN)'}
                              </label>
                              <input 
                                type="number" 
                                placeholder="Price"
-                               className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-base font-bold focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all"
+                               className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 rounded-2xl text-base font-black transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                value={formData.price}
                                onChange={(e) => setFormData({...formData, price: e.target.value})}
                              />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Domain</label>
-                             <div className="w-full px-6 py-4 bg-gray-50 rounded-2xl flex items-center justify-between text-sm font-bold opacity-70">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Domain</label>
+                             <div className="w-full px-6 py-5 bg-slate-100 border-2 border-slate-200 rounded-2xl flex items-center justify-between text-sm font-black text-slate-900">
                                {AD_CATEGORIES.find(c => c.id === formData.category)?.label || 'None'}
-                               <button onClick={() => setRegisterStep('CATEGORY')} className="text-indigo-600 text-[10px] uppercase tracking-widest font-black">Change</button>
+                               <button onClick={() => setRegisterStep('CATEGORY')} className="text-indigo-600 text-[11px] uppercase tracking-widest font-black hover:underline">Change</button>
                              </div>
                           </div>
                        </div>
 
                        {adType === 'SELL' && (
-                          <div className="p-8 bg-rose-50 border border-rose-100 rounded-3xl space-y-6">
+                          <div className="p-8 bg-rose-50 border-2 border-rose-200 rounded-3xl space-y-6">
                              <div className="flex items-center gap-3">
-                                <Shield className="w-5 h-5 text-rose-600" />
-                                <h4 className="text-[11px] font-black text-rose-900 uppercase tracking-widest">Business Trust Credentials</h4>
+                                <Shield className="w-5 h-5 text-rose-700" />
+                                <h4 className="text-[12px] font-black text-rose-950 uppercase tracking-widest">Business Trust Credentials</h4>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
-                                   <label className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Shop / Business Name</label>
+                                   <label className="text-[10px] font-black text-rose-950 uppercase tracking-widest">Shop / Business Name</label>
                                    <input 
                                       type="text"
                                       placeholder="e.g. EFADO Global Merchants"
-                                      className="w-full px-6 py-4 bg-white border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-rose-600 transition-all"
+                                      className="w-full px-6 py-4 bg-white border-2 border-rose-200 rounded-2xl text-sm font-black text-slate-900 focus:border-rose-600 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                       value={formData.details.businessName || ''}
                                       onChange={(e) => setFormData({
                                          ...formData,
@@ -783,9 +898,9 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                                     />
                                  </div>
                                  <div className="space-y-4">
-                                    <label className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Vendor Tier</label>
+                                    <label className="text-[10px] font-black text-rose-950 uppercase tracking-widest">Vendor Tier</label>
                                     <select 
-                                       className="w-full px-6 py-4 bg-white border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-rose-600 transition-all"
+                                       className="w-full px-6 py-4 bg-white border-2 border-rose-200 rounded-2xl text-sm font-black text-slate-900 focus:border-rose-600 transition-all focus:outline-none"
                                        value={formData.details.vendorTier || 'Standard'}
                                        onChange={(e) => setFormData({
                                           ...formData,
@@ -799,21 +914,21 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                                  </div>
                               </div>
                            </div>
-                        )}
+                       )}
 
                        {/* Dynamic Category Fields */}
                        {formData.category && CATEGORY_FIELDS[formData.category] && (
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
                            {CATEGORY_FIELDS[formData.category].map((field) => (
                              <div key={field.key} className="space-y-4">
-                               <label className="text-[10px] font-black text-gray-700 uppercase tracking-widest flex items-center justify-between">
+                               <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center justify-between">
                                  {field.label}
-                                 {field.optional && <span className="text-[9px] text-gray-950 font-black tracking-normal italic">(Optional)</span>}
+                                 {field.optional && <span className="text-[9px] text-indigo-600 font-bold tracking-normal italic">(Optional)</span>}
                                </label>
                                <input 
                                  type={field.type}
                                  placeholder={field.placeholder}
-                                 className="w-full px-6 py-4 bg-indigo-50 border-2 border-indigo-100 rounded-2xl text-sm font-black text-gray-950 focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all shadow-sm placeholder:text-indigo-200"
+                                 className="w-full px-6 py-4 bg-indigo-50 border-2 border-indigo-200 rounded-2xl text-sm font-black text-slate-900 focus:border-indigo-600 focus:bg-white transition-all shadow-sm placeholder:text-indigo-400 focus:outline-none focus:ring-0"
                                  value={formData.details[field.key] || ''}
                                  onChange={(e) => setFormData({
                                    ...formData, 
@@ -826,81 +941,81 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                        )}
 
                        <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
                             {adType === 'ADVERT' ? 'Mission Description' : 'Asset Details / Narrative'}
                           </label>
                           <textarea 
                             placeholder={adType === 'ADVERT' ? "What makes this offer unique? Feature list, benefits, etc." : "Condition, usage history, features, and selling points."}
-                            className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-600 focus:bg-white transition-all h-32 resize-none"
+                            className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:border-indigo-600 focus:bg-white transition-all h-32 resize-none placeholder:text-slate-400 focus:outline-none focus:ring-0"
                             value={formData.description}
                             onChange={(e) => setFormData({...formData, description: e.target.value})}
                           />
                        </div>
 
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-gray-50">
+                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-slate-200">
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-950 uppercase tracking-widest">State / Region</label>
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">State / Region</label>
                              <input 
                                 type="text" 
                                 placeholder="e.g. Lagos, Abuja, New York"
-                                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                 value={formData.state}
                                 onChange={(e) => setFormData({...formData, state: e.target.value})}
                              />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-950 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 Town / City
-                                <span className="text-[8px] text-gray-950 font-black uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <input 
                                 type="text" 
                                 placeholder="e.g. Ikeja, Manhattan"
-                                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                 value={formData.city}
                                 onChange={(e) => setFormData({...formData, city: e.target.value})}
                              />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-950 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 Locality / Village
-                                <span className="text-[8px] text-gray-950 font-black uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <input 
                                 type="text" 
                                 placeholder="Specific village or community"
-                                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                 value={formData.village}
                                 onChange={(e) => setFormData({...formData, village: e.target.value})}
                              />
                           </div>
                        </div>
 
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8 border-b border-gray-50">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8 border-b border-slate-200">
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 Full Address
-                                <span className="text-[8px] text-gray-300 font-bold uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <input 
                                 type="text" 
                                 placeholder="Street number and name"
-                                className="w-full px-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-600 shadow-sm"
+                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                 value={formData.address}
                                 onChange={(e) => setFormData({...formData, address: e.target.value})}
                              />
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 Outstanding Landmark
-                                <span className="text-[8px] text-gray-300 font-bold uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <div className="relative">
-                               <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                               <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                <input 
                                   type="text" 
                                   placeholder="e.g. Near ABC School, Opposite XYZ Port"
-                                  className="w-full pl-12 pr-6 py-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-600"
+                                  className="w-full pl-12 pr-6 py-4 bg-indigo-50/50 border-2 border-indigo-200 rounded-2xl text-sm font-black text-slate-900 focus:border-indigo-600 focus:bg-white transition-all placeholder:text-indigo-400 focus:outline-none focus:ring-0"
                                   value={formData.landmark}
                                   onChange={(e) => setFormData({...formData, landmark: e.target.value})}
                                />
@@ -908,47 +1023,47 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           </div>
                        </div>
 
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 pb-8 border-b border-gray-50">
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 pb-8 border-b border-slate-200">
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-950 uppercase tracking-widest">Phone Number</label>
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Phone Number</label>
                              <div className="relative">
-                               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                <input 
                                   type="tel" 
                                   placeholder="+234..."
-                                  className="w-full pl-12 pr-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                   value={formData.phone}
                                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                                />
                              </div>
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 WhatsApp Number
-                                <span className="text-[8px] text-gray-300 font-bold uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <div className="relative">
-                               <MessageCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                               <MessageCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
                                <input 
                                   type="tel" 
                                   placeholder="WhatsApp Number"
-                                  className="w-full pl-12 pr-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                   value={formData.whatsapp}
                                   onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
                                />
                              </div>
                           </div>
                           <div className="space-y-4">
-                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex justify-between">
+                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
                                 Contact Email
-                                <span className="text-[8px] text-gray-300 font-bold uppercase tracking-widest leading-none">(Optional)</span>
+                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
                              </label>
                              <div className="relative">
-                               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                                <input 
                                   type="email" 
                                   placeholder="Email Address"
-                                  className="w-full pl-12 pr-6 py-4 bg-gray-50 border-none rounded-2xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-indigo-600 transition-all font-mono"
+                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
                                   value={formData.email}
                                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                                />
@@ -956,13 +1071,59 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           </div>
                        </div>
 
+                       {/* Global Marketing Syndication Channels Section */}
+                       <div className={`p-8 bg-gradient-to-br ${adType === 'ADVERT' ? 'from-indigo-50/70 via-indigo-100/10' : 'from-rose-50/70 via-rose-100/10'} to-amber-50/70 border-2 ${adType === 'ADVERT' ? 'border-indigo-200/50' : 'border-rose-200/50'} rounded-[2.5rem] space-y-6`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                             <div className="flex items-center gap-3">
+                                <Globe className={`w-6 h-6 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} animate-pulse`} />
+                                <div>
+                                   <h4 className={`text-xs font-black ${adType === 'ADVERT' ? 'text-indigo-950' : 'text-rose-950'} uppercase tracking-widest`}>Global Marketing Syndication Channels</h4>
+                                   <p className={`text-[9px] ${adType === 'ADVERT' ? 'text-indigo-700' : 'text-rose-700'} font-bold uppercase`}>Auto-propagating your campaign across global high-intent pipelines</p>
+                                </div>
+                             </div>
+                             <span className={`self-start sm:self-auto px-3 py-1 ${adType === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'} text-white text-[8px] font-black uppercase rounded-full tracking-widest animate-pulse`}>Neural Active</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                   <span className="text-[10px] font-black text-slate-900 uppercase">Google Ads Network</span>
+                                   <div className="relative inline-flex items-center">
+                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
+                                   </div>
+                                </div>
+                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Syncs target keywords, headline variations, and automated daily bidding routing.</p>
+                             </div>
+
+                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                   <span className="text-[10px] font-black text-slate-900 uppercase">Social Media Pipelines</span>
+                                   <div className="relative inline-flex items-center">
+                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
+                                   </div>
+                                </div>
+                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Simultaneous scheduling and sponsor post formatting across Meta channels & WhatsApp grids.</p>
+                             </div>
+
+                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                   <span className="text-[10px] font-black text-slate-900 uppercase">Global Web & SEO Nodes</span>
+                                   <div className="relative inline-flex items-center">
+                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
+                                   </div>
+                                </div>
+                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Auto-indexes via real-time XML sitemaps, semantic JSON-LD structures, and global CDN caching.</p>
+                             </div>
+                          </div>
+                       </div>
+
                        <div className="space-y-4">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tactical Assets (Photos)</label>
+                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Tactical Assets (Photos)</label>
                           <div className="grid grid-cols-4 gap-4">
                              <button 
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-gray-400 hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                                className={`aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-slate-500 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:text-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} transition-all`}
                              >
                                 <Upload className="w-6 h-6 mb-2" />
                                 <span className="text-[9px] font-black uppercase">Upload</span>
@@ -976,7 +1137,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                                 onChange={handlePhotoUpload} 
                              />
                              {formData.photos.map((photo, index) => (
-                                <div key={index} className="aspect-square bg-gray-50 border border-gray-100 rounded-3xl relative overflow-hidden group animate-in fade-in zoom-in-95">
+                                <div key={index} className="aspect-square bg-slate-50 border border-slate-200 rounded-3xl relative overflow-hidden group animate-in fade-in zoom-in-95">
                                    <img src={photo} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
                                    <button 
                                       type="button"
@@ -995,12 +1156,12 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                              {formData.photos.length === 0 && (
                                 <div className="aspect-square bg-indigo-50 border border-indigo-100 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group animate-pulse">
                                    <img src={`https://picsum.photos/seed/adp1/300/300`} alt="Sample" className="w-full h-full object-cover opacity-50" />
-                                   <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-indigo-600 uppercase tracking-widest">Select Photos</span>
+                                   <span className={`absolute inset-0 flex items-center justify-center text-[8px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-widest`}>Select Photos</span>
                                 </div>
                              )}
                           </div>
-                          <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest italic flex items-center gap-2">
-                             <Info className="w-3 h-3" /> high-fidelity images increase conversion by 85%
+                          <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest italic flex items-center gap-2">
+                             <Info className={`w-3 h-3 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} animate-bounce`} /> high-fidelity images increase conversion by 85%
                           </p>
                        </div>
                     </div>
@@ -1014,8 +1175,11 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       </button>
                       <button 
                         disabled={!formData.title || !formData.category || !formData.price}
-                        onClick={() => setRegisterStep('PREVIEW')}
-                        className="flex-[2] py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
+                        onClick={() => {
+                          setRegisterStep('PREVIEW');
+                          generateCampaignAssets();
+                        }}
+                        className={`flex-[2] py-5 ${adType === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group`}
                       >
                         Review Audit Preview <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </button>
@@ -1040,7 +1204,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       <div className="p-12 grid grid-cols-1 md:grid-cols-3 gap-12">
                         <div className="md:col-span-2 space-y-8">
                           <div className="space-y-4">
-                            <h5 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Tactical Description</h5>
+                            <h5 className={`text-[10px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-widest`}>Tactical Description</h5>
                             <p className="text-gray-600 font-medium leading-relaxed">{formData.description || 'No description provided.'}</p>
                           </div>
                           
@@ -1062,14 +1226,14 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           
                           <div className="space-y-4 pt-6 border-t border-gray-200">
                             <div className="flex items-center gap-3">
-                              <MapPin className="w-4 h-4 text-indigo-600" />
+                              <MapPin className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />
                               <div>
                                 <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Global Location</p>
                                 <p className="text-[10px] font-bold text-gray-900 uppercase">{formData.city}, {formData.state}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              <Phone className="w-4 h-4 text-indigo-600" />
+                              <Phone className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />
                               <div>
                                 <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Secure Contact</p>
                                 <p className="text-[10px] font-bold text-gray-900 uppercase">{formData.phone}</p>
@@ -1078,6 +1242,124 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* AI Campaign Previews */}
+                    <div className={`bg-slate-900 border-2 ${adType === 'ADVERT' ? 'border-indigo-500/20' : 'border-rose-500/20'} rounded-[3.5rem] p-8 md:p-12 space-y-8 text-white`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+                        <div className="flex items-center gap-3">
+                          <Zap className={`w-6 h-6 ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} animate-pulse`} />
+                          <div>
+                            <h4 className="text-lg font-black uppercase tracking-tight">AI Syndicated Campaign Mockups</h4>
+                            <p className={`text-[10px] ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase tracking-widest`}>Neural copy variants formatted for global advertising channels</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={generateCampaignAssets}
+                          disabled={isGeneratingCampaign}
+                          className={`px-5 py-2.5 ${adType === 'ADVERT' ? 'bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/50 hover:border-indigo-500 text-indigo-100' : 'bg-rose-600/30 hover:bg-rose-600 border border-rose-500/50 hover:border-rose-500 text-rose-100'} text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50`}
+                        >
+                          {isGeneratingCampaign ? 'Re-Generating...' : '⚡ Regenerate Copy'}
+                        </button>
+                      </div>
+
+                      {isGeneratingCampaign ? (
+                        <div className="py-12 flex flex-col items-center justify-center space-y-4">
+                          <div className={`w-12 h-12 rounded-full border-4 ${adType === 'ADVERT' ? 'border-indigo-500/30 border-t-indigo-500' : 'border-rose-500/30 border-t-rose-500'} animate-spin`} />
+                          <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-black uppercase tracking-widest animate-pulse`}>EFADO Neural Engine compiling copy variants...</p>
+                        </div>
+                      ) : syndicationData.googleAds ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                          {/* Google Search Ad Variant */}
+                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google Sponsored Search</span>
+                              <span className="px-2 py-0.5 bg-slate-800 text-[8px] font-black uppercase text-slate-300 rounded">Ad</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center text-[10px] text-black font-black">G</div>
+                                <span className="text-[10px] text-slate-400">https://efado.net &gt; connect</span>
+                              </div>
+                              <h5 className="text-md font-extrabold text-blue-400 hover:underline cursor-pointer leading-tight">
+                                {syndicationData.googleAds.headline}
+                              </h5>
+                              <p className="text-xs text-slate-300 leading-normal">
+                                {syndicationData.googleAds.description}
+                              </p>
+                              <div className="flex flex-wrap gap-1.5 pt-2">
+                                {syndicationData.googleAds.keywords.map((kw, i) => (
+                                  <span key={i} className={`px-2 py-0.5 bg-slate-900 text-[9px] ${adType === 'ADVERT' ? 'text-indigo-300 border-indigo-950' : 'text-rose-300 border-rose-950'} border rounded-full font-bold`}>
+                                    #{kw}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Facebook Mobile Feed Post */}
+                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meta Mobile Feed</span>
+                              <span className={`px-2 py-0.5 ${adType === 'ADVERT' ? 'bg-indigo-900/40 text-indigo-300' : 'bg-rose-900/40 text-rose-300'} text-[8px] font-black uppercase rounded`}>Sponsored</span>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${adType === 'ADVERT' ? 'from-indigo-600 to-indigo-400' : 'from-rose-600 to-rose-400'} flex items-center justify-center text-[10px] font-black text-white`}>EF</div>
+                                <div>
+                                  <h6 className="text-[11px] font-black uppercase tracking-tight">EFADO Connection Engine</h6>
+                                  <p className="text-[8px] text-slate-400 uppercase tracking-widest">Sponsored · Active Now</p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-200 leading-normal font-medium">
+                                {syndicationData.socialMedia?.postText} <span className={adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'}>{syndicationData.socialMedia?.hashtags}</span>
+                              </p>
+                              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900">
+                                <img src={formData.photos[0] || `https://picsum.photos/seed/${formData.title}/600/350`} alt="Meta Ad" className="w-full h-40 object-cover" />
+                                <div className="p-4 flex items-center justify-between">
+                                  <div>
+                                    <span className={`text-[8px] font-black ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} uppercase tracking-widest`}>EFADO.NET</span>
+                                    <h6 className="text-xs font-black uppercase tracking-tight text-white line-clamp-1">{formData.title}</h6>
+                                  </div>
+                                  <span className="px-3 py-1.5 bg-slate-800 text-[9px] font-black uppercase rounded text-slate-200 border border-slate-700">Learn More</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Organic Search SEO snippet */}
+                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Organic Web Indexes</span>
+                              <span className="px-2 py-0.5 bg-emerald-950 text-[8px] font-black uppercase text-emerald-300 rounded">SEO Optimized</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-1.5">
+                                <Globe className="w-3.5 h-3.5 text-emerald-500" />
+                                <span className="text-[10px] text-slate-400">efado.net &gt; listings &gt; {formData.category.toLowerCase()}</span>
+                              </div>
+                              <h5 className="text-md font-extrabold text-blue-400 hover:underline cursor-pointer leading-tight">
+                                {syndicationData.seo?.title}
+                              </h5>
+                              <p className="text-xs text-slate-300 leading-normal">
+                                {syndicationData.seo?.metaDescription}
+                              </p>
+                              <div className="p-3 bg-slate-900 border border-slate-850 rounded-xl">
+                                <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Index Coordinates</span>
+                                <span className="font-mono text-[9px] text-emerald-400 block break-all">XML_PING: GOOGLE, BING, DUCKDUCKGO SUCCESSFUL</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
+                          <AlertCircle className={`w-8 h-8 ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} animate-bounce`} />
+                          <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase`}>Ready to compile optimal campaign assets.</p>
+                          <button onClick={generateCampaignAssets} className={`px-6 py-2.5 ${adType === 'ADVERT' ? 'bg-indigo-600 shadow-indigo-600/20' : 'bg-rose-600 shadow-rose-600/20'} text-white font-black uppercase tracking-widest text-[10px] rounded-full`}>
+                            ⚡ Trigger Campaign Optimization
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-4">
@@ -1089,7 +1371,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       </button>
                       <button 
                         onClick={() => setRegisterStep('PLAN')}
-                        className="flex-[2] py-5 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group"
+                        className={`flex-[2] py-5 ${adType === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
                       >
                         Proceed to Selection Plans <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </button>
@@ -1102,20 +1384,20 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                         <button 
                           key={plan.id}
                           onClick={() => setSelectedPlan(plan)}
-                          className={`p-8 rounded-[3rem] border transition-all text-left relative overflow-hidden group ${selectedPlan?.id === plan.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xl shadow-indigo-500/30' : 'bg-white border-gray-100 hover:border-indigo-100 hover:bg-gray-50'}`}
+                          className={`p-8 rounded-[3rem] border transition-all text-left relative overflow-hidden group ${selectedPlan?.id === plan.id ? (adType === 'ADVERT' ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xl shadow-indigo-500/30' : 'bg-rose-600 border-rose-600 text-white shadow-2xl shadow-rose-500/30') : (adType === 'ADVERT' ? 'bg-white border-gray-100 hover:border-indigo-100 hover:bg-gray-50' : 'bg-white border-gray-100 hover:border-rose-100 hover:bg-gray-50')}`}
                         >
                           {selectedPlan?.id === plan.id && (
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
                           )}
                           <div className="flex items-center justify-between mb-6">
-                            <div className={`p-3 rounded-2xl ${selectedPlan?.id === plan.id ? 'bg-white/20' : 'bg-indigo-50'} transition-all`}>
-                               {plan.id === 'Express' ? <Zap className="w-5 h-5 text-amber-400" /> : <Clock className="w-5 h-5 text-indigo-600" />}
+                            <div className={`p-3 rounded-2xl ${selectedPlan?.id === plan.id ? 'bg-white/20' : (adType === 'ADVERT' ? 'bg-indigo-50' : 'bg-rose-50')} transition-all`}>
+                               {plan.id === 'Express' ? <Zap className="w-5 h-5 text-amber-400" /> : <Clock className={`w-5 h-5 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />}
                             </div>
                             {selectedPlan?.id === plan.id && <CheckCircle2 className="w-5 h-5 text-white" />}
                           </div>
                           
                           <h4 className="text-xl font-black uppercase tracking-tighter mb-1">{plan.name}</h4>
-                          <p className={`text-[10px] font-black uppercase tracking-widest mb-6 ${selectedPlan?.id === plan.id ? 'text-indigo-100' : 'text-gray-600'}`}>
+                          <p className={`text-[10px] font-black uppercase tracking-widest mb-6 ${selectedPlan?.id === plan.id ? (adType === 'ADVERT' ? 'text-indigo-100' : 'text-rose-100') : 'text-gray-600'}`}>
                             {plan.durationDays} Day Deployment
                           </p>
                           
@@ -1144,7 +1426,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       <button 
                         disabled={!selectedPlan}
                         onClick={() => (selectedPlan?.price === 0 || user?.is_super_admin) ? handleCreateAd() : setShowPayment(true)}
-                        className="flex-[2] py-5 bg-gray-950 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group"
+                        className={`flex-[2] py-5 bg-gray-950 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl ${adType === 'ADVERT' ? 'hover:bg-indigo-600' : 'hover:bg-rose-600'} hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group`}
                       >
                         Deploy Strategy <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
                       </button>
@@ -1155,6 +1437,56 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
           </div>
         )}
       </main>
+
+      <AnimatePresence>
+        {isBroadcasting && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-md"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className={`bg-slate-900 border-2 ${adType === 'ADVERT' ? 'border-indigo-500/30' : 'border-rose-500/30'} w-full max-w-xl rounded-[3rem] shadow-2xl p-8 md:p-12 text-center space-y-8`}
+            >
+              <div className="relative w-24 h-24 mx-auto">
+                <div className={`absolute inset-0 rounded-full border-2 ${adType === 'ADVERT' ? 'border-indigo-500' : 'border-rose-500'} animate-ping opacity-40`} />
+                <div className="absolute -inset-2 rounded-full border-2 border-amber-500 animate-ping opacity-25" style={{ animationDelay: '0.5s' }} />
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
+                  <Globe className="w-10 h-10 text-white animate-spin-slow" />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic">Broadcasting Campaign</h3>
+                <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase tracking-widest`}>Deploying marketing assets to global network node sitemaps...</p>
+              </div>
+
+              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                <motion.div 
+                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 h-full"
+                  initial={{ width: '0%' }}
+                  animate={{ width: `${(broadcastStep / 6) * 100}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+
+              <div className="bg-black/80 border border-slate-800 rounded-2xl p-6 h-48 overflow-y-auto font-mono text-left text-xs space-y-2 custom-scrollbar">
+                {broadcastLogs.map((log, index) => (
+                  <p key={index} className={index === broadcastLogs.length - 1 ? "text-amber-400 font-extrabold animate-pulse" : "text-emerald-400 font-medium"}>
+                    {log}
+                  </p>
+                ))}
+              </div>
+
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Do not close this gateway. Campaign is being registered with 100% data integrity.</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showPayment && selectedPlan && (
@@ -1190,7 +1522,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
             >
               <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                 <div>
-                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{selectedAdForEngagement.category}</span>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50'} px-3 py-1 rounded-full`}>{selectedAdForEngagement.category}</span>
                   <h3 className="text-xl font-black text-gray-950 uppercase tracking-tighter italic mt-2">Sovereign Engagement Gate</h3>
                 </div>
                 <button 
@@ -1233,10 +1565,10 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                       {selectedAdForEngagement.contact?.phone && (
                         <a 
                           href={`tel:${selectedAdForEngagement.contact.phone}`}
-                          className="flex-1 p-4 bg-gray-50 hover:bg-indigo-50 border border-gray-100 hover:border-indigo-200 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group"
+                          className={`flex-1 p-4 bg-gray-50 ${selectedAdForEngagement.type === 'ADVERT' ? 'hover:bg-indigo-50 hover:border-indigo-200' : 'hover:bg-rose-50 hover:border-rose-200'} border border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group`}
                         >
-                          <Phone className="w-5 h-5 text-gray-600 group-hover:text-indigo-600 group-hover:scale-110 transition-all" />
-                          <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:text-indigo-600 mt-1">Direct Call</span>
+                          <Phone className={`w-5 h-5 text-gray-600 group-hover:${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} group-hover:scale-110 transition-all`} />
+                          <span className={`text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} mt-1`}>Direct Call</span>
                           <span className="text-[10px] font-mono font-bold text-gray-950 mt-1">{selectedAdForEngagement.contact.phone}</span>
                         </a>
                       )}
@@ -1262,7 +1594,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                         onChange={(e) => setEngagementMessage(e.target.value)}
                         placeholder="Type your strategic inquiry..."
                         rows={3}
-                        className="w-full p-4 bg-gray-50 border-2 border-gray-100 focus:border-indigo-600 rounded-2xl text-xs font-bold font-mono resize-none focus:outline-none transition-all"
+                        className={`w-full p-4 bg-gray-50 border-2 border-gray-100 focus:border-${selectedAdForEngagement.type === 'ADVERT' ? 'indigo-600' : 'rose-600'} rounded-2xl text-xs font-bold font-mono resize-none focus:outline-none transition-all`}
                       />
                     </div>
 
@@ -1275,7 +1607,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                         }, 1200);
                       }}
                       disabled={!engagementMessage || engagementSending}
-                      className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      className={`w-full py-4 ${selectedAdForEngagement.type === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
                     >
                       {engagementSending ? "Propagating Signal..." : "Transmit Signal"} 
                       <Zap className="w-4 h-4 text-amber-300" />

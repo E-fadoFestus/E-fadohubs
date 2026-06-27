@@ -36,6 +36,7 @@ import { ServiceCorpsRegistration } from './ServiceCorpsRegistration';
 import { ServiceBargainPlatform } from './ServiceBargainPlatform';
 import { db, collection, onSnapshot, query, where, limit, orderBy } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
+import { EfadoworksOnline } from './EfadoworksOnline';
 
 interface ServiceSubcategory {
   name: string;
@@ -389,6 +390,7 @@ interface EfadoServiceCorpsProps {
 }
 
 export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onClose, onOpenMining, onNavigate }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'DIRECTORY' | 'EFADOWORKS'>('DIRECTORY');
   const [selectedFamily, setSelectedFamily] = useState<ServiceFamily | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [scope, setScope] = useState<'Local' | 'International' | 'Both'>('Both');
@@ -481,8 +483,38 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
   return (
     <div className="min-h-screen bg-transparent">
       <div className="max-w-7xl mx-auto px-4 py-8 relative">
-        {/* Header */}
-        <div className="mb-20 text-center relative">
+        {/* Sub-Tab Navigation Bar */}
+        <div className="flex justify-center mb-10 relative z-30">
+          <div className="bg-slate-900/90 border border-white/10 p-1 rounded-full flex gap-1 shadow-2xl backdrop-blur-md">
+            <button 
+              onClick={() => setActiveSubTab('DIRECTORY')}
+              className={`px-6 sm:px-8 py-2.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${
+                activeSubTab === 'DIRECTORY' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/10' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Service Squads
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('EFADOWORKS')}
+              className={`px-6 sm:px-8 py-2.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${
+                activeSubTab === 'EFADOWORKS' 
+                  ? 'bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white shadow-lg shadow-fuchsia-500/15' 
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              EFADOworks Online
+            </button>
+          </div>
+        </div>
+
+        {activeSubTab === 'EFADOWORKS' ? (
+          <EfadoworksOnline user={user} />
+        ) : (
+          <>
+            {/* Header */}
+            <div className="mb-20 text-center relative">
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -940,6 +972,8 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
             </motion.div>
           )}
         </AnimatePresence>
+          </>
+        )}
 
         <AnimatePresence>
           {showRegistration && (

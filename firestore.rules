@@ -457,5 +457,29 @@ service cloud.firestore {
     match /vending_purchases/{purchaseId} {
       allow read, write: if isAuthenticated();
     }
+    match /efado_freelancers/{freelancerId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_clients/{clientId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_jobs/{jobId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_bids/{bidId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_contracts/{contractId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_milestones/{milestoneId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_reviews/{reviewId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /efado_notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

@@ -515,6 +515,138 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["groupId", "senderId", "content", "type", "createdAt"]
+    },
+    "FreelancerProfile": {
+      "title": "Freelancer Profile",
+      "description": "Professional profile for a freelancer offering services.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Links to existing user." },
+        "displayName": { "type": "string", "description": "Public name." },
+        "title": { "type": "string", "description": "Professional title." },
+        "bio": { "type": "string", "description": "Short bio." },
+        "skills": { "type": "array", "items": { "type": "string" }, "description": "List of skills." },
+        "hourlyRate": { "type": "number", "description": "Hourly rate in USD/local." },
+        "portfolioLinks": { "type": "array", "items": { "type": "string" }, "description": "URLs of past work." },
+        "rating": { "type": "number", "description": "Average review rating." },
+        "totalJobsCompleted": { "type": "number", "description": "Jobs counter." },
+        "availability": { "type": "string", "enum": ["Available", "Busy", "Not Available"] },
+        "memberSince": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "title", "bio", "skills", "hourlyRate", "rating", "totalJobsCompleted", "availability", "memberSince"]
+    },
+    "ClientProfile": {
+      "title": "Client Profile",
+      "description": "Professional profile for clients hiring freelancers.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "totalJobsPosted": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "rating": { "type": "number" }
+      },
+      "required": ["userId", "totalJobsPosted", "totalSpent", "rating"]
+    },
+    "FreelanceJob": {
+      "title": "Freelance Job Listing",
+      "description": "Job posted by clients for freelancers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "budgetType": { "type": "string", "enum": ["Fixed", "Hourly"] },
+        "budgetMin": { "type": "number" },
+        "budgetMax": { "type": "number" },
+        "duration": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Completed", "Cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "clientId", "title", "description", "category", "skills", "budgetType", "budgetMin", "budgetMax", "duration", "status", "createdAt", "updatedAt"]
+    },
+    "FreelanceBid": {
+      "title": "Freelance Bid/Proposal",
+      "description": "Bid submitted by a freelancer on a job.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "freelancerId": { "type": "string" },
+        "coverLetter": { "type": "string" },
+        "bidAmount": { "type": "number" },
+        "estimatedDuration": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Accepted", "Rejected", "Withdrawn"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "jobId", "freelancerId", "coverLetter", "bidAmount", "estimatedDuration", "status", "createdAt"]
+    },
+    "FreelanceContract": {
+      "title": "Freelance Contract",
+      "description": "Active freelance job contract between client and freelancer.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "jobId": { "type": "string" },
+        "freelancerId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "agreedAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Disputed", "Cancelled"] },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "jobId", "freelancerId", "clientId", "agreedAmount", "status", "startedAt"]
+    },
+    "FreelanceMilestone": {
+      "title": "Freelance Milestone",
+      "description": "Project milestone tracking payment & deliverable.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contractId": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Delivered", "Approved", "Paid"] },
+        "dueDate": { "type": "string" },
+        "deliverableDescription": { "type": "string" },
+        "deliverableFile": { "type": "string" }
+      },
+      "required": ["id", "contractId", "title", "amount", "status", "dueDate"]
+    },
+    "FreelanceReview": {
+      "title": "Freelance Review",
+      "description": "Reviews left after contract completion.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "contractId": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "roleOfReviewer": { "type": "string", "enum": ["Client", "Freelancer"] },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "contractId", "fromUserId", "toUserId", "roleOfReviewer", "rating", "comment", "createdAt"]
+    },
+    "FreelanceNotification": {
+      "title": "Freelance Notification",
+      "description": "In-app notifications for freelance marketplace actions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "message", "isRead", "createdAt"]
     }
   },
   "firestore": {
@@ -637,6 +769,38 @@
     "/raffle_turn_cards/{cardId}": {
       "schema": "RaffleTurnCard",
       "description": "User-facing raffle/turn cards."
+    },
+    "/efado_freelancers/{freelancerId}": {
+      "schema": "FreelancerProfile",
+      "description": "Freelancer public profiles."
+    },
+    "/efado_clients/{clientId}": {
+      "schema": "ClientProfile",
+      "description": "Client public profiles."
+    },
+    "/efado_jobs/{jobId}": {
+      "schema": "FreelanceJob",
+      "description": "Freelance job listings."
+    },
+    "/efado_bids/{bidId}": {
+      "schema": "FreelanceBid",
+      "description": "Bids submitted on job listings."
+    },
+    "/efado_contracts/{contractId}": {
+      "schema": "FreelanceContract",
+      "description": "Active freelance job contracts."
+    },
+    "/efado_milestones/{milestoneId}": {
+      "schema": "FreelanceMilestone",
+      "description": "Milestones for freelance contracts."
+    },
+    "/efado_reviews/{reviewId}": {
+      "schema": "FreelanceReview",
+      "description": "Freelance system reviews."
+    },
+    "/efado_notifications/{notificationId}": {
+      "schema": "FreelanceNotification",
+      "description": "In-app notifications."
     }
   }
 }

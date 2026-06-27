@@ -23,6 +23,7 @@ import {
   Search,
   X,
   Loader2,
+  RefreshCw,
   Banknote,
   UserCheck,
   MapPin,
@@ -76,7 +77,7 @@ interface EfadoHepiHandsLoanProps {
   user: UserProfile;
 }
 
-type LoanTab = 'DASHBOARD' | 'APPLY' | 'MY_LOANS' | 'REPAYMENT' | 'TRUST' | 'COMMUNITY';
+type LoanTab = 'DASHBOARD' | 'APPLY' | 'MY_LOANS' | 'REPAYMENT' | 'TRUST' | 'COMMUNITY' | 'VENDOR';
 
 export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
@@ -88,7 +89,19 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [showVendorReg, setShowVendorReg] = useState(false);
   const [myVendorProfile, setMyVendorProfile] = useState<LoanVendor | null>(null);
+  const [showFormInTab, setShowFormInTab] = useState(false);
   const [showSystemGuide, setShowSystemGuide] = useState(false);
+
+  // Vendor / Lender Hub States
+  const [allApplications, setAllApplications] = useState<LoanApplication[]>([]);
+  const [fundingLoadings, setFundingLoadings] = useState<Record<string, boolean>>({});
+  const [updatingParams, setUpdatingParams] = useState(false);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [editMinAmount, setEditMinAmount] = useState<number>(100);
+  const [editMaxAmount, setEditMaxAmount] = useState<number>(10000);
+  const [editInterestRange, setEditInterestRange] = useState<string>('10% - 15%');
+  const [editWebhookUrl, setEditWebhookUrl] = useState<string>('');
+  const [editEscrowOptIn, setEditEscrowOptIn] = useState<boolean>(true);
 
   // Robust Repayment States
   const [selectedRepaymentMethod, setSelectedRepaymentMethod] = useState<'wallet' | 'paystack' | 'bank_transfer'>('wallet');
@@ -208,6 +221,147 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
     );
     return () => unsubVendor();
   }, [user.uid]);
+
+  // Sync edit states with active vendor profile
+  useEffect(() => {
+    if (myVendorProfile) {
+      setEditMinAmount(myVendorProfile.lendingParameters?.minAmount ?? 100);
+      setEditMaxAmount(myVendorProfile.lendingParameters?.maxAmount ?? 10000);
+      setEditInterestRange(myVendorProfile.lendingParameters?.interestRange ?? '10% - 15%');
+      setEditWebhookUrl(myVendorProfile.lendingParameters?.webhookUrl ?? '');
+      setEditEscrowOptIn(myVendorProfile.settlement?.escrowOptIn ?? true);
+    }
+  }, [myVendorProfile]);
+
+  // Fetch pending third-party loan applications for the Lender Matching Pool
+  useEffect(() => {
+    if (!myVendorProfile) return;
+    const unsubAllApps = onSnapshot(
+      query(collection(db, 'loan_applications'), where('status', '==', 'pending')),
+      (snapshot) => {
+        setAllApplications(
+          snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as LoanApplication))
+            .filter(app => app.userId !== user.uid)
+        );
+      }
+    );
+    return () => unsubAllApps();
+  }, [myVendorProfile, user.uid]);
+
+  const handleUpdateLenderParameters = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myVendorProfile?.id) return;
+    setUpdatingParams(true);
+    setUpdateSuccess(false);
+    try {
+      const vendorRef = doc(db, 'loan_vendors', myVendorProfile.id);
+      await updateDoc(vendorRef, {
+        'lendingParameters.minAmount': Number(editMinAmount),
+        'lendingParameters.maxAmount': Number(editMaxAmount),
+        'lendingParameters.interestRange': editInterestRange,
+        'lendingParameters.webhookUrl': editWebhookUrl,
+        'settlement.escrowOptIn': editEscrowOptIn
+      });
+      setUpdateSuccess(true);
+      setTimeout(() => setUpdateSuccess(false), 4000);
+    } catch (err) {
+      console.error('Error updating vendor params:', err);
+      alert('Failed to update credentials. Please check your network connection.');
+    } finally {
+      setUpdatingParams(false);
+    }
+  };
+
+  const handleFundApplication = async (app: LoanApplication) => {
+    if (!myVendorProfile) return;
+    const currentBalance = user.playerWallet || 0;
+    if (currentBalance < app.amount) {
+      alert(`Insufficient balance in your Player Wallet. You need ${formatPrice(app.amount)} to fund this loan, but only have ${formatPrice(currentBalance)}.`);
+      return;
+    }
+
+    const confirmFund = window.confirm(`Are you sure you want to deploy ${formatPrice(app.amount)} from your Player Wallet to fund ${app.userName}'s loan request? This is irreversible and will bind you to the platform repayment escrow contract.`);
+    if (!confirmFund) return;
+
+    setFundingLoadings(prev => ({ ...prev, [app.id!]: true }));
+    try {
+      // 1. Calculate repayment schedule
+      const months = parseInt(app.tenor) || 3;
+      const totalRepayment = app.totalRepayment || (app.amount * 1.12);
+      const monthlyAmount = app.monthlyInstallment || (totalRepayment / months);
+      
+      const schedule = Array.from({ length: months }, (_, index) => {
+        const dueDate = new Date();
+        dueDate.setMonth(dueDate.getMonth() + index + 1);
+        return {
+          installmentNumber: index + 1,
+          amount: Number(monthlyAmount.toFixed(2)),
+          dueDate: dueDate.toISOString().split('T')[0],
+          status: 'pending' as const
+        };
+      });
+
+      // 2. Create the active loan in 'loans' collection
+      await addDoc(collection(db, 'loans'), {
+        userId: app.userId,
+        userName: app.userName,
+        amount: app.amount,
+        remainingAmount: totalRepayment,
+        tenor: app.tenor,
+        interestRate: app.interest || 12,
+        status: 'active',
+        repaymentSchedule: schedule,
+        lenderId: myVendorProfile.id,
+        lenderName: myVendorProfile.businessName,
+        createdAt: serverTimestamp()
+      });
+
+      // 3. Update application status to 'approved'
+      await updateDoc(doc(db, 'loan_applications', app.id!), {
+        status: 'approved',
+        fundedBy: myVendorProfile.businessName,
+        fundedAt: serverTimestamp()
+      });
+
+      // 4. Adjust Player Wallets (Lender is debited, Borrower is credited)
+      await updateDoc(doc(db, 'users', user.uid), {
+        playerWallet: increment(-app.amount)
+      });
+
+      await updateDoc(doc(db, 'users', app.userId), {
+        playerWallet: increment(app.amount)
+      });
+
+      // 5. Add transactions to both users
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        userName: user.displayName || user.email,
+        amount: -app.amount,
+        type: 'loan_funded',
+        category: 'Lending',
+        description: `Disbursed loan funding to borrower ${app.userName}`,
+        timestamp: serverTimestamp()
+      });
+
+      await addDoc(collection(db, 'transactions'), {
+        userId: app.userId,
+        userName: app.userName,
+        amount: app.amount,
+        type: 'loan_received',
+        category: 'Borrowing',
+        description: `Disbursed loan principal funded by ${myVendorProfile.businessName}`,
+        timestamp: serverTimestamp()
+      });
+
+      alert(`Success! You have successfully funded the loan request of ${formatPrice(app.amount)} for ${app.userName}. The loan is now active!`);
+    } catch (err) {
+      console.error('Error funding loan application:', err);
+      alert('An error occurred while funding this loan. Please try again.');
+    } finally {
+      setFundingLoadings(prev => ({ ...prev, [app.id!]: false }));
+    }
+  };
 
   const handlePerformRepayment = async (amountOverride?: number) => {
     const activeLoan = activeLoans.find(l => l.id === selectedLoanId) || activeLoans[0];
@@ -1308,6 +1462,385 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
     </div>
   );
 
+  const renderVendor = () => {
+    if (!myVendorProfile) {
+      if (showFormInTab) {
+        return (
+          <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-1 shadow-2xl relative overflow-hidden">
+            <div className="p-8 md:p-10 border-b border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-2.5 py-1 rounded-md">Onboarding Node</span>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight mt-3">Lender Onboarding Terminal</h2>
+                <p className="text-slate-400 text-xs mt-1">Upload credentials, set risk models, and bind your settlement node to the automated repayment splits.</p>
+              </div>
+              <button 
+                onClick={() => setShowFormInTab(false)}
+                className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-slate-700"
+              >
+                Cancel Onboarding
+              </button>
+            </div>
+            <div className="bg-slate-950">
+              <LoanVendorRegistration 
+                user={user}
+                onClose={() => setShowFormInTab(false)}
+                onSuccess={() => {
+                  setShowFormInTab(false);
+                }}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      // Show high tech landing card
+      return (
+        <div className="space-y-8 animate-fade-in">
+          <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-10 md:p-14 rounded-[3rem] text-white border border-indigo-500/10 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-[0.02]">
+              <Building2 className="w-96 h-96" />
+            </div>
+            
+            <div className="max-w-3xl relative z-10 space-y-6">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-md border border-indigo-500/30">
+                Institutional Partnership
+              </span>
+              <h2 className="text-4xl md:text-5xl font-black tracking-tight leading-none uppercase">
+                Deploy Liquidity. <br/>
+                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">Earn High-Yield ROI.</span>
+              </h2>
+              <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                Connect your professional money lending credentials to the EFADO HEPIHANDS core network. Instantly match with verified credit-scored borrowers, manage auto-settlements, and automate compliance routing.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                {[
+                  { title: "Direct Funding Pools", desc: "Access thousands of pre-screened borrowers waiting for capital matching." },
+                  { title: "Escrow Split Protection", desc: "Automated core-level payout splits back to your bank account." },
+                  { title: "Full Compliance", desc: "Fully automated license checks, AML pledges, and transparent ledger logs." }
+                ].map((item, idx) => (
+                  <div key={idx} className="bg-white/5 border border-white/10 p-5 rounded-2xl">
+                    <h4 className="font-bold text-white text-xs uppercase mb-1">{item.title}</h4>
+                    <p className="text-slate-400 text-[10.5px] leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-8">
+                <button 
+                  onClick={() => setShowFormInTab(true)}
+                  className="px-10 py-5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-3"
+                >
+                  Onboard as Verified Lender <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Tiers Showcase */}
+          <section className="space-y-6">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight text-center">Select Your Subscription Pool Tier</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { name: "Silver Pool", price: 1000, capacity: 50000, features: ["Up to $50,000 Lending Pool Cap", "Standard Matchmaking", "Manual API Webhook Integration", "12% Standard ROI Cap"] },
+                { name: "Gold Pool", price: 2500, capacity: 150000, features: ["Up to $150,000 Lending Pool Cap", "Priority Matchmaking Engine", "Real-Time Webhook Dispatches", "15% Maximum ROI Cap", "Automated Escrow Settler"] },
+                { name: "Titanium Elite", price: 5000, capacity: 500000, features: ["Up to $500,000 Lending Pool Cap", "Instant Neural Matching", "Dual-Disbursal Webhooks", "No ROI caps", "Direct Bank settlement splits", "Dedicated AML Support"] }
+              ].map((tier, idx) => (
+                <div key={idx} className={`bg-white border p-8 rounded-3xl relative flex flex-col justify-between ${idx === 1 ? 'border-emerald-500 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/30' : 'border-slate-100 shadow-sm'}`}>
+                  {idx === 1 && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-950 font-black uppercase tracking-widest text-[9px] px-3 py-1 rounded-full">Most Selected</span>}
+                  <div>
+                    <h4 className="font-black text-slate-900 text-lg uppercase mb-1">{tier.name}</h4>
+                    <p className="text-2xl font-black text-indigo-600 mb-6">{formatPrice(tier.price)} <span className="text-xs text-slate-400 font-bold">/ Month</span></p>
+                    <ul className="space-y-3 mb-8">
+                      {tier.features.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-slate-600 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button 
+                    onClick={() => setShowFormInTab(true)}
+                    className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all ${idx === 1 ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
+                  >
+                    Select {tier.name}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      );
+    }
+
+    // Active Lender Dashboard
+    const minParam = myVendorProfile.lendingParameters?.minAmount ?? 0;
+    const maxParam = myVendorProfile.lendingParameters?.maxAmount ?? 1000000;
+    const matchedApps = allApplications.filter(app => app.amount >= minParam && app.amount <= maxParam);
+
+    return (
+      <div className="space-y-8 animate-fade-in">
+        {/* Dynamic header / control center */}
+        <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 text-white rounded-[2.5rem] p-8 md:p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <ShieldCheck className="w-60 h-60 text-emerald-400" />
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-800/80 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center">
+                <Building2 className="w-7 h-7 text-emerald-400 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-xl font-black text-white uppercase tracking-tight">{myVendorProfile.businessName}</h2>
+                  <span className="text-[8.5px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                    {myVendorProfile.status}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Registered: <span className="font-bold text-slate-300">{myVendorProfile.registrationNumber}</span> | Authority: <span className="font-bold text-slate-300">{myVendorProfile.issuingAuthority}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <div className="px-5 py-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 flex flex-col justify-center">
+                <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-widest">Active Pool Tier</span>
+                <span className="text-xs font-black text-amber-400 uppercase tracking-wider mt-0.5">
+                  {(myVendorProfile as any).subscriptionTier || 'Silver Pool'}
+                </span>
+              </div>
+              <div className="px-5 py-3.5 bg-slate-900/60 rounded-2xl border border-slate-800 flex flex-col justify-center">
+                <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-widest">Platform Escrow Payout</span>
+                <span className={`text-xs font-black uppercase mt-0.5 ${myVendorProfile.settlement?.escrowOptIn ? 'text-emerald-400' : 'text-slate-400'}`}>
+                  {myVendorProfile.settlement?.escrowOptIn ? 'AUTOMATED SPLIT' : 'OFFLINE DIRECT'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/60">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Lender Liquidity Pool</span>
+              <p className="text-2xl font-black text-white mt-1">{formatPrice(user.playerWallet)}</p>
+              <div className="flex items-center gap-1.5 mt-2 text-[10px] font-bold text-emerald-400">
+                <Wallet className="w-3.5 h-3.5" />
+                <span>Player Wallet Node</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/60">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Capital Cap Capacity</span>
+              <p className="text-2xl font-black text-indigo-400 mt-1">
+                {formatPrice(myVendorProfile.lendingParameters?.capacity || 50000)}
+              </p>
+              <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-3">
+                <div 
+                  className="bg-indigo-500 h-full" 
+                  style={{ width: `${Math.min(100, ((user.playerWallet) / (myVendorProfile.lendingParameters?.capacity || 50000)) * 100)}%` }} 
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/60">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Credit Limits Matching</span>
+              <p className="text-lg font-black text-emerald-400 mt-2">
+                {formatPrice(myVendorProfile.lendingParameters?.minAmount)} - {formatPrice(myVendorProfile.lendingParameters?.maxAmount)}
+              </p>
+              <p className="text-[9.5px] text-slate-400 font-bold mt-1 uppercase tracking-tight">Active match windows</p>
+            </div>
+
+            <div className="bg-slate-950/40 p-5 rounded-2xl border border-slate-800/60 flex flex-col justify-between">
+              <div>
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Webhook Dispatcher</span>
+                <p className="text-[10px] font-bold text-slate-300 mt-1 truncate">
+                  {myVendorProfile.lendingParameters?.webhookUrl || 'No Endpoint Configured'}
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 text-[8.5px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md self-start mt-2">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
+                ONLINE
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Matched Borrowers Feed */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Active Lender Matching Pool</h3>
+                <p className="text-xs text-slate-500">Live matching with borrower requests that meet your capital thresholds.</p>
+              </div>
+              <span className="text-xs font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-700 px-3 py-1 rounded-md">
+                {matchedApps.length} Match{matchedApps.length !== 1 ? 'es' : ''}
+              </span>
+            </div>
+
+            {matchedApps.length === 0 ? (
+              <div className="bg-white p-12 text-center rounded-[2rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500">
+                  <RefreshCw className="w-8 h-8 animate-spin" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 uppercase text-sm">Searching System Network...</h4>
+                  <p className="text-slate-400 text-xs max-w-sm">No active pending applications fit your customized min/max parameters. Try adjusting your constraints.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {matchedApps.map((app) => (
+                  <motion.div 
+                    key={app.id}
+                    layoutId={app.id}
+                    className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group animate-fade-in"
+                  >
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 font-black uppercase text-[8.5px] rounded border border-indigo-100">
+                          PRE-AUDITED RISK ACCLAIM
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold">ID: {app.id?.substring(0, 8)}</span>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-black text-slate-900 text-lg">{app.userName}</h4>
+                        <p className="text-xs text-slate-500 italic mt-0.5">"{app.purpose}"</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 border-t border-slate-50">
+                        <div>
+                          <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Lending Ask</p>
+                          <p className="text-base font-black text-indigo-600">{formatPrice(app.amount)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Tenor Period</p>
+                          <p className="text-xs font-black text-slate-800 uppercase mt-1">{app.tenor}</p>
+                        </div>
+                        <div>
+                          <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest">Expected Returns</p>
+                          <p className="text-xs font-black text-slate-800 uppercase mt-1">
+                            {formatPrice(app.totalRepayment || (app.amount * 1.12))} ({app.interest || 12}% yield)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="md:border-l md:border-slate-100 md:pl-6 shrink-0 flex flex-col justify-center">
+                      <button 
+                        onClick={() => handleFundApplication(app)}
+                        disabled={fundingLoadings[app.id!]}
+                        className="px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2 disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        {fundingLoadings[app.id! ] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>Deploy Capital <ArrowRight className="w-4 h-4" /></>
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Parameters Configuration Center */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">System Parameters</h3>
+            
+            <form onSubmit={handleUpdateLenderParameters} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="space-y-1.5">
+                <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Lender Config Node</span>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-bold">Live adjustment updates directly to your ecosystem matching indices and compliance records.</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Minimum Loan principal offered</label>
+                  <input 
+                    type="number"
+                    value={editMinAmount}
+                    onChange={(e) => setEditMinAmount(Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 rounded-xl focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Maximum Loan principal offered</label>
+                  <input 
+                    type="number"
+                    value={editMaxAmount}
+                    onChange={(e) => setEditMaxAmount(Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 rounded-xl focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Expected Interest apr range</label>
+                  <input 
+                    type="text"
+                    value={editInterestRange}
+                    onChange={(e) => setEditInterestRange(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 rounded-xl focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">API Webhook dispatch URL</label>
+                  <input 
+                    type="url"
+                    placeholder="https://yourserver.com/api/loans"
+                    value={editWebhookUrl}
+                    onChange={(e) => setEditWebhookUrl(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 rounded-xl focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Settlement Escrow */}
+                <div className="flex items-start gap-2.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                  <input 
+                    id="editEscrowOptIn"
+                    type="checkbox"
+                    checked={editEscrowOptIn}
+                    onChange={(e) => setEditEscrowOptIn(e.target.checked)}
+                    className="w-4.5 h-4.5 rounded text-indigo-600 bg-white border-slate-200 mt-0.5 cursor-pointer focus:ring-0 focus:ring-offset-0"
+                  />
+                  <div>
+                    <label htmlFor="editEscrowOptIn" className="text-[10px] font-black uppercase tracking-wider text-slate-900 cursor-pointer">Opt-In on platform repayment escrow</label>
+                    <p className="text-[9px] text-slate-400 font-bold leading-normal mt-0.5">Automated settlement split routed directly back to configured bank on borrower payments.</p>
+                  </div>
+                </div>
+              </div>
+
+              {updateSuccess && (
+                <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-2xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <span className="text-[10.5px] font-bold">Lender settings updated successfully!</span>
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                disabled={updatingParams}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase tracking-widest text-xs rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2 disabled:bg-slate-300"
+              >
+                {updatingParams ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Save System Parameters"
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -1328,6 +1861,22 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
           </div>
         </div>
 
+        {/* Under Construction Banner */}
+        <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/5 border border-amber-500/25 rounded-[1.5rem] p-5 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-amber-500/15 rounded-2xl flex items-center justify-center shrink-0 border border-amber-500/30">
+              <AlertCircle className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-black text-sm text-amber-800 uppercase tracking-widest">Under Construction — Pending Accredited Vendors' Registration</h4>
+              <p className="text-xs font-bold text-amber-700/90 mt-0.5">All lending interfaces and core loan disbursements are temporarily halted until verified lenders complete their accreditation cycle.</p>
+            </div>
+          </div>
+          <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-amber-800 shrink-0 select-none animate-pulse">
+            System Locked
+          </div>
+        </div>
+
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 mb-12 overflow-x-auto pb-4 no-scrollbar">
           {[
@@ -1337,6 +1886,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
             { id: 'REPAYMENT', label: 'Repayment', icon: Calendar },
             { id: 'TRUST', label: 'Trust & Safety', icon: ShieldCheck },
             { id: 'COMMUNITY', label: 'Community', icon: Lightbulb },
+            { id: 'VENDOR', label: 'Lender Hub', icon: Building2 },
           ].map(tab => (
             <button
               key={tab.id}
@@ -1366,6 +1916,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
           {activeTab === 'REPAYMENT' && renderRepayment()}
           {activeTab === 'TRUST' && renderTrust()}
           {activeTab === 'COMMUNITY' && renderCommunity()}
+          {activeTab === 'VENDOR' && renderVendor()}
         </motion.div>
 
         {/* Vendor Registration Modal */}

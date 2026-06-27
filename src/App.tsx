@@ -2115,64 +2115,74 @@ function AppContent() {
             className="flex items-center gap-4 overflow-x-auto pb-8 no-scrollbar scroll-smooth px-4"
           >
             {[
-              { id: 'HOME', label: 'HomeHub', icon: Home, color: '#FFFFFF', activeColor: 'text-slate-950', bg: 'bg-white' },
-              { id: 'DASHBOARD', label: 'Dashboard', icon: TrendingUp, color: '#6366F1', activeColor: 'text-white', bg: 'bg-indigo-600' },
-              { id: 'GAMES', label: 'GameArena', icon: Gamepad2, color: '#EA580C', activeColor: 'text-white', bg: 'bg-orange-600' },
-              { id: 'MARKET', label: 'ModernMarket', icon: ShoppingBag, color: '#10B981', activeColor: 'text-white', bg: 'bg-emerald-600' },
-              { id: 'FAIRLY_USED', label: 'FairlyUsed', icon: Package, color: '#4F46E5', activeColor: 'text-white', bg: 'bg-indigo-700' },
-              { id: 'ADVERTISING', label: 'Advertise on EFADO', icon: Megaphone, color: '#6366F1', activeColor: 'text-white', bg: 'bg-indigo-600' },
-              { id: 'GIST', label: 'GistHub', icon: MessageSquare, color: '#6366F1', activeColor: 'text-white', bg: 'bg-indigo-600' },
-              { id: 'ZOOM', label: 'ZoomLive', icon: Video, color: '#2563EB', activeColor: 'text-white', bg: 'bg-blue-600' },
-              { id: 'SERVICE_CORPS', label: 'ServiceCorps', icon: HardHat, color: '#94A3B8', activeColor: 'text-white', bg: 'bg-slate-700' },
-              { id: 'COMMUNITY_HUBS', label: 'UnityHubs', icon: Users, color: '#9333EA', activeColor: 'text-white', bg: 'bg-purple-600' },
-              { id: 'HEPIHANDS_LOAN', label: 'LoanHub', icon: HandCoins, color: '#10B981', activeColor: 'text-white', bg: 'bg-emerald-600' },
-              { id: 'TECH_HUB', label: 'TechHub', icon: Cpu, color: '#0891B2', activeColor: 'text-white', bg: 'bg-cyan-600' },
-              { id: 'PARTNER_HUB', label: 'Partners', icon: Handshake, color: '#F59E0B', activeColor: 'text-white', bg: 'bg-amber-600' },
-              { id: 'DOMAIN_HUB', label: 'DomainHub', icon: Globe, color: '#6366F1', activeColor: 'text-white', bg: 'bg-indigo-600' },
-            ].map((item) => (
-              <motion.button 
-                key={item.id}
-                whileHover={{ 
-                  scale: 1.1, 
-                  y: -5,
-                  boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.2)"
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  if (item.id === 'ADVERTISING') handleNavigate('ADVERTISING', 'ADVERT');
-                  else if (item.id === 'ZOOM') handleNavigate('ZOOM');
-                  else if (item.id === 'GIST') handleNavigate('GIST');
-                  else if (item.id === 'COMMUNITY_HUBS') handleNavigate('COMMUNITY_HUBS');
-                  else setActiveHub(item.id as any);
-                }}
-                className={`px-8 py-6 rounded-[2.5rem] font-black tracking-widest text-xs transition-all flex flex-col items-center gap-3 min-w-[160px] shadow-sm border border-white/10 group relative transition-all duration-300 ${
-                  (activeHub === item.id || 
-                   (item.id === 'ADVERTISING' && showAdvertisingHub && adInitialType === 'ADVERT') ||
-                   (item.id === 'GIST' && showGistHub))
-                    ? `${item.bg} ${item.activeColor} ring-4 ring-white/20 shadow-2xl scale-105 !z-10` 
-                    : 'text-white bg-slate-900/60 backdrop-blur-xl hover:bg-slate-800'
-                }`}
-              >
-                <div className={`p-3 rounded-2xl ${activeHub === item.id ? 'bg-white/20' : 'bg-white/5'} mb-1`}>
-                  <item.icon className="w-6 h-6" style={{ color: activeHub === item.id ? undefined : item.color }} />
-                </div>
-                <span className="uppercase whitespace-nowrap text-[10px] tracking-tight">{item.label}</span>
-              </motion.button>
-            ))}
+              { id: 'HOME', label: 'HomeHub', icon: Home, gradient: 'from-emerald-500 via-emerald-600 to-emerald-700', border: 'border-emerald-800/80', ring: 'ring-emerald-400/40' },
+              { id: 'DASHBOARD', label: 'Dashboard', icon: TrendingUp, gradient: 'from-purple-500 via-purple-600 to-purple-700', border: 'border-purple-800/80', ring: 'ring-purple-400/40' },
+              { id: 'GAMES', label: 'GameArena', icon: Gamepad2, gradient: 'from-orange-500 via-orange-600 to-orange-700', border: 'border-orange-800/80', ring: 'ring-orange-400/40' },
+              { id: 'MARKET', label: 'ModernMarket', icon: ShoppingBag, gradient: 'from-amber-400 via-amber-500 to-amber-600', border: 'border-amber-700/80', ring: 'ring-amber-400/40' },
+              { id: 'FAIRLY_USED', label: 'FairlyUsed', icon: Package, gradient: 'from-lime-500 via-lime-600 to-lime-700', border: 'border-lime-700/80', ring: 'ring-lime-400/40' },
+              { id: 'ADVERTISING', label: 'Advertise', icon: Megaphone, gradient: 'from-red-500 via-red-600 to-red-700', border: 'border-red-800/80', ring: 'ring-red-400/40' },
+              { id: 'GIST', label: 'GistHub', icon: MessageSquare, gradient: 'from-blue-500 via-blue-600 to-blue-700', border: 'border-blue-800/80', ring: 'ring-blue-400/40' },
+              { id: 'ZOOM', label: 'ZoomLive', icon: Video, gradient: 'from-violet-500 via-violet-600 to-violet-700', border: 'border-violet-800/80', ring: 'ring-violet-400/40' },
+              { id: 'SERVICE_CORPS', label: 'ServiceCorps', icon: HardHat, gradient: 'from-slate-500 via-slate-600 to-slate-700', border: 'border-slate-800/80', ring: 'ring-slate-400/40' },
+              { id: 'COMMUNITY_HUBS', label: 'UnityHubs', icon: Users, gradient: 'from-cyan-500 via-cyan-600 to-cyan-700', border: 'border-cyan-800/80', ring: 'ring-cyan-400/40' },
+              { id: 'HEPIHANDS_LOAN', label: 'LoanHub', icon: HandCoins, gradient: 'from-rose-500 via-rose-600 to-rose-700', border: 'border-rose-800/80', ring: 'ring-rose-400/40' },
+              { id: 'TECH_HUB', label: 'TechHub', icon: Cpu, gradient: 'from-fuchsia-500 via-fuchsia-600 to-fuchsia-700', border: 'border-fuchsia-800/80', ring: 'ring-fuchsia-400/40' },
+              { id: 'PARTNER_HUB', label: 'Partners', icon: Handshake, gradient: 'from-yellow-500 via-yellow-600 to-yellow-700', border: 'border-yellow-800/80', ring: 'ring-yellow-400/40' },
+              { id: 'DOMAIN_HUB', label: 'DomainHub', icon: Globe, gradient: 'from-teal-500 via-teal-600 to-teal-700', border: 'border-teal-800/80', ring: 'ring-teal-400/40' },
+            ].map((item) => {
+              const isActive = (activeHub === item.id || 
+                               (item.id === 'ADVERTISING' && showAdvertisingHub && adInitialType === 'ADVERT') ||
+                               (item.id === 'GIST' && showGistHub));
+              return (
+                <motion.button 
+                  key={item.id}
+                  whileHover={{ 
+                    scale: 1.08, 
+                    y: -4,
+                    boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)"
+                  }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => {
+                    if (item.id === 'ADVERTISING') handleNavigate('ADVERTISING', 'ADVERT');
+                    else if (item.id === 'ZOOM') handleNavigate('ZOOM');
+                    else if (item.id === 'GIST') handleNavigate('GIST');
+                    else if (item.id === 'COMMUNITY_HUBS') handleNavigate('COMMUNITY_HUBS');
+                    else setActiveHub(item.id as any);
+                  }}
+                  className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border ${item.border} ${
+                    isActive
+                      ? `bg-gradient-to-b ${item.gradient} text-white ring-4 ring-white/30 scale-105 z-10 brightness-110 saturate-125 shadow-[inset_0_2px_0_0_rgba(255,255,255,0.6),0_15px_25px_-5px_rgba(0,0,0,0.5)]` 
+                      : `bg-gradient-to-b ${item.gradient} text-white/90 opacity-70 saturate-[0.85] brightness-[0.8] hover:opacity-100 hover:brightness-100 hover:saturate-100 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_8px_16px_-4px_rgba(0,0,0,0.3)]`
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20 shadow-inner border border-white/20' : 'bg-white/10 border border-white/5'} flex items-center justify-center`}>
+                    <item.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="uppercase whitespace-nowrap text-[11px] font-black tracking-wider text-white drop-shadow-[0_1.5px_1px_rgba(0,0,0,0.85)]">{item.label}</span>
+                  {isActive && (
+                    <span className="absolute bottom-1 w-6 h-0.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,1)]" />
+                  )}
+                </motion.button>
+              );
+            })}
 
             <motion.button 
-              whileHover={{ scale: 1.05, y: -5 }}
+              whileHover={{ scale: 1.08, y: -4, boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)" }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => handleNavigate('ADVERTISING', 'SELL')}
-              className={`px-8 py-6 rounded-[2.5rem] font-black tracking-widest text-xs transition-all flex flex-col items-center gap-3 min-w-[160px] shadow-sm border border-white/5 active:scale-95 group ${
+              className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border border-rose-800/80 ${
                 showAdvertisingHub && adInitialType === 'SELL'
-                  ? 'bg-rose-600 text-white ring-4 ring-rose-400/20 shadow-2xl' 
-                  : 'text-rose-400 bg-rose-600/10 border border-rose-500/20'
+                  ? 'bg-gradient-to-b from-rose-500 via-rose-600 to-rose-700 text-white ring-4 ring-white/30 scale-105 z-10 brightness-110 saturate-125 shadow-[inset_0_2px_0_0_rgba(255,255,255,0.6),0_15px_25px_-5px_rgba(0,0,0,0.5)]' 
+                  : 'bg-gradient-to-b from-rose-500 via-rose-600 to-rose-700 text-white/90 opacity-70 saturate-[0.85] brightness-[0.8] hover:opacity-100 hover:brightness-100 hover:saturate-100 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_8px_16px_-4px_rgba(0,0,0,0.3)]'
               }`}
             >
-              <div className={`p-3 rounded-2xl ${showAdvertisingHub && adInitialType === 'SELL' ? 'bg-white/20' : 'bg-rose-600/10'}`}>
-                <Zap className="w-6 h-6" />
+              <div className={`p-2 rounded-lg ${showAdvertisingHub && adInitialType === 'SELL' ? 'bg-white/20 shadow-inner border border-white/20' : 'bg-white/10 border border-white/5'} flex items-center justify-center`}>
+                <Zap className="w-5 h-5 text-white" />
               </div>
-              <span className="uppercase whitespace-nowrap text-[10px] tracking-tight">Sell @ EFADO</span>
+              <span className="uppercase whitespace-nowrap text-[11px] font-black tracking-wider text-white drop-shadow-[0_1.5px_1px_rgba(0,0,0,0.85)]">Sell @ EFADO</span>
+              {showAdvertisingHub && adInitialType === 'SELL' && (
+                <span className="absolute bottom-1 w-6 h-0.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,1)]" />
+              )}
             </motion.button>
           </div>
 

@@ -45,7 +45,8 @@ import {
   Store,
   ArrowRight,
   Pickaxe,
-  Mail
+  Mail,
+  Brain
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SUPPORT_EMAILS } from '../constants/businessProfile';
@@ -58,6 +59,14 @@ import { EfadoIntelligenceFeed } from './EfadoIntelligenceFeed';
 import { CurrencySelector } from './CurrencySelector';
 import { ExamCategory } from '../data/examData';
 import { UserProfile } from '../types';
+import { AiStudyPlatform } from './education/AiStudyPlatform';
+import { 
+  CgpaCalculator, 
+  SiwesLogbook, 
+  MilestoneTracker, 
+  AdmissionCutOffs, 
+  PrimarySchoolGame 
+} from './education/EducationInteractiveTools';
 
 interface SubCategory {
   title: string;
@@ -81,347 +90,90 @@ const educationData: EducationSection[] = [
     id: 'o_level',
     title: "O'Level Hub",
     icon: BookOpen,
-    description: "Resources and portals for WAEC, NECO, and GCE examinations.",
+    description: "Syllabi, past questions, and portals for WAEC, NECO, and GCE.",
     subCategories: [
       {
-        title: "EFADO WAEC CBT",
-        icon: Cpu,
-        description: "Practice specialized WAEC examination simulation with tactical analytics.",
-        tags: ['Recently Updated'],
-        examType: 'WAEC',
-        serviceType: 'CBT'
+        title: "WAEC Core Prep & Syllabus",
+        icon: FileText,
+        description: "Tactical questions, dynamic solutions, and official subject outlines.",
+        tags: ["Most Visited"],
+        examType: "WAEC"
       },
       {
-        title: "WAEC Strategic Seminar",
-        icon: Video,
-        description: "Official WAEC certificate protocols and examination success strategies.",
-        examType: 'WAEC',
-        serviceType: 'SEMINAR'
+        title: "NECO Strategic Suite",
+        icon: FileCheck,
+        description: "National secondary curriculum preparation node with simulated CBTs.",
+        tags: ["Recently Updated"],
+        examType: "NECO"
       },
       {
-        title: "EFADO NECO CBT",
-        icon: Target,
-        description: "National Merit CBT simulator for junior and senior secondary exams.",
-        examType: 'NECO',
-        serviceType: 'CBT'
-      },
-      {
-        title: "Result Checker",
-        icon: ClipboardList,
-        description: "Direct links and step-by-step result verification guides.",
-        tags: ['Most Visited']
+        title: "SIWES Logbook Planner",
+        icon: Briefcase,
+        description: "Organize weekly report parameters, departmental codes, and training logs.",
+        tags: ["Recently Updated"]
       }
     ]
   },
   {
     id: 'primary',
-    title: "Primary School Hub",
+    title: "Primary Academic Hub",
     icon: Backpack,
-    description: "Curriculum and preparatory materials for Classes 1 through 6.",
+    description: "Tactical study guides, tutorials, and interactive games for elementary candidates.",
     subCategories: [
       {
-        title: "Class 1-6 Curriculum",
-        icon: BookMarked,
-        description: "Termly scheme of work for primary education levels."
+        title: "National Common Entrance Guide",
+        icon: ClipboardList,
+        description: "CBT simulated questions for top-tier secondary placement exams.",
+        tags: ["Most Visited"]
       },
       {
-        title: "Common Entrance Prep",
-        icon: Target,
-        description: "Mock exams and past questions for entrance examinations.",
-        tags: ['Most Visited']
-      },
-      {
-        title: "Learning Games",
+        title: "Primary Hub Speed-Math Challenge",
         icon: Gamepad2,
-        description: "Interactive mathematics, English, and science games."
-      },
-      {
-        title: "Teacher Resources",
-        icon: Users,
-        description: "Standard lesson plans and printable worksheets."
-      },
-      {
-        title: "Parent Guide",
-        icon: HelpCircle,
-        description: "Homework assistance tips and child assessment tools."
+        description: "An active interactive game testing elementary mental calculation speed.",
+        tags: ["Recently Updated"]
       }
     ]
   },
   {
     id: 'nursery',
-    title: "Nursery School Hub",
+    title: "Nursery / Preschool Hub",
     icon: Shapes,
-    description: "Interactive learning and developmental tracking for preschool years.",
+    description: "Phonics syllables, child development checklists, and parent learning logs.",
     subCategories: [
       {
-        title: "KG 1-3 Curriculum",
-        icon: Shapes,
-        description: "Focus on phonics, number work, and developmental rhymes."
+        title: "Early Cognitive Milestone Tracker",
+        icon: Brain,
+        description: "Interactive developmental domain checklists for tracking preschool adaptation.",
+        tags: ["Most Visited"]
       },
       {
-        title: "Learning Videos",
-        icon: PlayCircle,
-        description: "Animated content for colours, shapes, and alphabet."
-      },
-      {
-        title: "Activity Sheets",
-        icon: FileSearch,
-        description: "Printable tracing, coloring, and logic sheets."
-      },
-      {
-        title: "Child Development",
-        icon: Clock,
-        description: "Milestone trackers and cognitive growth monitoring."
-      },
-      {
-        title: "School Readiness",
-        icon: ClipboardList,
-        description: "Interactive assessment quizzes for school entry."
+        title: "Phonics Core Workbook",
+        icon: BookMarked,
+        description: "Fundamental pronunciation and reading guides for toddlers.",
+        tags: ["Recently Updated"]
       }
     ]
   },
   {
-    id: 'jamb',
-    title: "JAMB & Admission Hub",
-    icon: Building2,
-    description: "UTME registration, Post-UTME updates, and admission tracking.",
-    subCategories: [
-      {
-        title: "EFADO Jamb CBT",
-        icon: Cpu,
-        description: "Practice free JAMB CBT with 220+ questions across all subjects.",
-        tags: ['Recently Updated'],
-        examType: 'JAMB',
-        serviceType: 'CBT'
-      },
-      {
-        title: "JAMB Success Seminar",
-        icon: Video,
-        description: "Professional presentation on UTME success strategies and tactical academic deployment.",
-        tags: ['Most Visited'],
-        examType: 'JAMB',
-        serviceType: 'SEMINAR'
-      },
-      {
-        title: "Seminar Material Hub",
-        icon: FileText,
-        description: "Upload and manage standardized JAMB seminar materials and agenda presentations.",
-        tags: ['Recently Updated'],
-        serviceType: 'PORTAL'
-      },
-      {
-        title: "Comprehensive JAMB Guide",
-        icon: FileSearch,
-        description: "Exhaustive write-up on registration, sub-combinations, and 2026 success protocols.",
-        tags: ['Most Visited'],
-        serviceType: 'GUIDE'
-      },
-      {
-        title: "Post-UTME Tactical Prep",
-        icon: GraduationCap,
-        description: "University-specific entrance simulation and strategic past questions.",
-        examType: 'POST_UTME',
-        serviceType: 'CBT'
-      },
-      {
-        title: "Cut-Off Marks",
-        icon: Target,
-        description: "Real-time tracker for University and Poly cut-off points.",
-        tags: ['Recently Updated']
-      },
-      {
-        title: "Admission Status",
-        icon: SearchCode,
-        description: "JAMB CAPS guide and direct status link verification."
-      },
-      {
-        title: "Change of Course/Inst.",
-        icon: UserPlus,
-        description: "Step-by-step tutorial for institutional corrections."
-      }
-    ]
-  },
-  {
-    id: 'university',
-    title: "University Hub",
+    id: 'higher_ed',
+    title: "University & Advanced Hub",
     icon: GraduationCap,
-    description: "NUC accredited courses, fee structures, and academic tools.",
+    description: "CAPS admission parameters, cut-off archives, and GPA/CGPA computation.",
     subCategories: [
       {
-        title: "Course Finder",
-        icon: Search,
-        description: "Search all NUC accredited courses across Nigeria."
-      },
-      {
-        title: "School Fees",
-        icon: BookOpen,
-        description: "Updated fee structure by university and faculty.",
-        tags: ['Recently Updated']
-      },
-      {
-        title: "CGPA Calculator",
-        icon: Calculator,
-        description: "Interactive GPA and Cumulative GPA tracking tool.",
-        tags: ['Most Visited']
-      },
-      {
-        title: "Project Topics",
-        icon: Microscope,
-        description: "Research ideas and department-specific project samples."
-      },
-      {
-        title: "ICAN CBT Hub",
-        icon: Cpu,
-        description: "Professional accounting certification simulation for prospective chartered accountants.",
-        examType: 'ICAN',
-        serviceType: 'CBT'
-      },
-      {
-        title: "NIM Leadership Hub",
-        icon: Target,
-        description: "Management certification practice and leadership tactical briefing.",
-        examType: 'NIM',
-        serviceType: 'CBT'
-      },
-      {
-        title: "Scholarships",
-        icon: Award,
-        description: "Undergraduate funding and allowance opportunities."
-      }
-    ]
-  },
-  {
-    id: 'polytechnic',
-    title: "Polytechnic Hub",
-    icon: Building2,
-    description: "ND/HND resources, SIWES guides, and conversion information.",
-    subCategories: [
-      {
-        title: "ND/HND Resources",
-        icon: BookMarked,
-        description: "Curriculum guides and past polytechnic papers."
-      },
-      {
-        title: "SIWES Guide",
-        icon: Briefcase,
-        description: "Logbook samples and industrial placement tips.",
-        tags: ['Most Visited']
-      },
-      {
-        title: "Poly JAMB",
-        icon: ClipboardList,
-        description: "JAMB specific requirements for polytechnic entry."
-      },
-      {
-        title: "Conversion Programs",
-        icon: ChevronRight,
-        description: "HND to BSc top-up information and school listings."
-      },
-      {
-        title: "Poly Rankings",
-        icon: Award,
-        description: "NBTE approved list of top polytechnics and monotechnics."
-      }
-    ]
-  },
-  {
-    id: 'a_level',
-    title: "A'Level & JUPEB Hub",
-    icon: Scroll,
-    description: "IJMB, JUPEB, and Cambridge A-Level preparation paths.",
-    subCategories: [
-      {
-        title: "JUPEB",
-        icon: FileSearch,
-        description: "Registration, syllabus, and affiliated universities."
-      },
-      {
-        title: "IJMB",
-        icon: ClipboardList,
-        description: "State-wide centers and subject combination guides.",
-        tags: ['Most Visited']
-      },
-      {
-        title: "Cambridge A'Level",
-        icon: Globe,
-        description: "International guide and local study center listings."
-      },
-      {
-        title: "Direct Entry",
-        icon: UserPlus,
-        description: "DE requirements via A'Level and JUPEB pathways."
-      },
-      {
-        title: "A'Level vs JAMB",
-        icon: LayoutGrid,
-        description: "Strategic comparison tool for university entry."
-      }
-    ]
-  },
-  {
-    id: 'postgraduate',
-    title: "Postgraduate Hub",
-    icon: Microscope,
-    description: "Advanced degree programs, application tips, and research tools.",
-    subCategories: [
-      {
-        title: "PGD Programs",
-        icon: BookMarked,
-        description: "List of schools and PGD specific entry requirements."
-      },
-      {
-        title: "Masters Guide",
-        icon: GraduationCap,
-        description: "Application tips and types of masters degree available.",
-        tags: ['Recently Updated']
-      },
-      {
-        title: "PhD Guide",
-        icon: Award,
-        description: "Proposal writing guide and supervisor finder tool."
-      },
-      {
-        title: "Transcript Request",
-        icon: BookMarked,
-        description: "Digitized request process for major academic schools."
-      },
-      {
-        title: "Research Tools",
-        icon: Compass,
-        description: "Citation generators, plagiarism and stats software."
-      }
-    ]
-  },
-  {
-    id: 'higher_degrees',
-    title: "Master, Doctorate & PhD Hub",
-    icon: Award,
-    description: "International PhD trackers, funding, and thesis repositories.",
-    subCategories: [
-      {
-        title: "MSc/MA/MBA",
-        icon: GraduationCap,
-        description: "International school finder and GMAT/GRE prep."
-      },
-      {
-        title: "PhD Tracker",
-        icon: Calendar,
-        description: "Global application deadlines and tracking database.",
-        tags: ['Recently Updated']
-      },
-      {
-        title: "Funding",
-        icon: Target,
-        description: "TETFund, Commonwealth, and Fulbright scholarship database.",
-        tags: ['Most Visited']
-      },
-      {
-        title: "Thesis Repository",
+        title: "CAPS Cut-offs & Admission Checker",
         icon: Database,
-        description: "Searchable database of research projects and papers."
+        description: "Check official university catchment scores and CAPS status logs.",
+        tags: ["Most Visited"]
       },
       {
-        title: "Viva Prep",
+        title: "Tactical CGPA Calculator",
+        icon: Calculator,
+        description: "Evaluate semester-specific grade point averages and cumulative files.",
+        tags: ["Recently Updated"]
+      },
+      {
+        title: "Viva Voce Oral Defense Simulator",
         icon: Users2,
         description: "Mock panels and frequent defense question database."
       }
@@ -430,7 +182,6 @@ const educationData: EducationSection[] = [
 ];
 
 export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfile; onUpdateMining?: (amount: number) => void; onNavigate?: (hub: any, subview?: any) => void; onOpenMining?: () => void }> = ({ onClose, user, onUpdateMining, onNavigate, onOpenMining }) => {
-  const [expandedId, setExpandedId] = useState<string | null>('o_level');
   const [showGuide, setShowGuide] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeExam, setActiveExam] = useState<{ type: ExamCategory, view: 'mode' | 'seminar' } | null>(null);
@@ -438,6 +189,11 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
   const [showJambGuide, setShowJambGuide] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showMining, setShowMining] = useState(false);
+
+  // New AI-powered study states & dynamic modals
+  const [showAiStudyPortal, setShowAiStudyPortal] = useState(false);
+  const [activeHubDetails, setActiveHubDetails] = useState<any | null>(null);
+  const [activeInteractiveTool, setActiveInteractiveTool] = useState<{ type: string; title: string } | null>(null);
 
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return educationData;
@@ -620,6 +376,48 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
            <EfadoIntelligenceFeed />
         </motion.div>
 
+        {/* Prominent Active Launching Button / CTA Card for the Extended AI Study Platform */}
+        <motion.div
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-tr from-slate-900 via-indigo-950/70 to-slate-900 p-8 md:p-12 rounded-[3.5rem] border-2 border-indigo-500/25 shadow-[0_20px_60px_rgba(99,102,241,0.15)] flex flex-col lg:flex-row items-center justify-between gap-8 relative overflow-hidden group"
+        >
+          {/* Neon backdrop flares */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none -mr-40 -mt-40 group-hover:bg-indigo-500/15 transition-all duration-700" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-500/10 rounded-full blur-[120px] pointer-events-none -ml-40 -mb-40 group-hover:bg-violet-500/15 transition-all duration-700" />
+
+          <div className="space-y-4 relative z-10 flex-1 max-w-3xl">
+            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-3.5 py-1.5 rounded-full text-[10px] font-black text-indigo-300 uppercase tracking-widest animate-pulse">
+              <Sparkles className="w-3.5 h-3.5" /> Extended Academic Protocol Live
+            </div>
+            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none italic">
+              LAUNCH AI INTELLECTUAL PREP PORTAL
+            </h2>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider leading-relaxed">
+              Activate the ultimate cognitive study node. Dynamic syllabus compilations, real-time examiner analysis, expert chat, and custom-generated test mockups matching <span className="text-indigo-400">JAMB, WAEC, NECO, GCE,</span> and tertiary syllabus protocols.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
+                ⚡ Real-time Gemini AI Notes
+              </span>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
+                ⚡ Dynamic Academic Quiz
+              </span>
+              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
+                ⚡ 100% CBT Simulation
+              </span>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setShowAiStudyPortal(true)}
+            className="w-full lg:w-auto px-12 py-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-[0.25em] shadow-[0_20px_50px_-5px_rgba(99,102,241,0.4)] hover:shadow-[0_20px_50px_rgba(99,102,241,0.6)] hover:scale-[1.05] transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 shrink-0 relative z-10"
+          >
+            Launch Command Centre <ArrowRight className="w-4 h-4" />
+          </button>
+        </motion.div>
+
+        {/* Academic Hub Sections Repositioned as Beautiful Interactive Cards */}
         {filteredData.length === 0 ? (
           <div className="text-center py-32 space-y-6">
             <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -630,105 +428,39 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           </div>
         ) : (
           <div className="space-y-6">
-            {filteredData.map((section) => (
-              <motion.div 
-                key={section.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card-ultra rounded-[2.5rem] overflow-hidden border border-white/5 transition-all"
-              >
-                <button 
-                  onClick={() => setExpandedId(expandedId === section.id ? null : section.id)}
-                  className="w-full flex items-center justify-between p-8 text-left hover:bg-white/5 transition-colors"
+            <div className="border-b border-white/5 pb-4">
+              <h3 className="text-sm font-black text-indigo-400 uppercase tracking-widest">Universal Academic Category Grid</h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Select a category node to launch its specialized sub-modules and interfaces</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {filteredData.map((section) => (
+                <motion.div 
+                  key={section.id}
+                  whileHover={{ y: -6, scale: 1.02 }}
+                  onClick={() => setActiveHubDetails(section)}
+                  className="bg-slate-900/60 border border-white/5 rounded-[2.5rem] p-6 cursor-pointer hover:border-indigo-500/35 hover:shadow-[0_25px_50px_rgba(99,102,241,0.08)] transition-all duration-300 relative group flex flex-col justify-between overflow-hidden"
                 >
-                  <div className="flex items-center gap-6">
-                    <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400">
+                  {/* Decorative background glow on hover */}
+                  <div className="absolute -right-16 -top-16 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors pointer-events-none" />
+                  
+                  <div>
+                    <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-all mb-6 shadow-md">
                       <section.icon className="w-7 h-7" />
                     </div>
-                    <div>
-                      <h2 className="text-xl font-black tracking-tight">{section.title}</h2>
-                      <p className="text-slate-400 text-sm font-black uppercase tracking-tight">{section.description}</p>
-                    </div>
+                    <h3 className="text-lg font-black tracking-tight text-white uppercase group-hover:text-indigo-400 transition-colors mb-2">{section.title}</h3>
+                    <p className="text-slate-400 text-xs font-bold uppercase leading-relaxed tracking-tight mb-6">{section.description}</p>
                   </div>
-                  <ChevronDown className={`w-6 h-6 text-slate-500 transition-transform duration-500 ${expandedId === section.id ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {expandedId === section.id && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    >
-                      <div className="p-8 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {section.subCategories.map((sub, idx) => (
-                            <motion.div 
-                            key={sub.title}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.05 }}
-                            onClick={() => {
-                              if (sub.serviceType === 'PORTAL') {
-                                setShowSeminarPortal(true);
-                                return;
-                              }
-                              if (sub.serviceType === 'GUIDE') {
-                                setShowJambGuide(true);
-                                return;
-                              }
-                              if (sub.examType) {
-                                setActiveExam({
-                                  type: sub.examType,
-                                  view: sub.serviceType === 'SEMINAR' ? 'seminar' : 'mode'
-                                });
-                              }
-                            }}
-                            className="bg-slate-800/80 golden-card-border p-6 rounded-[2rem] hover:bg-indigo-600 transition-all group cursor-pointer"
-                          >
-                            <div className="flex justify-between items-start mb-6">
-                              <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                                <sub.icon className="w-6 h-6 text-indigo-400 group-hover:text-white" />
-                              </div>
-                              {sub.tags && (
-                                <div className="flex flex-col gap-1.5 items-end">
-                                  {sub.tags.map(tag => (
-                                    <span 
-                                      key={tag} 
-                                      className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${
-                                        tag === 'Most Visited' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 
-                                        'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      }`}
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <h3 className="text-lg font-black text-white mb-2">{sub.title}</h3>
-                            <p className="text-slate-300 text-xs font-black leading-relaxed group-hover:text-white transition-colors mb-4 uppercase tracking-tight">
-                              {sub.description}
-                            </p>
-                            
-                            {(sub.serviceType === 'CBT' || sub.serviceType === 'SEMINAR') && (
-                              <div className="flex items-center gap-2 mb-6 p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-xl group-hover:bg-emerald-500/20 transition-colors">
-                                <Pickaxe className="w-3 h-3 text-emerald-400" />
-                                <span className="text-[8px] font-black text-emerald-400 uppercase tracking-tighter">Mining Node Payment Accepted</span>
-                              </div>
-                            )}
-
-                            <div className="mt-auto flex items-center gap-3 text-indigo-500 font-bold text-[10px] uppercase tracking-widest group-hover:text-white transition-all transform group-hover:translate-x-2">
-                              Access Module <ExternalLink className="w-3.5 h-3.5" />
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
+                  
+                  <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{section.subCategories.length} Active Modules</span>
+                    <span className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         )}
       </main>
@@ -760,10 +492,10 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
             className="fixed inset-0 z-[60] bg-slate-950"
           >
              <ExamSimulator 
-               onClose={() => setActiveExam(null)} 
-               initialView={activeExam.view}
-               user={user}
-               examType={activeExam.type}
+                onClose={() => setActiveExam(null)} 
+                initialView={activeExam.view}
+                user={user}
+                examType={activeExam.type}
              />
           </motion.div>
         )}
@@ -779,6 +511,148 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           <JambDetailedGuide 
             onClose={() => setShowJambGuide(false)}
           />
+        )}
+
+        {showAiStudyPortal && (
+          <AiStudyPlatform 
+            user={user}
+            onClose={() => setShowAiStudyPortal(false)}
+          />
+        )}
+
+        {/* Academic Hub Detail Overlay */}
+        {activeHubDetails && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 backdrop-blur-md p-4 md:p-8 flex items-center justify-center">
+            <div className="w-full max-w-4xl bg-slate-900 border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden relative p-8 md:p-10 max-h-[85vh] flex flex-col justify-between bg-slate-900">
+              
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none -mr-32 -mt-32" />
+              
+              <div className="flex justify-between items-start mb-8 relative z-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center">
+                    <activeHubDetails.icon className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-tight">{activeHubDetails.title}</h2>
+                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1">{activeHubDetails.description}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setActiveHubDetails(null)}
+                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Sub categories grid */}
+              <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pr-2 mb-6 relative z-10">
+                {activeHubDetails.subCategories.map((sub: any, idx: number) => (
+                  <motion.div 
+                    key={sub.title}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    onClick={() => {
+                      if (sub.serviceType === 'PORTAL') {
+                        setShowSeminarPortal(true);
+                        return;
+                      }
+                      if (sub.serviceType === 'GUIDE') {
+                        setShowJambGuide(true);
+                        return;
+                      }
+                      if (sub.examType) {
+                        setActiveExam({
+                          type: sub.examType,
+                          view: sub.serviceType === 'SEMINAR' ? 'seminar' : 'mode'
+                        });
+                        return;
+                      }
+
+                      // Launch interactive tools based on titles
+                      const titleLower = sub.title.toLowerCase();
+                      if (titleLower.includes('cgpa') || titleLower.includes('fees') || titleLower.includes('finder')) {
+                        setActiveInteractiveTool({ type: 'CGPA', title: sub.title });
+                      } else if (titleLower.includes('siwes') || titleLower.includes('logbook')) {
+                        setActiveInteractiveTool({ type: 'SIWES', title: sub.title });
+                      } else if (titleLower.includes('game') || titleLower.includes('speed-math') || titleLower.includes('challenge')) {
+                        setActiveInteractiveTool({ type: 'GAME', title: sub.title });
+                      } else if (titleLower.includes('milestone') || titleLower.includes('cognitive') || titleLower.includes('tracker')) {
+                        setActiveInteractiveTool({ type: 'MILESTONES', title: sub.title });
+                      } else {
+                        setActiveInteractiveTool({ type: 'CUTOFFS', title: sub.title });
+                      }
+                    }}
+                    className="bg-slate-800/60 p-6 rounded-[2rem] border border-white/5 hover:bg-indigo-600 transition-all group cursor-pointer flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                          <sub.icon className="w-6 h-6 text-indigo-400 group-hover:text-white" />
+                        </div>
+                        {sub.tags && (
+                          <div className="flex flex-col gap-1.5 items-end">
+                            {sub.tags.map((tag: any) => (
+                              <span 
+                                key={tag} 
+                                className={`px-2.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                                  tag === 'Most Visited' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 
+                                  'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                }`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <h3 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-white transition-colors mb-2">{sub.title}</h3>
+                      <p className="text-slate-300 text-xs font-bold leading-relaxed group-hover:text-white transition-colors mb-4 uppercase tracking-tight italic">
+                        {sub.description}
+                      </p>
+                    </div>
+                    
+                    <div className="mt-4 flex items-center gap-2 text-indigo-400 font-black text-[9px] uppercase tracking-widest group-hover:text-white transition-all transform group-hover:translate-x-2">
+                      Access Module <ExternalLink className="w-3.5 h-3.5" />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-white/5 relative z-10">
+                <button 
+                  onClick={() => setActiveHubDetails(null)}
+                  className="px-6 py-3 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+                >
+                  Close Hub Node
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Interactive Tool Modal */}
+        {activeInteractiveTool && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/95 backdrop-blur-md p-4 md:p-8 flex items-center justify-center">
+            <div className="w-full max-w-4xl bg-slate-900 border border-white/5 rounded-[2.5rem] shadow-2xl overflow-hidden relative">
+              <button 
+                onClick={() => setActiveInteractiveTool(null)}
+                className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all z-20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              
+              <div className="p-1">
+                {activeInteractiveTool.type === 'CGPA' && <CgpaCalculator />}
+                {activeInteractiveTool.type === 'SIWES' && <SiwesLogbook />}
+                {activeInteractiveTool.type === 'GAME' && <PrimarySchoolGame />}
+                {activeInteractiveTool.type === 'MILESTONES' && <MilestoneTracker />}
+                {activeInteractiveTool.type === 'CUTOFFS' && <AdmissionCutOffs />}
+              </div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>
