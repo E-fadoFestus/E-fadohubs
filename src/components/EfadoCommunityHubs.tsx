@@ -61,9 +61,10 @@ interface EfadoCommunityHubsProps {
   user: UserProfile;
   onOpenMining?: () => void;
   onNavigate?: (hub: any, subview?: any) => void;
+  onClose?: () => void;
 }
 
-export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, onOpenMining, onNavigate }) => {
+export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, onOpenMining, onNavigate, onClose }) => {
   const { formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'HOME' | 'CSCC' | 'CSCC_PLUS' | 'GROUPS' | 'WALLETS' | 'CENTRAL' | 'COMMUNITY' | 'SUPPORT' | 'RAFFLE' | 'PARTNERS'>('HOME');
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -3243,6 +3244,19 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
               )}
             </button>
           ))}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-300 relative group overflow-hidden text-rose-500 hover:bg-rose-50 hover:text-rose-600 mt-4 border border-rose-100"
+            >
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="p-2 rounded-xl bg-rose-50 group-hover:bg-rose-100 transition-colors">
+                  <ArrowLeft className="w-5 h-5 text-rose-500" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-widest">Exit Hub / Back</span>
+              </div>
+            </button>
+          )}
         </nav>
 
         <div className="mt-auto p-6 bg-gray-900 rounded-[2.5rem] text-white relative overflow-hidden group shadow-2xl">
@@ -3266,6 +3280,15 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       {/* Mobile Top Navigation */}
       <div className="md:hidden sticky top-0 z-50 bg-white/70 backdrop-blur-3xl border-b border-gray-100 p-4 flex items-center justify-between">
          <div className="flex items-center gap-3">
+            {onClose && (
+              <button 
+                onClick={onClose}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors mr-1"
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
             <TrendingUp className="w-6 h-6 text-indigo-600" />
             <h1 className="text-lg font-black text-gray-900 tracking-tighter">Hubs<span className="text-indigo-600 italic">Connect.</span></h1>
          </div>
@@ -3316,6 +3339,15 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
             
             <div className="flex items-center gap-4">
               <CurrencySelector />
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="hidden sm:flex items-center gap-2 px-5 py-3 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Go Back
+                </button>
+              )}
               <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
                  <div className="text-right">
                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Wallet Credits</p>

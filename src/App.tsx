@@ -2958,6 +2958,7 @@ function AppContent() {
                     user={user} 
                     onOpenMining={() => setShowEfadoMining(true)} 
                     onNavigate={handleNavigate}
+                    onClose={() => setShowCommunityHub(false)}
                   />
                 </div>
               </motion.div>
