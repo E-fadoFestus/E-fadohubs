@@ -180,7 +180,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
   const hubs = HUBS_DATA;
 
   return (
-    <div className="space-y-24 pb-32">
+    <div className="space-y-12 md:space-y-24 pb-32">
       {/* Global Intelligence Ticker - Always Displayed */}
       <EfadoIntelligenceFeed mode="ticker-only" />
 

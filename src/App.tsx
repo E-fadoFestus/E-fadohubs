@@ -102,7 +102,9 @@ import {
   ArrowUp,
   CheckCircle2,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Smartphone,
+  Laptop
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
@@ -514,6 +516,18 @@ function AppContent() {
   const [showLegalHub, setShowLegalHub] = useState(false);
   const [legalHubSection, setLegalHubSection] = useState<'TERMS' | 'PRIVACY' | 'GAMING' | 'DISCLAIMER'>('TERMS');
   const [showTechHub, setShowTechHub] = useState(false);
+
+  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>(() => {
+    const saved = localStorage.getItem('efado_view_mode');
+    if (saved === 'desktop' || saved === 'mobile') return saved;
+    return window.innerWidth < 1024 ? 'mobile' : 'desktop';
+  });
+
+  const toggleViewMode = () => {
+    const newMode = viewMode === 'desktop' ? 'mobile' : 'desktop';
+    setViewMode(newMode);
+    localStorage.setItem('efado_view_mode', newMode);
+  };
 
   const handleNavigate = (hub: any, subview?: any) => {
     if (hub !== 'GIST') setShowGistHub(false);
@@ -2013,8 +2027,26 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30">
-      <NocturnalBackground />
+    <div className={`min-h-screen text-slate-100 font-sans selection:bg-indigo-500/30 transition-colors duration-300 ${viewMode === 'mobile' ? 'bg-slate-900/60 flex flex-col items-center justify-center py-0 md:py-8 px-0 md:px-4' : 'bg-slate-950'}`}>
+      {viewMode === 'mobile' && (
+        <div className="hidden md:flex items-center gap-2 mb-3 px-4 py-1.5 bg-slate-800/80 backdrop-blur-md rounded-full border border-white/5 shadow-lg relative z-50">
+          <Smartphone className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+          <span className="text-[9px] font-black uppercase text-slate-300 tracking-widest">Mobile Preview Mode</span>
+          <button 
+            onClick={toggleViewMode}
+            className="ml-3 text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors border-l border-white/10 pl-3"
+          >
+            Switch to Desktop
+          </button>
+        </div>
+      )}
+
+      <div className={`w-full transition-all duration-300 relative flex flex-col ${
+        viewMode === 'mobile' 
+          ? 'max-w-[430px] h-[100vh] md:h-[880px] md:rounded-[48px] md:border-[10px] md:border-slate-800 bg-slate-950 shadow-[0_0_80px_rgba(79,70,229,0.25)] overflow-x-hidden overflow-y-auto' 
+          : 'min-h-screen'
+      }`}>
+        <NocturnalBackground />
       
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-30 shadow-2xl">
@@ -2064,6 +2096,24 @@ function AppContent() {
               </button>
             </div>
 
+            <button 
+              onClick={toggleViewMode}
+              className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5 active:scale-95 shrink-0"
+              title={viewMode === 'desktop' ? "Switch to Mobile-Optimized View" : "Switch to Desktop View"}
+            >
+              {viewMode === 'desktop' ? (
+                <>
+                  <Smartphone className="w-4 h-4 text-indigo-400" />
+                  <span className="hidden sm:inline uppercase">Mobile View</span>
+                </>
+              ) : (
+                <>
+                  <Laptop className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden sm:inline uppercase">Desktop View</span>
+                </>
+              )}
+            </button>
+
             <CurrencySelector />
             
             <div className="hidden md:flex flex-col items-end px-4 border-r border-white/5">
@@ -2092,13 +2142,6 @@ function AppContent() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Hero Carousel - Shifted to Top for immediate visibility */}
-        {activeHub === 'HOME' && (
-          <div className="mb-8">
-            <HubHeroCarousel hubType={activeHub} onAction={handleNavigate} />
-          </div>
-        )}
-
         {/* Hub Navigation Slider */}
         <div className="relative group/nav mb-12">
           <div className="absolute -top-6 left-4 right-4 flex justify-between items-end">
@@ -3789,6 +3832,7 @@ function AppContent() {
       />
 
       {user && <EfadoHelpChat user={user} />}
+      </div>
     </div>
   );
 }

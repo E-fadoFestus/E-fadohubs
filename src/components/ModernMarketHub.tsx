@@ -50,7 +50,9 @@ import {
   Star,
   Award,
   ThumbsUp,
-  FileText
+  FileText,
+  Film,
+  Video
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
@@ -1155,6 +1157,19 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               </div>
                               <span className="text-[10px] font-black text-blue-600">{formatPrice(product.price, true)}</span>
                             </div>
+                            
+                            {product.video && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigate?.('GIST', 'REELS');
+                                  onClose();
+                                }}
+                                className="w-full mb-3 py-2 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
+                              >
+                                <Film className="w-3.5 h-3.5 animate-pulse" /> Watch Product Reel
+                              </button>
+                            )}
                             
                             <div className="grid grid-cols-2 gap-2">
                               <button 

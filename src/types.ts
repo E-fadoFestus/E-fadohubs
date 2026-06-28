@@ -168,6 +168,8 @@ export interface MarketProduct {
   email?: string;
   warranty?: string;
   complianceConfirmed: boolean;
+  video?: string;
+  isReelPromotion?: boolean;
   createdAt: any;
   vendorPickupLocation?: string;
 }
@@ -686,6 +688,8 @@ export interface AdListing {
   };
   details: Record<string, any>;
   photos: string[];
+  video?: string;
+  isReelPromotion?: boolean;
   contact?: {
     phone?: string;
     whatsapp?: string;

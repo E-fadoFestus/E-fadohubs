@@ -19,14 +19,18 @@ import {
   Truck,
   ArrowLeft,
   Camera,
-  ShieldCheck
+  ShieldCheck,
+  Video,
+  Film,
+  Upload
 } from 'lucide-react';
 import { useCurrency } from '../lib/CurrencyContext';
 import { 
   db, 
   collection, 
   addDoc, 
-  serverTimestamp 
+  serverTimestamp,
+  auth
 } from '../firebase';
 import { VendorProfile, MarketProduct } from '../types';
 
@@ -154,10 +158,13 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
     phone: '',
     email: '',
     complianceConfirmed: false,
-    vendorPickupLocation: ''
+    vendorPickupLocation: '',
+    video: '',
+    isReelPromotion: false
   });
 
   const productPhotoInputRef = useRef<HTMLInputElement>(null);
+  const productVideoInputRef = useRef<HTMLInputElement>(null);
 
   const handleProductPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -176,6 +183,26 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleProductVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("This video file is larger than 5MB. A shorter or smaller video clip is recommended for optimal performance.");
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const base64Data = reader.result;
+          setCurrentProduct(prev => ({
+            ...prev,
+            video: base64Data
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const validateVendor = () => {
@@ -235,7 +262,9 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
         phone: '',
         email: '',
         complianceConfirmed: false,
-        vendorPickupLocation: ''
+        vendorPickupLocation: '',
+        video: '',
+        isReelPromotion: false
       });
       setErrors({});
     }
@@ -264,6 +293,21 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
           hub: hubName,
           createdAt: serverTimestamp()
         });
+
+        if (product.isReelPromotion && product.video) {
+          const currentUser = auth.currentUser;
+          await addDoc(collection(db, 'reels'), {
+            authorId: currentUser?.uid || 'anonymous',
+            authorName: currentUser?.displayName || currentUser?.email || vendorForm.fullName || 'EFADO Vendor',
+            authorPhoto: currentUser?.photoURL || '',
+            videoUrl: product.video,
+            caption: `🛍️ New Product: ${product.title}! \n\n${product.description} \n\nOnly ${product.price} ${product.currency} #product #vendor #reels #buy`,
+            likes: [],
+            comments: [],
+            shares: 0,
+            createdAt: serverTimestamp()
+          });
+        }
       }
 
       setRegStep('SUCCESS');
@@ -811,6 +855,83 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Optional Video & Reels Integration */}
+                <div className="md:col-span-2 space-y-4 border-t border-white/5 pt-6">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                    <Video className="w-4 h-4 text-indigo-400" /> Tactical Product Video (Optional)
+                  </span>
+                  <p className="text-[11px] text-slate-400">Add an optional promotional video (MP4/WebM, Max 5MB) or enter a video URL below to showcase your product in motion.</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Option A: Video File Upload</span>
+                      <div className="flex gap-4 items-center">
+                        <button 
+                          type="button"
+                          onClick={() => productVideoInputRef.current?.click()}
+                          className={`px-4 py-3 bg-slate-900/40 border-2 border-dashed ${colorClasses.border} rounded-2xl flex items-center gap-2 text-slate-400 hover:text-white transition-all`}
+                        >
+                          <Upload className="w-4 h-4" />
+                          <span className="text-[9px] font-black uppercase">Browse Video</span>
+                        </button>
+                        <input 
+                          type="file" 
+                          ref={productVideoInputRef} 
+                          className="hidden" 
+                          accept="video/*" 
+                          onChange={handleProductVideoUpload} 
+                        />
+                        {currentProduct.video && currentProduct.video.startsWith('data:video') && (
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-black uppercase">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+                            <button 
+                              type="button"
+                              onClick={() => setCurrentProduct(prev => ({ ...prev, video: '' }))}
+                              className="text-rose-400 hover:text-rose-500 font-bold ml-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black uppercase text-slate-500">Option B: Video URL Link</span>
+                      <input 
+                        type="text"
+                        placeholder="https://example.com/my-product-video.mp4"
+                        value={currentProduct.video?.startsWith('data:video') ? '' : currentProduct.video}
+                        onChange={(e) => setCurrentProduct(prev => ({ ...prev, video: e.target.value }))}
+                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl px-4 py-3 text-white focus:border-indigo-500 outline-none transition-all font-bold placeholder:italic placeholder:font-normal text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {currentProduct.video && (
+                    <div className="p-4 bg-slate-900/40 border border-white/5 rounded-2xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                          <Film className="w-4 h-4 text-amber-400" /> Optional: Promote via EFADO Reels Feed
+                        </span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={currentProduct.isReelPromotion || false} 
+                            onChange={(e) => setCurrentProduct(prev => ({ ...prev, isReelPromotion: e.target.checked }))} 
+                            className="sr-only peer" 
+                          />
+                          <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                          <span className="ml-2.5 text-[10px] font-black uppercase text-slate-300 tracking-wider">Enable Reels</span>
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        If enabled, EFADO will automatically broadcast this product's video as a promotional video listing in the **EFADO Reels Feed** inside Gist Hub, redirecting prospective buyers directly to your store!
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 p-4 bg-slate-800/30 rounded-2xl border border-white/5 md:col-span-2">

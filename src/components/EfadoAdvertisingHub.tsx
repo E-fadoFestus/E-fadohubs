@@ -45,7 +45,9 @@ import {
   Shield,
   ShieldCheck,
   LayoutGrid,
-  Globe
+  Globe,
+  Video,
+  Film
 } from 'lucide-react';
 import { UserProfile, AdListing, AdPlan } from '../types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -214,6 +216,7 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
 
   // Photo uploading refs and handlers
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Engagement modal / terminal states
   const [selectedAdForEngagement, setSelectedAdForEngagement] = useState<AdListing | null>(null);
@@ -238,6 +241,26 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("This video file is larger than 5MB. A shorter or smaller video clip is recommended for optimal performance.");
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          const base64Data = reader.result;
+          setFormData(prev => ({
+            ...prev,
+            video: base64Data
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const SELLER_BENEFITS = [
@@ -283,7 +306,9 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
     email: '',
     category: '',
     details: {} as any,
-    photos: [] as string[]
+    photos: [] as string[],
+    video: '',
+    isReelPromotion: false
   });
 
   const [syndicationData, setSyndicationData] = useState<{
@@ -417,12 +442,28 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
           },
           details: formData.details,
           photos: formData.photos,
+          video: formData.video || '',
+          isReelPromotion: formData.isReelPromotion || false,
           plan: selectedPlan.id,
           expiryDate: expiryDate.getTime(),
           status: adType === 'ADVERT' ? 'active' : 'pending',
           createdAt: serverTimestamp(),
           syndication: syndicationData
         });
+
+        if (formData.isReelPromotion && formData.video) {
+          await addDoc(collection(db, 'reels'), {
+            authorId: user.uid,
+            authorName: user.displayName || user.email || 'EFADO Advertiser',
+            authorPhoto: user.photoURL || '',
+            videoUrl: formData.video,
+            caption: `🔥 Featured Ad: ${formData.title}! \n\n${formData.description} \n\nStarting at ${formatPrice(parseFloat(formData.price))} #advertising #viral #reels #featured`,
+            likes: [],
+            comments: [],
+            shares: 0,
+            createdAt: serverTimestamp()
+          });
+        }
         
         setIsBroadcasting(false);
         setSyndicationData({ googleAds: null, socialMedia: null, seo: null });
@@ -440,7 +481,9 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
           email: '',
           category: '',
           details: {},
-          photos: []
+          photos: [],
+          video: '',
+          isReelPromotion: false
         });
         setSelectedCategory(null);
         setView('BROWSE');
@@ -1162,17 +1205,96 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                           </div>
                           <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest italic flex items-center gap-2">
                              <Info className={`w-3 h-3 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} animate-bounce`} /> high-fidelity images increase conversion by 85%
-                          </p>
-                       </div>
-                    </div>
+                           </p>
+                        </div>
 
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => setRegisterStep('CATEGORY')}
-                        className="flex-1 py-5 border border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-                      >
-                        <ChevronLeft className="w-4 h-4" /> Back
-                      </button>
+                        {/* Optional Video Upload and Reels Promotion */}
+                        <div className="space-y-4 border-t border-slate-100 pt-6">
+                           <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                              <Video className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} /> Promotional Video (Optional)
+                           </label>
+                           <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                              Add an optional high-impact promotional video to showcase your property, product, or offer in motion. You can upload a file or paste a direct video link.
+                           </p>
+
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Option A: Video File Upload</span>
+                                 <div className="flex gap-4 items-center">
+                                    <button 
+                                       type="button"
+                                       onClick={() => videoInputRef.current?.click()}
+                                       className={`px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:border-indigo-600 transition-all`}
+                                    >
+                                       <Upload className="w-4 h-4" />
+                                       <span className="text-[9px] font-black uppercase">Browse Video</span>
+                                    </button>
+                                    <input 
+                                       type="file" 
+                                       ref={videoInputRef} 
+                                       className="hidden" 
+                                       accept="video/*" 
+                                       onChange={handleVideoUpload} 
+                                    />
+                                    {formData.video && formData.video.startsWith('data:video') && (
+                                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-black uppercase">
+                                          <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+                                          <button 
+                                             type="button"
+                                             onClick={() => setFormData(prev => ({ ...prev, video: '' }))}
+                                             className="text-red-500 hover:text-red-600 font-bold ml-2"
+                                          >
+                                             Remove
+                                          </button>
+                                       </div>
+                                    )}
+                                 </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Option B: Video URL Link</span>
+                                 <input 
+                                    type="text"
+                                    placeholder="https://example.com/my-promo-video.mp4"
+                                    value={formData.video.startsWith('data:video') ? '' : formData.video}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, video: e.target.value }))}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 focus:border-indigo-500 outline-none transition-all font-bold placeholder:italic placeholder:font-normal text-xs"
+                                 />
+                              </div>
+                           </div>
+
+                           {formData.video && (
+                              <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-3xl space-y-2">
+                                 <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] flex items-center gap-1.5">
+                                       <Film className="w-4 h-4 text-amber-600 animate-pulse" /> Promote via EFADO Reels Feed
+                                    </span>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                       <input 
+                                          type="checkbox" 
+                                          checked={formData.isReelPromotion} 
+                                          onChange={(e) => setFormData(prev => ({ ...prev, isReelPromotion: e.target.checked }))} 
+                                          className="sr-only peer" 
+                                       />
+                                       <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                                       <span className="ml-2.5 text-[10px] font-black uppercase text-slate-700 tracking-wider">Enable Reels</span>
+                                    </label>
+                                 </div>
+                                 <p className="text-[10px] text-slate-600 leading-relaxed">
+                                    Enabling this lets you showcase your ad natively inside the **EFADO Reels Feed** in Gist Hub. When users click on the Reel, they are redirected instantly to your ad!
+                                  </p>
+                               </div>
+                            )}
+                        </div>
+                     </div>
+
+                     <div className="flex gap-4">
+                       <button 
+                         onClick={() => setRegisterStep('CATEGORY')}
+                         className="flex-1 py-5 border border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+                       >
+                         <ChevronLeft className="w-4 h-4" /> Back
+                       </button>
                       <button 
                         disabled={!formData.title || !formData.category || !formData.price}
                         onClick={() => {
