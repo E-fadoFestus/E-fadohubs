@@ -274,6 +274,65 @@ export const ExamSimulator: React.FC<{
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const renderSimulatorHeader = (currentView: string) => {
+    const handleGoBack = () => {
+      if (currentView === 'mode') {
+        onClose();
+      } else if (currentView === 'seminar') {
+        setView('mode');
+      } else if (currentView === 'subjects') {
+        setView('mode');
+      } else if (currentView === 'instructions') {
+        setView('subjects');
+      } else if (currentView === 'exam') {
+        if (window.confirm("Are you sure you want to abort the current examination session? Your answers will not be saved.")) {
+          setView('subjects');
+        }
+      } else if (currentView === 'results') {
+        setView('mode');
+      } else if (currentView === 'corrections') {
+        setView('results');
+      }
+    };
+
+    return (
+      <div className="w-full bg-slate-900/60 backdrop-blur-2xl border border-white/5 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 rounded-3xl shadow-xl z-50">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={handleGoBack}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 text-slate-100 hover:text-white hover:bg-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/5 active:scale-95 transition-all cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4 text-indigo-400" />
+            <span>Go Back</span>
+          </button>
+          
+          <span className="text-slate-650 hidden sm:inline">|</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">
+            {currentView === 'mode' && 'CBT Main Terminal'}
+            {currentView === 'seminar' && 'Strategy Seminar'}
+            {currentView === 'subjects' && 'Subject Configuration'}
+            {currentView === 'instructions' && 'Protocol Brief'}
+            {currentView === 'exam' && 'Live Examination Grid'}
+            {currentView === 'results' && 'Evaluation Report'}
+            {currentView === 'corrections' && 'Review Solutions'}
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2.5 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-rose-500/20 active:scale-95 transition-all cursor-pointer shadow-lg shadow-rose-600/10"
+          >
+            <XCircle className="w-4 h-4 text-rose-200" />
+            <span>Cancel / Exit CBT</span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   // --- Handlers ---
 
   const handleStartExam = () => {
@@ -474,9 +533,10 @@ export const ExamSimulator: React.FC<{
 
   if (view === 'mode') {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0F172A] p-6 flex items-center justify-center">
-        <div className="max-w-4xl w-full">
-          <div className="text-center mb-12">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-[#0F172A] p-6 flex flex-col items-center justify-start overflow-y-auto">
+        <div className="max-w-4xl w-full pt-4">
+          {renderSimulatorHeader('mode')}
+          <div className="text-center mb-12 mt-4">
             <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-500/20 rotate-12">
               <BookOpen className="w-10 h-10 text-white" />
             </div>
@@ -600,6 +660,7 @@ export const ExamSimulator: React.FC<{
         </AnimatePresence>
 
         <div className="max-w-5xl w-full">
+          {renderSimulatorHeader('seminar')}
           
           {/* Top Banner: Verification Status & Access Level Control */}
           <div className="mb-8 p-4 rounded-3xl bg-slate-900/40 border border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1440,11 +1501,10 @@ export const ExamSimulator: React.FC<{
   if (view === 'subjects') {
     return (
       <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col">
-        <div className="max-w-7xl mx-auto w-full flex-grow flex flex-col justify-center">
-          <div className="flex items-center gap-4 mb-12">
-            <button onClick={() => setView('mode')} className="p-3 bg-white/5 border border-white/5 rounded-2xl text-slate-400 hover:text-white transition-all">
-              <ChevronLeft className="w-6 h-6" />
-            </button>
+        <div className="max-w-7xl mx-auto w-full flex-grow flex flex-col justify-start">
+          {renderSimulatorHeader('subjects')}
+          
+          <div className="flex items-center gap-4 mb-12 mt-4">
             <div>
               <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase">Mission Logistics</h2>
               <p className="text-xs font-black text-indigo-500 uppercase tracking-widest">Subject Selection (Choose 4)</p>
@@ -1504,8 +1564,10 @@ export const ExamSimulator: React.FC<{
 
   if (view === 'instructions') {
     return (
-      <div className="min-h-screen bg-[#0F172A] p-6 flex items-center justify-center">
-        <div className="max-w-4xl w-full bg-slate-900/50 border border-white/5 rounded-[3rem] p-12 relative overflow-hidden">
+      <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col items-center justify-start overflow-y-auto">
+        <div className="max-w-4xl w-full pt-4">
+          {renderSimulatorHeader('instructions')}
+          <div className="bg-slate-900/50 border border-white/5 rounded-[3rem] p-12 relative overflow-hidden mt-4">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] -mr-32 -mt-32" />
           
           <div className="flex items-center gap-6 mb-10">
@@ -1552,6 +1614,7 @@ export const ExamSimulator: React.FC<{
              </button>
           </div>
         </div>
+        </div>
         <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
       </div>
     );
@@ -1564,6 +1627,9 @@ export const ExamSimulator: React.FC<{
 
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col">
+        <div className="max-w-7xl mx-auto w-full px-6 pt-4">
+          {renderSimulatorHeader('exam')}
+        </div>
         {/* Exam Header */}
         <div className="bg-slate-900 border-b border-white/5 p-6 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -1848,9 +1914,10 @@ export const ExamSimulator: React.FC<{
     const isPassing = totalScore >= 200;
 
     return (
-      <div className="min-h-screen bg-[#0F172A] p-6 flex items-center justify-center">
-        <div className="max-w-4xl w-full">
-          <div className="text-center mb-12">
+      <div className="min-h-screen bg-[#0F172A] p-6 flex flex-col items-center justify-start overflow-y-auto">
+        <div className="max-w-4xl w-full pt-4">
+          {renderSimulatorHeader('results')}
+          <div className="text-center mb-12 mt-4">
             <h1 className="text-5xl font-black text-white italic tracking-tighter mb-4 uppercase">Mission Debrief</h1>
             <p className="text-slate-400 uppercase tracking-[0.3em] font-black text-xs">Performance Analysis Protocols</p>
           </div>
@@ -1948,6 +2015,9 @@ export const ExamSimulator: React.FC<{
 
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col">
+        <div className="max-w-7xl mx-auto w-full px-6 pt-4">
+          {renderSimulatorHeader('corrections')}
+        </div>
         <div className="sticky top-0 z-50 bg-slate-900/50 backdrop-blur-xl border-b border-white/5 p-6">
            <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-4">

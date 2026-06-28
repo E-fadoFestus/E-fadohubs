@@ -224,11 +224,30 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
              onChange={(e) => setSearchQuery(e.target.value)}
            />
         </div>
+        {/* Go Back Button */}
+        <button 
+          onClick={() => {
+            if (activePlatform) {
+              setActivePlatform(null);
+            } else if (activeView !== 'home') {
+              setActiveView('home');
+            } else {
+              onClose();
+            }
+          }}
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-2xl text-slate-300 hover:text-white hover:bg-slate-800 transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4 text-indigo-400" />
+          <span>Go Back</span>
+        </button>
+
+        {/* Exit Hub Button */}
         <button 
           onClick={onClose}
-          className="p-2.5 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+          className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-650/90 border border-rose-500/20 rounded-2xl text-white hover:bg-rose-600 transition-all text-[10px] font-black uppercase tracking-widest cursor-pointer shadow-lg shadow-rose-600/10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 text-rose-200" />
+          <span>Exit Hub</span>
         </button>
       </div>
     </div>
@@ -449,14 +468,45 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
           <p className="text-indigo-100 max-w-xl text-lg font-medium">Manage your tactical broadcasts, educational modules, and technical assets from a unified interface.</p>
           
           <div className="mt-12 flex flex-wrap gap-4">
-             <CommandButton icon={Plus} label="New Intel" />
-             <CommandButton icon={Video} label="Start Deployment" />
-             <CommandButton icon={ShoppingBag} label="List Asset" />
+             <CommandButton 
+               icon={Plus} 
+               label="New Intel" 
+               onClick={() => {
+                 setActiveView('home');
+                 setActivePlatform('forge');
+               }}
+             />
+             <CommandButton 
+               icon={Video} 
+               label="Start Deployment" 
+               onClick={() => {
+                 const element = document.getElementById('broadcast-master-control');
+                 if (element) {
+                   element.scrollIntoView({ behavior: 'smooth' });
+                   element.classList.add('ring-4', 'ring-indigo-500/50', 'transition-all');
+                   setTimeout(() => {
+                     element.classList.remove('ring-4', 'ring-indigo-500/50');
+                   }, 2500);
+                 }
+                 const input = document.getElementById('broadcast-title-input');
+                 if (input) {
+                   setTimeout(() => input.focus(), 600);
+                 }
+               }}
+             />
+             <CommandButton 
+               icon={ShoppingBag} 
+               label="List Asset" 
+               onClick={() => {
+                 setActiveView('home');
+                 setActivePlatform('incubator');
+               }}
+             />
           </div>
         </div>
 
         {/* EFADO ZOOM LIVE BROADCASTER HUB */}
-        <div className="bg-slate-900 border border-[#ffffff]/5 rounded-[2.5rem] p-8 text-left space-y-4">
+        <div id="broadcast-master-control" className="bg-slate-900 border border-[#ffffff]/5 rounded-[2.5rem] p-8 text-left space-y-4">
           <div className="flex items-center gap-2 border-b border-white/5 pb-3">
             <span className="w-2.5 h-2.5 bg-red-650 rounded-full animate-ping shrink-0" />
             <h4 className="text-sm font-black uppercase text-white font-mono tracking-widest">EFADO BROADCAST MASTER CONTROL</h4>
@@ -466,6 +516,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
             <div className="md:col-span-5">
               <label className="text-[9.5px] font-black text-rose-450 block uppercase mb-1 tracking-wider font-mono">BROADCAST LECTURE SESSION TITLE</label>
               <input 
+                id="broadcast-title-input"
                 type="text"
                 placeholder="e.g. Masterclass: Advanced Smart Ledgers v4"
                 value={newClassTitle}
@@ -1747,9 +1798,9 @@ const FilterButton: React.FC<{ label: string }> = ({ label }) => (
    </button>
 );
 
-const CommandButton: React.FC<{ icon: any, label: string }> = ({ icon: Icon, label }) => (
-   <button className="px-6 py-3 bg-white text-indigo-900 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 shadow-xl shadow-black/20">
-     <Icon className="w-4 h-4" />
+const CommandButton: React.FC<{ icon: any, label: string, onClick?: () => void }> = ({ icon: Icon, label, onClick }) => (
+   <button onClick={onClick} className="px-6 py-3 bg-white text-indigo-900 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 hover:scale-105 transition-all hover:bg-indigo-50 active:scale-95 shadow-xl shadow-black/20 cursor-pointer">
+     <Icon className="w-4 h-4 text-indigo-600" />
      {label}
    </button>
 );

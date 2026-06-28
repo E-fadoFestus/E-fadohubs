@@ -139,31 +139,45 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({ user, onOpenCreator, onLike,
           exit={{ opacity: 0 }}
           className="absolute inset-0 z-0"
         >
-          {reels[activeIndex]?.videoUrl && (
-            reels[activeIndex].videoUrl.startsWith('data:video') || 
-            reels[activeIndex].videoUrl.startsWith('blob:') || 
-            reels[activeIndex].videoUrl.includes('.mp4') || 
-            reels[activeIndex].videoUrl.includes('.webm') || 
-            reels[activeIndex].videoUrl.includes('movie') ||
-            reels[activeIndex].videoUrl.includes('video') ||
-            (reels[activeIndex].id !== 'mock_1' && reels[activeIndex].id !== 'mock_2' && reels[activeIndex].id !== 'mock_3')
-          ) ? (
-            <video 
-              src={reels[activeIndex]?.videoUrl} 
-              autoPlay
-              loop
-              muted={isMuted}
-              playsInline
-              className="w-full h-full object-cover transition-all duration-700 hover:scale-105"
-            />
-          ) : (
-            <img 
-              src={reels[activeIndex]?.videoUrl} 
-              alt="Reel" 
-              className="w-full h-full object-cover grayscale brightness-90 transition-all duration-700 hover:scale-105" 
-              referrerPolicy="no-referrer" 
-            />
-          )}
+          {reels[activeIndex] && (() => {
+            const currentVideoUrl = (() => {
+              try {
+                const localVideos = JSON.parse(localStorage.getItem('efado_local_reel_videos') || '{}');
+                if (localVideos[reels[activeIndex].id]) {
+                  return localVideos[reels[activeIndex].id];
+                }
+              } catch (e) {}
+              return reels[activeIndex].videoUrl;
+            })();
+
+            const isVideo = currentVideoUrl && (
+              currentVideoUrl.startsWith('data:video') || 
+              currentVideoUrl.startsWith('blob:') || 
+              currentVideoUrl.includes('.mp4') || 
+              currentVideoUrl.includes('.webm') || 
+              currentVideoUrl.includes('movie') ||
+              currentVideoUrl.includes('video') ||
+              (!reels[activeIndex].id.startsWith('mock-'))
+            );
+
+            return isVideo ? (
+              <video 
+                src={currentVideoUrl} 
+                autoPlay
+                loop
+                muted={isMuted}
+                playsInline
+                className="w-full h-full object-cover transition-all duration-700 hover:scale-105"
+              />
+            ) : (
+              <img 
+                src={currentVideoUrl || 'https://picsum.photos/seed/reels/1080/1920'} 
+                alt="Reel" 
+                className="w-full h-full object-cover grayscale brightness-90 transition-all duration-700 hover:scale-105" 
+                referrerPolicy="no-referrer" 
+              />
+            );
+          })()}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
         </motion.div>
       </AnimatePresence>

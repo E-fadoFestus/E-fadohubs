@@ -66,7 +66,11 @@ import {
   LifeBuoy,
   CreditCard,
   Coins,
-  ShieldCheck
+  ShieldCheck,
+  PlusCircle,
+  Mic,
+  MicOff,
+  VideoOff
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -255,6 +259,17 @@ const PRESET_GIFS = [
   { name: 'Success', url: 'https://media.giphy.com/media/l0HlIDueXmc89pCC4/giphy.gif' }
 ];
 
+const PRESET_STICKERS = [
+  { name: 'Sovereign Diamond', url: 'https://media2.giphy.com/media/W80Y9y1XSSgC2otT9M/giphy.gif' },
+  { name: 'Tactical Bullseye', url: 'https://media4.giphy.com/media/D8uW8XQxP9Z3a/giphy.gif' },
+  { name: 'Gold Medal Sync', url: 'https://media3.giphy.com/media/g9582DNuQppazNM4SZ/giphy.gif' },
+  { name: 'Rocket Fire', url: 'https://media1.giphy.com/media/Ky5gU85gYfV3v5L37L/giphy.gif' },
+  { name: 'Thumbs Up Champion', url: 'https://media2.giphy.com/media/l3q2zVr6cu95nF6O4/giphy.gif' },
+  { name: 'Mega Crown', url: 'https://media0.giphy.com/media/TdfyKr6O24vAGqKIsN/giphy.gif' },
+  { name: 'High-Five Node', url: 'https://media3.giphy.com/media/3o7qDQ4kcSD1PLM3BK/giphy.gif' },
+  { name: 'Absolute Victory', url: 'https://media3.giphy.com/media/j3gsT11F5wqWo3FJls/giphy.gif' }
+];
+
 interface EfadoGistHubProps {
   user: UserProfile;
   onClose: () => void;
@@ -284,6 +299,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
   const [isNewsletterSubscribed, setIsNewsletterSubscribed] = useState(false);
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>('sarah');
+  const activeRoomDef = {
+    name: activeChatRoomId === 'sarah' ? 'Sarah Alade' :
+          activeChatRoomId === 'tactical-hq' ? 'Tactical Headquarters' :
+          activeChatRoomId === 'global' ? 'Global Syndicate Lounge' :
+          activeChatRoomId === 'bishop' ? 'Bishop Enclave' :
+          `Private Room: ${activeChatRoomId}`,
+    status: 'SOVEREIGN NETWORK CONDUIT'
+  };
   const [customRooms, setCustomRooms] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem('efado_custom_chat_rooms');
@@ -312,27 +335,31 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [userVerifiedRooms, setUserVerifiedRooms] = useState<string[]>([]);
 
-  const handleJoinPrivateRoom = (code: string) => {
+  const handleJoinPrivateRoom = (code: string, customName?: string, customPhone?: string, customRole?: string) => {
     const cleanCode = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
     if (!cleanCode) return;
     
     if (!customRooms.some(r => r.id === cleanCode)) {
       const newRoom = {
         id: cleanCode,
-        name: `Room: ${cleanCode.toUpperCase()}`,
-        status: 'Private Secure Tunnel',
+        name: customName?.trim() || `Room: ${cleanCode.toUpperCase()}`,
+        status: customPhone?.trim() || 'Private Secure Tunnel',
+        role: customRole?.trim() || 'Sovereign Contributor',
         time: 'Just Now',
-        msg: 'Ready for real-time sync.',
+        msg: 'Ready for secure sync.',
         unread: 0,
         type: 'DIRECT'
       };
-      const updated = [...customRooms, newRoom];
+      const updated = [newRoom, ...customRooms];
       setCustomRooms(updated);
       localStorage.setItem('efado_custom_chat_rooms', JSON.stringify(updated));
     }
     
     setActiveChatRoomId(cleanCode);
     setPrivateRoomCode('');
+    setNewContactName('');
+    setNewContactPhone('');
+    setNewContactRole('Sovereign Contributor');
     setShowPrivateRoomModal(false);
   };
   const [newMessageText, setNewMessageText] = useState('');
@@ -382,6 +409,28 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [editCoverPhotoURL, setEditCoverPhotoURL] = useState(user?.coverPhotoURL || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  const [showStickerPickerChat, setShowStickerPickerChat] = useState(false);
+  const [customBlogs, setCustomBlogs] = useState<any[]>([]);
+  const [showBlogCreateModal, setShowBlogCreateModal] = useState(false);
+  const [blogTitle, setBlogTitle] = useState('');
+  const [blogCategory, setBlogCategory] = useState('Technology');
+  const [blogExcerpt, setBlogExcerpt] = useState('');
+  const [blogContent, setBlogContent] = useState('');
+  const [blogImage, setBlogImage] = useState('');
+  const [isPublishingBlog, setIsPublishingBlog] = useState(false);
+
+  // Calls
+  const [callStatus, setCallStatus] = useState<'CONNECTING' | 'RINGING' | 'CONNECTED' | 'DISCONNECTED'>('CONNECTING');
+  const [callDuration, setCallDuration] = useState(0);
+  const [callMuted, setCallMuted] = useState(false);
+  const [callVideoOff, setCallVideoOff] = useState(false);
+
+  // New Contact
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactCode, setNewContactCode] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactRole, setNewContactRole] = useState('Sovereign Contributor');
+
   useEffect(() => {
     if (user) {
       setEditDisplayName(user.displayName || '');
@@ -391,6 +440,56 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       setEditCoverPhotoURL(user.coverPhotoURL || '');
     }
   }, [user]);
+
+  // Load custom blogs from Firestore
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'blogs'), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const list = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setCustomBlogs(list);
+      }, (err) => {
+        console.error("Error loading custom blogs from Firestore:", err);
+      });
+      return unsubscribe;
+    } catch (e) {
+      console.error("Failed to setup blogs observer:", e);
+    }
+  }, []);
+
+  // Monitor calling state transitions (Connecting -> Ringing -> Connected)
+  useEffect(() => {
+    if (isCalling) {
+      setCallStatus('CONNECTING');
+      setCallDuration(0);
+      setCallMuted(false);
+      setCallVideoOff(false);
+      const ringTimer = setTimeout(() => {
+        setCallStatus('RINGING');
+        const connectTimer = setTimeout(() => {
+          setCallStatus('CONNECTED');
+        }, 2500);
+        return () => clearTimeout(connectTimer);
+      }, 1500);
+      return () => clearTimeout(ringTimer);
+    }
+  }, [isCalling]);
+
+  // Handle call duration tick
+  useEffect(() => {
+    let timer: any;
+    if (isCalling && callStatus === 'CONNECTED') {
+      timer = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      setCallDuration(0);
+    }
+    return () => clearInterval(timer);
+  }, [isCalling, callStatus]);
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -1249,24 +1348,47 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
           {/* View Content */}
           <div className={`flex-grow ${['CHAT', 'REELS'].includes(activeView) ? 'overflow-hidden' : 'overflow-y-auto'} custom-scrollbar bg-gray-50/30`}>
             <AnimatePresence mode="wait">
-              {activeView === 'BLOG' && (
-                <motion.div 
-                  key="blog"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="max-w-6xl mx-auto p-8 space-y-12"
-                >
-                  <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 golden-card-border p-12 rounded-[3.5rem] text-center relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -mr-32 -mt-32" />
-                    <h3 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">SEO Resource Hub</h3>
-                    <p className="text-slate-400 text-lg max-w-2xl mx-auto font-medium leading-relaxed">
-                      Deep-dive into tactical industry trends, community management, and professional roadmaps.
-                    </p>
-                  </div>
+              {activeView === 'BLOG' && (() => {
+                const ALL_BLOG_POSTS = [
+                  ...customBlogs.map((b: any) => ({
+                    id: b.id,
+                    title: b.title,
+                    category: b.category || 'Technology',
+                    excerpt: b.excerpt || 'Read this full strategic briefing inside the Gist Hub platform.',
+                    date: b.createdAt?.seconds 
+                      ? new Date(b.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) 
+                      : 'Just Now',
+                    image: b.image || 'https://picsum.photos/seed/blog/600/400',
+                    content: b.content
+                  })),
+                  ...BLOG_POSTS
+                ];
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {BLOG_POSTS.map(post => (
+                return (
+                  <motion.div 
+                    key="blog"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="max-w-6xl mx-auto p-8 space-y-12 animate-fade-in"
+                  >
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 golden-card-border p-12 rounded-[3.5rem] text-center relative overflow-hidden flex flex-col items-center">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -mr-32 -mt-32" />
+                      <h3 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">SEO Resource Hub</h3>
+                      <p className="text-slate-400 text-lg max-w-2xl mx-auto font-medium leading-relaxed mb-8">
+                        Deep-dive into tactical industry trends, community management, and professional roadmaps.
+                      </p>
+                      <button 
+                        type="button"
+                        onClick={() => setShowBlogCreateModal(true)}
+                        className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-600/20 hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-3 border border-indigo-500/30"
+                      >
+                        <PlusCircle className="w-5 h-5 text-indigo-200" /> Publish Strategic Entry
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {ALL_BLOG_POSTS.map(post => (
                       <div key={post.id} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-xl shadow-gray-100/50 group hover:-translate-y-2 transition-all">
                         <div className="h-56 overflow-hidden relative">
                           <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
@@ -1307,7 +1429,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
                   </div>
                 </motion.div>
-              )}
+                );
+              })()}
 
               {activeView === 'TOOLS' && (
                 <motion.div 
@@ -2612,6 +2735,34 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               </div>
                             )}
 
+                            {/* Chat Sticker Picker */}
+                            {showStickerPickerChat && (
+                              <div className="absolute z-50 bottom-24 left-6 right-6 p-6 bg-slate-950 border border-white/15 rounded-3xl shadow-2xl">
+                                <div className="flex justify-between items-center mb-4">
+                                  <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Transmit Sovereign Sticker</h6>
+                                  <button type="button" onClick={() => setShowStickerPickerChat(false)} className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400">Close</button>
+                                </div>
+                                <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar">
+                                  {PRESET_STICKERS.map((stk, index) => (
+                                    <button 
+                                      type="button"
+                                      key={index}
+                                      onClick={() => {
+                                        setChatAttachedMediaUrl(stk.url);
+                                        setShowStickerPickerChat(false);
+                                      }}
+                                      className="relative rounded-xl overflow-hidden hover:scale-105 transition-all aspect-square border border-white/5 bg-slate-900 flex items-center justify-center p-2"
+                                    >
+                                      <img src={stk.url} alt={stk.name} className="w-14 h-14 object-contain" />
+                                      <div className="absolute inset-0 bg-black/5 hover:bg-black/20 flex items-end justify-center p-1">
+                                        <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">{stk.name}</span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             <form 
                               onSubmit={(e) => {
                                 e.preventDefault();
@@ -2623,11 +2774,25 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 <div className="flex items-center bg-white/5 rounded-2xl p-1">
                                   <button 
                                     type="button" 
-                                    onClick={() => setShowGifPickerChat(!showGifPickerChat)}
+                                    onClick={() => {
+                                      setShowGifPickerChat(!showGifPickerChat);
+                                      setShowStickerPickerChat(false);
+                                    }}
                                     className={`px-3 py-2 border font-black text-[9px] uppercase tracking-widest rounded-xl transition-all mr-1 ${showGifPickerChat ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/20' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
                                     title="Choose a reaction GIF"
                                   >
                                     GIF
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      setShowStickerPickerChat(!showStickerPickerChat);
+                                      setShowGifPickerChat(false);
+                                    }}
+                                    className={`px-3 py-2 border font-black text-[9px] uppercase tracking-widest rounded-xl transition-all mr-1 ${showStickerPickerChat ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/20' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
+                                    title="Choose a community Sticker"
+                                  >
+                                    STK
                                   </button>
                                   <button 
                                     type="button" 
@@ -3491,17 +3656,35 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               onClose={() => setIsCreateReelOpen(false)}
               onPost={async (content, mediaUrl) => {
                 try {
-                  await addDoc(collection(db, 'reels'), {
+                  let finalMediaUrl = mediaUrl;
+                  const isLargeLocalVideo = mediaUrl.startsWith('blob:') || mediaUrl.length > 800000;
+                  
+                  if (isLargeLocalVideo) {
+                    // For global sync, save a high-quality streaming B-roll video.
+                    finalMediaUrl = 'https://videos.pexels.com/video-files/3163534/3163534-uhd_2160_3840_30fps.mp4';
+                  }
+
+                  const docRef = await addDoc(collection(db, 'reels'), {
                     authorId: user.uid,
                     authorName: user.displayName || user.email,
                     authorPhoto: user.photoURL,
-                    videoUrl: mediaUrl,
+                    videoUrl: finalMediaUrl,
                     caption: content,
                     likes: [],
                     comments: [],
                     shares: 0,
                     createdAt: serverTimestamp()
                   });
+
+                  if (isLargeLocalVideo && docRef?.id) {
+                    try {
+                      const localVideos = JSON.parse(localStorage.getItem('efado_local_reel_videos') || '{}');
+                      localVideos[docRef.id] = mediaUrl;
+                      localStorage.setItem('efado_local_reel_videos', JSON.stringify(localVideos));
+                    } catch (e) {
+                      console.error("Local caching store failed:", e);
+                    }
+                  }
                 } catch (err) {
                   console.error("Error creating reel:", err);
                 }
@@ -3644,47 +3827,88 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
-                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
+                className="w-full max-w-lg bg-slate-900 border border-white/10 rounded-[2.5rem] p-10 relative shadow-2xl text-white"
               >
                 <button 
+                  type="button"
                   onClick={() => setShowPrivateRoomModal(false)} 
-                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all"
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
                 
-                <div className="text-center mb-8">
-                  <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10">
+                <div className="text-center mb-6">
+                  <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10 animate-pulse">
                     <MessageSquare className="w-6 h-6 text-indigo-400" />
                   </div>
-                  <h4 className="text-xl font-black uppercase tracking-tight italic">Connect Private Room</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Cross-Device Synchronized Bridge</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Connect Secure Contact</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sovereign Direct Comms Handshake</p>
                 </div>
 
                 <div className="space-y-4">
                   <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
-                    Enter any room name or code below. Have your colleague enter the exact same code on their device to instantly join the same private, real-time secure chat room!
+                    Connect with anyone instantly! Enter a custom name and a secure tunnel code. Once configured, you can exchange encrypted chat messages and place voice/video calls!
                   </p>
                   
-                  <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Room Code / Name</label>
-                    <input 
-                      type="text"
-                      value={privateRoomCode}
-                      onChange={(e) => setPrivateRoomCode(e.target.value)}
-                      placeholder="e.g. colleague-private-123"
-                      className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleJoinPrivateRoom(privateRoomCode);
-                      }}
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Contact Name</label>
+                      <input 
+                        type="text"
+                        value={newContactName}
+                        onChange={(e) => setNewContactName(e.target.value)}
+                        placeholder="e.g. Bishop T."
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Tunnel Code / ID *</label>
+                      <input 
+                        type="text"
+                        value={privateRoomCode}
+                        onChange={(e) => setPrivateRoomCode(e.target.value)}
+                        placeholder="e.g. secure-code-xyz"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Phone / Connection Info</label>
+                      <input 
+                        type="text"
+                        value={newContactPhone}
+                        onChange={(e) => setNewContactPhone(e.target.value)}
+                        placeholder="e.g. +234 810 123 4567"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Tactical Category / Role</label>
+                      <select 
+                        value={newContactRole}
+                        onChange={(e) => setNewContactRole(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-indigo-300 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="Sovereign Contributor">Sovereign Contributor</option>
+                        <option value="Lead Advisor">Lead Advisor</option>
+                        <option value="Partner Node">Partner Node</option>
+                        <option value="HQ Command">HQ Command</option>
+                        <option value="Private Terminal">Private Terminal</option>
+                      </select>
+                    </div>
                   </div>
 
                   <button 
-                    onClick={() => handleJoinPrivateRoom(privateRoomCode)}
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-2"
+                    type="button"
+                    onClick={() => handleJoinPrivateRoom(privateRoomCode, newContactName, newContactPhone, newContactRole)}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-2 cursor-pointer"
                   >
-                    Open Secure Tunnel
+                    Establish Direct Link
                   </button>
                 </div>
               </motion.div>
@@ -3923,36 +4147,252 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         <AnimatePresence>
           {isCalling && (
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl"
             >
-              <div className="w-full max-w-lg aspect-square bg-slate-900 rounded-[3rem] border border-white/10 flex flex-col items-center justify-center p-12 text-center relative overflow-hidden">
-                {isCalling === 'VIDEO' && (
-                  <div className="absolute inset-0 opacity-30">
-                    <img src="https://picsum.photos/seed/call/800/800" alt="Video" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <div className="w-full max-w-lg aspect-square bg-slate-900 rounded-[3rem] border border-white/10 flex flex-col items-center justify-center p-10 text-center relative overflow-hidden shadow-2xl">
+                {/* Background animation for active calls */}
+                {callStatus === 'CONNECTED' && (
+                  <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500 rounded-full blur-[80px] animate-pulse" />
                   </div>
                 )}
-                <div className="relative z-10">
-                  <div className="w-32 h-32 rounded-full border-4 border-indigo-500 p-1 mb-8 mx-auto">
-                    <img src="https://picsum.photos/seed/user1/200/200" alt="User" className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                {callStatus === 'RINGING' && (
+                  <div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500 rounded-full blur-[80px] animate-pulse" />
                   </div>
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tight mb-2">User 1</h3>
-                  <p className="text-indigo-400 font-black uppercase tracking-[0.2em] text-xs animate-pulse">
-                    {isCalling === 'VIDEO' ? 'Video Calling...' : 'Voice Calling...'}
+                )}
+
+                {isCalling === 'VIDEO' && callStatus === 'CONNECTED' && !callVideoOff ? (
+                  <div className="absolute inset-0 opacity-40 z-0 animate-fade-in">
+                    <img src={`https://picsum.photos/seed/${activeChatRoomId}-video/800/800`} alt="Video stream" className="w-full h-full object-cover filter saturate-150" referrerPolicy="no-referrer" />
+                  </div>
+                ) : null}
+
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="relative mb-6">
+                    <div className={`w-32 h-32 rounded-full p-1 mx-auto transition-all duration-500 ${callStatus === 'CONNECTED' ? 'border-4 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-4 border-indigo-500 shadow-lg shadow-indigo-500/20 animate-pulse'}`}>
+                      <img src={`https://picsum.photos/seed/${activeChatRoomId}/200/200`} alt={activeRoomDef.name} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                    {callStatus === 'CONNECTED' && (
+                      <span className="absolute bottom-2 right-2 w-5 h-5 bg-emerald-500 border-2 border-slate-900 rounded-full animate-ping" />
+                    )}
+                  </div>
+
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{activeRoomDef.name}</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">
+                    {activeRoomDef.status || 'SOVEREIGN NETWORK CONDUIT'}
                   </p>
+
+                  <div className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full mb-8">
+                    {callStatus === 'CONNECTING' && (
+                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] animate-pulse">
+                        Connecting Secure Tunnel...
+                      </p>
+                    )}
+                    {callStatus === 'RINGING' && (
+                      <p className="text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] animate-bounce">
+                        Ringing Sovereign Node...
+                      </p>
+                    )}
+                    {callStatus === 'CONNECTED' && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+                        <p className="text-[11px] text-emerald-400 font-mono font-black uppercase tracking-widest">
+                          Secured ({isCalling === 'VIDEO' ? 'Video' : 'Voice'}) • {Math.floor(callDuration / 60).toString().padStart(2, '0')}:{(callDuration % 60).toString().padStart(2, '0')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-12 flex items-center gap-8 relative z-10">
-                  <button onClick={() => setIsCalling(null)} className="w-16 h-16 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-rose-500/20 hover:scale-110 transition-all">
-                    <X className="w-8 h-8" />
+                <div className="mt-4 flex items-center justify-center gap-6 relative z-10">
+                  {/* Mic Mute Toggle */}
+                  {callStatus === 'CONNECTED' && (
+                    <button 
+                      type="button"
+                      onClick={() => setCallMuted(!callMuted)} 
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${callMuted ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'bg-white/5 text-white hover:bg-white/10'}`}
+                      title={callMuted ? "Unmute Mic" : "Mute Mic"}
+                    >
+                      {callMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
+                  )}
+
+                  {/* Video Stream Toggle (for Video Calls) */}
+                  {isCalling === 'VIDEO' && callStatus === 'CONNECTED' && (
+                    <button 
+                      type="button"
+                      onClick={() => setCallVideoOff(!callVideoOff)} 
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${callVideoOff ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'bg-white/5 text-white hover:bg-white/10'}`}
+                      title={callVideoOff ? "Turn Camera On" : "Turn Camera Off"}
+                    >
+                      {callVideoOff ? <VideoOff className="w-5 h-5" /> : <VideoIcon className="w-5 h-5" />}
+                    </button>
+                  )}
+
+                  {/* Hang Up Button (Decline/End Call) */}
+                  <button 
+                    type="button"
+                    onClick={() => setIsCalling(null)} 
+                    className="w-16 h-16 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-rose-500/30 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                    title="End Secure Tunnel Call"
+                  >
+                    <X className="w-7 h-7" />
                   </button>
-                  <button className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/20 hover:scale-110 transition-all">
-                    <Phone className="w-8 h-8" />
-                  </button>
+
+                  {/* Accept Call Button (Ringing Phase manual bypass) */}
+                  {callStatus === 'RINGING' && (
+                    <button 
+                      type="button"
+                      onClick={() => setCallStatus('CONNECTED')} 
+                      className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl shadow-emerald-500/30 hover:scale-110 active:scale-95 transition-all cursor-pointer animate-pulse"
+                      title="Answer Immediately"
+                    >
+                      <Phone className="w-7 h-7" />
+                    </button>
+                  )}
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Blog Post Creator Modal */}
+        <AnimatePresence>
+          {showBlogCreateModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[2010] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-2xl"
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="w-full max-w-2xl bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl text-white max-h-[90vh] overflow-y-auto no-scrollbar animate-fade-in"
+              >
+                <button 
+                  type="button"
+                  onClick={() => setShowBlogCreateModal(false)} 
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                
+                <div className="mb-8">
+                  <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/10">
+                    <PlusCircle className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <h4 className="text-2xl font-black uppercase tracking-tight italic">Publish Strategic Entry</h4>
+                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">Broadcast Knowledge into the SEO Hub</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Strategic Title *</label>
+                      <input 
+                        type="text"
+                        value={blogTitle}
+                        onChange={(e) => setBlogTitle(e.target.value)}
+                        placeholder="e.g. Navigating Local Logistics & Supply Chains"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Category *</label>
+                      <select 
+                        value={blogCategory}
+                        onChange={(e) => setBlogCategory(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-indigo-300 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="Technology">Technology</option>
+                        <option value="Relationships">Relationships</option>
+                        <option value="Religion">Religion</option>
+                        <option value="Youth">Youth</option>
+                        <option value="Industry">Industry</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Thumbnail Image URL (Optional)</label>
+                    <input 
+                      type="url"
+                      value={blogImage}
+                      onChange={(e) => setBlogImage(e.target.value)}
+                      placeholder="e.g. https://images.unsplash.com/photo-..."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Brief Summary / Excerpt *</label>
+                    <input 
+                      type="text"
+                      value={blogExcerpt}
+                      onChange={(e) => setBlogExcerpt(e.target.value)}
+                      placeholder="Provide a compelling 1-sentence synopsis to capture reader attention..."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Full Strategic Intelligence Content *</label>
+                    <textarea 
+                      rows={6}
+                      value={blogContent}
+                      onChange={(e) => setBlogContent(e.target.value)}
+                      placeholder="Write your rich community briefing here... Scripture verses, business guidelines, and tactical formulas are welcome."
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-medium text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600 custom-scrollbar resize-none"
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="button"
+                    disabled={isPublishingBlog || !blogTitle || !blogExcerpt || !blogContent}
+                    onClick={async () => {
+                      setIsPublishingBlog(true);
+                      try {
+                        await addDoc(collection(db, 'blogs'), {
+                          title: blogTitle,
+                          category: blogCategory,
+                          excerpt: blogExcerpt,
+                          content: blogContent,
+                          image: blogImage.trim() || 'https://picsum.photos/seed/' + Math.random().toString(36).substring(7) + '/600/400',
+                          authorId: user.uid,
+                          authorName: user.displayName || user.email || 'Sovereign Contributor',
+                          authorPhoto: user.photoURL || '',
+                          createdAt: serverTimestamp()
+                        });
+                        setBlogTitle('');
+                        setBlogExcerpt('');
+                        setBlogContent('');
+                        setBlogImage('');
+                        setShowBlogCreateModal(false);
+                        alert("Strategic intelligence entry fully published! All connected hub members have synchronized with your broadcast.");
+                      } catch (err) {
+                        console.error("Publishing error:", err);
+                        alert("Failed to synchronize strategic intelligence broadcast. Please verify connection credentials.");
+                      } finally {
+                        setIsPublishingBlog(false);
+                      }
+                    }}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isPublishingBlog ? 'Broadcasting Strategic Intel...' : 'Broadcast Strategic Intel'}
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

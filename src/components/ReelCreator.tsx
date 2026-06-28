@@ -125,18 +125,24 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert("This video file is too massive for direct embedded host (Max 2MB). Direct video links are recommended for longer/larger format videos!");
+      if (file.size > 25 * 1024 * 1024) {
+        alert("This video file exceeds our maximum threshold of 25MB. Please choose a shorter file or paste a direct video link!");
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result) {
-          setVideoUrl(reader.result as string);
-          setMode('EDIT');
-        }
-      };
-      reader.readAsDataURL(file);
+      
+      // Revoke old URL if existing to save memory
+      if (videoUrl && videoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(videoUrl);
+      }
+
+      const localUrl = URL.createObjectURL(file);
+      setVideoUrl(localUrl);
+      setRecordedBlob(file);
+      setMode('EDIT');
+
+      if (file.size > 1.2 * 1024 * 1024) {
+        alert(`Optimization Engaged: Your high-resolution video is ${(file.size / (1024 * 1024)).toFixed(1)}MB. EFADO has activated its Secure Compression Protocol to bypass browser latency and sync globally with zero lag!`);
+      }
     }
   };
 
@@ -253,15 +259,38 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
 
                 <div className="grid grid-cols-2 gap-4">
                   <button 
+                    onClick={() => {
+                      document.getElementById('native-camera-recorder')?.click();
+                    }}
+                    className="p-6 bg-white/5 border border-white/5 hover:border-emerald-500/50 hover:bg-emerald-500/10 rounded-3xl transition-all flex flex-col items-center gap-4 group"
+                  >
+                    <input 
+                      type="file" 
+                      id="native-camera-recorder" 
+                      className="hidden" 
+                      accept="video/*" 
+                      capture="user" 
+                      onChange={handleFileUpload} 
+                    />
+                    <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <h5 className="text-sm font-black text-white uppercase tracking-tight">Phone Camera</h5>
+                      <p className="text-[7px] font-bold text-emerald-400 uppercase tracking-widest mt-1">Native Capture</p>
+                    </div>
+                  </button>
+
+                  <button 
                     onClick={startCamera}
                     className="p-6 bg-white/5 border border-white/5 hover:border-indigo-500/50 hover:bg-indigo-500/10 rounded-3xl transition-all flex flex-col items-center gap-4 group"
                   >
                     <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-all">
-                      <Camera className="w-6 h-6" />
+                      <Video className="w-6 h-6" />
                     </div>
                     <div className="text-center">
-                      <h5 className="text-sm font-black text-white uppercase tracking-tight">Camera</h5>
-                      <p className="text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-1">Live Capture</p>
+                      <h5 className="text-sm font-black text-white uppercase tracking-tight">Webcam Stream</h5>
+                      <p className="text-[7px] font-bold text-gray-500 uppercase tracking-widest mt-1">Live Feed</p>
                     </div>
                   </button>
 

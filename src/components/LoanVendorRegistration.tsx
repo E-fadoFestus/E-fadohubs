@@ -86,7 +86,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     {
       id: 'silver',
       name: 'Silver Partner Pool',
-      price: 49,
+      price: 5000,
       limit: 25000,
       fee: '1.0%',
       color: 'from-slate-700 to-slate-900 border-slate-700',
@@ -96,7 +96,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     {
       id: 'gold',
       name: 'Gold Sovereign Pool',
-      price: 149,
+      price: 10000,
       limit: 100000,
       fee: '0.5%',
       color: 'from-amber-600 to-amber-950 border-amber-500/40',
@@ -106,7 +106,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     {
       id: 'titanium',
       name: 'Titanium Institutional Pool',
-      price: 299,
+      price: 20000,
       limit: 500000,
       fee: '0.1%',
       color: 'from-emerald-800 to-slate-950 border-emerald-500/30',

@@ -46,7 +46,8 @@ import {
   ArrowRight,
   Pickaxe,
   Mail,
-  Brain
+  Brain,
+  CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SUPPORT_EMAILS } from '../constants/businessProfile';
@@ -55,6 +56,7 @@ import { VendorMarketplace } from './VendorMarketplace';
 import { EfadoMining, AdvertisingMiniCard, MiningMiniCard } from './EfadoMining';
 import { SeminarPortal } from './education/SeminarPortal';
 import { JambDetailedGuide } from './education/JambDetailedGuide';
+import { JambPaymentPortal } from './education/JambPaymentPortal';
 import { EfadoIntelligenceFeed } from './EfadoIntelligenceFeed';
 import { CurrencySelector } from './CurrencySelector';
 import { ExamCategory } from '../data/examData';
@@ -74,7 +76,7 @@ interface SubCategory {
   description: string;
   tags?: ('Most Visited' | 'Recently Updated')[];
   examType?: ExamCategory;
-  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE';
+  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE' | 'PAYMENT';
 }
 
 interface EducationSection {
@@ -86,6 +88,44 @@ interface EducationSection {
 }
 
 const educationData: EducationSection[] = [
+  {
+    id: 'jamb',
+    title: "JAMB UTME Hub",
+    icon: Target,
+    description: "CBT simulated examinations, strategy seminars, profile guidelines, and e-PIN purchase portals.",
+    subCategories: [
+      {
+        title: "JAMB UTME CBT Simulator",
+        icon: ClipboardList,
+        description: "Practice simulated full-load JAMB CBT exams with the exact 400-point national ranking algorithm.",
+        tags: ["Most Visited"],
+        examType: "JAMB",
+        serviceType: "CBT"
+      },
+      {
+        title: "JAMB Strategy Seminar",
+        icon: Video,
+        description: "Access our exclusive webinar recording and tactical materials for academic success.",
+        tags: ["Recently Updated"],
+        examType: "JAMB",
+        serviceType: "SEMINAR"
+      },
+      {
+        title: "JAMB Profile & Syllabus Guide",
+        icon: FileSearch,
+        description: "Verify registration requirements, brochure options, and syllabus lists.",
+        tags: ["Most Visited"],
+        serviceType: "GUIDE"
+      },
+      {
+        title: "JAMB Payment Portal Protocol",
+        icon: CreditCard,
+        description: "Secure JAMB E-PIN purchase, registration fee payments, and transaction records.",
+        tags: ["Recently Updated"],
+        serviceType: "PAYMENT"
+      }
+    ]
+  },
   {
     id: 'o_level',
     title: "O'Level Hub",
@@ -187,6 +227,7 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
   const [activeExam, setActiveExam] = useState<{ type: ExamCategory, view: 'mode' | 'seminar' } | null>(null);
   const [showSeminarPortal, setShowSeminarPortal] = useState(false);
   const [showJambGuide, setShowJambGuide] = useState(false);
+  const [showJambPaymentModal, setShowJambPaymentModal] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showMining, setShowMining] = useState(false);
 
@@ -513,6 +554,13 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           />
         )}
 
+        {showJambPaymentModal && (
+          <JambPaymentPortal 
+            onClose={() => setShowJambPaymentModal(false)}
+            user={user}
+          />
+        )}
+
         {showAiStudyPortal && (
           <AiStudyPlatform 
             user={user}
@@ -560,6 +608,10 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                       }
                       if (sub.serviceType === 'GUIDE') {
                         setShowJambGuide(true);
+                        return;
+                      }
+                      if (sub.serviceType === 'PAYMENT') {
+                        setShowJambPaymentModal(true);
                         return;
                       }
                       if (sub.examType) {
