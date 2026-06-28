@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Plus, 
   Trash2, 
@@ -17,7 +17,15 @@ import {
   Calendar,
   XCircle,
   TrendingUp,
-  FileText
+  FileText,
+  Users2,
+  Cpu,
+  BookMarked,
+  Compass,
+  HelpCircle,
+  Check,
+  Building,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -798,6 +806,890 @@ export const PrimarySchoolGame: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+
+// ==========================================
+// 6. POSTGRADUATE THESIS & DISSERTATION PLANNER (PHD & MASTER'S)
+// ==========================================
+interface ThesisTask {
+  id: string;
+  title: string;
+  phase: 'conceptual' | 'proposal' | 'research' | 'writing' | 'defense';
+  done: boolean;
+}
+
+interface CitationItem {
+  id: string;
+  author: string;
+  year: string;
+  title: string;
+  journal: string;
+  type: 'APA' | 'Harvard' | 'MLA';
+}
+
+export const ThesisPlanner: React.FC = () => {
+  const [topic, setTopic] = useState("Evaluation of Distributed Ledger Consensus Speeds for African Financial Ingress");
+  const [problem, setProblem] = useState("Existing banking hubs incur high database replication costs, resulting in over-delayed settlement times for small cross-border payments.");
+  const [academicTone, setAcademicTone] = useState(false);
+  const [tasks, setTasks] = useState<ThesisTask[]>([
+    { id: '1', title: 'Complete literature search on cross-border blockchain protocols', phase: 'conceptual', done: true },
+    { id: '2', title: 'Formulate thesis proposal and research questions', phase: 'proposal', done: true },
+    { id: '3', title: 'Obtain institutional ethics and data collection authorization', phase: 'proposal', done: false },
+    { id: '4', title: 'Collect consensus telemetry datasets from test networks', phase: 'research', done: false },
+    { id: '5', title: 'Build and execute performance analysis simulators', phase: 'research', done: false },
+    { id: '6', title: 'Draft Literature Review (Chapters 1 & 2)', phase: 'writing', done: false },
+    { id: '7', title: 'Analyze empirical metrics and draft Methodology (Chapter 3)', phase: 'writing', done: false },
+    { id: '8', title: 'Submit dissertation script for internal pre-defense board', phase: 'defense', done: false }
+  ]);
+
+  const [citations, setCitations] = useState<CitationItem[]>([
+    { id: '1', author: 'Alade, S. & Eniola, O.', year: '2025', title: 'Sub-Saharan FinTech Node Performance Under Stress', journal: 'Journal of Sovereign Systems, 14(2)', type: 'APA' },
+    { id: '2', author: 'Ibrahim, C.', year: '2024', title: 'Distributed Ledgers for Low-Latency African Settlement Protocols', journal: 'African Technology Review, 8(4)', type: 'Harvard' }
+  ]);
+
+  // Citation inputs
+  const [cAuthor, setCAuthor] = useState('');
+  const [cYear, setCYear] = useState('');
+  const [cTitle, setCTitle] = useState('');
+  const [cJournal, setCJournal] = useState('');
+  const [cType, setCType] = useState<'APA' | 'Harvard' | 'MLA'>('APA');
+
+  const handleAddTask = (title: string, phase: any) => {
+    if (!title.trim()) return;
+    setTasks(prev => [...prev, { id: Date.now().toString(), title, phase, done: false }]);
+  };
+
+  const toggleTask = (id: string) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  };
+
+  const handleAddCitation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cAuthor || !cTitle || !cYear) return;
+    setCitations(prev => [...prev, { id: Date.now().toString(), author: cAuthor, year: cYear, title: cTitle, journal: cJournal || 'Self Published', type: cType }]);
+    setCAuthor('');
+    setCYear('');
+    setCTitle('');
+    setCJournal('');
+  };
+
+  const formatCitation = (cit: CitationItem) => {
+    if (cit.type === 'APA') {
+      return `${cit.author} (${cit.year}). ${cit.title}. *${cit.journal}*.`;
+    } else if (cit.type === 'MLA') {
+      return `${cit.author}. "${cit.title}." *${cit.journal}*, ${cit.year}.`;
+    } else {
+      return `${cit.author}, ${cit.year}. ${cit.title}. *${cit.journal}*.`;
+    }
+  };
+
+  const phases = [
+    { id: 'conceptual', name: 'Conceptual Stage' },
+    { id: 'proposal', name: 'Proposal stage' },
+    { id: 'research', name: 'Data & Research' },
+    { id: 'writing', name: 'Writing Thesis' },
+    { id: 'defense', name: 'Viva Oral Defense' }
+  ];
+
+  const currentProgress = Math.round((tasks.filter(t => t.done).length / tasks.length) * 100);
+
+  return (
+    <div className="bg-slate-950 p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 gap-4">
+        <div>
+          <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <BookMarked className="w-5 h-5 text-indigo-400" />
+            Postgraduate Thesis Roadmap & Planner
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Ph.D. & Master's Academic Milestone Suite</p>
+        </div>
+        <div className="px-4 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-xl text-indigo-300 text-[10px] font-black uppercase tracking-wider">
+          Roadmap Complete: {currentProgress}%
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Topic formulation & citations */}
+        <div className="lg:col-span-5 space-y-5">
+          {/* Topic Formulation */}
+          <div className="p-5 bg-slate-900 rounded-3xl border border-white/5 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block">Thesis Concept Definition</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setAcademicTone(!academicTone);
+                  if (!academicTone) {
+                    setTopic("An Empirical telemetrical Investigation into Distributed Consensus Latency Protocols across Sub-Saharan Financial Ingress Portals");
+                  } else {
+                    setTopic("Evaluation of Distributed Ledger Consensus Speeds for African Financial Ingress");
+                  }
+                }}
+                className="text-[9px] font-black text-emerald-400 hover:text-emerald-300 uppercase tracking-widest flex items-center gap-1.5 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {academicTone ? "Simplify Title" : "Academic Polish"}
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[8px] font-mono font-bold text-slate-500 uppercase block mb-1">PROPOSED RESEARCH TITLE</label>
+                <textarea
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-xs font-semibold text-white outline-none focus:border-indigo-500 h-20 resize-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-[8px] font-mono font-bold text-slate-500 uppercase block mb-1">STATEMENT OF THE PROBLEM</label>
+                <textarea
+                  value={problem}
+                  onChange={(e) => setProblem(e.target.value)}
+                  className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-xs font-semibold text-white outline-none focus:border-indigo-500 h-20 resize-none transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Citations Organizer */}
+          <div className="p-5 bg-slate-900 rounded-3xl border border-white/5 space-y-4">
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block">Citation & Literature Vault</span>
+            
+            <form onSubmit={handleAddCitation} className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  placeholder="Author(s)"
+                  value={cAuthor}
+                  onChange={(e) => setCAuthor(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 font-semibold"
+                />
+                <input
+                  type="text"
+                  placeholder="Year"
+                  value={cYear}
+                  onChange={(e) => setCYear(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 font-semibold"
+                />
+                <select
+                  value={cType}
+                  onChange={(e: any) => setCType(e.target.value)}
+                  className="px-3 py-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 font-semibold cursor-pointer"
+                >
+                  <option value="APA">APA</option>
+                  <option value="Harvard">Harvard</option>
+                  <option value="MLA">MLA</option>
+                </select>
+              </div>
+              <input
+                type="text"
+                placeholder="Source Title"
+                value={cTitle}
+                onChange={(e) => setCTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 font-semibold"
+              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Journal or Publisher"
+                  value={cJournal}
+                  onChange={(e) => setCJournal(e.target.value)}
+                  className="flex-grow px-3 py-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 font-semibold"
+                />
+                <button
+                  type="submit"
+                  className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Add Source
+                </button>
+              </div>
+            </form>
+
+            <div className="space-y-2 max-h-32 overflow-y-auto pr-1">
+              {citations.map((cit) => (
+                <div key={cit.id} className="p-2.5 bg-slate-950/80 rounded-xl border border-white/5 text-[10px] font-medium text-slate-300 leading-normal flex justify-between gap-2">
+                  <span dangerouslySetInnerHTML={{ __html: formatCitation(cit) }} />
+                  <button
+                    onClick={() => setCitations(prev => prev.filter(c => c.id !== cit.id))}
+                    className="text-rose-400 hover:text-rose-300 shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Interactive Milestones List */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="p-5 bg-slate-900 rounded-3xl border border-white/5 flex flex-col h-full">
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-4">Milestone Roadmap Phases</span>
+            
+            {/* New Task Entry */}
+            <div className="flex gap-2 mb-4">
+              <input
+                id="new-milestone-input"
+                type="text"
+                placeholder="Type a new custom thesis milestone..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const inputEl = document.getElementById('new-milestone-input') as HTMLInputElement;
+                    handleAddTask(inputEl.value, 'research');
+                    inputEl.value = '';
+                  }
+                }}
+                className="flex-grow px-4 py-2.5 bg-slate-950 border border-white/5 rounded-xl text-xs text-white outline-none focus:border-indigo-500 font-semibold"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const inputEl = document.getElementById('new-milestone-input') as HTMLInputElement;
+                  handleAddTask(inputEl.value, 'research');
+                  inputEl.value = '';
+                }}
+                className="px-4.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Add
+              </button>
+            </div>
+
+            {/* List by phase */}
+            <div className="space-y-4 overflow-y-auto max-h-[340px] pr-1">
+              {phases.map((phase) => {
+                const phaseTasks = tasks.filter(t => t.phase === phase.id);
+                if (phaseTasks.length === 0) return null;
+                return (
+                  <div key={phase.id} className="space-y-2">
+                    <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-1">{phase.name}</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      {phaseTasks.map((task) => (
+                        <div 
+                          key={task.id}
+                          onClick={() => toggleTask(task.id)}
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            task.done 
+                              ? 'bg-indigo-600/5 border-indigo-500/20 opacity-70' 
+                              : 'bg-slate-950 border-white/5 hover:border-white/10'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                              task.done ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-600 bg-slate-900'
+                            }`}>
+                              {task.done && <Check className="w-3 h-3" />}
+                            </div>
+                            <span className={`text-xs font-semibold uppercase tracking-wide leading-tight ${task.done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                              {task.title}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTasks(prev => prev.filter(t => t.id !== task.id));
+                            }}
+                            className="text-slate-500 hover:text-rose-400 transition-colors shrink-0 p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ==========================================
+// 7. ORAL VIVA-VOCE MOCK PANEL SIMULATOR (POSTGRADUATE)
+// ==========================================
+interface VivaMessage {
+  id: string;
+  sender: 'panel' | 'candidate';
+  text: string;
+  category?: string;
+}
+
+export const VivaSimulator: React.FC = () => {
+  const [panelVibe, setPanelVibe] = useState<'SUPPORTIVE' | 'STANDARD' | 'HOSTILE'>('STANDARD');
+  const [activeSession, setActiveSession] = useState(false);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [messages, setMessages] = useState<VivaMessage[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [confidence, setConfidence] = useState(70);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+
+  const vivaQuestions = [
+    {
+      category: "ORIGINALITY & CONTRIBUTION",
+      question: "Could you articulate in clear, precise terms what the unique original contribution of your thesis is, and how it departs from contemporary models?"
+    },
+    {
+      category: "METHODOLOGY ROBUSTNESS",
+      question: "How do you defend your choice of sample size and the specific empirical telemetry algorithms over more traditional qualitative heuristics?"
+    },
+    {
+      category: "LIMITATIONS & BIAS",
+      question: "Looking objectively at your Chapter 5 discussion, what major methodology compromises or statistical bias are inherent in your results?"
+    },
+    {
+      category: "LITERATURE CONTEXT",
+      question: "How does your distributed consensus model align with the seminal 2021 work of Alade & Ibrahim on Sub-Saharan network architectures?"
+    }
+  ];
+
+  const handleStartSession = () => {
+    setActiveSession(true);
+    setCurrentQuestionIdx(0);
+    setConfidence(70);
+    
+    let introduction = "Welcome, candidate. The doctoral board is now convened. ";
+    if (panelVibe === 'SUPPORTIVE') {
+      introduction += "We have read your dissertation with keen interest. Please present your core defense calmly.";
+    } else if (panelVibe === 'HOSTILE') {
+      introduction += "We have noted several severe methodology anomalies in your write-up. We expect rigid defenses of your telemetry assertions.";
+    } else {
+      introduction += "We will now begin the defense evaluation. Be precise and concise with your parameters.";
+    }
+
+    setMessages([
+      { id: 'intro', sender: 'panel', text: introduction },
+      { id: 'q0', sender: 'panel', text: vivaQuestions[0].question, category: vivaQuestions[0].category }
+    ]);
+  };
+
+  const handleSendResponse = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+
+    const userMsg: VivaMessage = {
+      id: `u-${Date.now()}`,
+      sender: 'candidate',
+      text: inputText
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setIsEvaluating(true);
+
+    setTimeout(() => {
+      // Evaluate response length & keywords for simulated confidence updates
+      const lower = userMsg.text.toLowerCase();
+      let feedback = "";
+      let confidenceDelta = 0;
+
+      if (lower.length < 25) {
+        feedback = panelVibe === 'HOSTILE' 
+          ? "That is a remarkably shallow answer for a PhD candidate. You must elaborate extensively."
+          : "We require more detail. Please speak more to the operational mechanics.";
+        confidenceDelta = -15;
+      } else if (lower.includes('limit') || lower.includes('algorithm') || lower.includes('consensus') || lower.includes('empirical')) {
+        feedback = panelVibe === 'SUPPORTIVE'
+          ? "Excellent defense. You highlighted the core boundaries and validated your variables precisely."
+          : "A reasonable defense. We accept the mathematical justification you've provided.";
+        confidenceDelta = 10;
+      } else {
+        feedback = "The panel notes your stance, but you did not fully resolve our technical inquiry.";
+        confidenceDelta = -2;
+      }
+
+      setConfidence(prev => Math.min(100, Math.max(0, prev + confidenceDelta)));
+
+      const panelResponseMsg: VivaMessage = {
+        id: `fb-${Date.now()}`,
+        sender: 'panel',
+        text: feedback
+      };
+
+      const nextIdx = currentQuestionIdx + 1;
+      setIsEvaluating(false);
+
+      if (nextIdx < vivaQuestions.length) {
+        setCurrentQuestionIdx(nextIdx);
+        setMessages(prev => [
+          ...prev, 
+          panelResponseMsg, 
+          { 
+            id: `q-${nextIdx}`, 
+            sender: 'panel', 
+            text: vivaQuestions[nextIdx].question, 
+            category: vivaQuestions[nextIdx].category 
+          }
+        ]);
+      } else {
+        // End of session
+        const finalStatus = confidence >= 60 
+          ? "CONGRATULATIONS, CANDIDATE! The doctoral committee has evaluated your defense, verified your academic record, and approved your dissertation script for publishing."
+          : "SESSION SUSPENDED: The board finds the methodology defenses inadequate. You are required to perform a substantial rewrite of Chapter 4 & 5 and re-defend in 3 months.";
+        
+        setMessages(prev => [
+          ...prev,
+          panelResponseMsg,
+          { id: 'end', sender: 'panel', text: finalStatus }
+        ]);
+      }
+    }, 2500);
+  };
+
+  return (
+    <div className="bg-slate-950 p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 gap-4">
+        <div>
+          <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Users2 className="w-5 h-5 text-indigo-400" />
+            Oral Viva-Voce defense Simulator
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Simulate postgrad oral committee defenses</p>
+        </div>
+      </div>
+
+      {!activeSession ? (
+        <div className="flex flex-col items-center justify-center text-center py-12 space-y-6 max-w-md mx-auto">
+          <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center text-indigo-400">
+            <GraduationCap className="w-8 h-8" />
+          </div>
+          <div>
+            <h4 className="text-base font-black text-white uppercase tracking-tight">Set Defense Committee Vibe</h4>
+            <p className="text-slate-400 text-xs mt-2 uppercase tracking-tight leading-relaxed">
+              Prepare for critical examination boards. Select the simulated academic temperament of your panel.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 w-full">
+            {(['SUPPORTIVE', 'STANDARD', 'HOSTILE'] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setPanelVibe(v)}
+                className={`py-3.5 border rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  panelVibe === v 
+                    ? 'bg-indigo-600 border-indigo-500 text-white' 
+                    : 'bg-slate-900 border-white/5 text-slate-400 hover:border-white/10'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleStartSession}
+            className="w-full py-4.5 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+          >
+            Convene Oral Board
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Chat Stream */}
+          <div className="lg:col-span-8 bg-slate-900 rounded-[2rem] border border-white/5 p-5 flex flex-col justify-between h-[400px]">
+            <div className="overflow-y-auto space-y-4 pr-1 flex-grow scrollbar-thin">
+              {messages.map((msg) => {
+                const isPanel = msg.sender === 'panel';
+                return (
+                  <div key={msg.id} className={`flex ${isPanel ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`p-4 rounded-2xl max-w-md border text-xs leading-relaxed font-semibold uppercase tracking-wide ${
+                      isPanel 
+                        ? 'bg-slate-950 border-white/5 text-slate-300' 
+                        : 'bg-indigo-600 border-indigo-500 text-white'
+                    }`}>
+                      {msg.category && (
+                        <span className="text-[8px] font-black text-indigo-400 block mb-1 tracking-widest">
+                          [{msg.category}]
+                        </span>
+                      )}
+                      <p>{msg.text}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isEvaluating && (
+                <div className="flex justify-start">
+                  <div className="p-4 rounded-2xl bg-slate-950 border border-white/5 text-[9px] font-bold text-slate-400 uppercase tracking-widest animate-pulse">
+                    The committee is deliberating on your arguments...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Response Input */}
+            <form onSubmit={handleSendResponse} className="flex gap-2 mt-4 border-t border-white/5 pt-4">
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                disabled={isEvaluating || messages[messages.length - 1]?.id === 'end'}
+                placeholder={messages[messages.length - 1]?.id === 'end' ? 'Session completed' : 'Type your methodology/theory defense here...'}
+                className="flex-grow px-4 py-3 bg-slate-950 border border-white/5 rounded-xl text-xs text-white outline-none focus:border-indigo-500 font-semibold uppercase"
+              />
+              <button
+                type="submit"
+                disabled={isEvaluating || messages[messages.length - 1]?.id === 'end' || !inputText.trim()}
+                className="px-5 bg-indigo-600 disabled:opacity-40 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          </div>
+
+          {/* Telemetry/Evaluation Metrics */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="p-5 bg-slate-900 rounded-[2rem] border border-white/5 space-y-4 h-full flex flex-col justify-between">
+              <div>
+                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-3">Live Defense telemetry</span>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-300 mb-1.5">
+                      <span>Board Approval Confidence:</span>
+                      <span className={confidence >= 60 ? 'text-emerald-400' : 'text-rose-400'}>{confidence}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className={`h-full transition-all duration-500 ${confidence >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                        style={{ width: `${confidence}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-950 rounded-xl border border-white/5">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Active panel</span>
+                    <span className="text-[11px] font-mono font-black text-white uppercase block mt-1">{panelVibe} PROTOCOL MODE</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-white/5 space-y-2">
+                <p className="text-[9px] text-slate-500 leading-normal font-medium uppercase tracking-wider">
+                  Tips: In doctoral panels, avoid vague statements. Ground your answers using keyword anchors like "limitations", "consensus algorithms", or "empirical evidence".
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveSession(false)}
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer"
+                >
+                  Convene New Board
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// ==========================================
+// 8. POLYTECHNIC & TECHNICAL PATHWAY GUIDE (ND TO HND / B.SC.)
+// ==========================================
+export const PolytechnicPathway: React.FC = () => {
+  const [cgpa, setCgpa] = useState<string>("3.25");
+  const [conversionGrade, setConversionGrade] = useState("UPPER_CREDIT");
+
+  const equivalentUniversityCgpa = useMemo(() => {
+    const rawVal = parseFloat(cgpa);
+    if (isNaN(rawVal) || rawVal < 0 || rawVal > 4.0) return "0.00";
+    // Convert 4.0 scale to 5.0 scale proportionally
+    return ((rawVal / 4.0) * 5.0).toFixed(2);
+  }, [cgpa]);
+
+  useEffect(() => {
+    const rawVal = parseFloat(cgpa);
+    if (isNaN(rawVal)) return;
+    if (rawVal >= 3.5) setConversionGrade("DISTINCTION (First Class Equivalent)");
+    else if (rawVal >= 3.0) setConversionGrade("UPPER CREDIT (Second Class Upper Equivalent)");
+    else if (rawVal >= 2.5) setConversionGrade("LOWER CREDIT (Second Class Lower Equivalent)");
+    else if (rawVal >= 2.0) setConversionGrade("PASS (Third Class Equivalent)");
+    else setConversionGrade("FAIL / INELIGIBLE");
+  }, [cgpa]);
+
+  return (
+    <div className="bg-slate-950 p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 gap-4">
+        <div>
+          <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Compass className="w-5 h-5 text-indigo-400" />
+            Polytechnic ND to HND / B.Sc. Pathway Guide
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">ND, HND, & Direct-Entry Transfer Matrices</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left Column: Grade Equivalent Calculator */}
+        <div className="p-5 bg-slate-900 rounded-[2rem] border border-white/5 space-y-5">
+          <div>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-1">Scale Conversions</span>
+            <h4 className="text-sm font-black text-white uppercase italic">CGPA Multi-Scale Translator</h4>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 block uppercase mb-1.5 tracking-wider">Your Polytechnic CGPA (4.0 Scale)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.00"
+                max="4.00"
+                value={cgpa}
+                onChange={(e) => setCgpa(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 text-center">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">University 5.0 Equivalent</span>
+                <span className="text-xl font-mono font-black text-indigo-400 block mt-1.5">{equivalentUniversityCgpa}</span>
+              </div>
+              <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 text-center">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Direct Entry Tier</span>
+                <span className="text-xs font-black text-white uppercase block mt-2.5">
+                  {parseFloat(cgpa) >= 3.0 ? "Tier 1 (High)" : parseFloat(cgpa) >= 2.5 ? "Tier 2 (Med)" : "Tier 3 (Low)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4.5 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+              <span className="text-[8px] font-black text-indigo-300 uppercase tracking-widest block">Academic Classification</span>
+              <span className="text-xs font-black text-white uppercase block mt-1">{conversionGrade}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Transfer Matrices Checklist */}
+        <div className="p-5 bg-slate-900 rounded-[2rem] border border-white/5 space-y-4">
+          <div>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-1">Transfer Guidelines</span>
+            <h4 className="text-sm font-black text-white uppercase italic">Sovereign Requirements Checklist</h4>
+          </div>
+
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[9px] font-black text-slate-300 block uppercase">1-Year Industrial Training (IT)</span>
+                <span className="text-[9.5px] text-slate-400 leading-normal block uppercase">Candidates with Lower Credit and above require 12 months minimum of verifiable IT prior to HND admission.</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[9px] font-black text-slate-300 block uppercase">JAMB Direct Entry registration</span>
+                <span className="text-[9.5px] text-slate-400 leading-normal block uppercase">For ND-to-University conversions, buy a JAMB DE pin. Upload official academic transcripts from your Polytechnic direct to your destination university.</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 flex items-start gap-3">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[9px] font-black text-slate-300 block uppercase">O'Level Regularization</span>
+                <span className="text-[9.5px] text-slate-400 leading-normal block uppercase">Check that you possess 5 credits in subjects matching your National Diploma (ND) specialization. No deficiencies allowed.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ==========================================
+// 9. POST-UTME SCREENING REQUIREMENTS & AGGREGATE CALCULATOR
+// ==========================================
+export const ScreeningRequirementsChecker: React.FC = () => {
+  const [jambScore, setJambScore] = useState("280");
+  const [selectedUni, setSelectedUni] = useState("UI");
+  
+  // O'Level grades input for calculations
+  const [mathGrade, setMathGrade] = useState("A1");
+  const [engGrade, setEngGrade] = useState("A1");
+  const [phyGrade, setPhyGrade] = useState("B2");
+  const [chmGrade, setChmGrade] = useState("B3");
+  const [bioGrade, setBioGrade] = useState("A1");
+
+  const getPoints = (grade: string) => {
+    switch (grade) {
+      case 'A1': return 10;
+      case 'B2': return 9;
+      case 'B3': return 8;
+      case 'C4': return 7;
+      case 'C5': return 6;
+      case 'C6': return 5;
+      default: return 0;
+    }
+  };
+
+  const aggregateScore = useMemo(() => {
+    const js = parseFloat(jambScore);
+    if (isNaN(js) || js < 0 || js > 400) return "0.00";
+
+    // Standard 50/50 weighted aggregate system (e.g. UNILAG / OAU)
+    // JAMB weighted out of 50 = (JAMB / 400) * 50
+    const jambWeighted = (js / 400) * 50;
+
+    // O'Level weighted out of 20 = (Sum of 5 core subject points / 50) * 20
+    const oLevelPoints = getPoints(mathGrade) + getPoints(engGrade) + getPoints(phyGrade) + getPoints(chmGrade) + getPoints(bioGrade);
+    const oLevelWeighted = (oLevelPoints / 50) * 20;
+
+    // Simulated Post-UTME screening test (weighted out of 30) - assume a model test score of 22/30 (approx 73%)
+    const postUtmeWeighted = 22;
+
+    return (jambWeighted + oLevelWeighted + postUtmeWeighted).toFixed(2);
+  }, [jambScore, mathGrade, engGrade, phyGrade, chmGrade, bioGrade]);
+
+  const screeningDocs = [
+    { title: "Original JAMB Result Notification Slip", code: "UTME_SLIP_ORIGINAL" },
+    { title: "O'Level Certificate / Online Printout (WAEC/NECO)", code: "SSCE_CERTIFICATE" },
+    { title: "LGA Letter of Identification of Origin", code: "LGA_IDENTIFICATION" },
+    { title: "Birth Certificate or Sworn Declaration of Age", code: "BIRTH_CERTIFICATE" },
+    { title: "Post-UTME Screen Registration Receipt & Card", code: "SCREEN_PAYMENT_REF" }
+  ];
+
+  return (
+    <div className="bg-slate-950 p-6 md:p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 gap-4">
+        <div>
+          <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Building className="w-5 h-5 text-indigo-400" />
+            Post-UTME Institutional Screening Checker
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Aggregate calculators & dossier audits</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Calculator */}
+        <div className="lg:col-span-7 p-5 bg-slate-900 rounded-[2rem] border border-white/5 space-y-5">
+          <div>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-1">Empirical admission algorithms</span>
+            <h4 className="text-sm font-black text-white uppercase italic">Weighted screening aggregate node</h4>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[9px] font-black text-slate-400 block uppercase mb-1 tracking-wider">Candidate JAMB Score (0-400)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="400"
+                  value={jambScore}
+                  onChange={(e) => setJambScore(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-white/5 rounded-xl text-xs font-semibold text-white outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="text-[9px] font-black text-slate-400 block uppercase mb-1 tracking-wider">Target University</label>
+                <select
+                  value={selectedUni}
+                  onChange={(e) => setSelectedUni(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-white/5 rounded-xl text-xs font-semibold text-white outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="UI">University of Ibadan (UI)</option>
+                  <option value="UNILAG">University of Lagos (UNILAG)</option>
+                  <option value="OAU">Obafemi Awolowo University (OAU)</option>
+                  <option value="UNIBEN">University of Benin (UNIBEN)</option>
+                  <option value="ABU">Ahmadu Bello University (ABU)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-indigo-400 block uppercase tracking-wider">Core O'Level Grades (5 Required Credits)</label>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { label: "Math", value: mathGrade, setter: setMathGrade },
+                  { label: "Eng", value: engGrade, setter: setEngGrade },
+                  { label: "Phy", value: phyGrade, setter: setPhyGrade },
+                  { label: "Chm", value: chmGrade, setter: setChmGrade },
+                  { label: "Bio", value: bioGrade, setter: setBioGrade }
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <span className="text-[8px] font-mono text-slate-500 uppercase block text-center">{item.label}</span>
+                    <select
+                      value={item.value}
+                      onChange={(e) => item.setter(e.target.value)}
+                      className="w-full p-2 bg-slate-950 border border-white/5 rounded-lg text-[10px] text-white outline-none focus:border-indigo-500 text-center font-bold cursor-pointer"
+                    >
+                      {['A1', 'B2', 'B3', 'C4', 'C5', 'C6'].map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-5 bg-slate-950 rounded-2xl border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Estimated Screening Aggregate</span>
+                <span className="text-3xl font-mono font-black text-white italic block mt-1">{aggregateScore}%</span>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest block">Screening Threshold Status</span>
+                <span className={`text-[10px] font-black uppercase mt-1 block px-2.5 py-1 rounded ${
+                  parseFloat(aggregateScore) >= 70 
+                    ? 'bg-emerald-500/15 text-emerald-400' 
+                    : parseFloat(aggregateScore) >= 55 
+                    ? 'bg-amber-500/15 text-amber-400' 
+                    : 'bg-rose-500/15 text-rose-400'
+                }`}>
+                  {parseFloat(aggregateScore) >= 70 ? 'High Admit Probability' : parseFloat(aggregateScore) >= 55 ? 'Competitive range' : 'Admission Unlikely'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Physical Screening Dossier Check */}
+        <div className="lg:col-span-5 p-5 bg-slate-900 rounded-[2rem] border border-white/5 space-y-4">
+          <div>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider block mb-1">Physical Credential Audit</span>
+            <h4 className="text-sm font-black text-white uppercase italic">Screening physical dossier checklist</h4>
+          </div>
+
+          <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+            {screeningDocs.map((doc, idx) => (
+              <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-white/5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-5 h-5 bg-indigo-600/10 text-indigo-400 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 border border-indigo-500/10">
+                    {idx + 1}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold text-white block leading-tight">{doc.title}</span>
+                    <span className="text-[8px] font-mono text-slate-500 uppercase tracking-widest block mt-0.5">{doc.code}</span>
+                  </div>
+                </div>
+                <div className="w-4.5 h-4.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 flex items-center justify-center shrink-0">
+                  <Check className="w-3 h-3 text-emerald-400" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5">
+            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[9px] text-amber-300 leading-normal font-bold uppercase tracking-tight">
+              Alert: Most universities disallow Cyber Cafe registration printouts during screening. Bring official scratch cards or transcripts!
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

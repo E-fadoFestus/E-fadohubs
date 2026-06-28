@@ -47,7 +47,8 @@ import {
   Pickaxe,
   Mail,
   Brain,
-  CreditCard
+  CreditCard,
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SUPPORT_EMAILS } from '../constants/businessProfile';
@@ -67,7 +68,11 @@ import {
   SiwesLogbook, 
   MilestoneTracker, 
   AdmissionCutOffs, 
-  PrimarySchoolGame 
+  PrimarySchoolGame,
+  ThesisPlanner,
+  VivaSimulator,
+  PolytechnicPathway,
+  ScreeningRequirementsChecker
 } from './education/EducationInteractiveTools';
 
 interface SubCategory {
@@ -76,7 +81,7 @@ interface SubCategory {
   description: string;
   tags?: ('Most Visited' | 'Recently Updated')[];
   examType?: ExamCategory;
-  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE' | 'PAYMENT';
+  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE' | 'PAYMENT' | 'THESIS_PLANNER' | 'VIVA_SIMULATOR' | 'POLY_PATHWAY' | 'SCREENING_CHECKER' | 'SIWES' | 'CGPA';
 }
 
 interface EducationSection {
@@ -216,6 +221,91 @@ const educationData: EducationSection[] = [
         title: "Viva Voce Oral Defense Simulator",
         icon: Users2,
         description: "Mock panels and frequent defense question database."
+      }
+    ]
+  },
+  {
+    id: 'post_utme',
+    title: "Post-UTME Academic Hub",
+    icon: Award,
+    description: "Practice university-specific screening CBTs, check official aggregate parameters, and track admission cut-offs.",
+    subCategories: [
+      {
+        title: "Post-UTME CBT Simulator",
+        icon: ClipboardList,
+        description: "Practice timed, university-specific Post-UTME computer-based screening tests.",
+        tags: ["Most Visited"],
+        examType: "POST_UTME",
+        serviceType: "CBT"
+      },
+      {
+        title: "Screening Requirements Checker",
+        icon: FileText,
+        description: "Audit physical screening dossiers, calculate weighted scoring metrics, and verify qualifications.",
+        tags: ["Recently Updated"],
+        serviceType: "SCREENING_CHECKER"
+      },
+      {
+        title: "University Cut-off Matrix",
+        icon: TrendingUp,
+        description: "Check admissions cut-offs for top universities, polytechnics, and colleges.",
+        serviceType: "SCREENING_CHECKER"
+      }
+    ]
+  },
+  {
+    id: 'polytechnic',
+    title: "Polytechnic & Technical Hub",
+    icon: Cpu,
+    description: "National Diploma (ND), Higher National Diploma (HND) curriculums, and direct transfer matrices.",
+    subCategories: [
+      {
+        title: "ND to HND / B.Sc. Pathway Guide",
+        icon: Compass,
+        description: "Calculate transfer grade point equivalents and plan direct-entry pathways.",
+        tags: ["Most Visited"],
+        serviceType: "POLY_PATHWAY"
+      },
+      {
+        title: "Polytechnic SIWES Placement",
+        icon: Briefcase,
+        description: "Plan SIWES logbook parameters and search industrial placement opportunities.",
+        tags: ["Recently Updated"],
+        serviceType: "SIWES"
+      },
+      {
+        title: "Direct Entry Syllabus Tracker",
+        icon: FileSearch,
+        description: "Track direct entry and transition syllabus lists for polytechnic transfers.",
+        serviceType: "GUIDE"
+      }
+    ]
+  },
+  {
+    id: 'postgraduate',
+    title: "Postgraduate & Research Hub",
+    icon: Brain,
+    description: "Ph.D. & Master's dissertation planning tools, citation builders, and live oral viva-voce mock panels.",
+    subCategories: [
+      {
+        title: "Thesis Research Roadmap Planner",
+        icon: BookMarked,
+        description: "Interactive timeline mapping, academic title polishing, and literature citation vault.",
+        tags: ["Most Visited"],
+        serviceType: "THESIS_PLANNER"
+      },
+      {
+        title: "Oral Viva-Voce Mock Panel",
+        icon: Users2,
+        description: "Simulate doctoral defense boards with supportive, standard, or hostile committees.",
+        tags: ["Recently Updated"],
+        serviceType: "VIVA_SIMULATOR"
+      },
+      {
+        title: "Postgraduate CGPA Calculator",
+        icon: Calculator,
+        description: "Evaluate postgraduate grade point thresholds and dissertation credits.",
+        serviceType: "CGPA"
       }
     ]
   }
@@ -614,6 +704,30 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                         setShowJambPaymentModal(true);
                         return;
                       }
+                      if (sub.serviceType === 'THESIS_PLANNER') {
+                        setActiveInteractiveTool({ type: 'THESIS_PLANNER', title: sub.title });
+                        return;
+                      }
+                      if (sub.serviceType === 'VIVA_SIMULATOR') {
+                        setActiveInteractiveTool({ type: 'VIVA_SIMULATOR', title: sub.title });
+                        return;
+                      }
+                      if (sub.serviceType === 'POLY_PATHWAY') {
+                        setActiveInteractiveTool({ type: 'POLY_PATHWAY', title: sub.title });
+                        return;
+                      }
+                      if (sub.serviceType === 'SCREENING_CHECKER') {
+                        setActiveInteractiveTool({ type: 'SCREENING_CHECKER', title: sub.title });
+                        return;
+                      }
+                      if (sub.serviceType === 'SIWES') {
+                        setActiveInteractiveTool({ type: 'SIWES', title: sub.title });
+                        return;
+                      }
+                      if (sub.serviceType === 'CGPA') {
+                        setActiveInteractiveTool({ type: 'CGPA', title: sub.title });
+                        return;
+                      }
                       if (sub.examType) {
                         setActiveExam({
                           type: sub.examType,
@@ -702,6 +816,10 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                 {activeInteractiveTool.type === 'GAME' && <PrimarySchoolGame />}
                 {activeInteractiveTool.type === 'MILESTONES' && <MilestoneTracker />}
                 {activeInteractiveTool.type === 'CUTOFFS' && <AdmissionCutOffs />}
+                {activeInteractiveTool.type === 'THESIS_PLANNER' && <ThesisPlanner />}
+                {activeInteractiveTool.type === 'VIVA_SIMULATOR' && <VivaSimulator />}
+                {activeInteractiveTool.type === 'POLY_PATHWAY' && <PolytechnicPathway />}
+                {activeInteractiveTool.type === 'SCREENING_CHECKER' && <ScreeningRequirementsChecker />}
               </div>
             </div>
           </div>
