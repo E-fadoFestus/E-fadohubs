@@ -2117,9 +2117,13 @@ function AppContent() {
             </div>
           </div>
           
+          {/* Edge fading shadows for scroll indicators */}
+          <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-slate-950 via-slate-950/20 to-transparent pointer-events-none z-10" />
+          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-slate-950 via-slate-950/20 to-transparent pointer-events-none z-10" />
+
           <div 
             id="hub-nav-slider"
-            className="flex items-center gap-4 overflow-x-auto pb-8 no-scrollbar scroll-smooth px-4"
+            className="flex items-center gap-4 overflow-x-auto pb-8 no-scrollbar scroll-smooth px-6 relative z-0"
           >
             {[
               { id: 'HOME', label: 'HomeHub', icon: Home, gradient: 'from-emerald-500 via-emerald-600 to-emerald-700', border: 'border-emerald-800/80', ring: 'ring-emerald-400/40' },
@@ -2194,18 +2198,20 @@ function AppContent() {
           </div>
 
           {/* Navigation Controls */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none px-2 opacity-0 group-hover/nav:opacity-100 transition-opacity">
+          <div className="absolute top-[45%] -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none z-30 px-2 sm:px-4">
             <button 
-              onClick={() => document.getElementById('hub-nav-slider')?.scrollBy({ left: -300, behavior: 'smooth' })}
-              className="p-4 bg-white/10 backdrop-blur-3xl border border-white/20 rounded-full text-white pointer-events-auto hover:bg-white/20 transition-all shadow-2xl hover:scale-110"
+              onClick={() => document.getElementById('hub-nav-slider')?.scrollBy({ left: -320, behavior: 'smooth' })}
+              className="p-3 sm:p-4 bg-slate-900/90 backdrop-blur-md border border-white/15 rounded-xl text-white pointer-events-auto hover:bg-slate-800 transition-all shadow-2xl hover:scale-110 active:scale-90 flex items-center justify-center group/btn shadow-indigo-500/10 hover:shadow-indigo-500/25 cursor-pointer opacity-90 hover:opacity-100"
+              title="Scroll Left"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 group-hover/btn:text-indigo-300 group-hover/btn:-translate-x-0.5 transition-transform" />
             </button>
             <button 
-              onClick={() => document.getElementById('hub-nav-slider')?.scrollBy({ left: 300, behavior: 'smooth' })}
-              className="p-4 bg-white/10 backdrop-blur-3xl border border-white/20 rounded-full text-white pointer-events-auto hover:bg-white/20 transition-all shadow-2xl hover:scale-110"
+              onClick={() => document.getElementById('hub-nav-slider')?.scrollBy({ left: 320, behavior: 'smooth' })}
+              className="p-3 sm:p-4 bg-slate-900/90 backdrop-blur-md border border-white/15 rounded-xl text-white pointer-events-auto hover:bg-slate-800 transition-all shadow-2xl hover:scale-110 active:scale-90 flex items-center justify-center group/btn shadow-indigo-500/10 hover:shadow-indigo-500/25 cursor-pointer opacity-90 hover:opacity-100"
+              title="Scroll Right"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400 group-hover/btn:text-indigo-300 group-hover/btn:translate-x-0.5 transition-transform" />
             </button>
           </div>
         </div>
