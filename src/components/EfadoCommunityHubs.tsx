@@ -47,7 +47,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CSCCGroup, CSCCMembership, CSCCCycle, CSCCContribution, ChatMessage } from '../types';
-import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, getDoc, runTransaction, increment } from '../firebase';
+import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, getDoc, runTransaction, increment, deleteDoc } from '../firebase';
 import { VendorRegistration } from './VendorRegistration';
 import { PaystackDeposit } from './PaystackDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
@@ -2264,7 +2264,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                           const conf = window.confirm('Are you sure you want to advance this circle to the next rotational phase? This is irreversible.');
                           if (conf) handleAdvanceCycle(group);
                         }}
-                        className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-indigo-100"
+                        className="flex-grow py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-indigo-100"
                       >
                         Advance Cycle
                       </button>
@@ -2273,9 +2273,34 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                           setSelectedGroup(group);
                           setActiveTab('CENTRAL');
                         }}
-                        className="py-3 px-4 bg-white hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 text-[9px] font-black uppercase tracking-widest transition-colors"
+                        className="py-3 px-3 bg-white hover:bg-gray-100 text-gray-700 rounded-xl border border-gray-200 text-[9px] font-black uppercase tracking-widest transition-colors"
                       >
                         Monitor
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          const conf = window.confirm(`Are you absolutely sure you want to delete the group "${group.name}"? This will delete the group and all its active/pending membership records. This is irreversible.`);
+                          if (conf) {
+                            try {
+                              // Delete the group document
+                              await deleteDoc(doc(db, 'cscc_groups', group.id!));
+                              
+                              // Query and delete associated memberships
+                              const membershipsSnap = await getDocs(query(collection(db, 'cscc_memberships'), where('groupId', '==', group.id)));
+                              for (const memDoc of membershipsSnap.docs) {
+                                await deleteDoc(doc(db, 'cscc_memberships', memDoc.id));
+                              }
+                              
+                              alert('Group and all of its associated membership records deleted successfully!');
+                            } catch (err) {
+                              console.error('Error deleting group:', err);
+                              alert('Failed to delete group: ' + (err as any).message);
+                            }
+                          }
+                        }}
+                        className="py-3 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-750 border border-rose-200 hover:border-rose-300 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
+                      >
+                        Delete
                       </button>
                     </div>
                   </div>

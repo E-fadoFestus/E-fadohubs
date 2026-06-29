@@ -922,6 +922,18 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
             {/* Sidebar Left: Timeline Nav */}
             <div className="w-full md:w-1/4 bg-slate-950/60 p-5 md:p-6 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between overflow-y-auto">
           <div>
+            <button 
+              onClick={() => {
+                setIsAgentConsole(true);
+                setSelectedCandidateId(null);
+                setSelectedServiceId(null);
+                setError(null);
+                setSuccessMsg(null);
+              }}
+              className="w-full flex items-center justify-center gap-2 mb-6 px-4 py-3 bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider border border-white/5 transition-all cursor-pointer shadow-lg hover:shadow-indigo-500/5 active:scale-95"
+            >
+              <ArrowLeft className="w-4 h-4 text-indigo-400" /> Cancel & Go Back
+            </button>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
                 <Award className="w-5 h-5" />

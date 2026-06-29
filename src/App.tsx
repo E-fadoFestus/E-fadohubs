@@ -2027,32 +2027,32 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30 relative flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500/30 relative flex flex-col overflow-x-hidden">
       <NocturnalBackground />
       
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-30 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 h-24 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 min-h-24 py-3 md:py-0 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <EfadoLogo size="sm" className="scale-75" />
+            <EfadoLogo size="sm" className="scale-75 animate-pulse" />
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <button 
                 onClick={() => setShowUserGuide(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
               >
-                <HelpCircle className="w-4 h-4 text-indigo-400" />
+                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
                 <span className="hidden sm:inline uppercase">Guide</span>
                 <span className="sm:hidden">?</span>
               </button>
 
               <button 
                 onClick={() => setShowAboutCeo(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
               >
-                <Info className="w-4 h-4 text-emerald-400" />
+                <Info className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="hidden sm:inline uppercase">About CEO</span>
                 <span className="sm:hidden">CEO</span>
               </button>
@@ -2060,9 +2060,9 @@ function AppContent() {
               {user.role === 'admin' && (
                 <button 
                   onClick={() => isCeoVerified ? setShowCeoPortal(true) : setShowCeoVerification(true)}
-                  className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold tracking-widest hover:bg-indigo-500 transition-all shadow-lg"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-indigo-500 transition-all shadow-lg"
                 >
-                  <ShieldCheck className="w-4 h-4" />
+                  <ShieldCheck className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">CEO Portal</span>
                   <span className="sm:hidden">CEO</span>
                 </button>
@@ -2070,19 +2070,17 @@ function AppContent() {
 
               <button 
                 onClick={() => openWalletWithTab('profile')}
-                className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-[10px] font-bold tracking-widest hover:brightness-110 transition-all shadow-lg border border-white/5"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:brightness-110 transition-all shadow-lg border border-white/5"
               >
-                <UserCheck className="w-4 h-4 text-amber-400" />
+                <UserCheck className="w-3.5 h-3.5 text-amber-400" />
                 <span className="hidden lg:inline uppercase">My Profile & Payouts</span>
                 <span className="lg:hidden uppercase">Profile</span>
               </button>
             </div>
 
-
-
             <CurrencySelector />
             
-            <div className="hidden md:flex flex-col items-end px-4 border-r border-white/5">
+            <div className="hidden sm:flex flex-col items-end px-3 border-r border-white/5">
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{liveUsers.toLocaleString()} Hub Active</span>
@@ -2090,7 +2088,7 @@ function AppContent() {
               <span className="text-[7px] font-bold text-slate-500 uppercase tracking-[0.2em]">Synchronising...</span>
             </div>
 
-            <div className="hidden md:flex flex-col items-end">
+            <div className="hidden sm:flex flex-col items-end">
               <div className="flex items-center gap-1.5">
                 {user.is_super_admin && <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/25 text-amber-400 text-[7px] font-black rounded uppercase tracking-widest animate-pulse">Free CEO Access</span>}
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{user.is_super_admin ? 'OWNER ADMIN' : 'Logged in'}</span>

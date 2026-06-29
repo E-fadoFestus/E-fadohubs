@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   Award,
   Layers,
-  ChevronDown
+  ChevronDown,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -634,8 +635,14 @@ export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose })
       className="fixed inset-0 z-[110] bg-slate-50 flex"
     >
       {/* Sidebar Navigation */}
-      <div className="w-80 bg-white border-r border-slate-200 p-8 flex flex-col justify-between shrink-0">
+      <div className="w-80 bg-white border-r border-slate-200 p-8 flex flex-col justify-between shrink-0 animate-fade-in">
         <div>
+          <button 
+            onClick={onClose}
+            className="w-full flex items-center justify-center gap-2 mb-6 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-lg active:scale-95 hover:shadow-indigo-100"
+          >
+            <ArrowLeft className="w-4 h-4 text-indigo-400 animate-pulse" /> Cancel & Go Back
+          </button>
           <div className="flex items-center gap-4 mb-12">
             <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
               <BookOpen className="w-6 h-6 text-white" />
