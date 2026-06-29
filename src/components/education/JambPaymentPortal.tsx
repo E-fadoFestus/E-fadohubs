@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   CheckCircle2, 
@@ -14,7 +14,24 @@ import {
   ArrowRight,
   Wallet,
   Sparkles,
-  Building
+  Building,
+  Award,
+  BookOpen,
+  Compass,
+  ArrowLeft,
+  Mail,
+  Fingerprint,
+  Printer,
+  FileSearch,
+  CheckSquare,
+  HelpCircle,
+  Database,
+  Search,
+  Lock,
+  Download,
+  AlertTriangle,
+  RefreshCw,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
@@ -37,32 +54,106 @@ interface SavedEPin {
 }
 
 export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, user }) => {
-  const [step, setStep] = useState<'details' | 'processing' | 'success'>('details');
-  const [examType, setExamType] = useState<'UTME' | 'DIRECT_ENTRY'>('UTME');
-  const [nin, setNin] = useState('');
-  const [profileCode, setProfileCode] = useState('');
-  const [fullName, setFullName] = useState(user.fullName || user.displayName || '');
-  const [email, setEmail] = useState(user.email || '');
-  const [phone, setPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'bank_transfer'>('wallet');
-  const [bankRef, setBankRef] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Simulated active e-PINs
-  const [generatedEpin, setGeneratedEpin] = useState<SavedEPin | null>(null);
-
-  // Load history
-  const [history, setHistory] = useState<SavedEPin[]>(() => {
+  // App-level state saved in localStorage for complete continuity
+  const [candidateState, setCandidateState] = useState(() => {
     try {
-      const saved = localStorage.getItem('efado_jamb_payments_history');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('efado_jamb_candidate_lifecycle');
+      return saved ? JSON.parse(saved) : {
+        // Phase 1
+        nin: '',
+        ninVerified: false,
+        profileCode: '',
+        profileCodeGenerated: false,
+        epin: '',
+        epinSerial: '',
+        epinPurchased: false,
+        phone: '',
+        phoneCorrected: false,
+        fullName: (user.fullName || user.displayName || '').toUpperCase(),
+        email: user.email || '',
+        
+        // Phase 2
+        examType: 'UTME',
+        registered: false,
+        primaryInstitution: 'UNIVERSITY OF LAGOS (UNILAG)',
+        primaryCourse: 'COMPUTER SCIENCE',
+        subjects: ['ENGLISH LANGUAGE', 'MATHEMATICS', 'PHYSICS', 'CHEMISTRY'],
+        oLevelUploaded: false,
+        oLevelBoard: 'WAEC',
+        oLevelYear: '2025',
+        oLevelResults: [
+          { subject: 'ENGLISH LANGUAGE', grade: 'A1' },
+          { subject: 'MATHEMATICS', grade: 'B2' },
+          { subject: 'PHYSICS', grade: 'B3' },
+          { subject: 'CHEMISTRY', grade: 'B3' },
+          { subject: 'CIVIC EDUCATION', grade: 'A1' },
+        ],
+        regSlipPrinted: false,
+
+        // Phase 3
+        examSlipPrinted: false,
+        examDate: 'APRIL 18, 2026',
+        examTime: '07:00 AM',
+        examVenue: 'EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS',
+        examSeat: 'SEAT-084',
+        mockExamTaken: false,
+        mockExamScore: 0,
+        resultChecked: false,
+        utmeScore: 0,
+        emailLinked: false,
+        originalResultPrinted: false,
+
+        // Phase 4
+        courseChanged: false,
+        dataCorrected: false,
+        capsStatus: 'admitted', // 'pending' | 'admitted' | 'accepted' | 'rejected'
+        letterPrinted: false,
+        emailCorrected: false,
+        regularized: false,
+      };
     } catch {
-      return [];
+      return {
+        nin: '', ninVerified: false, profileCode: '', profileCodeGenerated: false, epin: '', epinSerial: '', epinPurchased: false, phone: '', phoneCorrected: false, fullName: (user.fullName || user.displayName || '').toUpperCase(), email: user.email || '',
+        examType: 'UTME', registered: false, primaryInstitution: 'UNIVERSITY OF LAGOS (UNILAG)', primaryCourse: 'COMPUTER SCIENCE', subjects: ['ENGLISH LANGUAGE', 'MATHEMATICS', 'PHYSICS', 'CHEMISTRY'], oLevelUploaded: false, oLevelBoard: 'WAEC', oLevelYear: '2025', oLevelResults: [{ subject: 'ENGLISH LANGUAGE', grade: 'A1' }, { subject: 'MATHEMATICS', grade: 'B2' }, { subject: 'PHYSICS', grade: 'B3' }, { subject: 'CHEMISTRY', grade: 'B3' }, { subject: 'CIVIC EDUCATION', grade: 'A1' }], regSlipPrinted: false,
+        examSlipPrinted: false, examDate: 'APRIL 18, 2026', examTime: '07:00 AM', examVenue: 'EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS', examSeat: 'SEAT-084', mockExamTaken: false, mockExamScore: 0, resultChecked: false, utmeScore: 0, emailLinked: false, originalResultPrinted: false,
+        courseChanged: false, dataCorrected: false, capsStatus: 'admitted', letterPrinted: false, emailCorrected: false, regularized: false
+      };
     }
   });
 
-  const totalAmount = 5700; // ₦3,500 e-PIN + ₦1,000 text + ₦700 CBT fee + ₦500 network fee
+  useEffect(() => {
+    localStorage.setItem('efado_jamb_candidate_lifecycle', JSON.stringify(candidateState));
+  }, [candidateState]);
+
+  const updateState = (fields: Partial<typeof candidateState>) => {
+    setCandidateState((prev: any) => ({ ...prev, ...fields }));
+  };
+
+  const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+
+  // Error and transaction feedback
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Simulated active wallet balance
+  const [walletBalance, setWalletBalance] = useState(() => {
+    const saved = localStorage.getItem('efado_simulated_balance');
+    return saved ? parseFloat(saved) : (user.playerWallet || 45000);
+  });
+
+  const spendWallet = (amount: number): boolean => {
+    if (walletBalance < amount) {
+      setError(`Insufficient active wallet funds. Required: ₦${amount.toLocaleString()}. Current Balance: ₦${walletBalance.toLocaleString()}`);
+      return false;
+    }
+    const newBal = walletBalance - amount;
+    setWalletBalance(newBal);
+    localStorage.setItem('efado_simulated_balance', String(newBal));
+    return true;
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -70,494 +161,1303 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleInitiatePayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  // Chronological 18-service metadata
+  const services = [
+    // Phase 1: Pre-Registration & Profile Setup
+    { id: 'nin_verify', phase: 1, title: 'NIN Verification', desc: 'Validate 11-digit NIN with National NIMC Servers before registrations.', icon: Fingerprint, requiredKey: null, doneKey: 'ninVerified' },
+    { id: 'profile_code', phase: 1, title: 'Profile Code Creation', desc: 'Simulate 55019 / 66019 SMS protocol to command profile generation.', icon: Smartphone, requiredKey: 'ninVerified', doneKey: 'profileCodeGenerated' },
+    { id: 'epin_procure', phase: 1, title: 'JAMB e-Pin Procurement', desc: 'Purchase official 2026 e-PIN registry codes via wallet or bank.', icon: CreditCard, requiredKey: 'profileCodeGenerated', doneKey: 'epinPurchased' },
+    { id: 'phone_correction', phase: 1, title: 'Used Phone Correction / Update', desc: 'Recover or swap lost or broken mobile lines linked to profile code.', icon: RefreshCw, requiredKey: 'profileCodeGenerated', doneKey: 'phoneCorrected' },
 
-    // Validation
-    if (!nin.trim() || nin.length !== 11 || isNaN(Number(nin))) {
-      setError('Please enter a valid 11-digit National Identification Number (NIN)');
-      return;
-    }
-    if (!profileCode.trim() || profileCode.length !== 10) {
-      setError('Please enter a valid 10-character JAMB Profile Code');
-      return;
-    }
-    if (!fullName.trim()) {
-      setError('Candidate full name is required');
-      return;
-    }
-    if (!phone.trim() || phone.length < 10) {
-      setError('Please enter a valid mobile phone number');
-      return;
-    }
+    // Phase 2: Registration & Data Upload
+    { id: 'jamb_reg', phase: 2, title: 'JAMB CBT Center Registration', desc: 'Capture biometric scans, select course pathways, and pick subjects.', icon: Users, requiredKey: 'epinPurchased', doneKey: 'registered' },
+    { id: 'result_upload', phase: 2, title: 'O-Level Result CAPS Upload', desc: 'Upload WAEC/NECO/NABTEB subject arrays to the central mainframe.', icon: Database, requiredKey: 'registered', doneKey: 'oLevelUploaded' },
+    { id: 'reg_slip', phase: 2, title: 'Print Registration Confirmation Slip', desc: 'Generate official, security-embossed receipt of candidate choices.', icon: FileText, requiredKey: 'registered', doneKey: 'regSlipPrinted' },
 
-    if (paymentMethod === 'wallet' && (user.playerWallet || 0) < totalAmount) {
-      setError(`Insufficient funds in your EFADO active wallet. Required: ₦${totalAmount.toLocaleString()}. Your Balance: ₦${(user.playerWallet || 0).toLocaleString()}. Please select "Direct Bank Transfer" or top up your wallet.`);
-      return;
-    }
+    // Phase 3: Examination & Results
+    { id: 'exam_slip', phase: 3, title: 'Print Examination venue Slip', desc: 'Acquire venue allocations, seat assignments, date, and batch times.', icon: Printer, requiredKey: 'regSlipPrinted', doneKey: 'examSlipPrinted' },
+    { id: 'mock_exam', phase: 3, title: 'Participate in UTME Mock CBT', desc: 'Solve preparatory questions and estimate actual academic score.', icon: Compass, requiredKey: 'examSlipPrinted', doneKey: 'mockExamTaken' },
+    { id: 'result_check', phase: 3, title: 'UTME Result Checking Gateway', desc: 'Query examination database boards to view dynamic scoring breakdowns.', icon: Award, requiredKey: 'examSlipPrinted', doneKey: 'resultChecked' },
+    { id: 'email_linking', phase: 3, title: 'Email Profile Linking Protocol', desc: 'Connect secure email address to profile code to validate CAPS entry.', icon: Mail, requiredKey: 'resultChecked', doneKey: 'emailLinked' },
+    { id: 'original_result', phase: 3, title: 'Print Original Result Slip', desc: 'Vend standard premium results containing photographic identification.', icon: FileSearch, requiredKey: 'emailLinked', doneKey: 'originalResultPrinted' },
 
-    if (paymentMethod === 'bank_transfer' && !bankRef.trim()) {
-      setError('Please provide the transaction reference/code of your bank transfer for validation');
-      return;
-    }
+    // Phase 4: Post-UTME, Admissions & Corrections
+    { id: 'change_course', phase: 4, title: 'Change Course or Institution', desc: 'Permute choice listings or shift institutions post-result publication.', icon: RefreshCw, requiredKey: 'resultChecked', doneKey: 'courseChanged' },
+    { id: 'data_correction', phase: 4, title: 'Bio-Data Correction Suite', desc: 'Rectify typographic errors in names, state of origin, gender, or DoB.', icon: CheckSquare, requiredKey: 'resultChecked', doneKey: 'dataCorrected' },
+    { id: 'caps_monitor', phase: 4, title: 'JAMB CAPS Status Command Centre', desc: 'Log in to central CAPS to accept or decline university admission offers.', icon: ShieldCheck, requiredKey: 'emailLinked', doneKey: 'capsStatusAccepted' }, // will evaluate custom
+    { id: 'admission_letter', phase: 4, title: 'Print JAMB Admission Letter', desc: 'Acquire colored admission validation letter required for clearance.', icon: Award, requiredKey: 'capsStatusAccepted', doneKey: 'letterPrinted' },
+    { id: 'email_update', phase: 4, title: 'Linked Email Correction & Update', desc: 'Fix misspelled or broken linked email structures safely.', icon: Mail, requiredKey: 'emailLinked', doneKey: 'emailCorrected' },
+    { id: 'regularization', phase: 4, title: 'Admission Regularization (Late Application)', desc: 'Register direct university approvals onto the mainframe records.', icon: CheckSquare, requiredKey: 'ninVerified', doneKey: 'regularized' }
+  ];
 
-    // Move to processing
-    setStep('processing');
-    
-    // Simulate API callback network delays
-    setTimeout(() => {
-      const randomEpin = `EPIN-${Math.floor(100000 + Math.random() * 900000)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${examType}`;
-      const randomSerial = `SER-${Math.floor(100000000 + Math.random() * 900000000)}`;
-      const newEpinRecord: SavedEPin = {
-        epin: randomEpin,
-        serial: randomSerial,
-        candidateName: fullName.toUpperCase(),
-        profileCode: profileCode.toUpperCase(),
-        nin: nin,
-        examType: examType === 'UTME' ? 'JAMB UTME 2026' : 'JAMB DIRECT ENTRY 2026',
-        amount: totalAmount,
-        date: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-        method: paymentMethod === 'wallet' ? 'EFADO Sovereign Wallet' : 'Direct Bank Vault'
-      };
-
-      setGeneratedEpin(newEpinRecord);
-      
-      const updatedHistory = [newEpinRecord, ...history];
-      setHistory(updatedHistory);
-      localStorage.setItem('efado_jamb_payments_history', JSON.stringify(updatedHistory));
-      
-      // Update simulated wallet deduction
-      if (paymentMethod === 'wallet') {
-        try {
-          // If custom balance is stored in parent, trigger update or local simulated persistence
-          const currentBal = Number(localStorage.getItem('efado_simulated_balance') || user.playerWallet);
-          localStorage.setItem('efado_simulated_balance', String(Math.max(0, currentBal - totalAmount)));
-        } catch (err) {
-          console.error(err);
-        }
-      }
-
-      setStep('success');
-    }, 4500);
-  };
+  // Simple Mock Test Engine (Phase 3)
+  const mockQuestions = [
+    { q: "Which Nigerian body is responsible for managing tertiary admissions?", options: ["WAEC", "NECO", "JAMB", "NUC"], ans: "JAMB" },
+    { q: "What is the maximum obtainable score in a single JAMB UTME examination?", options: ["200", "300", "400", "500"], ans: "400" },
+    { q: "How many subject combinations are compulsory for a standard UTME candidate?", options: ["3", "4", "5", "6"], ans: "4" },
+    { q: "Which subject is strictly compulsory for ALL UTME candidates regardless of courses?", options: ["Mathematics", "English Language", "General Paper", "Civic Education"], ans: "English Language" },
+    { q: "What does the abbreviation NIMC represent?", options: ["National Information Center", "National Identity Management Commission", "Nigerian Intellectual Council", "National Immigration Management Cell"], ans: "National Identity Management Commission" }
+  ];
+  const [mockIndex, setMockIndex] = useState(0);
+  const [mockScore, setMockScore] = useState(0);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md p-4 md:p-8 flex items-center justify-center overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md p-2 md:p-6 flex items-center justify-center overflow-y-auto font-sans">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="w-full max-w-4xl bg-slate-900 border border-white/5 rounded-[3rem] shadow-2xl relative overflow-hidden flex flex-col md:flex-row max-h-[90vh]"
+        className="w-full max-w-6xl bg-slate-900 border border-white/5 rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col md:flex-row h-full max-h-[92vh] md:h-[80vh]"
       >
         
-        {/* Decorative corner glow */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
+        {/* Glow rings */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none" />
 
-        {/* Sidebar / Informational Guide */}
-        <div className="w-full md:w-1/3 bg-slate-950/60 p-8 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between">
+        {/* Sidebar Left: Timeline Nav */}
+        <div className="w-full md:w-1/4 bg-slate-950/60 p-5 md:p-6 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between overflow-y-auto">
           <div>
-            <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6 border border-indigo-500/20 shadow-md shadow-indigo-500/5">
-              <CreditCard className="w-6 h-6" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-white uppercase tracking-tight italic">JAMB Lifecycle Hub</h2>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">National Admission Console</p>
+              </div>
             </div>
-            
-            <h2 className="text-xl font-black text-white uppercase tracking-tight italic mb-3">JAMB e-PIN Portal</h2>
-            <p className="text-xs text-slate-400 leading-relaxed font-bold uppercase mb-6 tracking-wide">
-              Secure national gateway to generate and buy 2026 JAMB Unified Tertiary Matriculation Examination (UTME) registration pin.
-            </p>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-900/60 rounded-2xl border border-white/5">
-                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Pricing Breakdown</span>
-                <ul className="space-y-2 text-[10px] font-black text-slate-300 uppercase tracking-wide">
-                  <li className="flex justify-between">
-                    <span>JAMB e-PIN Code:</span>
-                    <span className="text-white">₦3,500</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>Official Novel Text:</span>
-                    <span className="text-white">₦1,000</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>CBT Registration Fee:</span>
-                    <span className="text-white">₦700</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>EFADO Network Charge:</span>
-                    <span className="text-white">₦500</span>
-                  </li>
-                  <li className="flex justify-between border-t border-white/10 pt-2 text-indigo-300 font-extrabold text-xs">
-                    <span>TOTAL REQUIRED:</span>
-                    <span className="text-white">₦5,700</span>
-                  </li>
-                </ul>
+            <div className="p-3.5 bg-slate-900/60 rounded-xl border border-white/5 mb-5 flex justify-between items-center text-xs">
+              <div>
+                <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">EFADO wallet</span>
+                <span className="text-white font-black">₦{walletBalance.toLocaleString()}</span>
               </div>
+              <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded uppercase font-black tracking-widest animate-pulse">active vault</span>
+            </div>
 
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-amber-300 leading-normal font-bold uppercase tracking-tight">
-                  Your profile code MUST be tied to your 11-digit NIN. Make sure you have texted "NIN [space] your-NIN" to 55019 before continuing.
-                </p>
-              </div>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-3">Chronological Phases</span>
+            <div className="space-y-2">
+              {[
+                { id: 1, label: 'Phase 1: Pre-Registration', desc: 'NIN, profile codes, pins' },
+                { id: 2, label: 'Phase 2: Data & Registration', desc: 'Biometrics, uploads, choices' },
+                { id: 3, label: 'Phase 3: Exam & Scoring', desc: 'Mock quiz, results, links' },
+                { id: 4, label: 'Phase 4: Admissions & CAPS', desc: 'CAPS approvals, modifications' },
+              ].map((phase) => {
+                const isActive = activeTab === phase.id;
+                return (
+                  <button
+                    key={phase.id}
+                    onClick={() => {
+                      setActiveTab(phase.id as any);
+                      setSelectedServiceId(null);
+                      setError(null);
+                      setSuccessMsg(null);
+                    }}
+                    className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                      isActive 
+                        ? 'bg-indigo-600/10 border-indigo-500/40 text-white shadow-md shadow-indigo-600/5' 
+                        : 'bg-transparent border-transparent text-slate-400 hover:bg-white/5'
+                    }`}
+                  >
+                    <div>
+                      <span className="text-[11px] font-black uppercase tracking-tight block">{phase.label}</span>
+                      <span className="text-[9px] text-slate-500 block uppercase tracking-wider mt-0.5">{phase.desc}</span>
+                    </div>
+                    {isActive && <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="pt-8 border-t border-white/5 hidden md:block">
-            <span className="text-[8.5px] font-mono text-slate-500 uppercase tracking-widest block">SECURE LOGISTICS SHIELD PRO</span>
-            <span className="text-[8.5px] font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1 mt-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> 256-BIT ENCRYPTION ACTIVE
-            </span>
+          <div className="pt-4 border-t border-white/5 hidden md:block text-[9px] font-mono text-slate-500">
+            <span>SECURE SYSTEM EMBED PRO</span>
+            <span className="text-emerald-400 flex items-center gap-1 mt-0.5"><ShieldCheck className="w-3.5 h-3.5" /> 256-BIT MAINFRAME CRYPTO ACTIVED</span>
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 p-8 md:p-10 flex flex-col justify-between overflow-y-auto max-h-[80vh] md:max-h-full">
+        {/* Workspace Central / Right */}
+        <div className="flex-1 p-5 md:p-8 flex flex-col justify-between overflow-y-auto">
           
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping" />
-              <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest">UTME_EPIN_DISPATCH_v2.0</span>
+          {/* Header */}
+          <div className="flex justify-between items-center mb-5 pb-3 border-b border-white/5 shrink-0">
+            <div>
+              {selectedServiceId ? (
+                <button 
+                  onClick={() => {
+                    setSelectedServiceId(null);
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition-all font-black uppercase tracking-widest text-[10px]"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to service menu
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                  <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest">
+                    SYSTEM_LIFECYCLE_GATEWAY_v3.4
+                  </span>
+                </div>
+              )}
             </div>
             
             <button 
               onClick={onClose}
-              className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all"
+              className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <AnimatePresence mode="wait">
-            {step === 'details' && (
-              <motion.form 
-                key="details"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                onSubmit={handleInitiatePayment}
-                className="space-y-6 flex-grow flex flex-col justify-between"
-              >
-                <div className="space-y-5">
-                  <div>
-                    <h3 className="text-lg font-black text-white uppercase italic">Validate Profile & Select Payment Node</h3>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wide">Complete the candidate dossier to generate the e-PIN code.</p>
-                  </div>
-
-                  {error && (
-                    <div className="p-4 bg-rose-650/10 border border-rose-500/25 text-rose-200 text-xs rounded-2xl flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
-                      <span className="font-semibold uppercase tracking-wide leading-tight">{error}</span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Candidate NIN (11 Digits)</label>
-                      <input 
-                        type="text"
-                        maxLength={11}
-                        placeholder="e.g. 12345678901"
-                        value={nin}
-                        onChange={(e) => setNin(e.target.value.replace(/\D/g, ''))}
-                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold uppercase outline-none focus:border-indigo-500 text-white transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">JAMB Profile Code (10 Characters)</label>
-                      <input 
-                        type="text"
-                        maxLength={10}
-                        placeholder="e.g. 55019A12BC"
-                        value={profileCode}
-                        onChange={(e) => setProfileCode(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold uppercase outline-none focus:border-indigo-500 text-white transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Candidate Full Name</label>
-                      <div className="relative">
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input 
-                          type="text"
-                          placeholder="e.g. CHIDI OLUWASEUN IBRAHIM"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold uppercase outline-none focus:border-indigo-500 text-white transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Candidate Email Address</label>
-                      <input 
-                        type="email"
-                        placeholder="e.g. candidate@domain.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 text-white transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Candidate Phone Number</label>
-                      <div className="relative">
-                        <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <input 
-                          type="text"
-                          placeholder="e.g. 08031234567"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
-                          className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 text-white transition-all"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Exam Application Type</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExamType('UTME')}
-                          className={`py-3 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                            examType === 'UTME' 
-                              ? 'bg-indigo-600 text-white border-indigo-500' 
-                              : 'bg-slate-950 text-slate-400 border-white/5 hover:border-white/15'
-                          }`}
-                        >
-                          UTME Registration
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setExamType('DIRECT_ENTRY')}
-                          className={`py-3 rounded-xl border font-black text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                            examType === 'DIRECT_ENTRY' 
-                              ? 'bg-indigo-600 text-white border-indigo-500' 
-                              : 'bg-slate-950 text-slate-400 border-white/5 hover:border-white/15'
-                          }`}
-                        >
-                          Direct Entry
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[9.5px] font-black text-indigo-400 block uppercase mb-2 tracking-wider">Choose Payment Track</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('wallet')}
-                        className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                          paymentMethod === 'wallet' 
-                            ? 'bg-indigo-600/10 border-indigo-500/50 shadow-lg shadow-indigo-600/5' 
-                            : 'bg-slate-950/60 border-white/5 hover:border-white/15'
-                        }`}
-                      >
-                        <Wallet className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
-                        <div>
-                          <span className="text-xs font-black text-white uppercase block">EFADO Active Wallet</span>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">
-                            Pay instantly using your sovereign wallet balance. Balance: <span className="text-indigo-300 font-extrabold">₦{(user.playerWallet || 0).toLocaleString()}</span>
-                          </span>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('bank_transfer')}
-                        className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                          paymentMethod === 'bank_transfer' 
-                            ? 'bg-indigo-600/10 border-indigo-500/50 shadow-lg shadow-indigo-600/5' 
-                            : 'bg-slate-950/60 border-white/5 hover:border-white/15'
-                        }`}
-                      >
-                        <Building className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
-                        <div>
-                          <span className="text-xs font-black text-white uppercase block">Direct Bank Transfer</span>
-                          <span className="text-[9px] text-slate-400 font-bold uppercase mt-1 block">
-                            Transfer ₦5,700 directly to the EFADO central verification vault.
-                          </span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {paymentMethod === 'bank_transfer' && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="p-5 bg-slate-950 rounded-2xl border border-white/5 space-y-4"
-                    >
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-3">
-                        <div>
-                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest block">Bank Destination</span>
-                          <span className="text-[11px] font-black text-white uppercase tracking-wide">GUARANTY TRUST BANK (GTBank)</span>
-                        </div>
-                        <div className="text-left sm:text-right">
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Account Number</span>
-                          <span className="text-sm font-mono font-black text-indigo-400 flex items-center gap-1.5 mt-0.5">
-                            0122938841 
-                            <button type="button" onClick={() => handleCopy('0122938841')} className="hover:text-white"><Copy className="w-3.5 h-3.5" /></button>
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="font-black text-slate-400 uppercase tracking-wide">ACCOUNT NAME:</span>
-                        <span className="font-extrabold text-white">EFADO GLOBAL LTD</span>
-                      </div>
-                      <div>
-                        <label className="text-[9px] font-black text-indigo-400 block uppercase mb-1 tracking-wider">Insert Bank Transfer Reference / Code</label>
-                        <input 
-                          type="text"
-                          placeholder="e.g. TXN-928374928174 or Ref Code"
-                          value={bankRef}
-                          onChange={(e) => setBankRef(e.target.value)}
-                          className="w-full px-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs font-semibold uppercase outline-none focus:border-indigo-500 text-white transition-all"
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </div>
-
-                <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
-                  <div className="text-left">
-                    <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block">Amount to Dispatch</span>
-                    <span className="text-2xl font-black italic text-white">₦{totalAmount.toLocaleString()} <span className="text-[10px] font-bold text-indigo-400">NGN</span></span>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    className="w-full sm:w-auto px-10 py-4.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-[1.3rem] text-xs font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-600/10 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>Authorize & Generate Pin</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </motion.form>
+          {/* Core dynamic body */}
+          <div className="flex-grow flex flex-col">
+            
+            {/* Feedback elements */}
+            {error && (
+              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-200 text-[10px] rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span className="font-extrabold uppercase tracking-wide leading-tight">{error}</span>
+              </div>
+            )}
+            {successMsg && (
+              <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-[10px] rounded-xl flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span className="font-extrabold uppercase tracking-wide leading-tight">{successMsg}</span>
+              </div>
             )}
 
-            {step === 'processing' && (
+            {!selectedServiceId ? (
+              // View 1: Service Menu for Active Phase
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-base font-black text-white uppercase italic">Phase {activeTab} Interactive Service Hub</h3>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">Select any process sequence to simulate functional outcomes with active credentials.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {services
+                    .filter(s => s.phase === activeTab)
+                    .map((service) => {
+                      const Icon = service.icon;
+                      
+                      // Calculate prerequisite state
+                      let isLocked = false;
+                      if (service.requiredKey) {
+                        if (service.requiredKey === 'capsStatusAccepted') {
+                          isLocked = candidateState.capsStatus !== 'accepted';
+                        } else {
+                          isLocked = !candidateState[service.requiredKey];
+                        }
+                      }
+                      
+                      // Calculate completed state
+                      const isDone = service.id === 'caps_monitor' 
+                        ? candidateState.capsStatus === 'accepted' || candidateState.capsStatus === 'rejected'
+                        : !!candidateState[service.doneKey as any];
+
+                      return (
+                        <div
+                          key={service.id}
+                          onClick={() => {
+                            if (isLocked) {
+                              setError(`System Node Locked! You must successfully execute prior lifecycle tasks first.`);
+                              return;
+                            }
+                            setError(null);
+                            setSuccessMsg(null);
+                            setSelectedServiceId(service.id);
+                          }}
+                          className={`p-4 rounded-2xl border text-left flex items-start gap-3.5 transition-all relative overflow-hidden group cursor-pointer ${
+                            isLocked 
+                              ? 'bg-slate-950/20 border-white/5 opacity-50 cursor-not-allowed' 
+                              : isDone
+                                ? 'bg-indigo-950/10 border-indigo-500/30 hover:border-indigo-500/50 shadow-lg shadow-indigo-600/5'
+                                : 'bg-slate-950/40 border-white/5 hover:border-white/10'
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 ${
+                            isDone 
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                              : isLocked 
+                                ? 'bg-slate-950 border-white/5 text-slate-600' 
+                                : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                          }`}>
+                            {isLocked ? <Lock className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                          </div>
+
+                          <div className="flex-1 space-y-0.5">
+                            <span className="text-xs font-black text-white uppercase block group-hover:text-indigo-300 transition-colors">
+                              {service.title}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-semibold leading-relaxed">
+                              {service.desc}
+                            </span>
+
+                            <div className="pt-2 flex items-center gap-1.5">
+                              {isDone ? (
+                                <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider">completed</span>
+                              ) : isLocked ? (
+                                <span className="text-[8px] font-black text-slate-500 bg-slate-950 border border-white/5 px-2 py-0.5 rounded uppercase tracking-wider">node locked</span>
+                              ) : (
+                                <span className="text-[8px] font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded uppercase tracking-wider">ready for execution</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            ) : (
+              // View 2: Active Service Form / Interactive Component
+              <div className="flex-grow flex flex-col justify-between">
+                
+                {/* 1. NIN Verification */}
+                {selectedServiceId === 'nin_verify' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">NIN Verification Protocol</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Validate database credentials against National NIMC server records.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4">
+                      <div>
+                        <label className="text-[9px] font-black text-indigo-400 block uppercase mb-1.5 tracking-wider">Candidate 11-Digit NIN</label>
+                        <input 
+                          type="text"
+                          maxLength={11}
+                          placeholder="e.g. 10293847561"
+                          value={candidateState.nin}
+                          onChange={(e) => updateState({ nin: e.target.value.replace(/\D/g, '') })}
+                          className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-mono outline-none focus:border-indigo-500 text-white tracking-widest"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (candidateState.nin.length !== 11) {
+                            setError('NIN code must be exactly 11 digits to execute database validations.');
+                            return;
+                          }
+                          setLoading(true);
+                          setTimeout(() => {
+                            setLoading(false);
+                            updateState({ ninVerified: true });
+                            setSuccessMsg('NIN Credentials successfully validated with NIMC database arrays.');
+                          }, 1500);
+                        }}
+                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                      >
+                        Verify with NIMC Mainframe
+                      </button>
+                    </div>
+
+                    {candidateState.ninVerified && (
+                      <div className="p-4 bg-slate-950 border border-emerald-500/20 rounded-2xl space-y-3 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl" />
+                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest block">NIMC VERIFIED CANDIDATE PROFILE</span>
+                        <div className="grid grid-cols-2 gap-4 text-xs font-bold uppercase text-slate-300">
+                          <div>
+                            <span className="text-[8px] text-slate-500 block">candidate name</span>
+                            <span className="text-white font-extrabold">{candidateState.fullName || 'CHIDI OLUWASEUN'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[8px] text-slate-500 block">date of birth</span>
+                            <span className="text-white font-mono">APRIL 15, 2007</span>
+                          </div>
+                          <div>
+                            <span className="text-[8px] text-slate-500 block">state of origin</span>
+                            <span className="text-white font-extrabold">LAGOS STATE</span>
+                          </div>
+                          <div>
+                            <span className="text-[8px] text-slate-500 block">gender</span>
+                            <span className="text-white">MALE</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. Profile Code Creation */}
+                {selectedServiceId === 'profile_code' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Profile Code Creation (SMS Gateway)</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simulate sending your verified NIN to 55019 or 66019 via secure cellular protocols.</p>
+                    </div>
+
+                    <div className="p-5 bg-slate-950 rounded-2xl border border-white/5 space-y-4 max-w-sm mx-auto">
+                      <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block text-center">SMS PHONE SIMULATOR</span>
+                      
+                      <div className="bg-slate-900 rounded-xl p-4 space-y-3 h-48 flex flex-col justify-between border border-white/5">
+                        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                          <span className="text-[9px] font-black text-slate-400">TO: 55019</span>
+                          <span className="text-[9px] font-mono text-slate-500">MOCK-CELL-SECURE</span>
+                        </div>
+                        
+                        <div className="flex-grow flex flex-col justify-end space-y-2 text-[10px]">
+                          {candidateState.profileCodeGenerated && (
+                            <>
+                              <div className="self-end bg-indigo-600 text-white p-2 rounded-xl rounded-tr-none font-bold uppercase tracking-wider max-w-[80%]">
+                                NIN {candidateState.nin}
+                              </div>
+                              <div className="self-start bg-slate-950 text-slate-300 p-2 border border-white/5 rounded-xl rounded-tl-none font-semibold uppercase tracking-wide max-w-[80%]">
+                                Profile Code generated: <span className="text-white font-black font-mono select-all">55019A12BC</span>. tie this to your 2026 E-pin procurement.
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setLoading(true);
+                          setTimeout(() => {
+                            setLoading(false);
+                            updateState({ profileCode: '55019A12BC', profileCodeGenerated: true });
+                            setSuccessMsg('Official Profile Code Generated via cell networks.');
+                          }, 1200);
+                        }}
+                        disabled={candidateState.profileCodeGenerated}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        {candidateState.profileCodeGenerated ? 'Profile Code Generated' : 'Command Profile SMS'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. JAMB e-Pin Procurement */}
+                {selectedServiceId === 'epin_procure' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">JAMB e-PIN Procurement</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Purchase application access code tied directly to candidate profile parameters.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="text-[8px] font-mono text-slate-400 uppercase block">CANDIDATE PROFILE CODE</span>
+                          <span className="text-white font-mono font-black">{candidateState.profileCode}</span>
+                        </div>
+                        <div>
+                          <span className="text-[8px] font-mono text-slate-400 uppercase block">EXAMINATION DISPATCH</span>
+                          <span className="text-white font-extrabold">{candidateState.examType === 'UTME' ? 'JAMB UTME 2026' : 'DIRECT ENTRY'}</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/5 pt-3">
+                        <span className="text-[8px] font-mono text-indigo-400 uppercase block">fee distribution</span>
+                        <div className="flex justify-between text-xs text-slate-300 font-bold mt-1 uppercase">
+                          <span>jamb e-PIN & syllabus literature:</span>
+                          <span className="text-white font-mono">₦5,700</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(5700)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ 
+                                epinPurchased: true,
+                                epin: `EPIN-${Math.floor(100000 + Math.random() * 900000)}-UTME`,
+                                epinSerial: `SER-${Math.floor(100000000 + Math.random() * 900000000)}`
+                              });
+                              setSuccessMsg('JAMB Registration e-PIN bought successfully.');
+                            }, 1500);
+                          }
+                        }}
+                        disabled={candidateState.epinPurchased}
+                        className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        {candidateState.epinPurchased ? 'e-PIN Already Procured' : 'Authorize ₦5,700 Payment'}
+                      </button>
+
+                      {candidateState.epinPurchased && (
+                        <div className="p-4 bg-indigo-950/20 border border-indigo-500/20 rounded-xl space-y-2 text-xs">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-[8px] text-slate-400 uppercase">OFFICIAL REGISTRATION E-PIN</span>
+                            <span className="text-emerald-400 uppercase">validated</span>
+                          </div>
+                          <span className="text-lg font-mono font-black text-white block select-all tracking-wider">{candidateState.epin}</span>
+                          <div className="text-[8.5px] text-slate-400 font-mono">SERIAL: {candidateState.epinSerial}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Used Phone Correction */}
+                {selectedServiceId === 'phone_correction' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Phone Number Correction Suite</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Request cellular number correction or swapping protocol for communications.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block mb-1">Old Phone Number</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 08031234567"
+                            className="w-full px-3 py-2 bg-slate-900 border border-white/5 rounded-lg outline-none focus:border-indigo-500" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block mb-1">New Phone Number</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 08129384756"
+                            className="w-full px-3 py-2 bg-slate-900 border border-white/5 rounded-lg outline-none focus:border-indigo-500" 
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(1000)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ phoneCorrected: true });
+                              setSuccessMsg('Linked Profile Phone Number swap authenticated across systems.');
+                            }, 1200);
+                          }
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Authorize Swap Protocol (₦1,000)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. JAMB CBT Center Registration */}
+                {selectedServiceId === 'jamb_reg' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">JAMB CBT Center Biometrics & Course Setup</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simulate capture of digital biometrics and submit course priorities.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">First Choice Institution</label>
+                          <select 
+                            value={candidateState.primaryInstitution}
+                            onChange={(e) => updateState({ primaryInstitution: e.target.value })}
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                          >
+                            <option>UNIVERSITY OF LAGOS (UNILAG)</option>
+                            <option>UNIVERSITY OF IBADAN (UI)</option>
+                            <option>OBAFEMI AWOLOWO UNIVERSITY (OAU)</option>
+                            <option>UNIVERSITY OF NIGERIA, NSUKKA (UNN)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Course of Choice</label>
+                          <select 
+                            value={candidateState.primaryCourse}
+                            onChange={(e) => updateState({ primaryCourse: e.target.value })}
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                          >
+                            <option>COMPUTER SCIENCE</option>
+                            <option>MEDICINE & SURGERY</option>
+                            <option>LAW</option>
+                            <option>MECHANICAL ENGINEERING</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-900 rounded-xl border border-white/5 flex items-center justify-between">
+                        <div>
+                          <span className="text-[8px] font-mono text-slate-400 uppercase block">SUBJECTS ALLOCATION</span>
+                          <span className="text-white font-extrabold text-[10px] block mt-0.5">{candidateState.subjects.join(' + ')}</span>
+                        </div>
+                        <span className="text-[8px] text-indigo-400 uppercase font-black tracking-wider">validated standard</span>
+                      </div>
+
+                      <div className="p-4 bg-slate-900/40 rounded-xl border border-white/5 text-center space-y-3">
+                        <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-wider block">Biometrics Capture Nodes</span>
+                        <div className="flex justify-center gap-2">
+                          <button 
+                            onClick={() => {
+                              setLoading(true);
+                              setTimeout(() => {
+                                setLoading(false);
+                                updateState({ registered: true });
+                                setSuccessMsg('Biometric capture complete! JAMB UTME Registration finalized.');
+                              }, 1500);
+                            }}
+                            className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-wider text-indigo-400 hover:text-white transition-all cursor-pointer"
+                          >
+                            <Fingerprint className="w-5 h-5" /> Simulate Fingerprint Scan
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. O-Level Result CAPS Upload */}
+                {selectedServiceId === 'result_upload' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">O-Level Result Upload Protocol</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Inject validated examination grades (WAEC/NECO/NABTEB) into CAPS Mainframe.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Exam Body</label>
+                          <select 
+                            value={candidateState.oLevelBoard}
+                            onChange={(e) => updateState({ oLevelBoard: e.target.value })}
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                          >
+                            <option>WAEC</option>
+                            <option>NECO</option>
+                            <option>NABTEB</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Exam Year</label>
+                          <input 
+                            type="text" 
+                            value={candidateState.oLevelYear}
+                            onChange={(e) => updateState({ oLevelYear: e.target.value })}
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-900 rounded-xl border border-white/5">
+                        <span className="text-[8.5px] font-black text-slate-400 uppercase tracking-widest block mb-2">Subject Grade Matrix</span>
+                        <div className="grid grid-cols-5 gap-1.5 font-mono text-[9px] text-slate-300">
+                          {candidateState.oLevelResults.map((r, i) => (
+                            <div key={i} className="p-1.5 bg-slate-950 border border-white/5 rounded text-center">
+                              <span className="block truncate text-slate-500 uppercase">{r.subject.substring(0, 7)}</span>
+                              <span className="font-extrabold text-indigo-400 text-xs block mt-0.5">{r.grade}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setLoading(true);
+                          setTimeout(() => {
+                            setLoading(false);
+                            updateState({ oLevelUploaded: true });
+                            setSuccessMsg('O-Level qualifications uploaded and linked on CAPS mainframe databases.');
+                          }, 1400);
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Transmit Dossier to CAPS Mainframe
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Print Registration Confirmation Slip */}
+                {selectedServiceId === 'reg_slip' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Registration Confirmation Slip Printing</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Generate security-embossed receipt verification slip.</p>
+                    </div>
+
+                    <div className="p-4 bg-white text-slate-900 rounded-2xl border shadow-inner font-mono text-[10px] space-y-4 max-w-lg mx-auto">
+                      <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2">
+                        <span className="font-bold text-xs uppercase">JAMB 2026 REGISTRATION SLIP</span>
+                        <span className="font-bold text-[8px] bg-slate-200 border border-slate-900 px-1 py-0.5 rounded">ORIGINAL RECEIPT</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">candidate name</span>
+                          <span className="font-black text-slate-900 text-xs uppercase">{candidateState.fullName}</span>
+                        </div>
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">registration code</span>
+                          <span className="font-black text-slate-900 text-xs font-mono">{candidateState.epin || 'UTME-2026-PENDING'}</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-slate-300 pt-2 space-y-1">
+                        <span className="text-[7.5px] text-slate-500 block uppercase font-bold">institution choices</span>
+                        <div className="text-[9px] font-bold">1ST CHOICE: {candidateState.primaryInstitution}</div>
+                        <div className="text-[9px] font-bold">PROGRAMME: {candidateState.primaryCourse}</div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          updateState({ regSlipPrinted: true });
+                          setSuccessMsg('Registration Slip sent to system PDF drivers and archived.');
+                        }}
+                        className="w-full py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Download Registration Confirmation PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 8. Print Examination venue Slip */}
+                {selectedServiceId === 'exam_slip' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Examination Venue Slip Printing</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Acquire official allocations, dates, time matrices, and security seat codes.</p>
+                    </div>
+
+                    <div className="p-4 bg-white text-slate-900 rounded-2xl border shadow-inner font-mono text-[10px] space-y-4 max-w-lg mx-auto">
+                      <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2">
+                        <span className="font-bold text-xs uppercase">UTME EXAMINATION VENUE SLIP</span>
+                        <span className="font-bold text-[8px] bg-slate-200 border border-slate-900 px-1 py-0.5 rounded">EXAM ADMITTANCE</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">assigned center</span>
+                          <span className="font-black text-slate-900 text-[9px] uppercase block leading-snug">{candidateState.examVenue}</span>
+                        </div>
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">examination date & time</span>
+                          <span className="font-black text-slate-900 block font-mono uppercase">{candidateState.examDate}</span>
+                          <span className="font-black text-slate-900 block font-mono">{candidateState.examTime}</span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-slate-300 pt-2 grid grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">seat number</span>
+                          <span className="font-bold text-slate-900 text-xs font-mono">{candidateState.examSeat}</span>
+                        </div>
+                        <div>
+                          <span className="text-[7.5px] text-slate-500 block uppercase font-bold">dossier code</span>
+                          <span className="font-bold text-slate-900 font-mono text-xs">{candidateState.profileCode}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          updateState({ examSlipPrinted: true });
+                          setSuccessMsg('Admittance Slip validated. Print drivers initialized.');
+                        }}
+                        className="w-full py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" /> Download Admittance Slip PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 9. Participate in UTME Mock CBT */}
+                {selectedServiceId === 'mock_exam' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Interactive preparatory Mock CBT</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Solve 5 preparatory general questions to estimate and predict actual scores.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      {mockIndex < mockQuestions.length ? (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold uppercase">
+                            <span>Question {mockIndex + 1} of {mockQuestions.length}</span>
+                            <span className="text-indigo-400">Mock Engine Active</span>
+                          </div>
+
+                          <div className="p-4 bg-slate-900 rounded-xl border border-white/5 font-extrabold uppercase text-white leading-relaxed">
+                            {mockQuestions[mockIndex].q}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {mockQuestions[mockIndex].options.map((opt, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  if (opt === mockQuestions[mockIndex].ans) {
+                                    setMockScore(prev => prev + 1);
+                                  }
+                                  if (mockIndex + 1 === mockQuestions.length) {
+                                    const finalMockPercentage = ((mockScore + (opt === mockQuestions[mockIndex].ans ? 1 : 0)) / mockQuestions.length) * 400;
+                                    updateState({ 
+                                      mockExamTaken: true,
+                                      mockExamScore: finalMockPercentage,
+                                      utmeScore: Math.round(finalMockPercentage)
+                                    });
+                                    setSuccessMsg(`Mock Exam Complete! Calculated score prediction: ${Math.round(finalMockPercentage)} / 400.`);
+                                  }
+                                  setMockIndex(prev => prev + 1);
+                                }}
+                                className="p-3 bg-slate-900 hover:bg-indigo-600 border border-white/5 hover:border-indigo-500 rounded-xl font-bold uppercase text-slate-300 hover:text-white text-center cursor-pointer transition-all"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 space-y-3">
+                          <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+                          <div>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">predicted scoreboard</span>
+                            <span className="text-2xl font-black italic text-white block mt-1">{candidateState.utmeScore} / 400</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setMockIndex(0);
+                              setMockScore(0);
+                            }}
+                            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wider cursor-pointer"
+                          >
+                            Restart Mock Simulation
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 10. UTME Result Checking Gateway */}
+                {selectedServiceId === 'result_check' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">UTME Result Checking Gateway</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Query dynamic examination servers to access results.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="space-y-2">
+                        <label className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block">Insert Registration Number / Profile Code</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 55019A12BC" 
+                          value={candidateState.profileCode}
+                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-xl outline-none focus:border-indigo-500 font-mono" 
+                          readOnly
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setLoading(true);
+                          setTimeout(() => {
+                            setLoading(false);
+                            if (candidateState.utmeScore === 0) {
+                              updateState({ utmeScore: 312, resultChecked: true });
+                            } else {
+                              updateState({ resultChecked: true });
+                            }
+                            setSuccessMsg('Examination Results checked successfully.');
+                          }, 1400);
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Query Results Database
+                      </button>
+
+                      {candidateState.resultChecked && (
+                        <div className="p-4 bg-slate-900 rounded-xl border border-white/5 text-center space-y-3 font-mono text-[10px] text-slate-300">
+                          <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest block">CANDIDATE EXAM MATRIX REPORT</span>
+                          <div className="grid grid-cols-2 gap-3 uppercase font-bold text-left">
+                            <div className="border-b border-white/5 pb-2">
+                              <span>english:</span>
+                              <span className="text-white block mt-0.5 font-black">78 / 100</span>
+                            </div>
+                            <div className="border-b border-white/5 pb-2">
+                              <span>mathematics:</span>
+                              <span className="text-white block mt-0.5 font-black">84 / 100</span>
+                            </div>
+                            <div>
+                              <span>physics:</span>
+                              <span className="text-white block mt-0.5 font-black">75 / 100</span>
+                            </div>
+                            <div>
+                              <span>chemistry:</span>
+                              <span className="text-white block mt-0.5 font-black">75 / 100</span>
+                            </div>
+                          </div>
+                          <div className="border-t border-white/5 pt-2 flex justify-between font-black text-xs text-white">
+                            <span>TOTAL OBTAINED SCORE:</span>
+                            <span className="text-indigo-400 italic font-black">{candidateState.utmeScore || 312} / 400</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 11. Email Profile Linking Protocol */}
+                {selectedServiceId === 'email_linking' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Email Profile Linking Protocol</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Connect valid email to profile records to grant access to CAPS panel.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div>
+                        <label className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block mb-1.5">Candidate Email Address</label>
+                        <input 
+                          type="email" 
+                          placeholder="e.g. candidate@gmail.com" 
+                          value={candidateState.email}
+                          onChange={(e) => updateState({ email: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-slate-900 border border-white/10 rounded-xl outline-none focus:border-indigo-500" 
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setLoading(true);
+                          setTimeout(() => {
+                            setLoading(false);
+                            updateState({ emailLinked: true });
+                            setSuccessMsg('Secure Email Link code dispatched and validated across channels.');
+                          }, 1300);
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Link Email to Profile Code
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 12. Print Original Result Slip */}
+                {selectedServiceId === 'original_result' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Print Original Result Slip</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vend standard original result slip with photographic identification.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      {!candidateState.originalResultPrinted ? (
+                        <div className="space-y-3">
+                          <p className="text-[9.5px] text-slate-400 uppercase leading-relaxed font-semibold">Generating the Original Result slip containing photographic security identifiers requires a standard service validation fee.</p>
+                          <button
+                            onClick={() => {
+                              if (spendWallet(1500)) {
+                                setLoading(true);
+                                setTimeout(() => {
+                                  setLoading(false);
+                                  updateState({ originalResultPrinted: true });
+                                  setSuccessMsg('Original Result slip vended successfully.');
+                                }, 1500);
+                              }
+                            }}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                          >
+                            Pay result generation fee (₦1,500)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-white text-slate-900 rounded-xl border font-mono text-[9px] space-y-4 max-w-lg mx-auto">
+                          <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2">
+                            <span className="font-bold text-xs">ORIGINAL UTME RESULT CERTIFICATE</span>
+                            <span className="font-bold text-[8px] bg-indigo-100 text-indigo-900 border border-indigo-900 px-1 py-0.5 rounded">PASSPORT VERIFIED</span>
+                          </div>
+
+                          <div className="flex gap-4 items-start">
+                            <div className="w-16 h-16 bg-slate-200 border-2 border-slate-900 flex items-center justify-center text-slate-500 uppercase font-bold text-[8px] tracking-tighter rounded">
+                              PHOTO AVATAR
+                            </div>
+                            <div className="flex-1 grid grid-cols-2 gap-2 text-[8.5px]">
+                              <div>
+                                <span className="text-slate-500 block uppercase font-bold text-[7px]">candidate name</span>
+                                <span className="font-black text-slate-900 uppercase block">{candidateState.fullName}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 block uppercase font-bold text-[7px]">registration number</span>
+                                <span className="font-black text-slate-900 font-mono block">{candidateState.epin}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-300 pt-2 grid grid-cols-4 gap-2 text-center text-slate-800">
+                            <div className="p-1 bg-slate-100 rounded">
+                              <span className="block font-bold">ENG</span>
+                              <span className="block font-black text-xs text-slate-900">78</span>
+                            </div>
+                            <div className="p-1 bg-slate-100 rounded">
+                              <span className="block font-bold">MTH</span>
+                              <span className="block font-black text-xs text-slate-900">84</span>
+                            </div>
+                            <div className="p-1 bg-slate-100 rounded">
+                              <span className="block font-bold">PHY</span>
+                              <span className="block font-black text-xs text-slate-900">75</span>
+                            </div>
+                            <div className="p-1 bg-slate-100 rounded">
+                              <span className="block font-bold">CHM</span>
+                              <span className="block font-black text-xs text-slate-900">75</span>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-300 pt-2 flex justify-between font-black text-xs text-slate-900">
+                            <span>TOTAL OBTAINED SCORE:</span>
+                            <span className="text-indigo-600 font-extrabold italic">{candidateState.utmeScore} / 400</span>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setSuccessMsg('Original PDF vended and archived on server nodes.');
+                            }}
+                            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Export Result Certificate PDF
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 13. Change Course or Institution */}
+                {selectedServiceId === 'change_course' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Change Course or Institution</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Permute institutional listings or shift choices post-exams safely.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">New Chosen Institution</label>
+                          <select 
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                            onChange={(e) => updateState({ primaryInstitution: e.target.value })}
+                          >
+                            <option>OBAFEMI AWOLOWO UNIVERSITY (OAU)</option>
+                            <option>UNIVERSITY OF IBADAN (UI)</option>
+                            <option>UNIVERSITY OF LAGOS (UNILAG)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">New Desired Course</label>
+                          <select 
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                            onChange={(e) => updateState({ primaryCourse: e.target.value })}
+                          >
+                            <option>MECHANICAL ENGINEERING</option>
+                            <option>COMPUTER SCIENCE</option>
+                            <option>MEDICINE & SURGERY</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(2500)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ courseChanged: true });
+                              setSuccessMsg('Institution and course preferences updated on JAMB server mainframe logs.');
+                            }, 1300);
+                          }
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Authorize Change of Course (₦2,500)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 14. Bio-Data Correction Suite */}
+                {selectedServiceId === 'data_correction' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Bio-Data Correction Suite</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Correct spelling mistakes in names, state of origin, gender, or DoB arrays.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div>
+                        <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1.5">Correct Full Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. AMADI KINGSLEY" 
+                          value={candidateState.fullName}
+                          onChange={(e) => updateState({ fullName: e.target.value.toUpperCase() })}
+                          className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-bold"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(2500)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ dataCorrected: true });
+                              setSuccessMsg('Bio-data corrections submitted and validated on centralized mainframe databases.');
+                            }, 1400);
+                          }
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Authorize Correction (₦2,500)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 15. JAMB CAPS Status Command Centre */}
+                {selectedServiceId === 'caps_monitor' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">JAMB CAPS Status Command Centre</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Secure candidate log-in to monitor academic admittance status.</p>
+                    </div>
+
+                    <div className="p-5 bg-slate-950 rounded-2xl border border-indigo-500/10 space-y-4 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/5 rounded-full blur-3xl" />
+                      
+                      <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                        <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">CENTRAL ADMISSIONS PROCESSING SYSTEM (CAPS)</span>
+                        <span className="text-[8px] font-mono text-slate-500">SECURE SHELL</span>
+                      </div>
+
+                      <div className="space-y-3 font-mono text-[10px] text-slate-300">
+                        <div>
+                          <span className="text-slate-500 block uppercase text-[8px]">admitting institution</span>
+                          <span className="text-white font-extrabold">{candidateState.primaryInstitution}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block uppercase text-[8px]">programme offered</span>
+                          <span className="text-white font-extrabold">{candidateState.primaryCourse}</span>
+                        </div>
+                        
+                        <div className="border-t border-white/5 pt-3">
+                          <span className="text-slate-500 block uppercase text-[8px]">ADMISSION OFFER STATUS</span>
+                          {candidateState.capsStatus === 'admitted' && (
+                            <div className="space-y-3 mt-1.5">
+                              <span className="text-emerald-400 font-black animate-pulse uppercase tracking-wider block">CONGRATULATIONS! YOU HAVE BEEN OFFERED PROVISIONAL ADMISSION.</span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    updateState({ capsStatus: 'accepted' });
+                                    setSuccessMsg('You have ACCEPTED the admission. Keep print parameters secure.');
+                                  }}
+                                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-black uppercase text-[8.5px] cursor-pointer"
+                                >
+                                  Accept Offer
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    updateState({ capsStatus: 'rejected' });
+                                    setError('You have REJECTED the admission offer.');
+                                  }}
+                                  className="px-4 py-2 bg-rose-650 hover:bg-rose-600 text-white rounded font-black uppercase text-[8.5px] cursor-pointer"
+                                >
+                                  Reject Offer
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {candidateState.capsStatus === 'accepted' && (
+                            <span className="text-emerald-400 font-black block uppercase tracking-wider mt-1">ADMISSION OFFER ACCEPTED. VEND ADMISSION LETTER NEXT.</span>
+                          )}
+
+                          {candidateState.capsStatus === 'rejected' && (
+                            <span className="text-rose-400 font-black block uppercase tracking-wider mt-1">ADMISSION OFFER REJECTED.</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 16. Print JAMB Admission Letter */}
+                {selectedServiceId === 'admission_letter' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Print JAMB Admission Letter</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vend colored official admission letter required for physical university clearance.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      {!candidateState.letterPrinted ? (
+                        <div className="space-y-3">
+                          <p className="text-[9.5px] text-slate-400 uppercase leading-relaxed font-semibold">Generating the colored, Registrar-stamped official Admission Letter requires a small administrative validation fee.</p>
+                          <button
+                            onClick={() => {
+                              if (spendWallet(2000)) {
+                                setLoading(true);
+                                setTimeout(() => {
+                                  setLoading(false);
+                                  updateState({ letterPrinted: true });
+                                  setSuccessMsg('Official JAMB Admission Letter generated successfully.');
+                                }, 1500);
+                              }
+                            }}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                          >
+                            Pay admission letter fee (₦2,000)
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-white text-slate-900 rounded-xl border font-mono text-[9px] space-y-4 max-w-lg mx-auto">
+                          <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2 text-center">
+                            <span className="font-bold text-xs uppercase block w-full text-slate-900">THE JOINT ADMISSIONS AND MATRICULATION BOARD</span>
+                          </div>
+
+                          <div className="text-center font-bold text-[10px] uppercase text-indigo-900">
+                            OFFICIAL PROVISIONAL ADMISSION LETTER
+                          </div>
+
+                          <div className="space-y-2 text-[8.5px] leading-relaxed text-slate-800">
+                            <p>This is to confirm that <span className="font-bold text-slate-900">{candidateState.fullName}</span> has been offered admission to:</p>
+                            <div className="p-2.5 bg-slate-100 rounded font-black text-slate-900 uppercase">
+                              <div>INSTITUTION: {candidateState.primaryInstitution}</div>
+                              <div>COURSE: {candidateState.primaryCourse}</div>
+                              <div>DURATION: 4 YEARS (UTME)</div>
+                            </div>
+                            <p className="text-[7.5px] text-slate-500">Please present this document along with original credentials at the Office of the Registrar during physical clearance validation.</p>
+                          </div>
+
+                          <div className="flex justify-between items-center border-t border-slate-300 pt-3">
+                            <span className="text-[7px] text-slate-400 block font-mono">REGISTRAR SECURE BARCODE</span>
+                            <span className="font-bold font-mono text-emerald-600">VALIDATED STAMP</span>
+                          </div>
+
+                          <button
+                            onClick={() => {
+                              setSuccessMsg('Provisional Admission Letter PDF saved successfully.');
+                            }}
+                            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download provisional letter PDF
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 17. Linked Email Correction */}
+                {selectedServiceId === 'email_update' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Linked Email Correction & Update</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Fix misspelled or inaccessible linked email structures safely.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div>
+                        <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">New Intended Email Address</label>
+                        <input 
+                          type="email" 
+                          placeholder="e.g. corrected@candidate.com" 
+                          className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(1000)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ emailCorrected: true });
+                              setSuccessMsg('Linked profile email successfully updated on JAMB directories.');
+                            }, 1200);
+                          }
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Authorize Email Correction (₦1,000)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 18. Regularization of Admission */}
+                {selectedServiceId === 'regularization' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase italic">Admission Regularization (Late Application)</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Validate direct university approvals onto the mainframe records.</p>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Direct Admitting Institution</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. LASU" 
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Matriculation Number</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 190201024" 
+                            className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (spendWallet(10000)) {
+                            setLoading(true);
+                            setTimeout(() => {
+                              setLoading(false);
+                              updateState({ regularized: true });
+                              setSuccessMsg('Direct Admission Regularized and approved on Central JAMB mainframe databases.');
+                            }, 1600);
+                          }
+                        }}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer"
+                      >
+                        Authorize Regularization (₦10,000)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </div>
+
+          {/* Loading Overlay */}
+          <AnimatePresence>
+            {loading && (
               <motion.div 
-                key="processing"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="py-16 text-center space-y-8 flex-grow flex flex-col items-center justify-center"
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 z-50"
               >
                 <div className="relative">
-                  <div className="w-20 h-20 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin mx-auto" />
-                  <Sparkles className="w-8 h-8 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
+                  <div className="w-16 h-16 border-4 border-indigo-500/10 border-t-indigo-500 rounded-full animate-spin" />
+                  <Sparkles className="w-6 h-6 text-indigo-400 absolute inset-0 m-auto animate-pulse" />
                 </div>
-                
-                <div className="space-y-3">
-                  <h3 className="text-xl font-black text-white uppercase italic tracking-tight animate-pulse">Initializing Dispatch Node...</h3>
-                  <div className="max-w-md mx-auto space-y-1">
-                    <p className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest">CONNECTING TO COGNITIVE GATEWAY: SOVEREIGN PROTOCOL ACTIVE</p>
-                    <p className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-widest">DEDUCTING FEES & VALIDATING NIN DOSSIER...</p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {step === 'success' && generatedEpin && (
-              <motion.div 
-                key="success"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="space-y-6 flex-grow flex flex-col justify-between"
-              >
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/5">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">e-PIN Generation Successful!</h3>
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">The registration parameters are secured and validated.</p>
-                  </div>
-                </div>
-
-                <div className="p-8 bg-slate-950 rounded-[2.5rem] border border-white/5 space-y-6 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full blur-[80px]" />
-                  
-                  <div className="flex flex-col sm:flex-row justify-between gap-4 border-b border-white/5 pb-4">
-                    <div>
-                      <span className="text-[8px] font-mono text-slate-400 uppercase block">CANDIDATE DOSSIER</span>
-                      <span className="text-sm font-black text-white uppercase tracking-wide block mt-1">{generatedEpin.candidateName}</span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] font-mono text-slate-400 uppercase block">EXAMINATION DISPATCH</span>
-                      <span className="text-xs font-black text-indigo-400 uppercase tracking-widest block mt-1">{generatedEpin.examType}</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div>
-                      <span className="text-[8px] font-mono text-slate-400 uppercase block">NIN PROTOCOL CODE</span>
-                      <span className="text-xs font-mono font-bold text-white block mt-1">{generatedEpin.nin}</span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] font-mono text-slate-400 uppercase block">JAMB PROFILE CODE</span>
-                      <span className="text-xs font-mono font-black text-white uppercase block mt-1">{generatedEpin.profileCode}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/80 p-6 rounded-2xl border border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="w-full text-center sm:text-left">
-                      <span className="text-[8px] font-mono text-emerald-400 uppercase tracking-widest block">OFFICIAL JAMB UTME E-PIN</span>
-                      <span className="text-lg sm:text-2xl font-mono font-black tracking-wider text-white select-all block mt-1">
-                        {generatedEpin.epin}
-                      </span>
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(generatedEpin.epin)}
-                      className="w-full sm:w-auto px-5 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copied ? 'Copied!' : 'Copy Pin'}</span>
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row justify-between gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-wide">
-                    <div>
-                      <span>SERIAL NUMBER: </span>
-                      <span className="text-white font-mono">{generatedEpin.serial}</span>
-                    </div>
-                    <div>
-                      <span>GATEWAY TRACK: </span>
-                      <span className="text-white font-mono">{generatedEpin.method}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4.5 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl flex items-start gap-3">
-                  <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                  <p className="text-[9.5px] text-slate-300 leading-normal font-medium uppercase tracking-wide">
-                    Next Protocol: Take this copied <span className="text-white font-extrabold">{generatedEpin.epin}</span> and your <span className="text-white font-extrabold">{generatedEpin.profileCode}</span> to any accredited JAMB CBT registration center to finalize biometric scanning and institutional data input. No other payment is required there.
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-white/5 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStep('details');
-                      setNin('');
-                      setProfileCode('');
-                      setPhone('');
-                      setBankRef('');
-                    }}
-                    className="px-6 py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
-                  >
-                    Generate Another Pin
-                  </button>
-                </div>
+                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest animate-pulse">
+                  transmitting data to jamb central mainframe...
+                </span>
               </motion.div>
             )}
           </AnimatePresence>

@@ -123,9 +123,9 @@ const educationData: EducationSection[] = [
         serviceType: "GUIDE"
       },
       {
-        title: "JAMB Payment Portal Protocol",
+        title: "JAMB Admissions Lifecycle Suite",
         icon: CreditCard,
-        description: "Secure JAMB E-PIN purchase, registration fee payments, and transaction records.",
+        description: "Interactive hub for all 18 official JAMB phases: NIN validation, e-PINs, CAPS, course changes, and document printing.",
         tags: ["Recently Updated"],
         serviceType: "PAYMENT"
       }
