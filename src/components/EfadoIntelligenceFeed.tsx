@@ -125,7 +125,7 @@ export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 
             <span className="text-xs font-black text-white uppercase tracking-widest italic">Live updates</span>
           </div>
           
-          <div className="flex-1 min-h-[4.5rem] sm:min-h-[3rem] relative w-full flex items-center overflow-hidden py-1">
+          <div className="flex-1 min-h-[8rem] sm:min-h-[6rem] md:min-h-[5rem] relative w-full flex items-center py-4">
             <AnimatePresence mode="wait">
               <motion.div
                 key={tickerIndex}
@@ -133,20 +133,24 @@ export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-start sm:items-center gap-3 sm:gap-4 w-full"
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full h-full justify-center"
               >
-                <span className="text-[10px] sm:text-xs font-black text-indigo-400 bg-indigo-950/50 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest shrink-0 mt-0.5 sm:mt-0">
-                  [{FEED_DATA[tickerIndex].category}]
-                </span>
-                <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 hidden sm:inline">
-                  {FEED_DATA[tickerIndex].group}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[10px] sm:text-xs font-black text-indigo-400 bg-indigo-950/50 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest">
+                    [{FEED_DATA[tickerIndex].category}]
+                  </span>
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">
+                    {FEED_DATA[tickerIndex].group}
+                  </span>
+                </div>
                 <div className="h-4 w-px bg-white/10 hidden sm:inline shrink-0" />
-                <p className="text-sm sm:text-base font-black text-white uppercase tracking-tight italic whitespace-normal break-words leading-snug flex-1">
+                <p className="text-sm sm:text-base md:text-lg font-extrabold text-white uppercase tracking-tight italic whitespace-normal break-words leading-relaxed flex-1 py-1">
                   {FEED_DATA[tickerIndex].title}
                 </p>
-                <div className="w-2 h-2 bg-emerald-500 rounded-full shrink-0 animate-ping mt-1.5 sm:mt-0" />
-                <span className="text-[10px] sm:text-xs text-slate-500 font-mono tracking-tighter italic shrink-0 mt-0.5 sm:mt-0">{FEED_DATA[tickerIndex].timestamp}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+                  <span className="text-[10px] sm:text-xs text-slate-500 font-mono tracking-tighter italic">{FEED_DATA[tickerIndex].timestamp}</span>
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>

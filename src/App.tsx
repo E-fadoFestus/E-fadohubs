@@ -86,6 +86,9 @@ import {
   Brain, 
   UserPlus, 
   GraduationCap, 
+  Building,
+  Award,
+  BookOpen,
   Video,
   Cpu,
   HelpCircle,
@@ -415,6 +418,13 @@ function AppContent() {
   const [domainHubSection, setDomainHubSection] = useState<'domains' | 'course' | 'tools' | 'vending' | 'otc' | 'sourcing'>('domains');
   const [showCSCCRegistration, setShowCSCCRegistration] = useState(false);
   const [showEducationHub, setShowEducationHub] = useState(false);
+  const [eduSectionId, setEduSectionId] = useState<string | undefined>(undefined);
+
+  const openEducationHubWithSection = (sectionId?: string) => {
+    setEduSectionId(sectionId);
+    setShowEducationHub(true);
+  };
+
   const [showMoneyQuiz, setShowMoneyQuiz] = useState(false);
   const [showEquilibrium, setShowEquilibrium] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
@@ -2624,30 +2634,150 @@ function AppContent() {
               <motion.section
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
+                className="space-y-8"
               >
                 <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 tracking-tighter">
+                  <h2 className="text-3xl font-black text-white flex items-center gap-3 tracking-tighter uppercase italic">
                     <GraduationCap className="w-8 h-8 text-indigo-500" />
-                    Universal Education Hub
+                    Universal Academic Hubs
                   </h2>
+                  <button
+                    onClick={() => openEducationHubWithSection(undefined)}
+                    className="px-5 py-2.5 bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    Open Master Portal
+                  </button>
                 </div>
-                <div className="max-w-3xl mx-auto">
-                  {/* EFADO Education Hub Card */}
-                  <div className="glass-card-ultra golden-card-border p-12 rounded-[3rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/5 to-purple-500/5" />
-                    <div className="relative z-10">
-                      <div className="w-24 h-24 bg-indigo-500/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 group-hover:scale-110 group-hover:bg-indigo-600 group-hover:shadow-[0_0_50px_rgba(79,70,229,0.5)] transition-all duration-700">
-                        <GraduationCap className="w-12 h-12 text-indigo-400 group-hover:text-white" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Card 1: JAMB */}
+                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[6px] bg-indigo-600" />
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-600/10 transition-all duration-750" />
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-16 h-16 bg-indigo-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-500 shadow-md">
+                          <GraduationCap className="w-8 h-8 text-indigo-400 group-hover:text-white" />
+                        </div>
+                        <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic animate-pulse">
+                          Agent Connected
+                        </span>
                       </div>
-                      <h3 className="text-3xl font-black text-white mb-4 tracking-tight">Academic Portal</h3>
-                      <p className="text-slate-400 mb-12 text-lg font-medium leading-relaxed max-w-xl mx-auto">Comprehensive academic resources, examination portals, and developmental tools for unified learning.</p>
-                      <button 
-                        onClick={() => setShowEducationHub(true)}
-                        className="px-12 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-[0_10px_40px_rgba(79,70,229,0.3)] hover:scale-105 transition-all uppercase tracking-[0.3em] text-[11px] border border-indigo-500/50"
-                      >
-                        Launch Academy
-                      </button>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">JAMB UTME COMMAND</h3>
+                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
+                        Complete candidate registration lifecycle: NIN validation, profile codes, secure e-PIN procurement, course changes, and central CAPS status tracking. Supports high-velocity multi-candidate Agent Console management.
+                      </p>
                     </div>
+                    <button 
+                      onClick={() => openEducationHubWithSection('jamb')}
+                      className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(79,70,229,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                    >
+                      Launch Command Console
+                    </button>
+                  </div>
+
+                  {/* Card 2: Post-UTME */}
+                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[6px] bg-emerald-600" />
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-600/10 transition-all duration-750" />
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-16 h-16 bg-emerald-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-600 transition-all duration-500 shadow-md">
+                          <Award className="w-8 h-8 text-emerald-400 group-hover:text-white" />
+                        </div>
+                        <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
+                          Academic Screening
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POST-UTME SCREENING HUB</h3>
+                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
+                        Simulate rigorous university entry examinations with authentic past question banks. Verify institutional eligibility with active admission requirement matrices and national cut-off score databases.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => openEducationHubWithSection('post_utme')}
+                      className="w-full py-4 bg-emerald-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                    >
+                      Launch Screening Portal
+                    </button>
+                  </div>
+
+                  {/* Card 3: Polytechnic */}
+                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[6px] bg-amber-600" />
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-600/10 transition-all duration-750" />
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-16 h-16 bg-amber-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-600 transition-all duration-500 shadow-md">
+                          <Building className="w-8 h-8 text-amber-400 group-hover:text-white" />
+                        </div>
+                        <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
+                          Technical & Voc
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POLYTECHNIC & TECHNICAL</h3>
+                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
+                        Navigate ND, HND, and technical training pathways. Log SIWES industrial assignments in real-time with supervisor auto-approvals, and access Direct Entry syllabus-alignment tracking grids.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => openEducationHubWithSection('polytechnic')}
+                      className="w-full py-4 bg-amber-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(217,119,6,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                    >
+                      Launch Technical Portal
+                    </button>
+                  </div>
+
+                  {/* Card 4: Postgraduate */}
+                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-[6px] bg-rose-600" />
+                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-rose-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-rose-600/10 transition-all duration-750" />
+                    <div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-16 h-16 bg-rose-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-rose-600 transition-all duration-500 shadow-md">
+                          <BookOpen className="w-8 h-8 text-rose-400 group-hover:text-white" />
+                        </div>
+                        <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
+                          Ph.D. & Master's
+                        </span>
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POSTGRADUATE & RESEARCH</h3>
+                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
+                        Structure Master's and Ph.D. dissertations with dynamic roadmap planners. Utilize automated APA/Harvard reference formatting tools, and simulate oral defenses with interactive mock viva panels.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => openEducationHubWithSection('postgraduate')}
+                      className="w-full py-4 bg-rose-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(225,29,72,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                    >
+                      Launch Research Portal
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card 5: Full Academic Overview & General Hub */}
+                <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] relative group overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-[6px] bg-blue-600" />
+                  <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-600/10 transition-all duration-750" />
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-blue-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500 shadow-md shrink-0">
+                        <Cpu className="w-8 h-8 text-blue-400 group-hover:text-white" />
+                      </div>
+                      <div>
+                        <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded uppercase tracking-wider">Universal Learning Suite</span>
+                        <h3 className="text-xl font-black text-white tracking-tight mt-1">O'LEVEL, PRIMARY & NURSERY EDUCATION</h3>
+                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-tight mt-1 max-w-xl">
+                          Explore O'Level preparation, nursery milestone trackers, interactive mental arithmetic challenges, and our advanced AI-powered intellectual study node.
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => openEducationHubWithSection(undefined)}
+                      className="px-8 py-4 bg-blue-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(37,99,235,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px] shrink-0"
+                    >
+                      Open Main Academy
+                    </button>
                   </div>
                 </div>
               </motion.section>
@@ -2742,11 +2872,15 @@ function AppContent() {
 
             {showEducationHub && user && (
               <EfadoEducationHub 
-                onClose={() => setShowEducationHub(false)} 
+                onClose={() => {
+                  setShowEducationHub(false);
+                  setEduSectionId(undefined);
+                }} 
                 user={user}
                 onUpdateMining={handleMiningUpdate}
                 onNavigate={handleNavigate}
                 onOpenMining={() => setShowEfadoMining(true)}
+                initialSectionId={eduSectionId}
               />
             )}
 

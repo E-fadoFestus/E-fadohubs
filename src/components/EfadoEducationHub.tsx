@@ -311,7 +311,7 @@ const educationData: EducationSection[] = [
   }
 ];
 
-export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfile; onUpdateMining?: (amount: number) => void; onNavigate?: (hub: any, subview?: any) => void; onOpenMining?: () => void }> = ({ onClose, user, onUpdateMining, onNavigate, onOpenMining }) => {
+export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfile; onUpdateMining?: (amount: number) => void; onNavigate?: (hub: any, subview?: any) => void; onOpenMining?: () => void; initialSectionId?: string }> = ({ onClose, user, onUpdateMining, onNavigate, onOpenMining, initialSectionId }) => {
   const [showGuide, setShowGuide] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeExam, setActiveExam] = useState<{ type: ExamCategory, view: 'mode' | 'seminar' } | null>(null);
@@ -325,6 +325,15 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
   const [showAiStudyPortal, setShowAiStudyPortal] = useState(false);
   const [activeHubDetails, setActiveHubDetails] = useState<any | null>(null);
   const [activeInteractiveTool, setActiveInteractiveTool] = useState<{ type: string; title: string } | null>(null);
+
+  React.useEffect(() => {
+    if (initialSectionId) {
+      const found = educationData.find(sec => sec.id === initialSectionId);
+      if (found) {
+        setActiveHubDetails(found);
+      }
+    }
+  }, [initialSectionId]);
 
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return educationData;

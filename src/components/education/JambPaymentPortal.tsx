@@ -31,10 +31,16 @@ import {
   Download,
   AlertTriangle,
   RefreshCw,
-  Users
+  Users,
+  Plus,
+  Trash,
+  Sliders,
+  TrendingUp,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
+import { db, auth, collection, onSnapshot, query, where, addDoc, doc, updateDoc, deleteDoc } from '../../firebase';
 
 interface JambPaymentPortalProps {
   onClose: () => void;
@@ -53,80 +59,441 @@ interface SavedEPin {
   method: string;
 }
 
+// Chronological candidate template database
+const DEFAULT_CANDIDATES = [
+  {
+    id: "cand_1",
+    fullName: "AMINU IBRAHIM",
+    nin: "12345678901",
+    ninVerified: true,
+    profileCode: "5501928472",
+    profileCodeGenerated: true,
+    epin: "EPIN-9082-1824-7263",
+    epinSerial: "SER-827362",
+    epinPurchased: true,
+    phone: "08031112222",
+    phoneCorrected: false,
+    email: "aminu.ibrahim@gmail.com",
+    examType: "UTME",
+    registered: false,
+    primaryInstitution: "AHMADU BELLO UNIVERSITY (ABU)",
+    primaryCourse: "COMPUTER SCIENCE",
+    subjects: ["ENGLISH LANGUAGE", "MATHEMATICS", "PHYSICS", "CHEMISTRY"],
+    oLevelUploaded: false,
+    oLevelBoard: "WAEC",
+    oLevelYear: "2025",
+    oLevelResults: [
+      { subject: "ENGLISH LANGUAGE", grade: "B3" },
+      { subject: "MATHEMATICS", grade: "A1" },
+      { subject: "PHYSICS", grade: "B2" },
+      { subject: "CHEMISTRY", grade: "C4" },
+      { subject: "CIVIC EDUCATION", grade: "A1" }
+    ],
+    regSlipPrinted: false,
+    examSlipPrinted: false,
+    examDate: "APRIL 19, 2026",
+    examTime: "09:00 AM",
+    examVenue: "EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS",
+    examSeat: "SEAT-112",
+    mockExamTaken: false,
+    mockExamScore: 0,
+    resultChecked: false,
+    utmeScore: 0,
+    emailLinked: false,
+    originalResultPrinted: false,
+    courseChanged: false,
+    dataCorrected: false,
+    capsStatus: "pending",
+    letterPrinted: false,
+    emailCorrected: false,
+    regularized: false,
+    createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "cand_2",
+    fullName: "OLUWASEUN ADEBAYO",
+    nin: "98765432109",
+    ninVerified: true,
+    profileCode: "5501982736",
+    profileCodeGenerated: true,
+    epin: "EPIN-1234-5678-9012",
+    epinSerial: "SER-112233",
+    epinPurchased: true,
+    phone: "08123334444",
+    phoneCorrected: false,
+    email: "seun.adebayo@yahoo.com",
+    examType: "UTME",
+    registered: true,
+    primaryInstitution: "UNIVERSITY OF LAGOS (UNILAG)",
+    primaryCourse: "MEDICINE & SURGERY",
+    subjects: ["ENGLISH LANGUAGE", "BIOLOGY", "PHYSICS", "CHEMISTRY"],
+    oLevelUploaded: true,
+    oLevelBoard: "WAEC",
+    oLevelYear: "2025",
+    oLevelResults: [
+      { subject: "ENGLISH LANGUAGE", grade: "A1" },
+      { subject: "BIOLOGY", grade: "A1" },
+      { subject: "PHYSICS", grade: "B2" },
+      { subject: "CHEMISTRY", grade: "A1" },
+      { subject: "CIVIC EDUCATION", grade: "B2" }
+    ],
+    regSlipPrinted: true,
+    examSlipPrinted: true,
+    examDate: "APRIL 18, 2026",
+    examTime: "07:00 AM",
+    examVenue: "EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS",
+    examSeat: "SEAT-084",
+    mockExamTaken: true,
+    mockExamScore: 340,
+    resultChecked: false,
+    utmeScore: 0,
+    emailLinked: false,
+    originalResultPrinted: false,
+    courseChanged: false,
+    dataCorrected: false,
+    capsStatus: "pending",
+    letterPrinted: false,
+    emailCorrected: false,
+    regularized: false,
+    createdAt: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "cand_3",
+    fullName: "CHINEDU OKAFOR",
+    nin: "45612378954",
+    ninVerified: true,
+    profileCode: "6601938472",
+    profileCodeGenerated: true,
+    epin: "EPIN-4455-8822-1199",
+    epinSerial: "SER-449201",
+    epinPurchased: true,
+    phone: "09056667777",
+    phoneCorrected: false,
+    email: "chinedu.okafor@outlook.com",
+    examType: "UTME",
+    registered: true,
+    primaryInstitution: "UNIVERSITY OF IBADAN (UI)",
+    primaryCourse: "MECHANICAL ENGINEERING",
+    subjects: ["ENGLISH LANGUAGE", "MATHEMATICS", "PHYSICS", "CHEMISTRY"],
+    oLevelUploaded: true,
+    oLevelBoard: "NECO",
+    oLevelYear: "2025",
+    oLevelResults: [
+      { subject: "ENGLISH LANGUAGE", grade: "B2" },
+      { subject: "MATHEMATICS", grade: "A1" },
+      { subject: "PHYSICS", grade: "A1" },
+      { subject: "CHEMISTRY", grade: "B3" },
+      { subject: "CIVIC EDUCATION", grade: "A1" }
+    ],
+    regSlipPrinted: true,
+    examSlipPrinted: true,
+    examDate: "APRIL 20, 2026",
+    examTime: "11:00 AM",
+    examVenue: "EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE B, IKEJA, LAGOS",
+    examSeat: "SEAT-002",
+    mockExamTaken: true,
+    mockExamScore: 312,
+    resultChecked: true,
+    utmeScore: 324,
+    emailLinked: true,
+    originalResultPrinted: true,
+    courseChanged: false,
+    dataCorrected: false,
+    capsStatus: "accepted",
+    letterPrinted: true,
+    emailCorrected: false,
+    regularized: false,
+    createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString()
+  },
+  {
+    id: "cand_4",
+    fullName: "FAVOUR AMADI",
+    nin: "55443322110",
+    ninVerified: true,
+    profileCode: "",
+    profileCodeGenerated: false,
+    epin: "",
+    epinSerial: "",
+    epinPurchased: false,
+    phone: "08055554444",
+    phoneCorrected: false,
+    email: "favour.amadi@gmail.com",
+    examType: "UTME",
+    registered: false,
+    primaryInstitution: "OBAFEMI AWOLOWO UNIVERSITY (OAU)",
+    primaryCourse: "MECHANICAL ENGINEERING",
+    subjects: ["ENGLISH LANGUAGE", "MATHEMATICS", "PHYSICS", "CHEMISTRY"],
+    oLevelUploaded: false,
+    oLevelBoard: "WAEC",
+    oLevelYear: "2025",
+    oLevelResults: [
+      { subject: "ENGLISH LANGUAGE", grade: "B3" },
+      { subject: "MATHEMATICS", grade: "B3" },
+      { subject: "PHYSICS", grade: "C5" },
+      { subject: "CHEMISTRY", grade: "C6" },
+      { subject: "CIVIC EDUCATION", grade: "A1" }
+    ],
+    regSlipPrinted: false,
+    examSlipPrinted: false,
+    examDate: "APRIL 18, 2026",
+    examTime: "07:00 AM",
+    examVenue: "EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS",
+    examSeat: "SEAT-084",
+    mockExamTaken: false,
+    mockExamScore: 0,
+    resultChecked: false,
+    utmeScore: 0,
+    emailLinked: false,
+    originalResultPrinted: false,
+    courseChanged: false,
+    dataCorrected: false,
+    capsStatus: "pending",
+    letterPrinted: false,
+    emailCorrected: false,
+    regularized: false,
+    createdAt: new Date().toISOString()
+  }
+];
+
 export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, user }) => {
-  // App-level state saved in localStorage for complete continuity
-  const [candidateState, setCandidateState] = useState(() => {
-    try {
-      const saved = localStorage.getItem('efado_jamb_candidate_lifecycle');
-      return saved ? JSON.parse(saved) : {
-        // Phase 1
-        nin: '',
-        ninVerified: false,
-        profileCode: '',
-        profileCodeGenerated: false,
-        epin: '',
-        epinSerial: '',
-        epinPurchased: false,
-        phone: '',
-        phoneCorrected: false,
-        fullName: (user.fullName || user.displayName || '').toUpperCase(),
-        email: user.email || '',
-        
-        // Phase 2
-        examType: 'UTME',
-        registered: false,
-        primaryInstitution: 'UNIVERSITY OF LAGOS (UNILAG)',
-        primaryCourse: 'COMPUTER SCIENCE',
-        subjects: ['ENGLISH LANGUAGE', 'MATHEMATICS', 'PHYSICS', 'CHEMISTRY'],
-        oLevelUploaded: false,
-        oLevelBoard: 'WAEC',
-        oLevelYear: '2025',
-        oLevelResults: [
-          { subject: 'ENGLISH LANGUAGE', grade: 'A1' },
-          { subject: 'MATHEMATICS', grade: 'B2' },
-          { subject: 'PHYSICS', grade: 'B3' },
-          { subject: 'CHEMISTRY', grade: 'B3' },
-          { subject: 'CIVIC EDUCATION', grade: 'A1' },
-        ],
-        regSlipPrinted: false,
-
-        // Phase 3
-        examSlipPrinted: false,
-        examDate: 'APRIL 18, 2026',
-        examTime: '07:00 AM',
-        examVenue: 'EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS',
-        examSeat: 'SEAT-084',
-        mockExamTaken: false,
-        mockExamScore: 0,
-        resultChecked: false,
-        utmeScore: 0,
-        emailLinked: false,
-        originalResultPrinted: false,
-
-        // Phase 4
-        courseChanged: false,
-        dataCorrected: false,
-        capsStatus: 'admitted', // 'pending' | 'admitted' | 'accepted' | 'rejected'
-        letterPrinted: false,
-        emailCorrected: false,
-        regularized: false,
-      };
-    } catch {
-      return {
-        nin: '', ninVerified: false, profileCode: '', profileCodeGenerated: false, epin: '', epinSerial: '', epinPurchased: false, phone: '', phoneCorrected: false, fullName: (user.fullName || user.displayName || '').toUpperCase(), email: user.email || '',
-        examType: 'UTME', registered: false, primaryInstitution: 'UNIVERSITY OF LAGOS (UNILAG)', primaryCourse: 'COMPUTER SCIENCE', subjects: ['ENGLISH LANGUAGE', 'MATHEMATICS', 'PHYSICS', 'CHEMISTRY'], oLevelUploaded: false, oLevelBoard: 'WAEC', oLevelYear: '2025', oLevelResults: [{ subject: 'ENGLISH LANGUAGE', grade: 'A1' }, { subject: 'MATHEMATICS', grade: 'B2' }, { subject: 'PHYSICS', grade: 'B3' }, { subject: 'CHEMISTRY', grade: 'B3' }, { subject: 'CIVIC EDUCATION', grade: 'A1' }], regSlipPrinted: false,
-        examSlipPrinted: false, examDate: 'APRIL 18, 2026', examTime: '07:00 AM', examVenue: 'EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS', examSeat: 'SEAT-084', mockExamTaken: false, mockExamScore: 0, resultChecked: false, utmeScore: 0, emailLinked: false, originalResultPrinted: false,
-        courseChanged: false, dataCorrected: false, capsStatus: 'admitted', letterPrinted: false, emailCorrected: false, regularized: false
-      };
-    }
+  // Operator / Agent states
+  const [isAgentConsole, setIsAgentConsole] = useState(true);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  
+  // Commissions variables
+  const [withdrawnCommissions, setWithdrawnCommissions] = useState(() => {
+    const saved = localStorage.getItem('efado_jamb_withdrawn_commissions');
+    return saved ? parseFloat(saved) : 0;
   });
 
-  useEffect(() => {
-    localStorage.setItem('efado_jamb_candidate_lifecycle', JSON.stringify(candidateState));
-  }, [candidateState]);
+  // Candidate DB State
+  const [candidates, setCandidates] = useState<any[]>(() => {
+    const saved = localStorage.getItem('efado_jamb_center_candidates');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return DEFAULT_CANDIDATES;
+  });
 
-  const updateState = (fields: Partial<typeof candidateState>) => {
-    setCandidateState((prev: any) => ({ ...prev, ...fields }));
+  // Active workspace candidate state
+  const [candidateState, setCandidateState] = useState<any>(() => {
+    return DEFAULT_CANDIDATES[0];
+  });
+
+  // Sync candidateState with currently selectedCandidateId and candidates list
+  useEffect(() => {
+    if (selectedCandidateId) {
+      const found = candidates.find(c => c.id === selectedCandidateId);
+      if (found) {
+        setCandidateState(found);
+      }
+    }
+  }, [selectedCandidateId, candidates]);
+
+  // Sync candidates to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('efado_jamb_center_candidates', JSON.stringify(candidates));
+  }, [candidates]);
+
+  // Real-time Cloud Synchronization using Firebase Firestore if logged in
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const q = query(
+      collection(db, 'jamb_candidates'),
+      where('operatorId', '==', auth.currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const list = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      if (list.length > 0) {
+        setCandidates(list);
+        localStorage.setItem('efado_jamb_center_candidates', JSON.stringify(list));
+      } else {
+        // Seed database
+        for (const cand of DEFAULT_CANDIDATES) {
+          try {
+            const { setDoc, doc } = await import('firebase/firestore');
+            await setDoc(doc(db, 'jamb_candidates', cand.id), {
+              ...cand,
+              operatorId: auth.currentUser!.uid
+            });
+          } catch (err) {
+            console.error("Error seeding default candidates to Firestore:", err);
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth.currentUser]);
+
+  // Unified update state handler which syncs both local list and Firestore
+  const updateState = async (fields: Partial<typeof candidateState>) => {
+    setCandidateState((prev: any) => {
+      const updated = { ...prev, ...fields };
+
+      // Update in local candidates array
+      setCandidates(curr => {
+        const idx = curr.findIndex(c => c.id === updated.id);
+        if (idx > -1) {
+          const next = [...curr];
+          next[idx] = updated;
+          localStorage.setItem('efado_jamb_center_candidates', JSON.stringify(next));
+
+          // Sync to Cloud
+          if (auth.currentUser) {
+            updateDoc(doc(db, 'jamb_candidates', updated.id), fields as any).catch(err => {
+              console.error("Firestore update sync error:", err);
+            });
+          }
+          return next;
+        }
+        return curr;
+      });
+
+      return updated;
+    });
+  };
+
+  // Add a brand new candidate to database
+  const addNewCandidate = async (name: string, nin: string, phone: string, examType: string) => {
+    const brandNew = {
+      id: "cand_" + Math.random().toString(36).substring(2, 11),
+      fullName: name.toUpperCase(),
+      nin: nin || "",
+      ninVerified: !!nin,
+      profileCode: "",
+      profileCodeGenerated: false,
+      epin: "",
+      epinSerial: "",
+      epinPurchased: false,
+      phone: phone || "",
+      phoneCorrected: false,
+      email: name.toLowerCase().replace(/\s+/g, ".") + "@gmail.com",
+      examType: examType || "UTME",
+      registered: false,
+      primaryInstitution: "UNIVERSITY OF LAGOS (UNILAG)",
+      primaryCourse: "COMPUTER SCIENCE",
+      subjects: ["ENGLISH LANGUAGE", "MATHEMATICS", "PHYSICS", "CHEMISTRY"],
+      oLevelUploaded: false,
+      oLevelBoard: "WAEC",
+      oLevelYear: "2025",
+      oLevelResults: [
+        { subject: "ENGLISH LANGUAGE", grade: "C5" },
+        { subject: "MATHEMATICS", grade: "B3" },
+        { subject: "PHYSICS", grade: "B3" },
+        { subject: "CHEMISTRY", grade: "C4" },
+        { subject: "CIVIC EDUCATION", grade: "B2" }
+      ],
+      regSlipPrinted: false,
+      examSlipPrinted: false,
+      examDate: "APRIL 18, 2026",
+      examTime: "07:00 AM",
+      examVenue: "EFADO DIGITAL COGNITIVE CBT CENTRE, ZONE A, IKEJA, LAGOS",
+      examSeat: "SEAT-084",
+      mockExamTaken: false,
+      mockExamScore: 0,
+      resultChecked: false,
+      utmeScore: 0,
+      emailLinked: false,
+      originalResultPrinted: false,
+      courseChanged: false,
+      dataCorrected: false,
+      capsStatus: "pending",
+      letterPrinted: false,
+      emailCorrected: false,
+      regularized: false,
+      createdAt: new Date().toISOString()
+    };
+
+    setCandidates(curr => {
+      const next = [brandNew, ...curr];
+      localStorage.setItem('efado_jamb_center_candidates', JSON.stringify(next));
+      return next;
+    });
+
+    if (auth.currentUser) {
+      try {
+        const { setDoc, doc } = await import('firebase/firestore');
+        await setDoc(doc(db, 'jamb_candidates', brandNew.id), {
+          ...brandNew,
+          operatorId: auth.currentUser.uid
+        });
+      } catch (err) {
+        console.error("Error creating candidate in Firestore:", err);
+      }
+    }
+
+    setSuccessMsg(`Candidate ${name.toUpperCase()} successfully enrolled in CBT database!`);
+  };
+
+  // Delete candidate from database
+  const deleteCandidate = async (candId: string) => {
+    const name = candidates.find(c => c.id === candId)?.fullName || "Candidate";
+    setCandidates(curr => {
+      const next = curr.filter(c => c.id !== candId);
+      localStorage.setItem('efado_jamb_center_candidates', JSON.stringify(next));
+      return next;
+    });
+
+    if (auth.currentUser) {
+      try {
+        await deleteDoc(doc(db, 'jamb_candidates', candId));
+      } catch (err) {
+        console.error("Error deleting candidate from Firestore:", err);
+      }
+    }
+
+    setSuccessMsg(`Candidate ${name} successfully removed from CBT records.`);
+  };
+
+  // Commissions mapping for the 18 phases
+  const calculateCandidateCommissions = (c: any) => {
+    let earned = 0;
+    if (c.ninVerified) earned += 200;
+    if (c.profileCodeGenerated) earned += 200;
+    if (c.epinPurchased) earned += 500;
+    if (c.registered) earned += 800;
+    if (c.oLevelUploaded) earned += 400;
+    if (c.regSlipPrinted) earned += 200;
+    if (c.examSlipPrinted) earned += 200;
+    if (c.mockExamTaken) earned += 300;
+    if (c.resultChecked) earned += 200;
+    if (c.emailLinked) earned += 200;
+    if (c.originalResultPrinted) earned += 400;
+    if (c.courseChanged) earned += 500;
+    if (c.dataCorrected) earned += 500;
+    if (c.capsStatus === 'accepted') earned += 300;
+    if (c.letterPrinted) earned += 500;
+    if (c.emailCorrected) earned += 300;
+    if (c.regularized) earned += 1500;
+    return earned;
+  };
+
+  // Aggregated Commissions stats
+  const totalCommissions = candidates.reduce((sum, c) => sum + calculateCandidateCommissions(c), 0);
+  const availableCommissions = totalCommissions - withdrawnCommissions;
+
+  // Withdraw commissions to master wallet
+  const withdrawCommissions = () => {
+    if (availableCommissions <= 0) {
+      setError("No available commissions to withdraw at this moment.");
+      return;
+    }
+    const amountToWithdraw = availableCommissions;
+    const newWithdrawn = withdrawnCommissions + amountToWithdraw;
+    setWithdrawnCommissions(newWithdrawn);
+    localStorage.setItem('efado_jamb_withdrawn_commissions', String(newWithdrawn));
+
+    const newBal = walletBalance + amountToWithdraw;
+    setWalletBalance(newBal);
+    localStorage.setItem('efado_simulated_balance', String(newBal));
+    setSuccessMsg(`Commissions of ₦${amountToWithdraw.toLocaleString()} successfully withdrawn and credited to your master EFADO wallet!`);
   };
 
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
@@ -214,8 +581,346 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-600/10 rounded-full blur-[100px] pointer-events-none" />
 
-        {/* Sidebar Left: Timeline Nav */}
-        <div className="w-full md:w-1/4 bg-slate-950/60 p-5 md:p-6 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between overflow-y-auto">
+        {isAgentConsole ? (
+          <div className="flex-grow flex flex-col h-full overflow-hidden">
+            {/* Master Console Header */}
+            <div className="p-5 md:p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-950/40 shrink-0">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-white uppercase tracking-tight italic">EFADO COGNITIVE CBT AGENT NETWORK</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Authorized National Operator Terminal • Station #084</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full uppercase font-black tracking-wider flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" /> System Live
+                </span>
+                <button 
+                  onClick={onClose}
+                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Container */}
+            <div className="flex-1 overflow-y-auto p-5 md:p-6 space-y-6">
+              
+              {/* Feedback messages */}
+              {error && (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-200 text-[10px] rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span className="font-black uppercase tracking-wider">{error}</span>
+                  <button onClick={() => setError(null)} className="ml-auto text-rose-400 hover:text-rose-200 uppercase text-[9px] font-black">Dismiss</button>
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-[10px] rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-black uppercase tracking-wider">{successMsg}</span>
+                  <button onClick={() => setSuccessMsg(null)} className="ml-auto text-emerald-400 hover:text-emerald-200 uppercase text-[9px] font-black">Dismiss</button>
+                </div>
+              )}
+
+              {/* Bento Stats row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                {/* Stat 1: Active Wallet */}
+                <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-indigo-500/20 transition-all relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-all" />
+                  <div>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Active Operator Wallet</span>
+                    <span className="text-2xl font-black text-white block mt-1">₦{walletBalance.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <button 
+                      onClick={() => {
+                        const newBal = walletBalance + 25000;
+                        setWalletBalance(newBal);
+                        localStorage.setItem('efado_simulated_balance', String(newBal));
+                        setSuccessMsg("₦25,000 simulated agent deposit successfully authorized!");
+                      }}
+                      className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border border-white/5 hover:border-white/10 cursor-pointer"
+                    >
+                      Refill Balance
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stat 2: Available Commissions */}
+                <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-emerald-500/20 transition-all relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl group-hover:bg-emerald-500/10 transition-all" />
+                  <div>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Accrued Commissions</span>
+                    <span className="text-2xl font-black text-emerald-400 block mt-1">₦{availableCommissions.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <button 
+                      onClick={withdrawCommissions}
+                      disabled={availableCommissions <= 0}
+                      className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:hover:bg-emerald-500 text-slate-950 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Credit to Wallet
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stat 3: Enrolled Candidates */}
+                <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-violet-500/20 transition-all relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-violet-500/5 rounded-full blur-xl group-hover:bg-violet-500/10 transition-all" />
+                  <div>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Candidates Enrolled</span>
+                    <span className="text-2xl font-black text-white block mt-1">{candidates.length}</span>
+                  </div>
+                  <div className="mt-4 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+                    {candidates.filter(c => c.registered).length} Fully Registered (Phase 2)
+                  </div>
+                </div>
+
+                {/* Stat 4: Admission Status */}
+                <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-pink-500/20 transition-all relative overflow-hidden group">
+                  <div className="absolute -top-10 -right-10 w-24 h-24 bg-pink-500/5 rounded-full blur-xl group-hover:bg-pink-500/10 transition-all" />
+                  <div>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Admissions Cleared</span>
+                    <span className="text-2xl font-black text-white block mt-1">
+                      {candidates.filter(c => c.capsStatus === 'accepted').length} Accepted
+                    </span>
+                  </div>
+                  <div className="mt-4 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+                    {candidates.filter(c => c.resultChecked).length} UTME Results Loaded
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Add Candidate Form Panel */}
+              <div className="p-5 bg-slate-950/60 border border-white/5 rounded-2xl">
+                <div className="flex items-center gap-2 mb-4">
+                  <Plus className="w-4 h-4 text-indigo-400" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-white">Enroll New Candidate to Terminal</span>
+                </div>
+                
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const name = fd.get('fullName') as string;
+                    const nin = fd.get('nin') as string;
+                    const phone = fd.get('phone') as string;
+                    const examType = fd.get('examType') as string;
+                    
+                    if (!name) {
+                      setError("Candidate's Full Name is required to enroll them.");
+                      return;
+                    }
+                    if (nin && nin.length !== 11) {
+                      setError("National Identification Number (NIN) must be exactly 11 digits.");
+                      return;
+                    }
+                    
+                    addNewCandidate(name, nin, phone, examType);
+                    e.currentTarget.reset();
+                  }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end text-xs"
+                >
+                  <div>
+                    <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Candidate Full Name</label>
+                    <input 
+                      type="text" 
+                      name="fullName"
+                      placeholder="e.g. ADEBIYI BOLAJI" 
+                      required
+                      className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-black"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">National Identity Number (NIN)</label>
+                    <input 
+                      type="text" 
+                      name="nin"
+                      placeholder="11-digit NIN (optional)" 
+                      maxLength={11}
+                      className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Phone Number</label>
+                    <input 
+                      type="text" 
+                      name="phone"
+                      placeholder="Candidate's Mobile" 
+                      className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-mono"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-[8.5px] font-black text-indigo-400 block uppercase mb-1">Exam Type</label>
+                      <select 
+                        name="examType"
+                        className="w-full p-2.5 bg-slate-900 border border-white/5 rounded-lg text-white font-mono font-bold"
+                      >
+                        <option value="UTME">UTME</option>
+                        <option value="DE">DIRECT ENTRY (DE)</option>
+                      </select>
+                    </div>
+                    <button 
+                      type="submit"
+                      className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase rounded-lg text-[10px] tracking-wider transition-all h-[42px] cursor-pointer"
+                    >
+                      Enlist
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Candidates Records Database Table */}
+              <div className="border border-white/5 rounded-2xl overflow-hidden bg-slate-950/20">
+                <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-950/40 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-400" />
+                    <span className="text-[11px] font-black uppercase tracking-wider text-white">Active Terminal Candidates Directory</span>
+                  </div>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    {/* Simple Search Input */}
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input 
+                        type="text" 
+                        placeholder="Search Candidate Name or NIN..."
+                        id="cbtSearchInput"
+                        onChange={(e) => {
+                          const val = e.target.value.toLowerCase();
+                          const rows = document.querySelectorAll('.candidate-db-row');
+                          rows.forEach((row: any) => {
+                            const name = row.getAttribute('data-name')?.toLowerCase() || '';
+                            const nin = row.getAttribute('data-nin')?.toLowerCase() || '';
+                            if (name.includes(val) || nin.includes(val)) {
+                              row.style.display = '';
+                            } else {
+                              row.style.display = 'none';
+                            }
+                          });
+                        }}
+                        className="w-full pl-9 pr-3 py-1.5 bg-slate-900 border border-white/5 rounded-xl text-[10px] text-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-slate-950/60 text-slate-400 font-black uppercase tracking-wider text-[8.5px]">
+                        <th className="p-4">Candidate Profile</th>
+                        <th className="p-4">Identity Verification</th>
+                        <th className="p-4">Lifecycle Status</th>
+                        <th className="p-4">Center Commissions</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {candidates.map((cand) => {
+                        const earnedComm = calculateCandidateCommissions(cand);
+                        
+                        // Compute current status badge
+                        let statusBadge = "Phase 1: Pre-Reg";
+                        let statusColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                        if (cand.capsStatus === 'accepted') {
+                          statusBadge = "Phase 4: CAPS Accepted";
+                          statusColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+                        } else if (cand.resultChecked) {
+                          statusBadge = "Phase 3: Score Verified";
+                          statusColor = "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
+                        } else if (cand.registered) {
+                          statusBadge = "Phase 2: Registered";
+                          statusColor = "bg-violet-500/10 text-violet-400 border-violet-500/20";
+                        }
+
+                        return (
+                          <tr 
+                            key={cand.id} 
+                            className="candidate-db-row hover:bg-white/5 transition-colors"
+                            data-name={cand.fullName}
+                            data-nin={cand.nin}
+                          >
+                            <td className="p-4">
+                              <div>
+                                <span className="font-black text-white block">{cand.fullName}</span>
+                                <span className="text-[10px] text-slate-400 block mt-0.5">{cand.email}</span>
+                                <span className="text-[9px] text-slate-500 font-mono block mt-0.5">ID: {cand.id}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${cand.ninVerified ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                  <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wide">NIN: {cand.nin || 'Not Verified'}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${cand.profileCodeGenerated ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                                  <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wide">Code: {cand.profileCode || 'Not Created'}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div>
+                                <span className={`inline-block px-2 py-0.5 border rounded uppercase font-black tracking-widest text-[8px] ${statusColor}`}>
+                                  {statusBadge}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block mt-1 font-medium">{cand.primaryInstitution?.slice(0, 24)}...</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div>
+                                <span className="font-black text-emerald-400 block text-xs">₦{earnedComm.toLocaleString()}</span>
+                                <span className="text-[9px] text-slate-500 block uppercase font-bold tracking-widest">accrued</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex justify-end items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedCandidateId(cand.id);
+                                    setIsAgentConsole(false);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                                >
+                                  Manage Candidate
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to delete ${cand.fullName}?`)) {
+                                      deleteCandidate(cand.id);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-lg transition-all cursor-pointer"
+                                  title="Delete Record"
+                                >
+                                  <Trash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Sidebar Left: Timeline Nav */}
+            <div className="w-full md:w-1/4 bg-slate-950/60 p-5 md:p-6 border-b md:border-b-0 md:border-r border-white/5 flex flex-col justify-between overflow-y-auto">
           <div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400 border border-indigo-500/20">
@@ -303,12 +1008,24 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
               )}
             </div>
             
-            <button 
-              onClick={onClose}
-              className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  setIsAgentConsole(true);
+                  setSelectedCandidateId(null);
+                  setSelectedServiceId(null);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer"
+              >
+                <Sliders className="w-3.5 h-3.5" /> Agent Console
+              </button>
+              <button 
+                onClick={onClose}
+                className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Core dynamic body */}
@@ -1463,6 +2180,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
           </AnimatePresence>
 
         </div>
+      </>
+    )}
 
       </motion.div>
     </div>

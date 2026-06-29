@@ -481,5 +481,8 @@ service cloud.firestore {
     match /efado_notifications/{notificationId} {
       allow read, write: if isAuthenticated();
     }
+    match /jamb_candidates/{candidateId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }
