@@ -56,6 +56,7 @@ import {
   where, 
   serverTimestamp,
   doc,
+  setDoc,
   updateDoc,
   increment
 } from '../firebase';
@@ -63,6 +64,7 @@ import { PaymentPlatform } from './PaymentPlatform';
 import { DomainSeller, DomainCatalog, DomainOrder, UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { EfadoEmailHub } from './EfadoEmailHub';
+import { VendingMarketplace } from './VendingMarketplace';
 
 interface EfadoDomainHubProps {
   user: UserProfile;
@@ -722,6 +724,25 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
   const [timelineExpanded, setTimelineExpanded] = useState<boolean>(true);
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
+  // Multi-Vendor Airtime/Data Marketplace States
+  const [vendingSubTab, setVendingSubTab] = useState<'refill' | 'marketplace' | 'console'>('refill');
+  const [telecomVendors, setTelecomVendors] = useState<any[]>([]);
+  const [telecomVendorOrders, setTelecomVendorOrders] = useState<any[]>([]);
+  const [myTelecomVendor, setMyTelecomVendor] = useState<any | null>(null);
+  const [selectedVendorForOrder, setSelectedVendorForOrder] = useState<any | null>(null);
+  
+  // Forms for vendor onboarding/management
+  const [vendorOnboardBusinessName, setVendorOnboardBusinessName] = useState('');
+  const [vendorOnboardEmail, setVendorOnboardEmail] = useState(user.email || '');
+  const [vendorProviderName, setVendorProviderName] = useState('Palmpay Business API');
+  const [vendorApiKey, setVendorApiKey] = useState('sk_live_vtu_eFado_xxxxxxxxx');
+  const [vendorApiEndpoint, setVendorApiEndpoint] = useState('https://api.palmpay.com/v1/vtu/recharge');
+  const [vendorMarginAirtime, setVendorMarginAirtime] = useState<number>(0.0); // markup/discount percentage
+  const [vendorMarginData, setVendorMarginData] = useState<number>(0.0);
+  const [vendorAirtimeActive, setVendorAirtimeActive] = useState<boolean>(true);
+  const [vendorDataActive, setVendorDataActive] = useState<boolean>(true);
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(1000);
+
   // Vendor/Merchant simulation state
   const [isMerchant, setIsMerchant] = useState<boolean>(false);
   const [merchantFloat, setMerchantFloat] = useState<number>(15000);
@@ -892,6 +913,117 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
     setIsEnrolling(false);
   };
 
+  // Vendor Onboarding Action
+  const handleOnboardVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!vendorOnboardBusinessName.trim()) {
+      alert("Please provide a valid business or partner name.");
+      return;
+    }
+    
+    try {
+      addVendingLog(`[Onboarding] Registering partner: "${vendorOnboardBusinessName}"...`);
+      const vendorRef = doc(db, 'telecom_vendors', user.uid);
+      await setDoc(vendorRef, {
+        id: user.uid,
+        businessName: vendorOnboardBusinessName,
+        email: vendorOnboardEmail,
+        status: 'verified', // Auto-verified for instant access in demo environment
+        providerName: vendorProviderName,
+        apiKey: vendorApiKey,
+        apiEndpoint: vendorApiEndpoint,
+        marginAirtime: Number(vendorMarginAirtime) || 0,
+        marginData: Number(vendorMarginData) || 0,
+        airtimeAvailability: vendorAirtimeActive,
+        dataAvailability: vendorDataActive,
+        walletBalance: 0,
+        salesCount: 0,
+        totalEarnings: 0,
+        createdAt: serverTimestamp()
+      });
+      
+      addVendingLog(`[Onboarding] Partner "${vendorOnboardBusinessName}" has been successfully onboarded and verified!`);
+    } catch (err: any) {
+      addVendingLog(`[Onboarding Error] Registration failed: ${err.message}`);
+      alert("Error: " + err.message);
+    }
+  };
+
+  // Vendor Config Update Action
+  const handleUpdateVendorConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myTelecomVendor) return;
+    
+    try {
+      addVendingLog(`[Config Engine] Updating VTU credentials & margin pricing for "${myTelecomVendor.businessName}"...`);
+      const vendorRef = doc(db, 'telecom_vendors', user.uid);
+      await updateDoc(vendorRef, {
+        providerName: vendorProviderName,
+        apiKey: vendorApiKey,
+        apiEndpoint: vendorApiEndpoint,
+        marginAirtime: Number(vendorMarginAirtime) || 0,
+        marginData: Number(vendorMarginData) || 0,
+        airtimeAvailability: vendorAirtimeActive,
+        dataAvailability: vendorDataActive
+      });
+      addVendingLog(`[Config Engine] API details and pricing margins saved successfully.`);
+      alert("Telecom vendor credentials and markup pricing updated successfully!");
+    } catch (err: any) {
+      addVendingLog(`[Config Error] Failed to update settings: ${err.message}`);
+      alert("Error: " + err.message);
+    }
+  };
+
+  // Vendor Wallet Payout Withdrawal Action
+  const handleVendorWithdrawal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!myTelecomVendor) return;
+    const balance = myTelecomVendor.walletBalance || 0;
+    if (withdrawAmount <= 0) {
+      alert("Please enter a positive withdrawal amount.");
+      return;
+    }
+    if (withdrawAmount > balance) {
+      alert(`Insufficient funds in your vendor wallet. Maximum available: ₦${balance.toLocaleString()}`);
+      return;
+    }
+
+    try {
+      addVendingLog(`[Payout Ledger] Executing withdrawal of ₦${withdrawAmount.toLocaleString()}...`);
+      
+      // Deduct from vendor wallet balance
+      const vendorRef = doc(db, 'telecom_vendors', user.uid);
+      await updateDoc(vendorRef, {
+        walletBalance: increment(-withdrawAmount)
+      });
+
+      // Credit to main user Deposit Wallet balance
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        depositWallet: increment(withdrawAmount)
+      });
+
+      // Log transaction in db
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        type: 'refund', // Or payout credit
+        amount: withdrawAmount,
+        currency: 'NGN',
+        status: 'completed',
+        purpose: 'Vendor Wallet Withdrawal',
+        description: `Withdrew ₦${withdrawAmount.toLocaleString()} from telecom vendor earnings balance into main deposit wallet.`,
+        timestamp: serverTimestamp()
+      });
+
+      addVendingLog(`[Payout Ledger] Payout successful. ₦${withdrawAmount.toLocaleString()} transferred to your main deposit wallet.`);
+      alert(`Withdrawal successful! ₦${withdrawAmount.toLocaleString()} has been added to your main deposit wallet.`);
+      setWithdrawAmount(1000);
+    } catch (err: any) {
+      addVendingLog(`[Payout Ledger Error] Payout execution failed: ${err.message}`);
+      alert("Withdrawal failed: " + err.message);
+    }
+  };
+
   const handleVendingPurchase = async () => {
     setVendingStatus('processing');
     setVendingStatusMessage('');
@@ -950,7 +1082,53 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
 
     // Apply Merchant Markup if purchasing in merchant mode
     let clientChargedNGN = purchaseCostNGN;
-    if (isMerchant) {
+    
+    // Multi-Vendor Routing Logic
+    let routedVendor: any = null;
+    let routedVendorMargin = 0;
+    let vendorMarkupAmount = 0;
+    let platformCommission = 0;
+    let vendorEarnedAmount = 0;
+
+    if (vendingSubTab === 'marketplace') {
+      if (selectedVendorForOrder) {
+        routedVendor = selectedVendorForOrder;
+        addVendingLog(`[Routing] Order manually routed to selected Vendor: "${routedVendor.businessName}"`);
+      } else {
+        // Find best active vendor (lowest margin)
+        const activeVendors = telecomVendors.filter((v: any) => {
+          if (vendingType === 'airtime') {
+            return v.status === 'verified' && v.airtimeAvailability !== false;
+          } else {
+            return v.status === 'verified' && v.dataAvailability !== false;
+          }
+        });
+        
+        if (activeVendors.length > 0) {
+          activeVendors.sort((a, b) => {
+            const marginA = vendingType === 'airtime' ? (a.marginAirtime || 0) : (a.marginData || 0);
+            const marginB = vendingType === 'airtime' ? (b.marginAirtime || 0) : (b.marginData || 0);
+            return marginA - marginB;
+          });
+          routedVendor = activeVendors[0];
+          addVendingLog(`[Routing] Order auto-routed to best active Vendor: "${routedVendor.businessName}"`);
+        } else {
+          addVendingLog(`[Routing Alert] No active verified vendors found. Routing via Standard Platform Direct.`);
+        }
+      }
+
+      if (routedVendor) {
+        routedVendorMargin = vendingType === 'airtime' ? (routedVendor.marginAirtime || 0) : (routedVendor.marginData || 0);
+        vendorMarkupAmount = (purchaseCostNGN * routedVendorMargin) / 100;
+        clientChargedNGN = purchaseCostNGN + vendorMarkupAmount;
+        
+        // Commission: standard middleman platform fee (2.5% of transaction amount)
+        platformCommission = parseFloat((clientChargedNGN * 0.025).toFixed(2));
+        vendorEarnedAmount = parseFloat((clientChargedNGN - platformCommission).toFixed(2));
+        
+        addVendingLog(`[Pricing Engine] Base cost: ₦${purchaseCostNGN.toLocaleString()} | Vendor Margin: ${routedVendorMargin}% (₦${vendorMarkupAmount.toLocaleString()}) | Selling Price: ₦${clientChargedNGN.toLocaleString()}`);
+      }
+    } else if (isMerchant) {
       const markupAmount = (purchaseCostNGN * merchantMarkup) / 100;
       clientChargedNGN = purchaseCostNGN + markupAmount;
       addVendingLog(`[Merchant Markup Applied] Base Cost: ₦${purchaseCostNGN.toLocaleString()} | Markup ${merchantMarkup}% (+₦${markupAmount.toFixed(1)}) | Selling Price: ₦${clientChargedNGN.toLocaleString()}`);
@@ -974,7 +1152,13 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
           [walletField]: increment(-clientChargedNGN)
         });
 
-        addVendingLog(`[API Request] POST https://api.reloadly.com/v1/topups - payload: { operatorId: "${opObj.code}", recipientPhone: "${countryObj.phonePrefix}${rawPhoneDigits}", amount: ${purchaseCostNGN} }`);
+        // Log vendor routing credentials if applicable
+        if (routedVendor) {
+          addVendingLog(`[API Route] Dispatching via Vendor Gateway: ${routedVendor.providerName || 'REST VTU API'}`);
+          addVendingLog(`[API Route] API Credentials validated. Gateway Target: ${routedVendor.apiEndpoint || 'https://api.vtu.com/recharge'}`);
+        } else {
+          addVendingLog(`[API Request] POST https://api.reloadly.com/v1/topups - payload: { operatorId: "${opObj.code}", recipientPhone: "${countryObj.phonePrefix}${rawPhoneDigits}", amount: ${purchaseCostNGN} }`);
+        }
         addVendingLog(`[API Pending] Queueing in Reloadly transaction pipeline (Ref ID: TX-${Math.floor(Math.random() * 900000 + 100000)})...`);
 
         setTimeout(async () => {
@@ -990,7 +1174,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               amountNGN: purchaseCostNGN,
               amountUSD: purchaseCostUSD,
               clientChargedNGN,
-              markupPercent: isMerchant ? merchantMarkup : 0,
+              markupPercent: isMerchant ? merchantMarkup : (routedVendor ? routedVendorMargin : 0),
               paymentMethod: vendingPayMethod,
               status: 'completed',
               createdAt: serverTimestamp()
@@ -1006,6 +1190,34 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               description: `Successful Global Reloadly dispatch to mobile user: ${countryObj.phonePrefix} ${rawPhoneDigits} (${opObj.name}).`,
               timestamp: serverTimestamp()
             });
+
+            // Credit routed vendor wallet if applicable
+            if (routedVendor) {
+              await updateDoc(doc(db, 'telecom_vendors', routedVendor.id), {
+                walletBalance: increment(vendorEarnedAmount),
+                totalEarnings: increment(vendorEarnedAmount),
+                salesCount: increment(1)
+              });
+
+              await addDoc(collection(db, 'telecom_vendor_orders'), {
+                vendorId: routedVendor.id,
+                vendorName: routedVendor.businessName,
+                customerEmail: user.email,
+                type: vendingType,
+                amount: purchaseCostNGN,
+                markupAmount: vendorMarkupAmount,
+                totalCharged: clientChargedNGN,
+                commission: platformCommission,
+                vendorEarned: vendorEarnedAmount,
+                carrier: opObj.name,
+                phone: `${countryObj.phonePrefix}${rawPhoneDigits}`,
+                dataAllowance: vendingType === 'data' ? (opObj.plans.find(p => p.id === vendingSelectedDataPlanId)?.dataAllowance || 'Standard Bundle') : '',
+                status: 'completed',
+                createdAt: serverTimestamp()
+              });
+
+              addVendingLog(`[Ledger Status] Multi-Vendor Settlement OK. Transferred ₦${vendorEarnedAmount.toLocaleString()} to "${routedVendor.businessName}" earnings wallet (Commission ₦${platformCommission.toLocaleString()}).`);
+            }
 
             if (isMerchant) {
               setMerchantFloat(prev => Math.max(0, prev - purchaseCostNGN));
@@ -1182,6 +1394,45 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
     );
     return () => unsubVending();
   }, [user.uid]);
+
+  // Subscription for multi-vendor airtime/data system
+  useEffect(() => {
+    const unsubVendors = onSnapshot(collection(db, 'telecom_vendors'), (snap) => {
+      const vendorList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTelecomVendors(vendorList);
+      
+      const myProfile = vendorList.find((v: any) => v.id === user.uid || v.email === user.email);
+      if (myProfile) {
+        setMyTelecomVendor(myProfile);
+      } else {
+        setMyTelecomVendor(null);
+      }
+    });
+
+    const unsubVendorOrders = onSnapshot(collection(db, 'telecom_vendor_orders'), (snap) => {
+      const orderList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTelecomVendorOrders(orderList);
+    });
+
+    return () => {
+      unsubVendors();
+      unsubVendorOrders();
+    };
+  }, [user.uid, user.email]);
+
+  useEffect(() => {
+    if (myTelecomVendor) {
+      setVendorOnboardBusinessName(myTelecomVendor.businessName || '');
+      setVendorOnboardEmail(myTelecomVendor.email || '');
+      setVendorProviderName(myTelecomVendor.providerName || 'Palmpay Business API');
+      setVendorApiKey(myTelecomVendor.apiKey || 'sk_live_vtu_eFado_xxxxxxxxx');
+      setVendorApiEndpoint(myTelecomVendor.apiEndpoint || 'https://api.palmpay.com/v1/vtu/recharge');
+      setVendorMarginAirtime(myTelecomVendor.marginAirtime || 0.0);
+      setVendorMarginData(myTelecomVendor.marginData || 0.0);
+      setVendorAirtimeActive(myTelecomVendor.airtimeAvailability ?? true);
+      setVendorDataActive(myTelecomVendor.dataAvailability ?? true);
+    }
+  }, [myTelecomVendor]);
 
   // Loop for fetching live price feeds from CoinGecko with automated random variation fallback
   useEffect(() => {
@@ -1832,7 +2083,63 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
           </div>
         </div>
 
-        {/* Wizard Step Progress Tracker */}
+        {/* Multi-Vendor Navigation Sub-tabs */}
+        <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-800 select-none">
+          <button
+            type="button"
+            onClick={() => setVendingSubTab('refill')}
+            className={`px-5 py-3 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
+              vendingSubTab === 'refill'
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 ring-2 ring-indigo-500/20'
+                : 'bg-slate-900 text-slate-400 hover:bg-slate-850 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Phone className="w-4 h-4 text-indigo-400" />
+            📱 Buy Recharge
+          </button>
+          <button
+            type="button"
+            onClick={() => setVendingSubTab('marketplace')}
+            className={`px-5 py-3 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
+              vendingSubTab === 'marketplace'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 ring-2 ring-amber-400/20'
+                : 'bg-slate-900 text-slate-400 hover:bg-slate-850 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-amber-500" />
+            👥 Vendor Marketplace
+          </button>
+          <button
+            type="button"
+            onClick={() => setVendingSubTab('console')}
+            className={`px-5 py-3 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 cursor-pointer ${
+              vendingSubTab === 'console'
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 ring-2 ring-emerald-500/20'
+                : 'bg-slate-900 text-slate-400 hover:bg-slate-850 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Briefcase className="w-4 h-4 text-emerald-400" />
+            ⚙️ Vendor Console {myTelecomVendor && <span className="bg-emerald-950 text-emerald-300 text-[8px] px-1.5 py-0.5 rounded-full font-bold">Partner</span>}
+          </button>
+        </div>
+
+        {vendingSubTab !== 'refill' ? (
+          <VendingMarketplace
+            user={user}
+            telecomVendors={telecomVendors}
+            telecomVendorOrders={telecomVendorOrders}
+            myTelecomVendor={myTelecomVendor}
+            selectedVendorForOrder={selectedVendorForOrder}
+            setSelectedVendorForOrder={setSelectedVendorForOrder}
+            vendingSubTab={vendingSubTab}
+            setVendingSubTab={setVendingSubTab}
+            setVendingFlowStep={setVendingFlowStep}
+            addVendingLog={addVendingLog}
+            vendingType={vendingType}
+          />
+        ) : (
+          <>
+            {/* Wizard Step Progress Tracker */}
         <div className="max-w-2xl mx-auto flex items-center justify-between px-6 py-2 select-none">
           {[
             { step: 'choice', label: '1. Service' },
@@ -2578,6 +2885,8 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
     );
   };

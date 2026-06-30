@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   CheckCircle2, 
+  Globe,
   CreditCard, 
   Info, 
   ShieldCheck, 
@@ -505,21 +506,47 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Simulated active wallet balance
+  // Simulated or Active wallet balance
   const [walletBalance, setWalletBalance] = useState(() => {
     const saved = localStorage.getItem('efado_simulated_balance');
-    return saved ? parseFloat(saved) : (user.playerWallet || 45000);
+    return saved ? parseFloat(saved) : (user.depositWallet || user.playerWallet || 45000);
   });
 
-  const spendWallet = (amount: number): boolean => {
-    if (walletBalance < amount) {
-      setError(`Insufficient active wallet funds. Required: ₦${amount.toLocaleString()}. Current Balance: ₦${walletBalance.toLocaleString()}`);
+  const spendWallet = async (amount: number): Promise<boolean> => {
+    const currentBalance = user.depositWallet !== undefined ? user.depositWallet : walletBalance;
+    if (currentBalance < amount) {
+      setError(`Insufficient wallet funds. Required: ₦${amount.toLocaleString()}. Current Balance: ₦${currentBalance.toLocaleString()}`);
       return false;
     }
-    const newBal = walletBalance - amount;
-    setWalletBalance(newBal);
-    localStorage.setItem('efado_simulated_balance', String(newBal));
-    return true;
+    
+    try {
+      if (auth.currentUser && user.depositWallet !== undefined) {
+        const { increment } = await import('firebase/firestore');
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          depositWallet: increment(-amount)
+        });
+        
+        await addDoc(collection(db, 'transactions'), {
+          userId: auth.currentUser.uid,
+          type: 'jamb_fee',
+          amount: amount,
+          currency: 'NGN',
+          status: 'completed',
+          purpose: 'JAMB Service Payment',
+          description: `Paid ₦${amount.toLocaleString()} for online JAMB processing services.`,
+          timestamp: new Date()
+        });
+      } else {
+        const newBal = walletBalance - amount;
+        setWalletBalance(newBal);
+        localStorage.setItem('efado_simulated_balance', String(newBal));
+      }
+      return true;
+    } catch (err: any) {
+      setError(`Payment processing error: ${err.message}`);
+      return false;
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -532,12 +559,12 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
   const services = [
     // Phase 1: Pre-Registration & Profile Setup
     { id: 'nin_verify', phase: 1, title: 'NIN Verification', desc: 'Validate 11-digit NIN with National NIMC Servers before registrations.', icon: Fingerprint, requiredKey: null, doneKey: 'ninVerified' },
-    { id: 'profile_code', phase: 1, title: 'Profile Code Creation', desc: 'Simulate 55019 / 66019 SMS protocol to command profile generation.', icon: Smartphone, requiredKey: 'ninVerified', doneKey: 'profileCodeGenerated' },
+    { id: 'profile_code', phase: 1, title: 'Profile Code Creation', desc: 'Initialize candidate profile code command by linking NIN to 55019 or 66019 cellular protocols.', icon: Smartphone, requiredKey: 'ninVerified', doneKey: 'profileCodeGenerated' },
     { id: 'epin_procure', phase: 1, title: 'JAMB e-Pin Procurement', desc: 'Purchase official 2026 e-PIN registry codes via wallet or bank.', icon: CreditCard, requiredKey: 'profileCodeGenerated', doneKey: 'epinPurchased' },
     { id: 'phone_correction', phase: 1, title: 'Used Phone Correction / Update', desc: 'Recover or swap lost or broken mobile lines linked to profile code.', icon: RefreshCw, requiredKey: 'profileCodeGenerated', doneKey: 'phoneCorrected' },
 
     // Phase 2: Registration & Data Upload
-    { id: 'jamb_reg', phase: 2, title: 'JAMB CBT Center Registration', desc: 'Capture biometric scans, select course pathways, and pick subjects.', icon: Users, requiredKey: 'epinPurchased', doneKey: 'registered' },
+    { id: 'jamb_reg', phase: 2, title: 'JAMB CBT Center Registration', desc: 'Configure institution and course priorities online. Note: Biometric finger scan must be completed physically at an accredited JAMB CBT center to finalize.', icon: Users, requiredKey: 'epinPurchased', doneKey: 'registered' },
     { id: 'result_upload', phase: 2, title: 'O-Level Result CAPS Upload', desc: 'Upload WAEC/NECO/NABTEB subject arrays to the central mainframe.', icon: Database, requiredKey: 'registered', doneKey: 'oLevelUploaded' },
     { id: 'reg_slip', phase: 2, title: 'Print Registration Confirmation Slip', desc: 'Generate official, security-embossed receipt of candidate choices.', icon: FileText, requiredKey: 'registered', doneKey: 'regSlipPrinted' },
 
@@ -591,8 +618,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                     <Database className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-base font-black text-white uppercase tracking-tight italic">EFADO COGNITIVE CBT AGENT NETWORK</h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Authorized National Operator Terminal • Station #084</p>
+                    <h2 className="text-base font-black text-white uppercase tracking-tight italic">EFADO GLOBAL COGNITIVE JAMB PORTAL</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Connecting Candidates Globally • Online Registration & Academic Processing</p>
                   </div>
                 </div>
               </div>
@@ -629,6 +656,28 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                 </div>
               )}
 
+              {/* Efado Global Candidate Connection Banner */}
+              <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border border-indigo-500/10 p-5 rounded-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5 max-w-2xl">
+                  <span className="text-[8px] bg-indigo-500/15 text-indigo-300 font-extrabold uppercase px-2 py-0.5 rounded-full tracking-wider font-mono border border-indigo-500/15 select-none">
+                    Efado Global Connectivity Suite
+                  </span>
+                  <h3 className="text-sm font-black uppercase text-white tracking-wider flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-indigo-400 animate-spin" /> Connecting Candidates Globally
+                  </h3>
+                  <p className="text-[10px] text-slate-300 font-semibold leading-relaxed">
+                    This global platform is created to render JAMB registration activities, process profiles, and enable candidates all over the globe to submit details and pay online. Candidates do not need to physically visit the office except for the mandatory biometric thumbprint, which can be done at any accredited JAMB CBT center.
+                  </p>
+                </div>
+                <div className="p-3 bg-indigo-950/40 border border-indigo-500/20 rounded-xl flex items-center gap-2.5 shrink-0 self-start md:self-auto select-none">
+                  <Fingerprint className="w-5 h-5 text-indigo-400 animate-pulse" />
+                  <div className="font-mono">
+                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">Thumbprint Step</p>
+                    <p className="text-[9px] font-bold text-white uppercase">Accredited CBT Center Only</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Bento Stats row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 
@@ -636,16 +685,24 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                 <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-indigo-500/20 transition-all relative overflow-hidden group">
                   <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl group-hover:bg-indigo-500/10 transition-all" />
                   <div>
-                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Active Operator Wallet</span>
-                    <span className="text-2xl font-black text-white block mt-1">₦{walletBalance.toLocaleString()}</span>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Active Processing Wallet</span>
+                    <span className="text-2xl font-black text-white block mt-1">₦{(user.depositWallet !== undefined ? user.depositWallet : walletBalance).toLocaleString()}</span>
                   </div>
                   <div className="mt-4 flex gap-2">
                     <button 
-                      onClick={() => {
-                        const newBal = walletBalance + 25000;
-                        setWalletBalance(newBal);
-                        localStorage.setItem('efado_simulated_balance', String(newBal));
-                        setSuccessMsg("₦25,000 simulated agent deposit successfully authorized!");
+                      onClick={async () => {
+                        if (auth.currentUser && user.depositWallet !== undefined) {
+                          const { increment } = await import('firebase/firestore');
+                          await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                            depositWallet: increment(25000)
+                          });
+                          setSuccessMsg("₦25,000 successfully deposited to your Efado Wallet!");
+                        } else {
+                          const newBal = walletBalance + 25000;
+                          setWalletBalance(newBal);
+                          localStorage.setItem('efado_simulated_balance', String(newBal));
+                          setSuccessMsg("₦25,000 successfully loaded to your Processing Wallet!");
+                        }
                       }}
                       className="flex-1 py-1.5 bg-white/5 hover:bg-white/10 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border border-white/5 hover:border-white/10 cursor-pointer"
                     >
@@ -676,11 +733,11 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                 <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-violet-500/20 transition-all relative overflow-hidden group">
                   <div className="absolute -top-10 -right-10 w-24 h-24 bg-violet-500/5 rounded-full blur-xl group-hover:bg-violet-500/10 transition-all" />
                   <div>
-                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Candidates Enrolled</span>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Candidates Processed</span>
                     <span className="text-2xl font-black text-white block mt-1">{candidates.length}</span>
                   </div>
                   <div className="mt-4 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
-                    {candidates.filter(c => c.registered).length} Fully Registered (Phase 2)
+                    {candidates.filter(c => c.registered).length} Profiles Ready (Phase 2)
                   </div>
                 </div>
 
@@ -688,7 +745,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                 <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex flex-col justify-between hover:border-pink-500/20 transition-all relative overflow-hidden group">
                   <div className="absolute -top-10 -right-10 w-24 h-24 bg-pink-500/5 rounded-full blur-xl group-hover:bg-pink-500/10 transition-all" />
                   <div>
-                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Admissions Cleared</span>
+                    <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-widest">Admissions Approved</span>
                     <span className="text-2xl font-black text-white block mt-1">
                       {candidates.filter(c => c.capsStatus === 'accepted').length} Accepted
                     </span>
@@ -704,7 +761,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
               <div className="p-5 bg-slate-950/60 border border-white/5 rounded-2xl">
                 <div className="flex items-center gap-2 mb-4">
                   <Plus className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[11px] font-black uppercase tracking-wider text-white">Enroll New Candidate to Terminal</span>
+                  <span className="text-[11px] font-black uppercase tracking-wider text-white">Register New Candidate Online</span>
                 </div>
                 
                 <form 
@@ -774,7 +831,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       type="submit"
                       className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase rounded-lg text-[10px] tracking-wider transition-all h-[42px] cursor-pointer"
                     >
-                      Enlist
+                      Process Candidate
                     </button>
                   </div>
                 </form>
@@ -785,7 +842,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                 <div className="p-4 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-950/40 shrink-0">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-indigo-400" />
-                    <span className="text-[11px] font-black uppercase tracking-wider text-white">Active Terminal Candidates Directory</span>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-white">Global Candidates Registry</span>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
                     {/* Simple Search Input */}
@@ -1062,7 +1119,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
               <div className="space-y-4">
                 <div>
                   <h3 className="text-base font-black text-white uppercase italic">Phase {activeTab} Interactive Service Hub</h3>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">Select any process sequence to simulate functional outcomes with active credentials.</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mt-0.5">Select any process sequence to initialize secure online candidate registration, payments and processing.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -1215,16 +1272,16 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-black text-white uppercase italic">Profile Code Creation (SMS Gateway)</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simulate sending your verified NIN to 55019 or 66019 via secure cellular protocols.</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Initialize candidate profile code command by linking NIN to 55019 or 66019 cellular protocols.</p>
                     </div>
 
                     <div className="p-5 bg-slate-950 rounded-2xl border border-white/5 space-y-4 max-w-sm mx-auto">
-                      <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block text-center">SMS PHONE SIMULATOR</span>
+                      <span className="text-[8.5px] font-black text-indigo-400 uppercase tracking-widest block text-center">CANDIDATE SMS PORTAL GATEWAY</span>
                       
                       <div className="bg-slate-900 rounded-xl p-4 space-y-3 h-48 flex flex-col justify-between border border-white/5">
                         <div className="flex justify-between items-center border-b border-white/5 pb-2">
                           <span className="text-[9px] font-black text-slate-400">TO: 55019</span>
-                          <span className="text-[9px] font-mono text-slate-500">MOCK-CELL-SECURE</span>
+                          <span className="text-[9px] font-mono text-slate-500">CELLULAR-SECURE</span>
                         </div>
                         
                         <div className="flex-grow flex flex-col justify-end space-y-2 text-[10px]">
@@ -1288,8 +1345,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(5700)) {
+                        onClick={async () => {
+                          if (await spendWallet(5700)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
@@ -1351,8 +1408,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(1000)) {
+                        onClick={async () => {
+                          if (await spendWallet(1000)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
@@ -1374,7 +1431,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                   <div className="space-y-4">
                     <div>
                       <h4 className="text-sm font-black text-white uppercase italic">JAMB CBT Center Biometrics & Course Setup</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Simulate capture of digital biometrics and submit course priorities.</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Initialize candidate course layout and prepare physical biometric details.</p>
                     </div>
 
                     <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 space-y-4 text-xs">
@@ -1424,12 +1481,12 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                               setTimeout(() => {
                                 setLoading(false);
                                 updateState({ registered: true });
-                                setSuccessMsg('Biometric capture complete! JAMB UTME Registration finalized.');
+                                setSuccessMsg('Online pre-registration profile is complete! Candidate can physically thumbprint at any accredited JAMB CBT center.');
                               }, 1500);
                             }}
                             className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 border border-indigo-500/20 rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-wider text-indigo-400 hover:text-white transition-all cursor-pointer"
                           >
-                            <Fingerprint className="w-5 h-5" /> Simulate Fingerprint Scan
+                            <Fingerprint className="w-5 h-5" /> Confirm Pre-Registration & Payments Completed
                           </button>
                         </div>
                       </div>
@@ -1780,8 +1837,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                         <div className="space-y-3">
                           <p className="text-[9.5px] text-slate-400 uppercase leading-relaxed font-semibold">Generating the Original Result slip containing photographic security identifiers requires a standard service validation fee.</p>
                           <button
-                            onClick={() => {
-                              if (spendWallet(1500)) {
+                            onClick={async () => {
+                              if (await spendWallet(1500)) {
                                 setLoading(true);
                                 setTimeout(() => {
                                   setLoading(false);
@@ -1891,8 +1948,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(2500)) {
+                        onClick={async () => {
+                          if (await spendWallet(2500)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
@@ -1930,8 +1987,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(2500)) {
+                        onClick={async () => {
+                          if (await spendWallet(2500)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
@@ -2028,8 +2085,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                         <div className="space-y-3">
                           <p className="text-[9.5px] text-slate-400 uppercase leading-relaxed font-semibold">Generating the colored, Registrar-stamped official Admission Letter requires a small administrative validation fee.</p>
                           <button
-                            onClick={() => {
-                              if (spendWallet(2000)) {
+                            onClick={async () => {
+                              if (await spendWallet(2000)) {
                                 setLoading(true);
                                 setTimeout(() => {
                                   setLoading(false);
@@ -2101,8 +2158,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(1000)) {
+                        onClick={async () => {
+                          if (await spendWallet(1000)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
@@ -2148,8 +2205,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                       </div>
 
                       <button
-                        onClick={() => {
-                          if (spendWallet(10000)) {
+                        onClick={async () => {
+                          if (await spendWallet(10000)) {
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);

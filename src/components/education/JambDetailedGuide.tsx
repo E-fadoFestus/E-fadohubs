@@ -25,7 +25,8 @@ import {
   Award,
   Layers,
   ChevronDown,
-  ArrowLeft
+  ArrowLeft,
+  CreditCard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -34,6 +35,7 @@ interface JambDetailedGuideProps {
 }
 
 const sections = [
+  { id: 'site_guide', title: 'Efado Onboarding Guide', icon: Globe },
   { id: 'registration', title: 'Registration Protocol', icon: UserCheck },
   { id: 'structure', title: 'Exam Structure', icon: Layers },
   { id: 'subjects', title: 'Subject Hub', icon: BookMarked },
@@ -71,7 +73,7 @@ const courseCombinations = [
 ];
 
 export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose }) => {
-  const [activeSection, setActiveSection] = useState('registration');
+  const [activeSection, setActiveSection] = useState('site_guide');
   const [subjectSearch, setSubjectSearch] = useState('');
 
   const filteredCombinations = courseCombinations.filter(c => 
@@ -80,6 +82,202 @@ export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose })
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'site_guide':
+        return (
+          <div className="space-y-8">
+            <header className="mb-10">
+              <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase italic underline decoration-indigo-500 decoration-4 underline-offset-8 transition-all">Efado Hubs Quickstart Guide</h2>
+              <p className="text-slate-500 font-bold uppercase tracking-widest text-[11px] mt-4">Connecting Candidates Globally • Core Operations, Live Webinars, Payments, and CBT Simulator Instruction.</p>
+            </header>
+
+            {/* Global Context Message */}
+            <div className="bg-gradient-to-r from-indigo-900 to-slate-950 text-white p-8 rounded-[2.5rem] border border-indigo-500/10 relative overflow-hidden shadow-xl">
+              <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl" />
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <span className="text-[9px] bg-indigo-500/25 text-indigo-200 font-extrabold uppercase px-3 py-1 rounded-full tracking-wider font-mono border border-indigo-500/25">
+                    Platform Orientation
+                  </span>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Welcome to the Efado Cognitive Network</h3>
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                    Efado is designed to handle all academic, financial, and preparatory tasks entirely online from anywhere in the world. Learn how to fund your wallet, buy official JAMB e-PINs, practice with our CBT engine, and join interactive webinars right below.
+                  </p>
+                </div>
+                <div className="flex gap-4 shrink-0">
+                  <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center w-28 select-none">
+                    <CheckCircle2 className="w-5 h-5 text-indigo-400 mb-1" />
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-300">100% Online</p>
+                    <p className="text-[7.5px] font-bold text-slate-400">Except Biometrics</p>
+                  </div>
+                  <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-center w-28 select-none">
+                    <Globe className="w-5 h-5 text-emerald-400 mb-1 animate-pulse" />
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-300">Global</p>
+                    <p className="text-[7.5px] font-bold text-slate-400">Any Device, Anywhere</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step-by-Step Onboarding Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Card 1: Registration Step by Step */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
+                    <UserCheck className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase">1. JAMB Registration Steps</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">The streamlined path to get fully registered</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-4 font-sans">
+                  <div className="flex gap-4 items-start">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-950 uppercase">Link NIN & Verify Credentials</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Verify your 11-digit National Identification Number (NIN) in the Processing Portal under "NIN Verification". This validates your identity with government servers.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4 items-start">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-950 uppercase">Create Profile Code</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Initiate the SMS cellular gateway command on our platform to generate your 10-digit Profile Code linking your NIN to cell networks securely.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-start">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-950 uppercase">Procure e-PIN & Choice Setup</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">Instantly purchase your official 2026 JAMB e-PIN. Set up your institution and course choices, choosing preferred universities and subject combinations.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 items-start">
+                    <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">4</span>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-950 uppercase">Physical Thumbprinting Only</h4>
+                      <p className="text-[11px] text-slate-500 leading-relaxed font-semibold">With your online profile fully completed, you do not need to sit in queues. Simply walk into any accredited JAMB CBT center to perform the mandatory physical biometrics thumbprint to finalize!</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Payments & Wallets */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+                    <CreditCard className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase">2. Making Payments</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">How to fund your processing wallet</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-xs font-sans">
+                  <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-500/10">
+                    <h4 className="font-black uppercase text-emerald-900 mb-1 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" /> Active Processing Wallet
+                    </h4>
+                    <p className="text-[11px] text-emerald-950 font-semibold leading-relaxed">
+                      Your current active processing wallet balance is shown on the portal header. Every transaction (buying e-PINs, validating NINs, data correction) is automatically and securely deducted from this balance.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 font-semibold text-slate-500 text-[11px] leading-relaxed">
+                    <div className="flex gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-950 font-black uppercase">Instantly Add Funds</span>: Click the <span className="text-emerald-600 font-black">"Add Simulated Funds (₦25k)"</span> button on the dashboard to immediately replenish your active balance without leaving the app.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-950 font-black uppercase">Automated Auditing</span>: Clear invoices, receipt cards, and confirmation numbers are generated for every payment to give you clean records.</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-950 font-black uppercase">Secure Mainframe</span>: Backend architecture automatically updates user document collections securely in Firestore on successful actions.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: CBT Simulator */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
+                    <Award className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase">3. Using CBT Simulator</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Optimize your cognitive response speed</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-xs font-sans text-slate-600">
+                  <p className="font-semibold leading-relaxed">
+                    The CBT Engine mimics the exact configuration, user interface, and keyboard shortcuts of the national UTME examination.
+                  </p>
+
+                  <ul className="space-y-3 font-semibold text-[11px] leading-relaxed">
+                    <li className="flex gap-3">
+                      <Layers className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">Practice Drill Mode</span>: Practice with unlimited time or custom subject combinations. Helps you master topics incrementally.</p>
+                    </li>
+                    <li className="flex gap-3">
+                      <Target className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">Master Mock Mode</span>: Full 180-question exam simulated under strict countdown conditions to test your speed and endurance.</p>
+                    </li>
+                    <li className="flex gap-3">
+                      <Clock className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">Analytical Insights</span>: On completion, get an instant score breakdown, percentage accuracy, and time-per-question metrics.</p>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Card 4: Webinars & Seminars */}
+              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-4 border-b border-slate-100 pb-4">
+                  <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-violet-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 uppercase">4. Seminars & Live Webinars</h3>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Connect with seasoned tutors and mentors</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-xs font-sans text-slate-600">
+                  <p className="font-semibold leading-relaxed">
+                    Learn how to attend workshops, webinars, and prep sessions live inside the Efado Seminar Portal.
+                  </p>
+
+                  <ul className="space-y-3 font-semibold text-[11px] leading-relaxed">
+                    <li className="flex gap-3">
+                      <Globe className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">Find Webinars</span>: Click on the "Webinars & Academic Seminars" module in the Education Hub. Explore upcoming events.</p>
+                    </li>
+                    <li className="flex gap-3">
+                      <Clock className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">Check Countdown Timers</span>: Active timers display remaining time before the webinar broadcasts. Registrants will get instant audio alarms.</p>
+                    </li>
+                    <li className="flex gap-3">
+                      <Zap className="w-4 h-4 text-violet-500 shrink-0 mt-0.5" />
+                      <p><span className="text-slate-900 font-black uppercase">One-Click Join</span>: Once live, click the "Join Webinar Channel" button to instantly link with the stream, download slides, and participate in Q&As.</p>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
       case 'registration':
         return (
           <div className="space-y-8">
