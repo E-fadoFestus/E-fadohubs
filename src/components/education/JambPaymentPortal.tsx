@@ -42,6 +42,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { db, auth, collection, onSnapshot, query, where, addDoc, doc, updateDoc, deleteDoc } from '../../firebase';
+import { ThankYouPage } from '../ThankYouPage';
 
 interface JambPaymentPortalProps {
   onClose: () => void;
@@ -503,6 +504,7 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
   // Error and transaction feedback
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [thankYouData, setThankYouData] = useState<{ amount: number; productName: string; referenceId: string; } | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -594,6 +596,27 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
   ];
   const [mockIndex, setMockIndex] = useState(0);
   const [mockScore, setMockScore] = useState(0);
+
+  if (thankYouData) {
+    return (
+      <ThankYouPage
+        user={user}
+        amount={thankYouData.amount}
+        productName={thankYouData.productName}
+        referenceId={thankYouData.referenceId}
+        paymentMethod="EFADO Active Processing Wallet"
+        onClose={() => setThankYouData(null)}
+        onJoinWebinar={() => {
+          setThankYouData(null);
+          alert('Welcome! Rerouting to Active Academic Coaching Webinar room on EFADO ecosystem...');
+        }}
+        onLaunchCBT={() => {
+          setThankYouData(null);
+          alert('Initializing exam engines... Preparing mock UTME test arrays.');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md p-2 md:p-6 flex items-center justify-center overflow-y-auto font-sans">
@@ -1350,12 +1373,18 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
                             setLoading(true);
                             setTimeout(() => {
                               setLoading(false);
+                              const refId = `EFD_EPIN_${Math.floor(100000 + Math.random() * 900000)}`;
                               updateState({ 
                                 epinPurchased: true,
                                 epin: `EPIN-${Math.floor(100000 + Math.random() * 900000)}-UTME`,
                                 epinSerial: `SER-${Math.floor(100000000 + Math.random() * 900000000)}`
                               });
                               setSuccessMsg('JAMB Registration e-PIN bought successfully.');
+                              setThankYouData({
+                                amount: 5700,
+                                productName: 'JAMB UTME Registration e-PIN & Syllabus Literature',
+                                referenceId: refId
+                              });
                             }, 1500);
                           }
                         }}
