@@ -637,7 +637,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
                   onClick={handleNext}
                   className="flex-[2] py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all flex items-center justify-center gap-2"
                 >
-                  Next: License Credentials <ArrowRight className="w-4 h-4" />
+                  Next: License Credentials (FCCPC) <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -654,8 +654,8 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
           >
             <div className="mb-6">
               <span className="text-[9px] font-black uppercase tracking-widest bg-emerald-500/15 text-emerald-400 px-2.5 py-1 rounded-md">Step 3 of 5</span>
-              <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-tight mt-3">Lending License credentials</h2>
-              <p className="text-slate-400 text-xs">Verify your structural legal authority to issue microloans and commercial loans.</p>
+              <h2 className="text-2xl font-black text-white mb-1 uppercase tracking-tight mt-3">Lending License & FCCPC Credentials</h2>
+              <p className="text-slate-400 text-xs">Verify your structural legal authority and FCCPC accreditation to issue loans.</p>
             </div>
 
             <div className="space-y-6">
