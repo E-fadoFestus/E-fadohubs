@@ -774,9 +774,17 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
                       <Phone className="w-5 h-5" />
                    </a>
                 )}
-                <a href={`mailto:${SUPPORT_EMAILS.DEFAULT}`} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-indigo-600 hover:text-white transition-all border border-white/10">
+                <button 
+                   onClick={() => {
+                     navigator.clipboard.writeText(SUPPORT_EMAILS.DEFAULT);
+                     alert(`📧 Corporate Email Address Copied:\n\n${SUPPORT_EMAILS.DEFAULT}\n\nPasted address to clipboard! Opening email application...`);
+                     window.location.href = `mailto:${SUPPORT_EMAILS.DEFAULT}`;
+                   }}
+                   className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 hover:bg-indigo-600 hover:text-white transition-all border border-white/10"
+                   title="Contact EFADO Email Support"
+                >
                    <Mail className="w-5 h-5" />
-                </a>
+                </button>
               </div>
             </div>
 

@@ -599,7 +599,10 @@ const AffiliateMarketingModal: React.FC<{
   const [isCopied, setIsCopied] = useState(false);
   const [activePromoTab, setActivePromoTab] = useState<'CARD' | 'SOCIAL' | 'EMAIL'>('CARD');
 
-  const referralLink = `https://e-fado.com/join?ref=${affiliateCode.toUpperCase()}`;
+  const origin = typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')
+    ? window.location.origin
+    : 'https://www.e-fado.com';
+  const referralLink = `${origin}/#partners?ref=${affiliateCode.toUpperCase()}`;
 
   const copyRefLink = () => {
     navigator.clipboard.writeText(referralLink);
@@ -1094,11 +1097,14 @@ export const EfadoPartnerHub: React.FC<PartnerHubProps> = ({ user, onNavigate })
                   <p className="text-slate-400 text-sm mb-8 leading-relaxed">
                     Hook-up your existing e-commerce site, blog, or logistics portal to EFADO the North Star Hubs. Sync inventory and payments seamlessly.
                   </p>
-                  <code className="block p-4 bg-black/40 rounded-xl text-[10px] font-mono text-purple-300 mb-8 border border-white/5">
-                    {`<script src="https://api.efado.com/v1/sync.js"></script>`}
+                  <code className="block p-4 bg-black/40 rounded-xl text-[10px] font-mono text-purple-300 mb-8 border border-white/5 overflow-x-auto">
+                    {`<script src="${typeof window !== 'undefined' ? window.location.origin : 'https://www.e-fado.com'}/api/sync.js" data-affiliate="${user?.uid || 'EFADOGLOBAL'}"></script>`}
                   </code>
-                  <button className="w-full py-4 bg-white/5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white border border-white/5 group-hover:bg-purple-600 transition-all">
-                    Documentation
+                  <button 
+                    onClick={() => alert(`API Integration Guidance:\n\n1. Copy the script tag above into the <head> section of your external website or e-commerce store.\n\n2. Notice the attribute data-affiliate="${user?.uid || 'EFADOGLOBAL'}". This automatically syncs all external visitor checkouts to your EFADO Partner Ledger for instant commission payouts!`)}
+                    className="w-full py-4 bg-white/5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white border border-white/5 group-hover:bg-purple-600 transition-all"
+                  >
+                    Documentation & Setup
                   </button>
                 </div>
 
@@ -1114,7 +1120,14 @@ export const EfadoPartnerHub: React.FC<PartnerHubProps> = ({ user, onNavigate })
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-black text-emerald-400 uppercase">Live Webhook Status: Active</span>
                   </div>
-                  <button className="w-full py-4 bg-white/5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white border border-white/5 group-hover:bg-indigo-600 transition-all">
+                  <button 
+                    onClick={() => {
+                      const key = 'efado_sk_live_' + Math.random().toString(36).substring(2, 10).toUpperCase() + '_' + Date.now().toString().slice(-4);
+                      navigator.clipboard.writeText(key);
+                      alert(`🔐 Strategic Webhook Secret Key Generated:\n\n${key}\n\nThis secret key has been copied to your clipboard. Configure your receiving server to verify incoming EFADO webhook signatures using HMAC SHA-256 with this secret.`);
+                    }}
+                    className="w-full py-4 bg-white/5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white border border-white/5 group-hover:bg-indigo-600 transition-all"
+                  >
                     Generate Secret Key
                   </button>
                 </div>

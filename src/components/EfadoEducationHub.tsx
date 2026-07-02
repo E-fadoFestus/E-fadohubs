@@ -426,7 +426,11 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                 </button>
                 <div className="w-1 h-1 bg-white/20 rounded-full" />
                 <button 
-                  onClick={() => window.location.href = `mailto:${SUPPORT_EMAILS.EDUCATION}`}
+                  onClick={() => {
+                    navigator.clipboard.writeText(SUPPORT_EMAILS.EDUCATION);
+                    alert(`📧 Support Email Address Copied:\n\n${SUPPORT_EMAILS.EDUCATION}\n\nPasted address to clipboard! Opening your default email client...`);
+                    window.location.href = `mailto:${SUPPORT_EMAILS.EDUCATION}`;
+                  }}
                   className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 hover:text-indigo-300 transition-colors"
                 >
                   <Mail className="w-3 h-3" /> Support

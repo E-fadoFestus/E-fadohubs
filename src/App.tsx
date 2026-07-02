@@ -107,7 +107,8 @@ import {
   ShieldAlert,
   ArrowRight,
   Smartphone,
-  Laptop
+  Laptop,
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
@@ -521,6 +522,7 @@ function AppContent() {
   const [gistInitialView, setGistInitialView] = useState<'FEED' | 'REELS' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS'>('FEED');
   const [gistAutoStartLive, setGistAutoStartLive] = useState(false);
   const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED'>('HOME');
+  const [activeReferralCode, setActiveReferralCode] = useState<string | null>(() => localStorage.getItem('efado_referral_code'));
   const [showAgeGate, setShowAgeGate] = useState(false);
   const [isAgeVerified, setIsAgeVerified] = useState(false);
   const [showLegalHub, setShowLegalHub] = useState(false);
@@ -826,13 +828,31 @@ function AppContent() {
   // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
   useEffect(() => {
     const handleHashRoute = () => {
-      const hash = window.location.hash.replace('#', '').toLowerCase().trim();
+      // 1. Capture strategic affiliate code from search params or hash if present
+      try {
+        const fullHref = window.location.href;
+        const refMatch = fullHref.match(/[?&]ref=([a-zA-Z0-9_-]+)/i);
+        if (refMatch && refMatch[1]) {
+          const capturedRef = refMatch[1].toUpperCase();
+          localStorage.setItem('efado_referral_code', capturedRef);
+          setActiveReferralCode(capturedRef);
+          console.log('🎯 Strategic Referral Code captured in ledger:', capturedRef);
+        }
+      } catch (err) {
+        console.warn('URL parsing notice:', err);
+      }
+
+      // 2. Clean hash routing
+      const rawHash = window.location.hash.replace('#', '').split('?')[0].toLowerCase().trim();
+      const pathname = window.location.pathname.toLowerCase().replace('/', '').trim();
+      const hash = rawHash || pathname;
+
       if (!hash) {
         setActiveHub('HOME');
         return;
       }
 
-      console.log('Synchronizing tactical navigation state for hash:', hash);
+      console.log('Synchronizing tactical navigation state for route:', hash);
       if (hash === 'community' || hash === 'community_hubs') {
         setActiveHub('COMMUNITY_HUBS');
         if (user) {
@@ -864,7 +884,7 @@ function AppContent() {
         setActiveHub(hash.toUpperCase() as any);
       } else if (hash === 'loanhub' || hash === 'loan') {
         setActiveHub('HEPIHANDS_LOAN');
-      } else if (hash === 'partners') {
+      } else if (hash === 'partners' || hash === 'join' || hash === 'affiliate' || hash.startsWith('partner')) {
         setActiveHub('PARTNER_HUB');
       }
     };
@@ -2239,6 +2259,36 @@ function AppContent() {
             <span className="uppercase whitespace-nowrap">Invite Hubs</span>
           </button>
         </div>
+
+        {/* Strategic Referral Code Active Banner */}
+        {activeReferralCode && (
+          <motion.div 
+            initial={{ opacity: 0, y: -15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-5 bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-600/20 border-2 border-amber-500/40 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl text-white"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Target className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="text-left">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 block">Strategic Referral Hook-Up Verified</span>
+                <p className="text-xs md:text-sm font-bold text-slate-100 mt-0.5">
+                  Affiliate Code <span className="font-mono bg-amber-500/30 px-2 py-0.5 rounded text-amber-300 font-black">{activeReferralCode}</span> is active! You are eligible for priority processing & discounted corporate rates.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                localStorage.removeItem('efado_referral_code');
+                setActiveReferralCode(null);
+              }}
+              className="px-4 py-2 bg-black/40 hover:bg-black/60 text-slate-300 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border border-white/10 shrink-0"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
 
         {/* Active Banner Announcements */}
         {announcements.filter(ann => ann.active !== false && !dismissedAnnouncements.includes(ann.id || '') && (!ann.type || ann.type === 'banner')).length > 0 && (
