@@ -122,6 +122,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     businessName: '',
     registrationNumber: '',
     licenseNumber: '',
+    fccpcApprovalNumber: '',
     issuingAuthority: '',
     contactEmail: user.email || '',
     contactPhone: '',
@@ -194,12 +195,16 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     }
     if (currentStep === 'CREDENTIALS') {
       if (!formData.licenseNumber) errors.licenseNumber = "Authorized Lending License Number is required by law.";
+      if (!formData.fccpcApprovalNumber) errors.fccpcApprovalNumber = "FCCPC Approval / Lending Regulatory License No. is mandatory for statutory compliance.";
       if (!formData.issuingAuthority) errors.issuingAuthority = "Specify the regulating financial authority body.";
       if (!formData.address) errors.address = "Registered administrative office physical location is mandatory.";
     }
     if (currentStep === 'CERTIFICATES') {
       if (!uploadedFiles['licenseCert']?.completed) {
         errors.licenseCert = "Lender License Certificate document is mandatory for validation.";
+      }
+      if (!uploadedFiles['fccpcCert']?.completed) {
+        errors.fccpcCert = "FCCPC Regulatory Approval or Lending License Certificate is mandatory for compliance verification.";
       }
       if (formData.vendorType === 'Organization' && !uploadedFiles['cacCert']?.completed) {
         errors.cacCert = "Certificate of Corporate Incorporation is required for registered organizations.";
@@ -268,6 +273,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
         vendorType: formData.vendorType,
         registrationNumber: formData.registrationNumber,
         licenseNumber: formData.licenseNumber,
+        fccpcApprovalNumber: formData.fccpcApprovalNumber,
         issuingAuthority: formData.issuingAuthority,
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
@@ -653,6 +659,17 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
             </div>
 
             <div className="space-y-6">
+              {/* Statutory Compliance Notice for Vendors */}
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start gap-3">
+                <Award className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-left space-y-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 block">STATUTORY REGULATORY MANDATE (FCCPC & CBN COMPLIANCE)</span>
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                    To maintain platform KYC accreditation and protect consumer rights, all vendors offering digital lending services through EFADO must provide their verifiable <strong className="text-white">FCCPC Approval Number</strong> or official statutory lending license.
+                  </p>
+                </div>
+              </div>
+
               <FormField 
                 label="Lending License Permit Number" 
                 icon={<Scale className="w-3.5 h-3.5 text-slate-400" />}
@@ -668,6 +685,24 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
                   }}
                   placeholder="e.g. CBN/MFI-837493" 
                   className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
+                />
+              </FormField>
+
+              <FormField 
+                label="FCCPC Approval Number / Regulatory License No." 
+                icon={<Award className="w-3.5 h-3.5 text-emerald-400" />}
+                error={validationErrors.fccpcApprovalNumber}
+                hint="Federal Competition and Consumer Protection Commission (FCCPC) digital lending approval or permit registration number."
+              >
+                <input 
+                  type="text" 
+                  value={formData.fccpcApprovalNumber}
+                  onChange={(e) => {
+                    setFormData({...formData, fccpcApprovalNumber: e.target.value});
+                    if (validationErrors.fccpcApprovalNumber) setValidationErrors({...validationErrors, fccpcApprovalNumber: ''});
+                  }}
+                  placeholder="e.g. FCCPC/INTERIM/ML/2026/0894 or CBN Accreditation No." 
+                  className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-emerald-500/40 hover:border-emerald-500/70 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all shadow-sm"
                 />
               </FormField>
 
@@ -779,6 +814,49 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
                     <UploadCloud className="w-8 h-8 text-slate-500 group-hover:text-emerald-400 mx-auto mb-2 transition-colors" />
                     <p className="text-xs font-bold text-slate-300">Drag & Drop or Click to Upload License Certificate</p>
                     <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Accepted Formats: PDF, PNG, JPG (Max 5MB)</p>
+                  </div>
+                )}
+              </div>
+
+              {/* FCCPC Approval Certificate */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-black uppercase tracking-widest text-slate-200 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-emerald-400" /> FCCPC Regulatory Approval / Digital License Document
+                  </span>
+                  <span className="text-[8.5px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">MANDATORY FOR LENDERS</span>
+                </div>
+                {validationErrors.fccpcCert && (
+                  <p className="text-[9.5px] text-rose-500 font-bold mb-2 flex items-center gap-1"><ShieldAlert className="w-3.5 h-3.5" /> {validationErrors.fccpcCert}</p>
+                )}
+                {uploadedFiles['fccpcCert'] ? (
+                  <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-8 h-8 text-emerald-400" />
+                      <div>
+                        <p className="text-xs font-bold text-white">{uploadedFiles['fccpcCert'].name}</p>
+                        <p className="text-[10px] text-slate-400">{uploadedFiles['fccpcCert'].size} • {uploadedFiles['fccpcCert'].completed ? 'FCCPC Compliance Verified' : `Uploading ${uploadedFiles['fccpcCert'].progress}%`}</p>
+                      </div>
+                    </div>
+                    {uploadedFiles['fccpcCert'].completed ? (
+                      <button 
+                        onClick={() => removeUploadedFile('fccpcCert')}
+                        className="p-1.5 bg-slate-700 hover:bg-rose-950 hover:text-rose-400 rounded-lg text-slate-400 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                    )}
+                  </div>
+                ) : (
+                  <div 
+                    onClick={() => simulateFileUpload('fccpcCert', 'FCCPC_Digital_Lending_Approval_2026.pdf')}
+                    className="border-2 border-dashed border-emerald-500/30 hover:border-emerald-500 bg-slate-900/60 p-6 rounded-2xl text-center cursor-pointer transition-all hover:bg-slate-800/20 group shadow-inner"
+                  >
+                    <UploadCloud className="w-8 h-8 text-emerald-500/60 group-hover:text-emerald-400 mx-auto mb-2 transition-colors" />
+                    <p className="text-xs font-bold text-slate-300">Drag & Drop or Click to Upload Verifiable FCCPC Approval / License</p>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-1">Accepted Formats: PDF, PNG, JPG (Max 10MB)</p>
                   </div>
                 )}
               </div>

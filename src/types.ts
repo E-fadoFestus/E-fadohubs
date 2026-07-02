@@ -494,6 +494,7 @@ export interface LoanVendor {
   vendorType?: string;
   registrationNumber: string;
   licenseNumber: string;
+  fccpcApprovalNumber?: string;
   issuingAuthority: string;
   contactEmail: string;
   contactPhone: string;
