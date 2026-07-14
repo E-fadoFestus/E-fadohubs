@@ -56,6 +56,7 @@ import { EfadoIntelligenceFeed } from './components/EfadoIntelligenceFeed';
 import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
+import { IosInstallGuideModal } from './components/IosInstallGuideModal';
 import { 
   Info,  Wallet, Lock,
   LogOut, 
@@ -349,6 +350,13 @@ function AppContent() {
   const [standardRegisterSuccess, setStandardRegisterSuccess] = useState<string | null>(null);
   const [isInAppBrowser, setIsInAppBrowser] = useState(false);
 
+  // Progressive Web App (PWA) Installation, Connectivity, and iOS State Guides
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
   useEffect(() => {
     const isUserInAppBrowser = () => {
       if (typeof navigator === 'undefined') return false;
@@ -359,7 +367,53 @@ function AppContent() {
       );
     };
     setIsInAppBrowser(isUserInAppBrowser());
+
+    // Detect iOS
+    const checkIsIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(checkIsIOS);
   }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+      console.log('EFADO: Progressive Web App installed successfully!');
+    };
+
+    const handleOnlineStatus = () => setIsOnline(true);
+    const handleOfflineStatus = () => setIsOnline(false);
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as any);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOfflineStatus);
+
+    if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt as any);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOfflineStatus);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`EFADO: User choice outcome: ${outcome}`);
+    setDeferredPrompt(null);
+    setIsInstallable(false);
+  };
 
   useEffect(() => {
     if (user) {
@@ -383,6 +437,7 @@ function AppContent() {
   const [authorizedSmsRecipient, setAuthorizedSmsRecipient] = useState('');
 
   useEffect(() => {
+    if (!user) return;
     // Keep dynamic CEO password synchronized from centralized system settings in Firestore
     const unsub = onSnapshot(doc(db, 'adminStats', 'settings'), (snap) => {
       if (snap.exists()) {
@@ -392,9 +447,11 @@ function AppContent() {
           console.log('Centralized CEO Authorization Credential synced safely.');
         }
       }
+    }, (e) => {
+      console.warn("Settings fetch not authorized yet or failed:", e.message);
     });
     return () => unsub();
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -798,6 +855,8 @@ function AppContent() {
                   .filter(a => a.active)
                   .sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
                 setAnnouncements(ann);
+              }, (e) => {
+                console.warn("Saved session: failed to load announcements:", e.message);
               });
 
               // Listen for admin stats
@@ -805,6 +864,8 @@ function AppContent() {
                 if (snapshot.exists()) {
                   setAdminStats(snapshot.data() as AdminStats);
                 }
+              }, (e) => {
+                console.warn("Saved session: failed to load adminStats/global:", e.message);
               });
 
               return; // Skip setting user to null
@@ -2059,6 +2120,17 @@ function AppContent() {
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {/* PWA Install Button */}
+              {(isInstallable || isIOS) && (
+                <button 
+                  onClick={isInstallable ? handleInstallClick : () => setShowIosInstallGuide(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white rounded-xl text-[9px] sm:text-[10px] font-black tracking-widest hover:brightness-110 transition-all shadow-xl border border-emerald-400/20 uppercase"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Install App</span>
+                </button>
+              )}
+
               <button 
                 onClick={() => setShowUserGuide(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
@@ -2102,10 +2174,14 @@ function AppContent() {
             
             <div className="hidden sm:flex flex-col items-end px-3 border-r border-white/5">
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">{liveUsers.toLocaleString()} Hub Active</span>
+                <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500 animate-ping'}`} />
+                <span className={`text-[9px] font-black uppercase tracking-widest ${isOnline ? 'text-emerald-500' : 'text-red-400'}`}>
+                  {isOnline ? `${liveUsers.toLocaleString()} Hub Active` : 'Offline Mode'}
+                </span>
               </div>
-              <span className="text-[7px] font-bold text-slate-500 uppercase tracking-[0.2em]">Synchronising...</span>
+              <span className="text-[7px] font-bold text-slate-500 uppercase tracking-[0.2em]">
+                {isOnline ? 'Synchronising...' : 'Using Cache'}
+              </span>
             </div>
 
             <div className="hidden sm:flex flex-col items-end">
@@ -2113,7 +2189,8 @@ function AppContent() {
                 {user.is_super_admin && <span className="px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/25 text-amber-400 text-[7px] font-black rounded uppercase tracking-widest animate-pulse">Free CEO Access</span>}
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{user.is_super_admin ? 'OWNER ADMIN' : 'Logged in'}</span>
               </div>
-              <span className="text-xs font-bold text-slate-300">{user.email.split('@')[0]}</span>
+              <span className="text-xs font-bold text-slate-300 capitalize">{user.fullName || user.displayName || user.email.split('@')[0]}</span>
+              {user.phoneNumber && <span className="text-[9px] font-semibold text-slate-400 mt-0.5 font-mono">{user.phoneNumber}</span>}
             </div>
             <button 
               onClick={handleLogout}
@@ -3102,6 +3179,11 @@ function AppContent() {
               <AboutCeoModal 
                 isOpen={showAboutCeo}
                 onClose={() => setShowAboutCeo(false)}
+              />
+
+              <IosInstallGuideModal 
+                isOpen={showIosInstallGuide}
+                onClose={() => setShowIosInstallGuide(false)}
               />
             </AnimatePresence>
 

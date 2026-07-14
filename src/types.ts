@@ -14,6 +14,7 @@ export interface UserProfile {
   gbp_balance?: number;
   eur_balance?: number;
   fullName?: string;
+  phoneNumber?: string;
   miningWallet?: number;
   miningProgress?: {
     stage: 'E' | 'F' | 'A' | 'D' | 'O' | 'COMPLETED';
@@ -141,6 +142,16 @@ export interface VendorProfile {
   pickupMethod: 'Pickup' | 'Delivery' | 'Both';
   termsAccepted: boolean;
   createdAt: any;
+  // Flutterwave Automated Subaccount & Payment Split System
+  account_number?: string;
+  bank_code?: string;
+  bank_name?: string;
+  business_email?: string;
+  business_mobile?: string;
+  currency?: string;
+  split_percentage?: number;
+  subaccount_id?: string;
+  flutterwave_status?: 'active' | 'pending' | 'failed';
 }
 
 export interface MarketProduct {
@@ -202,6 +213,7 @@ export interface MarketOrder {
   };
   paymentMethod: string;
   paystackRef?: string | null;
+  flwRef?: string | null;
   directProof?: any;
   status: 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'pending_manual_verification' | 'verifying';
   trackingNumber?: string;

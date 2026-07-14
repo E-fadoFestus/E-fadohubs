@@ -69,6 +69,11 @@ export default defineConfig(({mode}) => {
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.VITE_FLW_PUBLIC_KEY': JSON.stringify(env.VITE_FLW_PUBLIC_KEY || env.VITE_FLW_PUBLIC_KE || ''),
+      'import.meta.env.VITE_FLW_PUBLIC_KE': JSON.stringify(env.VITE_FLW_PUBLIC_KE || ''),
+      'import.meta.env.VITE_FLW_SECRET_KEY': JSON.stringify(env.VITE_FLW_SECRET_KEY || ''),
+      'import.meta.env.VITE_PAYPAL_HOSTED_BUTTON_ID': JSON.stringify(env.VITE_PAYPAL_HOSTED_BUTTON_ID || ''),
+      'import.meta.env.VITE_PAYPAL_CLIENT_ID': JSON.stringify(env.VITE_PAYPAL_CLIENT_ID || ''),
     },
     resolve: {
       alias: {

@@ -825,7 +825,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
         if (currentBalance < totalCostNGN) {
           setEnrollmentStatus({
             success: false,
-            message: `Insufficient funds in your ${paymentMethod === 'win_wallet' ? 'Win Wallet / Play Balance' : 'Deposit Wallet'}. You need ₦${totalCostNGN.toLocaleString()} but currently have ₦${currentBalance.toLocaleString()}. Please choose Bank Transfer/Paystack or fund your wallet.`
+            message: `Insufficient funds in your ${paymentMethod === 'win_wallet' ? 'Win Wallet / Play Balance' : 'Deposit Wallet'}. You need ₦${totalCostNGN.toLocaleString()} but currently have ₦${currentBalance.toLocaleString()}. Please choose Bank Transfer/Flutterwave or fund your wallet.`
           });
           setIsEnrolling(false);
           return;
@@ -878,7 +878,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               courseName: courseName,
               priceUSD: totalCostUSD,
               priceNGN: totalCostNGN,
-              paymentMethod: 'paystack_node',
+              paymentMethod: 'flutterwave_node',
               status: 'completed',
               createdAt: serverTimestamp()
             });
@@ -890,7 +890,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               currency: 'NGN',
               status: 'completed',
               purpose: `AI Course Enrollment (${courseName})`,
-              description: `Instant course seat activated after successful Paystack node authorization.`,
+              description: `Instant course seat activated after successful Flutterwave node authorization.`,
               timestamp: serverTimestamp()
             });
 
@@ -1257,7 +1257,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
         setPaymentPlatformOnSuccess(() => async () => {
           try {
             setVendingStatus('processing');
-            addVendingLog(`[API Connect] Payment confirmed on Paystack Node! Initializing vending dispatch...`);
+            addVendingLog(`[API Connect] Payment confirmed on Flutterwave Node! Initializing vending dispatch...`);
             
             await addDoc(collection(db, 'vending_purchases'), {
               userId: user.uid,
@@ -1271,7 +1271,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
               amountUSD: purchaseCostUSD,
               clientChargedNGN,
               markupPercent: isMerchant ? merchantMarkup : 0,
-              paymentMethod: 'paystack_node',
+              paymentMethod: 'flutterwave_node',
               status: 'completed',
               createdAt: serverTimestamp()
             });
@@ -1288,7 +1288,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
             });
 
             setVendingStatus('success');
-            setVendingStatusMessage(`Paystack Refill completed successfully! ₦${clientChargedNGN.toLocaleString()} has been processed. Mobile service is active on ${countryObj.phonePrefix} ${rawPhoneDigits}.`);
+            setVendingStatusMessage(`Flutterwave Refill completed successfully! ₦${clientChargedNGN.toLocaleString()} has been processed. Mobile service is active on ${countryObj.phonePrefix} ${rawPhoneDigits}.`);
             addVendingLog(`[API 200 OK] Reloadly Dispatch OK. Carrier ID: REL-${Math.floor(Math.random() * 99999999)}. Dispatch Completed!`);
             setVendingFlowStep('result');
           } catch (innerErr: any) {
@@ -3117,16 +3117,71 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                       ))}
                       {/* Mock Sellers if none in DB */}
                       {sellers.length === 0 && [
-                        { name: 'HostAfrica', logo: 'https://picsum.photos/seed/host1/100/100' },
-                        { name: 'BlueWave', logo: 'https://picsum.photos/seed/host2/100/100' },
-                        { name: 'Goddy', logo: 'https://picsum.photos/seed/host3/100/100' },
-                        { name: 'Hostger', logo: 'https://picsum.photos/seed/host4/100/100' }
+                        { 
+                          name: 'HostAfrica', 
+                          url: 'https://www.hostafrica.com', 
+                          logoUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=100&h=100&fit=crop&q=80',
+                          type: 'Web Hosting & Domains',
+                          tag: 'Cloud Partner',
+                          color: 'from-orange-500 to-amber-600',
+                          initials: 'HA'
+                        },
+                        { 
+                          name: 'BlueWave', 
+                          url: 'https://www.bluehost.com', 
+                          logoUrl: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=100&h=100&fit=crop&q=80',
+                          type: 'Premium Hosting',
+                          tag: 'Official Partner',
+                          color: 'from-blue-500 to-indigo-600',
+                          initials: 'BW'
+                        },
+                        { 
+                          name: 'GoDaddy', 
+                          url: 'https://www.godaddy.com', 
+                          logoUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=100&h=100&fit=crop&q=80',
+                          type: 'Domain Registrar',
+                          tag: 'Global Registrar',
+                          color: 'from-emerald-500 to-teal-600',
+                          initials: 'GD'
+                        },
+                        { 
+                          name: 'Hostinger', 
+                          url: 'https://www.hostinger.com', 
+                          logoUrl: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=100&h=100&fit=crop&q=80',
+                          type: 'VPS & Cloud Hosting',
+                          tag: 'Premium Partner',
+                          color: 'from-purple-500 to-violet-600',
+                          initials: 'HI'
+                        }
                       ].map((s, i) => (
-                        <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-200 opacity-50 grayscale">
-                          <div className="w-16 h-16 bg-slate-50 rounded-2xl mb-4" />
-                          <h3 className="text-lg font-black text-slate-900 uppercase">{s.name}</h3>
-                          <p className="text-xs text-slate-400">Coming Soon</p>
-                        </div>
+                        <motion.a 
+                          key={i} 
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          whileHover={{ y: -5 }}
+                          className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-xl transition-all cursor-pointer group flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-100 relative">
+                                <img src={s.logoUrl} alt={s.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                                <div className={`absolute inset-0 bg-gradient-to-br ${s.color} opacity-20`} />
+                              </div>
+                              <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-slate-500 group-hover:text-slate-900 group-hover:bg-amber-50 group-hover:border-amber-200 transition-colors`}>
+                                {s.tag}
+                              </span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">{s.name}</h3>
+                            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">{s.type}</p>
+                          </div>
+                          <div className="mt-6 flex items-center justify-between border-t border-slate-50 pt-4">
+                            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-widest group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                              Visit Site
+                            </span>
+                            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                          </div>
+                        </motion.a>
                       ))}
                     </div>
                   </div>
@@ -4674,7 +4729,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                           <span className="text-[9px] text-slate-400 uppercase font-black">Admin Receiving Bank (CEO)</span>
                         </div>
                         <p className="text-[11px] font-black text-white mt-1">Guaranty Trust Bank (GTBank)</p>
-                        <p className="text-xs text-emerald-400 font-mono font-bold">01229415892</p>
+                        <p className="text-xs text-emerald-400 font-mono font-bold">0122941589</p>
                         <p className="text-[9px] text-slate-500 font-medium mt-0.5 leading-tight uppercase">EFADO INT'L COGNITIVE SERVICES</p>
                         <div className="border-t border-slate-800 mt-2 pt-2 flex items-center justify-between">
                           <span className="text-[8px] text-slate-400 uppercase font-bold">Sovereign Benefit Rate</span>
@@ -4736,7 +4791,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                   sourceAmount: "500 USDT",
                                   targetAmount: "775,000 NGN",
                                   fee: "38,750 NGN (5%)",
-                                  recipient: "GTBank ****5892 (Sovereign Benefit)",
+                                  recipient: "GTBank ****1589 (Sovereign Benefit)",
                                   status: "Settled",
                                   txHash: "0x7a839dae198b182390f7a39e831"
                                 },
@@ -4982,7 +5037,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                 <div>
                                   <h4 className="text-[10px] font-black text-indigo-950 uppercase tracking-wider">CEO / Admin Brokerage Protocol Rules</h4>
                                   <p className="text-[10px] text-indigo-700 leading-relaxed font-semibold mt-0.5">
-                                    The 5.0% service charge is allocated directly to the founding eFado Administrator bank index (GTBank - 01229415892) for processing settlements. This is auto-deducted before payout dispatch.
+                                    The 5.0% service charge is allocated directly to the founding eFado Administrator bank index (GTBank - 0122941589) for processing settlements. This is auto-deducted before payout dispatch.
                                   </p>
                                 </div>
                               </div>
@@ -5250,7 +5305,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                           sourceAmount: `${otcSellAmount} ${otcSellCrypto}`,
                                           targetAmount: `${cleanDispatchVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${otcGetCurrency}`,
                                           fee: `${splitRoyalty.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${otcGetCurrency} (5%)`,
-                                          recipient: `${otcPayoutMethod === 'bank' ? (otcBankName || 'Traditional Bank') + ' ****' + (otcBankAccount.slice(-4) || '5892') : otcPayoutMethod === 'paypal' ? otcEmailAddress : (otcBankAccount || 'Sovereign Wallet')}`,
+                                          recipient: `${otcPayoutMethod === 'bank' ? (otcBankName || 'Traditional Bank') + ' ****' + (otcBankAccount.slice(-4) || '1589') : otcPayoutMethod === 'paypal' ? otcEmailAddress : (otcBankAccount || 'Sovereign Wallet')}`,
                                           status: 'Settled',
                                           txHash: '0x' + Math.random().toString(16).substr(2, 24)
                                         };
@@ -5258,7 +5313,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                         setOtcOrders(prev => [payload, ...prev]);
                                         setOtcStep('complete');
                                         addVendingLog(`[PAYOUT DISPATCH] 3/3 block confirmations archived! Broker system initiated fiat output settlement through bank API gateway.`);
-                                        addVendingLog(`[PAYOUT CONFIRMED] Direct cashout finalized. Transferred ${cleanDispatchVal.toLocaleString()} ${otcGetCurrency} to ${payload.recipient}. 5% royalty routed to CEO bank index GTBank (01229415892). Done.`);
+                                        addVendingLog(`[PAYOUT CONFIRMED] Direct cashout finalized. Transferred ${cleanDispatchVal.toLocaleString()} ${otcGetCurrency} to ${payload.recipient}. 5% royalty routed to CEO bank index GTBank (0122941589). Done.`);
                                       }, 6000);
                                     }}
                                     disabled={otcProgress > 0}
@@ -5503,7 +5558,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                       
                                       setOtcOrders(prev => [receipt, ...prev]);
                                       setConvStatus('success');
-                                      addVendingLog(`[DISPATCH] Sovereign remit settled successfully! Dispatched ${convertedRecipientGets.toLocaleString()} ${convTargetCurrency} out to ${receipt.recipient}. 5% royalty routed to CEO GTBANK corporate (01229415892).`);
+                                      addVendingLog(`[DISPATCH] Sovereign remit settled successfully! Dispatched ${convertedRecipientGets.toLocaleString()} ${convTargetCurrency} out to ${receipt.recipient}. 5% royalty routed to CEO GTBANK corporate (0122941589).`);
                                     }, 3000);
                                   }}
                                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest py-4 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -6196,7 +6251,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                         <div className="space-y-1 border-t border-slate-800 pt-2 text-[10px]">
                           <p>🏦 <strong>Bank:</strong> Guaranty Trust Bank (GTBank)</p>
                           <p>📋 <strong>Acc Name:</strong> EFADO INTERNATIONAL COGNITIVE SERVICES</p>
-                          <p>🔢 <strong>Acc Num:</strong> 01229415892</p>
+                          <p>🔢 <strong>Acc Num:</strong> 0122941589</p>
                         </div>
                       </div>
                     )}

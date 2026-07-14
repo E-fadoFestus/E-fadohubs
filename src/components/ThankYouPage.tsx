@@ -32,7 +32,7 @@ export const ThankYouPage: React.FC<ThankYouPageProps> = ({
   amount,
   productName,
   referenceId,
-  paymentMethod = 'Paystack Instant Gate',
+  paymentMethod = 'Flutterwave Instant Gate',
   onClose,
   onJoinWebinar,
   onLaunchCBT

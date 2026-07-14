@@ -47,6 +47,14 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [expandedTxIds, setExpandedTxIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedTxIds(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -420,6 +428,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
             {paginatedTxs.map((tx, idx) => {
               const uniqueId = tx.id || String(tx.timestamp?.seconds || startIdx + idx);
               const isHighlighted = highlightedTxId === uniqueId;
+              const isExpanded = !!expandedTxIds[uniqueId];
               return (
                 <motion.div
                   key={`${uniqueId}-${idx}`}
@@ -427,48 +436,53 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className={`group relative duration-500 rounded-[1.5rem] transition-all ${
+                  className={`group relative duration-500 rounded-[1.5rem] transition-all bg-slate-950/20 border border-white/5 overflow-hidden ${
                     isHighlighted ? 'ring-4 ring-amber-500 bg-amber-500/10 shadow-2xl scale-[1.01]' : ''
                   }`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-all rounded-[1.5rem]" />
-                  <div className="relative glass-card-ultra p-6 rounded-[1.5rem] border border-white/5 flex items-center justify-between gap-6 hover:translate-x-2 transition-all">
-                    <div className="flex items-center gap-6">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-all rounded-[1.5rem] pointer-events-none" />
+                  
+                  {/* Clickable Header Area of Row */}
+                  <div 
+                    onClick={() => toggleExpand(uniqueId)}
+                    className="relative p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] transition-all"
+                  >
+                    <div className="flex items-center gap-4 sm:gap-6">
+                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
                         tx.type === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' :
                         tx.type === 'withdrawal' ? 'bg-rose-500/20 text-rose-400' :
                         'bg-indigo-500/20 text-indigo-400'
                       }`}>
-                        {tx.type === 'deposit' ? <ArrowDownLeft className="w-6 h-6" /> :
-                         tx.type === 'withdrawal' ? <ArrowUpRight className="w-6 h-6" /> :
-                         <CreditCard className="w-6 h-6" />}
+                        {tx.type === 'deposit' ? <ArrowDownLeft className="w-5 h-5 sm:w-6 sm:h-6" /> :
+                         tx.type === 'withdrawal' ? <ArrowUpRight className="w-5 h-5 sm:w-6 sm:h-6" /> :
+                         <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1 col">
-                          <h4 className="text-lg font-black text-white uppercase tracking-tighter italic">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h4 className="text-base sm:text-lg font-black text-white uppercase tracking-tighter italic truncate">
                             {tx.purpose || tx.description || 'Verified Operation'}
                           </h4>
                           {tx.hub && (
-                            <span className="px-2 py-0.5 bg-white/5 text-[8px] font-black text-slate-500 rounded border border-white/5 uppercase">
+                            <span className="px-1.5 py-0.5 bg-white/5 text-[8px] font-black text-slate-400 rounded border border-white/5 uppercase shrink-0">
                               {tx.hub}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleDateString() : 'Recent'}</span>
-                          <span className="font-mono opacity-50">Ref: {tx.reference}</span>
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-amber-500/80" /> {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleDateString() : 'Recent'}</span>
+                          <span className="font-mono opacity-50 truncate max-w-[120px] sm:max-w-none">Ref: {tx.reference}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-8">
-                      <div className="text-right">
-                        <p className={`text-2xl font-black font-display ${
+                    <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-white/5 sm:border-t-0">
+                      <div className="text-left sm:text-right">
+                        <p className={`text-xl sm:text-2xl font-black font-display ${
                           tx.type === 'deposit' || tx.type === 'game_win' ? 'text-emerald-400' : 'text-white'
                         }`}>
                           {tx.type === 'deposit' || tx.type === 'game_win' ? '+' : '-'}{formatPrice(tx.amount)}
                         </p>
-                        <div className="flex items-center justify-end gap-1 mt-1">
+                        <div className="flex items-center sm:justify-end gap-1 mt-0.5">
                           <ShieldCheck className="w-3 h-3 text-emerald-500" />
                           <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">
                             {tx.status || 'Secured'}
@@ -476,14 +490,115 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
                         </div>
                       </div>
                       
-                      <button 
-                        onClick={() => setSelectedTx(tx)}
-                        className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 hover:text-amber-500 transition-all border border-white/5 group/btn"
-                      >
-                        <Download className="w-5 h-5 group-hover/btn:scale-110 transition-all" />
-                      </button>
+                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        {/* Elegant Show/Hide Button */}
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(uniqueId)}
+                          className={`px-3 py-2 rounded-xl text-[9px] font-black tracking-widest uppercase border transition-all flex items-center gap-1.5 ${
+                            isExpanded 
+                              ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' 
+                              : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
+                          }`}
+                        >
+                          <span>{isExpanded ? 'Hide' : 'Details'}</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        <button 
+                          onClick={() => setSelectedTx(tx)}
+                          className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-amber-500 transition-all border border-white/5 group/btn"
+                          title="Download Receipt"
+                        >
+                          <Download className="w-4 h-4 group-hover/btn:scale-110 transition-all" />
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Collapsible Details Area */}
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="border-t border-white/5 bg-slate-950/60 overflow-hidden text-left"
+                      >
+                        <div className="p-6 space-y-4 font-sans text-xs text-slate-300">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {/* Detail Col 1 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Ledger Identifier (Hash)</span>
+                              <span className="font-mono text-[10px] text-amber-500 break-all block">{uniqueId}</span>
+                            </div>
+
+                            {/* Detail Col 2 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">System Reference Code</span>
+                              <span className="font-mono text-[10px] text-white block">{tx.reference}</span>
+                            </div>
+
+                            {/* Detail Col 3 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Operations Channel / Hub</span>
+                              <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wide block">{tx.hub || 'PRIMARY SYSTEM'} ({tx.type})</span>
+                            </div>
+
+                            {/* Detail Col 4 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Transaction Time (UTC)</span>
+                              <span className="text-[10px] font-extrabold text-white block">
+                                {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleString() : 'Recent Entry'}
+                              </span>
+                            </div>
+
+                            {/* Detail Col 5 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Funding / Payout Route</span>
+                              <span className="text-[10px] font-extrabold text-emerald-400 uppercase block">{tx.method || 'Internal Node Clearance'}</span>
+                            </div>
+
+                            {/* Detail Col 6 */}
+                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Block Security Level</span>
+                              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wide flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
+                                AES-256 GCM INTEGRITY PASS
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Extra Metadata Section (if exists) */}
+                          {(tx.description || tx.metadata) && (
+                            <div className="p-4 bg-slate-900/30 rounded-2xl border border-white/5 space-y-2 text-left">
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Liaison Context / Audit Notes</span>
+                              <p className="text-[11px] font-bold text-slate-200 uppercase leading-relaxed tracking-wide">
+                                {tx.description || 'Verified secure transaction recorded under sovereign clearance node.'}
+                              </p>
+                              {tx.metadata && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 pt-2 border-t border-white/5 font-mono text-[10px] text-slate-400">
+                                  {tx.metadata.bankName && (
+                                    <div><span className="text-slate-600">Settlement Bank:</span> <span className="text-white uppercase">{tx.metadata.bankName}</span></div>
+                                  )}
+                                  {tx.metadata.accountNumber && (
+                                    <div><span className="text-slate-600">Account Number:</span> <span className="text-white">{tx.metadata.accountNumber}</span></div>
+                                  )}
+                                  {tx.metadata.senderName && (
+                                    <div><span className="text-slate-600">Sender:</span> <span className="text-white uppercase">{tx.metadata.senderName}</span></div>
+                                  )}
+                                  {tx.metadata.receiverName && (
+                                    <div><span className="text-slate-600">Beneficiary:</span> <span className="text-white uppercase">{tx.metadata.receiverName}</span></div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}

@@ -54,6 +54,7 @@ import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
 import { OFFICE_ADDRESSES } from '../constants/businessProfile';
+import bokehBg from '../assets/images/marketplace_bokeh_bg_1783758466790.jpg';
 
 // Category Dataset (4-level taxonomy)
 const CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
@@ -217,7 +218,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     accountName: '',
     routingNumber: ''
   });
-  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_paystack' | 'direct_bank'>('escrow_paystack');
+  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_flutterwave' | 'direct_bank'>('escrow_flutterwave');
   const [senderBankName, setSenderBankName] = useState('');
   const [senderAccountNumber, setSenderAccountNumber] = useState('');
   const [senderAccountName, setSenderAccountName] = useState('');
@@ -328,7 +329,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       options: [
         { id: 'paypal', name: 'PayPal' },
         { id: 'stripe', name: 'Stripe' },
-        { id: 'paystack', name: 'Paystack' }
+        { id: 'flutterwave', name: 'Flutterwave' }
       ]
     }
   ];
@@ -392,18 +393,18 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
-  const [paystackInited, setPaystackInited] = useState(false);
+  const [flwInited, setFlwInited] = useState(false);
 
-  // Dynamically load Paystack Inline JS script
+  // Dynamically load Flutterwave Inline JS script
   useEffect(() => {
-    if ((window as any).PaystackPop) {
-      setPaystackInited(true);
+    if ((window as any).FlutterwaveCheckout) {
+      setFlwInited(true);
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.src = 'https://checkout.flutterwave.com/v3.js';
     script.async = true;
-    script.onload = () => setPaystackInited(true);
+    script.onload = () => setFlwInited(true);
     document.body.appendChild(script);
   }, []);
 
@@ -424,52 +425,50 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     }
   }, [selectedBankCode, bankAccountNumber]);
 
-  const handlePaystackCheckout = () => {
+  const handleFlutterwaveCheckout = () => {
     const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
     // Exchange rate conversion: 1450 NGN per 1 USD
     const ngnAmount = usdAmount * 1450;
 
-    if (!(window as any).PaystackPop) {
-      alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+    if (!(window as any).FlutterwaveCheckout) {
+      alert("Flutterwave secure gateway is initializing. Please wait a brief moment and retry.");
       return;
     }
 
-    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
     const reference = `EFD_MARK_USED_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
-    // Map selected payment method to corresponding Paystack channels
-    let channels = ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'];
-    if (['visa', 'mastercard', 'verve'].includes(paymentMethod)) {
-      channels = ['card'];
-    } else if (['zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod)) {
-      channels = ['bank_transfer', 'bank'];
-    } else if (['opay', 'palmpay', 'kuda'].includes(paymentMethod)) {
-      channels = ['mobile_money', 'bank_transfer', 'card'];
-    }
-
     try {
-      const handler = (window as any).PaystackPop.setup({
-        key: paystackKey,
-        email: user.email,
-        amount: Math.round(ngnAmount * 100), // convert to kobo
+      (window as any).FlutterwaveCheckout({
+        public_key: flwKey,
+        tx_ref: reference,
+        amount: Math.round(ngnAmount),
         currency: 'NGN',
-        ref: reference,
-        channels: channels,
+        payment_options: 'card, banktransfer, ussd, account, mobilemoneyghana, mobilemoneyfranco',
+        customer: {
+          email: user.email,
+          phone_number: '08072456836',
+          name: user.displayName || 'EFADO Valued Customer',
+        },
+        customizations: {
+          title: 'EFADO Marketplace (Used)',
+          description: 'Secure Sovereign Escrow Order Protocol',
+          logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=100&q=80',
+        },
         callback: (response: any) => {
-          if (response && (response.status === 'success' || response.message === 'Approved')) {
-            finalizePurchase(undefined, response.reference || reference);
+          if (response && (response.status === 'successful' || response.status === 'completed')) {
+            finalizePurchase(undefined, response.tx_ref || reference);
           } else {
-            alert("Payment approval was incomplete. Please verify details and retry.");
+            alert("Payment was not completed successfully on Flutterwave. Please verify details.");
           }
         },
-        onClose: () => {
-          alert("Secure checkout closed by browser user.");
+        onclose: () => {
+          alert("Secure checkout closed by user.");
         }
       });
-      handler.openIframe();
     } catch (err) {
-      console.error("Paystack launch error:", err);
-      alert("Could not load Paystack inline checkouts. Check network and refresh.");
+      console.error("Flutterwave launch error:", err);
+      alert("Could not load Flutterwave inline checkouts. Check network and refresh.");
     }
   };
 
@@ -503,8 +502,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       setCheckoutStep('payment');
     }
     else if (checkoutStep === 'payment') {
-      if (paymentStrategy === 'escrow_paystack') {
-        handlePaystackCheckout();
+      if (paymentStrategy === 'escrow_flutterwave') {
+        handleFlutterwaveCheckout();
         return;
       } else if (paymentStrategy === 'direct_bank') {
         const errors: Record<string, string> = {};
@@ -528,9 +527,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         return;
       }
 
-      const paystackSupportedMethods = ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
-      if (paystackSupportedMethods.includes(paymentMethod)) {
-        handlePaystackCheckout();
+      const flutterwaveSupportedMethods = ['flutterwave', 'paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
+      if (flutterwaveSupportedMethods.includes(paymentMethod)) {
+        handleFlutterwaveCheckout();
         return;
       }
 
@@ -560,7 +559,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     return `EDADO${random}`;
   };
 
-  const finalizePurchase = async (pin?: string, paystackRef?: string, directProof?: any) => {
+  const finalizePurchase = async (pin?: string, paymentRef?: string, directProof?: any) => {
     setIsProcessing(true);
     setPaymentStatusText('Initiating Secure Transaction...');
     setCheckoutStep('processing');
@@ -569,7 +568,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     // Simulated steps consistent with Modern Market Hub
     const steps = [
       'Verifying Fairly Used Item Condition...',
-      paystackRef ? 'Confirming Paystack Instant Reference...' : directProof ? 'Registering Direct Proof Details...' : 'Securing Escrow Payment...',
+      paymentRef ? 'Confirming Flutterwave Instant Reference...' : directProof ? 'Registering Direct Proof Details...' : 'Securing Escrow Payment...',
       'Generating Digital Tracking Code...',
       'Finalizing Global Delivery Path...'
     ];
@@ -606,7 +605,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
       },
       paymentMethod: directProof ? 'direct_bank_transfer' : paymentMethod,
-      paystackRef: paystackRef || null,
+      paystackRef: paymentRef || null,
+      flwRef: paymentRef || null,
       status: directProof ? 'pending_manual_verification' : 'processing',
       trackingNumber: `TRK-FU-${Math.random().toString(36).substring(7).toUpperCase()}`,
       trackingHistory: [
@@ -614,8 +614,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
           status: 'Order Placed',
           location: 'EFADO Digital System',
           timestamp: new Date(),
-          description: paystackRef 
-            ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` 
+          description: paymentRef 
+            ? `Your order has been paid via Flutterwave (Ref: ${paymentRef}) & received.` 
             : directProof
               ? `Order placed with Direct Bank Transfer Proof. Sender: ${directProof.senderAccountName} (${directProof.senderBankName} - ${directProof.senderAccountNumber}). Bank confirmation pending.`
               : 'Your fairly used item order has been received.'
@@ -644,17 +644,20 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl overflow-hidden"
     >
-      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-50 border border-slate-200/80 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
+      <div 
+        className="relative w-full max-w-7xl h-[90vh] border border-amber-200/50 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden"
+        style={{ backgroundImage: `url(${bokehBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-200 bg-white/95 backdrop-blur-xl z-20 shadow-sm">
+        <div className="px-8 py-6 border-b border-amber-200/30 bg-white/75 backdrop-blur-md z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                 <ShoppingBag className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-indigo-600">Fairly Used</span> Market Hub</h2>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Where Fairly Used Products Find New Homes</p>
+                <h2 className="text-2xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">Fairly Used</span> Market Hub</h2>
+                <p className="text-xs font-black text-slate-800 uppercase tracking-widest mt-1">Where Fairly Used Products Find New Homes</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -748,7 +751,10 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Level 1: Category */}
             <div className="space-y-4">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Category</h3>
+              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
+                <span>Category</span>
+                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">1</span>
+              </h3>
               <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                 {Object.keys(CATEGORIES).map(cat => (
                   <button
@@ -761,12 +767,12 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     }}
                     className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                       selectedL1 === cat 
-                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20 font-black' 
+                        : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                     }`}
                   >
-                    <span className="text-[10px] font-black uppercase tracking-tight">{cat}</span>
-                    <ChevronRight className={`w-3 h-3 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                    <span className="text-[10px] uppercase tracking-tight leading-tight">{cat}</span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
                   </button>
                 ))}
               </div>
@@ -774,7 +780,10 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
             {/* Level 2: Section */}
             <div className="space-y-4">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Section</h3>
+              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
+                <span>Section</span>
+                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">2</span>
+              </h3>
               {selectedL1 ? (
                 <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                   {Object.keys(CATEGORIES[selectedL1]).map(sub => (
@@ -787,26 +796,29 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       }}
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL2 === sub 
-                          ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                          ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20 font-black' 
+                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                       }`}
                     >
-                      <span className="text-[10px] font-black uppercase tracking-tight">{sub}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                      <span className="text-[10px] uppercase tracking-tight leading-tight">{sub}</span>
+                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
-                  <Info className="w-8 h-8 mb-2 opacity-35" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Category First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
+                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Category First</p>
                 </div>
               )}
             </div>
 
             {/* Level 3: Subcategory */}
             <div className="space-y-4">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Subcategory</h3>
+              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
+                <span>Subcategory</span>
+                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">3</span>
+              </h3>
               {selectedL2 ? (
                 <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                   {Object.keys(CATEGORIES[selectedL1!][selectedL2]).map(subSub => (
@@ -818,26 +830,29 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       }}
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL3 === subSub 
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20 font-black' 
+                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                       }`}
                     >
-                      <span className="text-[10px] font-black uppercase tracking-tight">{subSub}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                      <span className="text-[10px] uppercase tracking-tight leading-tight">{subSub}</span>
+                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
-                  <Info className="w-8 h-8 mb-2 opacity-35" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Section First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
+                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Section First</p>
                 </div>
               )}
             </div>
 
             {/* Level 4: Group */}
             <div className="space-y-4">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2">Group</h3>
+              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
+                <span>Group</span>
+                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">4</span>
+              </h3>
               {selectedL3 ? (
                 <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                   {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map(group => (
@@ -846,19 +861,19 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       onClick={() => setSelectedL4(group)}
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL4 === group 
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20' 
-                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20 font-black' 
+                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                       }`}
                     >
-                      <span className="text-[10px] font-black uppercase tracking-tight">{group}</span>
-                      <CheckCircle2 className={`w-3 h-3 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0'}`} />
+                      <span className="text-[10px] uppercase tracking-tight leading-tight">{group}</span>
+                      <CheckCircle2 className={`w-3 h-3 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0 text-slate-900 font-black'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200 text-slate-400">
-                  <Info className="w-8 h-8 mb-2 opacity-35" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Subcategory First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
+                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Subcategory First</p>
                 </div>
               )}
             </div>
@@ -1561,15 +1576,15 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 mb-4 font-sans">
                       <button
                         type="button"
-                        onClick={() => setPaymentStrategy('escrow_paystack')}
+                        onClick={() => setPaymentStrategy('escrow_flutterwave')}
                         className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
-                          paymentStrategy === 'escrow_paystack'
+                          paymentStrategy === 'escrow_flutterwave'
                             ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 border-t border-white/10'
                             : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
                         }`}
                       >
                         <ShieldCheck className="w-3.5 h-3.5 shrink-0 animate-pulse" />
-                        Option A: Escrow Paystack
+                        Option A: Escrow Flutterwave
                       </button>
                       <button
                         type="button"
@@ -1585,7 +1600,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       </button>
                     </div>
 
-                    {paymentStrategy === 'escrow_paystack' ? (
+                    {paymentStrategy === 'escrow_flutterwave' ? (
                       <div className="space-y-4">
                         <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-1.5 text-left mb-4">
                           <div className="flex items-center gap-2">
@@ -1593,7 +1608,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                             <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Secured Intermediary Split Escrow</h5>
                           </div>
                           <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
-                            Buyer pays securely via Paystack on behalf of <strong>Efado Hubs</strong>. Paystack splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
+                            Buyer pays securely via Flutterwave on behalf of <strong>Efado Hubs</strong>. Flutterwave splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
                           </p>
                         </div>
                         <div className="bg-slate-800/20 p-6 rounded-[2rem] border border-white/5 mb-6 text-left">
@@ -1715,11 +1730,11 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                               {/* Instantly Click Pay */}
                               <button
                                 type="button"
-                                onClick={handlePaystackCheckout}
+                                onClick={handleFlutterwaveCheckout}
                                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
                               >
                                 <ShieldCheck className="w-4.5 h-4.5 animate-bounce" />
-                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA PAYSTACK</span>
+                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA FLUTTERWAVE</span>
                               </button>
                             </div>
                           )}
@@ -1988,14 +2003,14 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </div>
                   )}
                   
-                  {checkoutStep === 'payment' && paymentStrategy === 'escrow_paystack' ? (
+                  {checkoutStep === 'payment' && paymentStrategy === 'escrow_flutterwave' ? (
                     <button 
-                      onClick={handlePaystackCheckout}
+                      onClick={handleFlutterwaveCheckout}
                       className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-2xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
                     >
                       <CreditCard className="w-5 h-5" />
                       <span className="uppercase tracking-[0.2em] text-xs">
-                        Complete Secure Order (Paystack)
+                        Complete Secure Order (Flutterwave)
                       </span>
                       <ArrowRight className="w-5 h-5 animate-bounce" />
                     </button>

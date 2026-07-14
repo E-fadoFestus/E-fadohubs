@@ -251,7 +251,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
       options: [
         { id: 'PayPal', name: 'PayPal' },
         { id: 'Stripe', name: 'Stripe' },
-        { id: 'Paystack', name: 'Paystack' }
+        { id: 'Flutterwave', name: 'Flutterwave' }
       ]
     }
   ];

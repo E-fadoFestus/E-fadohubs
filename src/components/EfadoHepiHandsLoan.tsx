@@ -104,7 +104,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
   const [editEscrowOptIn, setEditEscrowOptIn] = useState<boolean>(true);
 
   // Robust Repayment States
-  const [selectedRepaymentMethod, setSelectedRepaymentMethod] = useState<'wallet' | 'paystack' | 'bank_transfer'>('wallet');
+  const [selectedRepaymentMethod, setSelectedRepaymentMethod] = useState<'wallet' | 'flutterwave' | 'bank_transfer'>('wallet');
   const [selectedLoanId, setSelectedLoanId] = useState<string>('');
   const [payingRepayment, setPayingRepayment] = useState(false);
   const [showPaymentPlatform, setShowPaymentPlatform] = useState(false);
@@ -421,7 +421,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
         currency: selectedCurrency.code,
         status: 'completed',
         purpose: 'Loan Repayment',
-        description: `Installment repayment successfully settled via ${selectedRepaymentMethod === 'wallet' ? 'EFADO Wallet' : 'Paystack Core'}.`,
+        description: `Installment repayment successfully settled via ${selectedRepaymentMethod === 'wallet' ? 'EFADO Wallet' : 'Flutterwave Core'}.`,
         timestamp: serverTimestamp()
       });
       
@@ -1206,19 +1206,19 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                         <p className="text-[10px] text-indigo-600 font-bold mt-1">Balance: {formatPrice(user.playerWallet)}</p>
                       </button>
 
-                      {/* Paystack instant */}
+                      {/* Flutterwave instant */}
                       <button
                         type="button"
-                        onClick={() => setSelectedRepaymentMethod('paystack')}
+                        onClick={() => setSelectedRepaymentMethod('flutterwave')}
                         className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                          selectedRepaymentMethod === 'paystack'
+                          selectedRepaymentMethod === 'flutterwave'
                             ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/5'
                             : 'border-gray-100 hover:bg-gray-50'
                         }`}
                       >
                         <CreditCard className="w-6 h-6 text-gray-400 mb-2" />
                         <h4 className="font-bold text-sm text-gray-900">Debit Card / USSD</h4>
-                        <p className="text-[10px] text-gray-500 font-semibold mt-1">Instant Paystack</p>
+                        <p className="text-[10px] text-gray-500 font-semibold mt-1">Instant Flutterwave</p>
                       </button>
 
                       {/* Bank transfer */}
@@ -1287,7 +1287,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                 </p>
                 <button 
                   onClick={() => {
-                    setSelectedRepaymentMethod('paystack');
+                    setSelectedRepaymentMethod('flutterwave');
                     setShowPaymentPlatform(true);
                   }}
                   className="w-full py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all"

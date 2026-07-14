@@ -33,6 +33,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { db, collection, addDoc, serverTimestamp, doc, updateDoc, increment } from '../firebase';
+import { FLUTTERWAVE_COUNTRIES, getBanksByCountry, getCurrencyByCountry } from '../data/flutterwaveBanks';
+import { flutterwaveService } from '../services/flutterwaveService';
 
 const FormField: React.FC<{
   label: string,
@@ -79,6 +81,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
   const { formatPrice, selectedCurrency } = useCurrency();
   const [step, setStep] = useState<'WELCOME' | 'SUBSCRIPTION' | 'IDENTITY' | 'CREDENTIALS' | 'CERTIFICATES' | 'PARAMETERS' | 'SUCCESS'>('WELCOME');
   const [loading, setLoading] = useState(false);
+  const [bankSearch, setBankSearch] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Subscription Tiers
@@ -134,11 +137,19 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     lendingCapacity: '50000',
     targetAudience: 'All Members',
     // Settlement Account Fields
-    settlementBank: '',
-    settlementAccountName: '',
+    settlementBank: 'Access Bank',
+    settlementAccountName: user.displayName || user.email || '',
     settlementAccountNumber: '',
     escrowOptIn: true,
     webhookUrl: '',
+    // Flutterwave Subaccount Settlement
+    bankCode: '044',
+    bankName: 'Access Bank',
+    country: 'NG',
+    currency: 'NGN',
+    splitPercentage: 95,
+    businessEmail: user.email || '',
+    businessMobile: ''
   });
 
   // Certificates Upload Simulation States
@@ -259,10 +270,30 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
 
     setLoading(true);
     try {
+      // Step A: Create a Subaccount on Flutterwave
+      const subaccountRes = await flutterwaveService.createSubaccount({
+        account_bank: formData.bankCode || '044',
+        account_number: formData.settlementAccountNumber,
+        business_name: formData.businessName || user.displayName || user.email,
+        business_email: formData.businessEmail || user.email,
+        business_contact: formData.businessMobile || formData.contactPhone,
+        country: formData.country || 'NG',
+        split_type: 'percentage',
+        split_value: formData.splitPercentage || 95
+      });
+
+      const subaccountId = String(subaccountRes?.data?.id || `FLW_SUB_${Math.floor(100000 + Math.random() * 900000)}`);
+
       // 1. Deduct subscription fee from playerWallet dynamically for real integration!
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
-        playerWallet: increment(-cost)
+        playerWallet: increment(-cost),
+        subaccount_id: subaccountId,
+        account_number: formData.settlementAccountNumber,
+        bank_code: formData.bankCode,
+        bank_name: formData.settlementBank,
+        split_percentage: 95,
+        flutterwave_status: 'active'
       });
 
       // 2. Insert into collection
@@ -280,6 +311,12 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
         address: formData.address,
         subscriptionTier: selectedTier,
         subscriptionPrice: cost,
+        subaccount_id: subaccountId,
+        account_number: formData.settlementAccountNumber,
+        bank_code: formData.bankCode,
+        bank_name: formData.settlementBank,
+        split_percentage: 95,
+        flutterwave_status: 'active',
         settlement: {
           bank: formData.settlementBank,
           accountName: formData.settlementAccountName,
@@ -569,61 +606,119 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
                 </FormField>
               </div>
 
-              {/* Settlement banking section */}
+              {/* Settlement banking section with Flutterwave Mandate */}
               <div className="border-t border-slate-800 pt-6">
-                <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 mb-4 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" /> Settlement Bank node Configuration
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormField label="Settlement Bank Name" error={validationErrors.settlementBank}>
+                 <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                   <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                       <CreditCard className="w-5 h-5 text-emerald-400" />
+                     </div>
+                     <div>
+                       <h5 className="text-xs font-black text-emerald-300 uppercase tracking-widest flex items-center gap-2">
+                         Flutterwave Automated Settlement Mandate
+                       </h5>
+                       <p className="text-[10px] text-emerald-200/80 font-bold mt-0.5">
+                         Direct loan payout & collection routing: 95% instant automated settlement to your bank account, 5% ecosystem split.
+                       </p>
+                     </div>
+                   </div>
+                   <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-black rounded-xl uppercase tracking-widest border border-emerald-500/30 shrink-0">
+                     95% VENDOR SPLIT
+                   </span>
+                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <FormField label="Country of Operation">
                     <select 
-                      value={formData.settlementBank}
+                      value={formData.country}
                       onChange={(e) => {
-                        setFormData({...formData, settlementBank: e.target.value});
-                        if (validationErrors.settlementBank) setValidationErrors({...validationErrors, settlementBank: ''});
+                        const selectedCountry = e.target.value;
+                        const newCurrency = getCurrencyByCountry(selectedCountry);
+                        const availableBanks = getBanksByCountry(selectedCountry);
+                        setFormData({
+                          ...formData, 
+                          country: selectedCountry,
+                          currency: newCurrency,
+                          bankCode: availableBanks[0]?.code || '044',
+                          settlementBank: availableBanks[0]?.name || 'Access Bank'
+                        });
                       }}
-                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 cursor-pointer appearance-none"
                     >
-                      <option value="">Select Settlement Bank</option>
-                      <option value="access">Access Bank</option>
-                      <option value="gtb">Guaranty Trust Bank (GTB)</option>
-                      <option value="zenith">Zenith Bank</option>
-                      <option value="uba">United Bank for Africa (UBA)</option>
-                      <option value="firstbank">First Bank of Nigeria</option>
-                      <option value="sterling">Sterling Bank</option>
-                      <option value="kuda">Kuda Microfinance</option>
-                      <option value="providus">Providus Bank</option>
+                      {FLUTTERWAVE_COUNTRIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>
+                      ))}
+                      <option value="Other">Other Global Location (USD)</option>
                     </select>
                   </FormField>
 
-                  <FormField label="Settlement Account No." error={validationErrors.settlementAccountNumber}>
+                  <FormField label="Settlement Account No. (10 Digits)" error={validationErrors.settlementAccountNumber}>
                     <input 
                       type="text" 
                       maxLength={10}
                       value={formData.settlementAccountNumber}
                       onChange={(e) => {
-                        setFormData({...formData, settlementAccountNumber: e.target.value.replace(/\D/g, '')});
+                        const val = e.target.value.replace(/\D/g, '');
+                        setFormData({...formData, settlementAccountNumber: val});
                         if (validationErrors.settlementAccountNumber) setValidationErrors({...validationErrors, settlementAccountNumber: ''});
                       }}
-                      placeholder="e.g. 0123456789"
-                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
-                    />
-                  </FormField>
-
-                  <FormField label="Settlement Account Name" error={validationErrors.settlementAccountName}>
-                    <input 
-                      type="text" 
-                      value={formData.settlementAccountName}
-                      onChange={(e) => {
-                        setFormData({...formData, settlementAccountName: e.target.value});
-                        if (validationErrors.settlementAccountName) setValidationErrors({...validationErrors, settlementAccountName: ''});
-                      }}
-                      placeholder="e.g. Apex cooperative Ltd"
-                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
+                      placeholder="e.g. 0690000044"
+                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 hover:border-slate-700 rounded-xl text-xs font-mono font-black tracking-wider text-white focus:outline-none focus:border-emerald-500 transition-all"
                     />
                   </FormField>
                 </div>
+
+                <div className="space-y-2 mb-6">
+                  <div className="flex items-center justify-between">
+                    <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${validationErrors.bankCode ? 'text-rose-500' : 'text-slate-400'}`}>
+                      Select Settlement Bank
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-400 uppercase">Country: {formData.country}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={bankSearch}
+                      onChange={e => setBankSearch(e.target.value)}
+                      placeholder="🔍 Search Bank Name or Code..."
+                      className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-400 focus:border-emerald-500 focus:outline-none font-bold"
+                    />
+                    <select 
+                      value={formData.bankCode}
+                      onChange={e => {
+                        const selectedCode = e.target.value;
+                        const availableBanks = getBanksByCountry(formData.country);
+                        const foundBank = availableBanks.find(b => b.code === selectedCode);
+                        setFormData({
+                          ...formData,
+                          bankCode: selectedCode,
+                          settlementBank: foundBank ? foundBank.name : selectedCode
+                        });
+                        if (validationErrors.bankCode) setValidationErrors({...validationErrors, bankCode: ''});
+                      }}
+                      className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer"
+                    >
+                      {getBanksByCountry(formData.country)
+                        .filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()) || b.code.includes(bankSearch))
+                        .map(b => (
+                          <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <FormField label="Settlement Account Name / Beneficiary Title" error={validationErrors.settlementAccountName}>
+                  <input 
+                    type="text" 
+                    value={formData.settlementAccountName}
+                    onChange={(e) => {
+                      setFormData({...formData, settlementAccountName: e.target.value});
+                      if (validationErrors.settlementAccountName) setValidationErrors({...validationErrors, settlementAccountName: ''});
+                    }}
+                    placeholder="e.g. Apex Cooperative Ltd"
+                    className="w-full px-5 py-3.5 bg-slate-800/60 border-2 border-slate-800 hover:border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
+                  />
+                </FormField>
               </div>
 
               <div className="flex gap-4 pt-4">

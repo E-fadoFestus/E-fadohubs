@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
+import bokehBg from '../assets/images/marketplace_bokeh_bg_1783758466790.jpg';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
@@ -277,7 +278,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   ]);
   const [submittingMarketReview, setSubmittingMarketReview] = useState(false);
   
-  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_paystack' | 'direct_bank'>('escrow_paystack');
+  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_flutterwave' | 'direct_bank'>('escrow_flutterwave');
   const [senderBankName, setSenderBankName] = useState('');
   const [senderAccountNumber, setSenderAccountNumber] = useState('');
   const [senderAccountName, setSenderAccountName] = useState('');
@@ -398,7 +399,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       options: [
         { id: 'paypal', name: 'PayPal' },
         { id: 'stripe', name: 'Stripe' },
-        { id: 'paystack', name: 'Paystack' }
+        { id: 'flutterwave', name: 'Flutterwave' }
       ]
     }
   ];
@@ -542,18 +543,18 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
-  const [paystackInited, setPaystackInited] = useState(false);
+  const [flwInited, setFlwInited] = useState(false);
 
-  // Dynamically load Paystack Inline JS script
+  // Dynamically load Flutterwave Inline JS script
   useEffect(() => {
-    if ((window as any).PaystackPop) {
-      setPaystackInited(true);
+    if ((window as any).FlutterwaveCheckout) {
+      setFlwInited(true);
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.src = 'https://checkout.flutterwave.com/v3.js';
     script.async = true;
-    script.onload = () => setPaystackInited(true);
+    script.onload = () => setFlwInited(true);
     document.body.appendChild(script);
   }, []);
 
@@ -574,52 +575,50 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     }
   }, [selectedBankCode, bankAccountNumber]);
 
-  const handlePaystackCheckout = () => {
+  const handleFlutterwaveCheckout = () => {
     const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
     // Exchange rate conversion: 1450 NGN per 1 USD
     const ngnAmount = usdAmount * 1450;
 
-    if (!(window as any).PaystackPop) {
-      alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+    if (!(window as any).FlutterwaveCheckout) {
+      alert("Flutterwave secure gateway is initializing. Please wait a brief moment and retry.");
       return;
     }
 
-    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
     const reference = `EFD_MARK_MODERN_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
-    // Map selected payment method to corresponding Paystack channels
-    let channels = ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'];
-    if (['visa', 'mastercard', 'verve'].includes(paymentMethod)) {
-      channels = ['card'];
-    } else if (['zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod)) {
-      channels = ['bank_transfer', 'bank'];
-    } else if (['opay', 'palmpay', 'kuda'].includes(paymentMethod)) {
-      channels = ['mobile_money', 'bank_transfer', 'card'];
-    }
-
     try {
-      const handler = (window as any).PaystackPop.setup({
-        key: paystackKey,
-        email: user.email,
-        amount: Math.round(ngnAmount * 100), // convert kobo
+      (window as any).FlutterwaveCheckout({
+        public_key: flwKey,
+        tx_ref: reference,
+        amount: Math.round(ngnAmount),
         currency: 'NGN',
-        ref: reference,
-        channels: channels,
+        payment_options: 'card, banktransfer, ussd, account, mobilemoneyghana, mobilemoneyfranco',
+        customer: {
+          email: user.email,
+          phone_number: '08072456836',
+          name: user.displayName || 'EFADO Valued Customer',
+        },
+        customizations: {
+          title: 'EFADO Marketplace (Modern)',
+          description: 'Secure Sovereign Escrow Order Protocol',
+          logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=100&q=80',
+        },
         callback: (response: any) => {
-          if (response && (response.status === 'success' || response.message === 'Approved')) {
-            finalizePurchase(undefined, response.reference || reference);
+          if (response && (response.status === 'successful' || response.status === 'completed')) {
+            finalizePurchase(undefined, response.tx_ref || reference);
           } else {
-            alert("Payment approval was incomplete. Please verify details and retry.");
+            alert("Payment was not completed successfully on Flutterwave. Please verify details.");
           }
         },
-        onClose: () => {
+        onclose: () => {
           alert("Secure checkout closed by user.");
         }
       });
-      handler.openIframe();
     } catch (err) {
-      console.error("Paystack launch error:", err);
-      alert("Could not load Paystack inline checkouts. Check network and refresh.");
+      console.error("Flutterwave launch error:", err);
+      alert("Could not load Flutterwave inline checkouts. Check network and refresh.");
     }
   };
 
@@ -657,9 +656,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         return;
       }
 
-      const paystackSupportedMethods = ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
-      if (paystackSupportedMethods.includes(paymentMethod)) {
-        handlePaystackCheckout();
+      const flutterwaveSupportedMethods = ['flutterwave', 'paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
+      if (flutterwaveSupportedMethods.includes(paymentMethod)) {
+        handleFlutterwaveCheckout();
         return;
       }
 
@@ -676,7 +675,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     return `EDADO${random}`;
   };
 
-  const finalizePurchase = async (pin?: string, paystackRef?: string, directProof?: any) => {
+  const finalizePurchase = async (pin?: string, paymentRef?: string, directProof?: any) => {
     setIsProcessing(true);
     setPaymentStatusText('Initiating Secure Transaction...');
     setCheckoutStep('processing');
@@ -691,9 +690,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     } else if (paymentMethod === 'crypto') {
       await new Promise(r => setTimeout(r, 1500));
       setPaymentStatusText('Generating Unique Wallet Address...');
-    } else if (paystackRef) {
+    } else if (paymentRef) {
       await new Promise(r => setTimeout(r, 1500));
-      setPaymentStatusText('Verifying Playstack Instant Reference...');
+      setPaymentStatusText('Verifying Flutterwave Instant Reference...');
     } else {
       await new Promise(r => setTimeout(r, 1200));
       setPaymentStatusText('Verifying Payment Source...');
@@ -730,7 +729,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
       },
       paymentMethod: directProof ? 'direct_bank_transfer' : paymentMethod,
-      paystackRef: paystackRef || null,
+      paystackRef: paymentRef || null,
+      flwRef: paymentRef || null,
       directProof: directProof || null,
       status: directProof ? 'verifying' : 'processing',
       trackingNumber: `TRK${Math.random().toString(36).substring(7).toUpperCase()}`,
@@ -739,8 +739,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
           status: 'Order Placed',
           location: 'EFADO Digital System',
           timestamp: new Date(),
-          description: paystackRef 
-            ? `Your order has been paid via Paystack (Ref: ${paystackRef}) & received.` 
+          description: paymentRef 
+            ? `Your order has been paid via Flutterwave (Ref: ${paymentRef}) & received.` 
             : directProof 
               ? `Your Direct Bank Transfer proof was submitted (Sender Bank: ${directProof.bankName}, Sender A/C: ${directProof.accountNumber}) and is currently being verified.` 
               : 'Your order has been received and is being processed.'
@@ -825,9 +825,12 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="relative w-full max-w-7xl h-[90vh] bg-slate-50 border border-slate-200/80 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden">
+      <div 
+        className="relative w-full max-w-7xl h-[90vh] border border-amber-200/50 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden"
+        style={{ backgroundImage: `url(${bokehBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+      >
         {/* Header Block */}
-        <div className="px-10 py-8 border-b border-slate-200 bg-white/95 backdrop-blur-xl z-20 shadow-sm">
+        <div className="px-10 py-8 border-b border-amber-200/30 bg-white/75 backdrop-blur-md z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-5">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
@@ -959,10 +962,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 className="h-full flex flex-col lg:flex-row"
               >
                 {/* Level 1: Category */}
-                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-white">
-                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center text-[10px] font-black">1</span>
+                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/40 backdrop-blur-sm">
+                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
+                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">1</span>
                       Category
                     </h3>
                   </div>
@@ -973,8 +976,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                         onClick={() => handleL1Select(cat)}
                         className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                           selectedL1 === cat 
-                            ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20' 
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                            ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20 font-black' 
+                            : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                         }`}
                       >
                         <div className="relative z-10 flex items-center gap-4">
@@ -990,10 +993,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </div>
 
                 {/* Level 2: Section */}
-                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-slate-50/30">
-                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-600 flex items-center justify-center text-[10px] font-black">2</span>
+                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/20 backdrop-blur-sm">
+                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
+                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-lg bg-cyan-600 text-white flex items-center justify-center text-[10px] font-black">2</span>
                       Section
                     </h3>
                   </div>
@@ -1005,8 +1008,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           onClick={() => handleL2Select(sub)}
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL2 === sub 
-                              ? 'bg-cyan-600 border-cyan-400 text-white shadow-xl shadow-cyan-500/20' 
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                              ? 'bg-cyan-600 border-cyan-400 text-white shadow-xl shadow-cyan-500/20 font-black' 
+                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{sub}</span>
@@ -1025,10 +1028,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </div>
 
                 {/* Level 3: Subcategory */}
-                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-white">
-                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-[10px] font-black">3</span>
+                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/40 backdrop-blur-sm">
+                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
+                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">3</span>
                       Subcategory
                     </h3>
                   </div>
@@ -1040,8 +1043,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           onClick={() => handleL3Select(subSub)}
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL3 === subSub 
-                              ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20' 
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                              ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20 font-black' 
+                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{subSub}</span>
@@ -1060,10 +1063,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </div>
 
                 {/* Level 4: Group */}
-                <div className="lg:w-1/5 border-r border-slate-200/60 flex flex-col bg-slate-50/30">
-                  <div className="p-6 border-b border-slate-200 bg-slate-50/50">
-                    <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-[10px] font-black">4</span>
+                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/20 backdrop-blur-sm">
+                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
+                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">4</span>
                       Group
                     </h3>
                   </div>
@@ -1075,8 +1078,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           onClick={() => handleL4Select(group)}
                           className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
                             selectedL4 === group 
-                              ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20' 
-                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                              ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 font-black' 
+                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
                           }`}
                         >
                           <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{group}</span>
@@ -1095,11 +1098,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 </div>
 
                 {/* Product Feed Area */}
-                <div className="lg:w-1/5 flex flex-col bg-slate-100/50">
-                  <div className="p-6 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
-                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-[0.2em]">Live Feed</h3>
-                    <div className="px-2 py-0.5 bg-blue-500/10 rounded-full">
-                      <span className="text-[8px] font-black text-blue-600 uppercase tracking-widest">{filteredProducts.length} Items</span>
+                <div className="lg:w-1/5 flex flex-col bg-slate-100/30 backdrop-blur-sm">
+                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5 flex items-center justify-between">
+                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Live Feed</h3>
+                    <div className="px-2 py-0.5 bg-blue-600 rounded-full">
+                      <span className="text-[8px] font-black text-white uppercase tracking-widest">{filteredProducts.length} Items</span>
                     </div>
                   </div>
                   <div className="p-4 flex-grow overflow-y-auto space-y-4 custom-scrollbar">
@@ -1802,15 +1805,15 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                     <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 mb-4">
                       <button
                         type="button"
-                        onClick={() => setPaymentStrategy('escrow_paystack')}
+                        onClick={() => setPaymentStrategy('escrow_flutterwave')}
                         className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
-                          paymentStrategy === 'escrow_paystack'
+                          paymentStrategy === 'escrow_flutterwave'
                             ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 border-t border-white/10'
                             : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
                         }`}
                       >
                         <ShieldCheck className="w-3.5 h-3.5 shrink-0 animate-pulse" />
-                        Option A: Escrow Paystack
+                        Option A: Escrow Flutterwave
                       </button>
                       <button
                         type="button"
@@ -1826,7 +1829,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                       </button>
                     </div>
 
-                    {paymentStrategy === 'escrow_paystack' ? (
+                    {paymentStrategy === 'escrow_flutterwave' ? (
                       <div className="space-y-4">
                         <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-1.5 text-left mb-4">
                           <div className="flex items-center gap-2">
@@ -1834,7 +1837,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                             <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Secured Intermediary Split Escrow</h5>
                           </div>
                           <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
-                            Buyer pays securely via Paystack on behalf of <strong>Efado Hubs</strong>. Paystack splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
+                            Buyer pays securely via Flutterwave on behalf of <strong>Efado Hubs</strong>. Flutterwave splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
                           </p>
                         </div>
                         <div className="space-y-4 mb-6">
@@ -1956,11 +1959,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               {/* Instantly Click Pay */}
                               <button
                                 type="button"
-                                onClick={handlePaystackCheckout}
+                                onClick={handleFlutterwaveCheckout}
                                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
                               >
                                 <ShieldCheck className="w-4.5 h-4.5 animate-bounce" />
-                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA PAYSTACK</span>
+                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA FLUTTERWAVE</span>
                               </button>
                             </div>
                           )}
@@ -2275,13 +2278,13 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                     </div>
                   )}
                   
-                  {checkoutStep === 'payment' && ['paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod) ? (
+                  {checkoutStep === 'payment' && ['flutterwave', 'paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'].includes(paymentMethod) ? (
                     <button 
-                      onClick={handlePaystackCheckout}
+                      onClick={handleFlutterwaveCheckout}
                       className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-emerald-500/20 flex items-center justify-center gap-3 animate-pulse"
                     >
                       <CreditCard className="w-4 h-4" />
-                      Complete Secure Order (Paystack)
+                      Complete Secure Order (Flutterwave)
                       <ArrowRight className="w-4 h-4 animate-bounce" />
                     </button>
                   ) : (

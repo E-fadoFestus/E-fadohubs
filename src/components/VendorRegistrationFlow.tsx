@@ -33,6 +33,8 @@ import {
   auth
 } from '../firebase';
 import { VendorProfile, MarketProduct } from '../types';
+import { FLUTTERWAVE_COUNTRIES, getBanksByCountry, getCurrencyByCountry } from '../data/flutterwaveBanks';
+import { flutterwaveService } from '../services/flutterwaveService';
 
 const allColorClasses = {
   indigo: {
@@ -121,6 +123,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
   const [regStep, setRegStep] = useState<'VENDOR' | 'PRODUCTS' | 'SUCCESS'>('VENDOR');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [bankSearch, setBankSearch] = useState('');
 
   // Vendor Form State
   const [vendorForm, setVendorForm] = useState({
@@ -130,14 +133,22 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
     email: '',
     phone: '',
     whatsapp: '',
-    country: '',
+    country: 'NG',
     city: '',
     village: '',
     address: '',
     landmark: '',
     registrationNumber: '',
     pickupMethod: 'Both' as 'Pickup' | 'Delivery' | 'Both',
-    termsAccepted: false
+    termsAccepted: false,
+    // Flutterwave Automated Subaccount & Payment Split System
+    accountNumber: '',
+    bankCode: '044',
+    bankName: 'Access Bank',
+    businessEmail: '',
+    businessMobile: '',
+    currency: 'NGN',
+    splitPercentage: 95
   });
 
   // Product Form State
@@ -208,10 +219,15 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
   const validateVendor = () => {
     const newErrors: Record<string, string> = {};
     if (!vendorForm.fullName) newErrors.fullName = 'Full name is required';
+    if (!vendorForm.businessName) newErrors.businessName = "Vendor's business/trading name is required";
     if (!vendorForm.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) newErrors.email = 'Invalid email format';
     if (vendorForm.phone.length < 8) newErrors.phone = 'Invalid phone number';
     if (!vendorForm.country) newErrors.country = 'Country is required';
     if (!vendorForm.city) newErrors.city = 'City is required';
+    if (!vendorForm.accountNumber || !/^\d{10}$/.test(vendorForm.accountNumber)) {
+      newErrors.accountNumber = 'Bank account number must be exactly 10 digits (Flutterwave requirement)';
+    }
+    if (!vendorForm.bankCode) newErrors.bankCode = 'Select your settlement bank';
     if (!vendorForm.termsAccepted) newErrors.terms = 'You must accept the terms';
     
     // Local requirement logic: If Country is Nigeria, require registration number for Companies
@@ -278,9 +294,32 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
 
     setIsSubmitting(true);
     try {
-      // 1. Create Vendor
+      // Step A: Create a Subaccount on Flutterwave
+      const subaccountRes = await flutterwaveService.createSubaccount({
+        account_bank: vendorForm.bankCode,
+        account_number: vendorForm.accountNumber,
+        business_name: vendorForm.businessName || vendorForm.fullName,
+        business_email: vendorForm.businessEmail || vendorForm.email,
+        business_contact: vendorForm.businessMobile || vendorForm.phone,
+        country: vendorForm.country || 'NG',
+        split_type: 'percentage',
+        split_value: vendorForm.splitPercentage || 95
+      });
+
+      const subaccountId = String(subaccountRes?.data?.id || `FLW_SUB_${Math.floor(100000 + Math.random() * 900000)}`);
+
+      // Step B: Create Vendor in Database with Subaccount & Split details
       const vendorRef = await addDoc(collection(db, 'vendors'), {
         ...vendorForm,
+        subaccount_id: subaccountId,
+        account_number: vendorForm.accountNumber,
+        bank_code: vendorForm.bankCode,
+        bank_name: vendorForm.bankName,
+        business_name: vendorForm.businessName || vendorForm.fullName,
+        business_email: vendorForm.businessEmail || vendorForm.email,
+        business_mobile: vendorForm.businessMobile || vendorForm.phone,
+        split_percentage: 95,
+        flutterwave_status: 'active',
         hub: hubName,
         createdAt: serverTimestamp()
       });
@@ -432,16 +471,29 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                 </div>
 
                 <FormField label="Deployment Country" icon={<Globe className="w-3 h-3" />} error={errors.country}>
-                  <input 
-                    type="text" 
+                  <select 
                     value={vendorForm.country}
                     onChange={e => {
-                      setVendorForm({...vendorForm, country: e.target.value});
+                      const selectedCountry = e.target.value;
+                      const newCurrency = getCurrencyByCountry(selectedCountry);
+                      const availableBanks = getBanksByCountry(selectedCountry);
+                      setVendorForm({
+                        ...vendorForm, 
+                        country: selectedCountry,
+                        currency: newCurrency,
+                        bankCode: availableBanks[0]?.code || '044',
+                        bankName: availableBanks[0]?.name || 'Access Bank'
+                      });
                       if (errors.country) setErrors({...errors, country: ''});
                     }}
-                    placeholder="e.g. Nigeria"
-                    className={`w-full bg-slate-800/50 border rounded-2xl px-6 py-4 text-white focus:border-indigo-500 outline-none transition-all font-bold ${errors.country ? 'border-rose-500' : 'border-white/5'}`}
-                  />
+                    className={`w-full bg-slate-800/50 border rounded-2xl px-6 py-4 text-white focus:border-indigo-500 outline-none transition-all font-bold appearance-none cursor-pointer ${errors.country ? 'border-rose-500' : 'border-white/5'}`}
+                  >
+                    <option value="" disabled>Select Country</option>
+                    {FLUTTERWAVE_COUNTRIES.map(c => (
+                      <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>
+                    ))}
+                    <option value="Other">Other Global Location (USD)</option>
+                  </select>
                 </FormField>
                 <FormField label="Operational City Core" icon={<MapPin className="w-3 h-3" />} error={errors.city}>
                   <input 
@@ -529,6 +581,106 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                   <option value="Both">Hybrid Fulfillment (Both)</option>
                 </select>
               </FormField>
+
+                {/* Flutterwave Automated Subaccount & Payment Split Section */}
+                <div className="md:col-span-2 pt-6 border-t border-white/10">
+                   <div className="p-4 bg-emerald-950/40 border border-emerald-500/30 rounded-2xl mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                     <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                         <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                       </div>
+                       <div>
+                         <h5 className="text-xs font-black text-emerald-300 uppercase tracking-widest flex items-center gap-2">
+                           Flutterwave Automated Settlement Mandate
+                         </h5>
+                         <p className="text-[10px] text-emerald-200/80 font-bold mt-0.5">
+                           Instant automated subaccount routing: 95% direct settlement to vendor bank, 5% EFADO ecosystem fee.
+                         </p>
+                       </div>
+                     </div>
+                     <span className="px-3 py-1.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-black rounded-xl uppercase tracking-widest border border-emerald-500/30 shrink-0">
+                       95% VENDOR SPLIT
+                     </span>
+                   </div>
+                </div>
+
+                <FormField label="Settlement Bank Account Number (10 Digits)" icon={<ShieldCheck className="w-3 h-3" />} error={errors.accountNumber} hint="Vendor's official bank account number for instant payout.">
+                  <input 
+                    type="text" 
+                    maxLength={10}
+                    value={vendorForm.accountNumber}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setVendorForm({...vendorForm, accountNumber: val});
+                      if (errors.accountNumber) setErrors({...errors, accountNumber: ''});
+                    }}
+                    placeholder="e.g. 0690000044"
+                    className={`w-full bg-slate-800/50 border rounded-2xl px-6 py-4 text-white focus:border-emerald-500 outline-none transition-all font-mono font-black tracking-wider ${errors.accountNumber ? 'border-rose-500' : 'border-white/5'}`}
+                  />
+                </FormField>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${errors.bankCode ? 'text-rose-500' : 'text-slate-400'}`}>
+                      <Building2 className="w-3 h-3" /> Select Settlement Bank
+                    </label>
+                    <span className="text-[9px] font-bold text-emerald-400 uppercase">Country: {vendorForm.country}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={bankSearch}
+                      onChange={e => setBankSearch(e.target.value)}
+                      placeholder="🔍 Search Bank Name or Code..."
+                      className="w-full bg-slate-800/80 border border-white/10 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-400 focus:border-emerald-500 outline-none font-bold"
+                    />
+                    <select 
+                      value={vendorForm.bankCode}
+                      onChange={e => {
+                        const selectedCode = e.target.value;
+                        const availableBanks = getBanksByCountry(vendorForm.country);
+                        const foundBank = availableBanks.find(b => b.code === selectedCode);
+                        setVendorForm({
+                          ...vendorForm,
+                          bankCode: selectedCode,
+                          bankName: foundBank ? foundBank.name : selectedCode
+                        });
+                        if (errors.bankCode) setErrors({...errors, bankCode: ''});
+                      }}
+                      className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-emerald-500 outline-none transition-all appearance-none font-bold cursor-pointer text-xs"
+                    >
+                      {getBanksByCountry(vendorForm.country)
+                        .filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()) || b.code.includes(bankSearch))
+                        .map(b => (
+                          <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                        ))}
+                    </select>
+                  </div>
+                  {errors.bankCode && <p className="text-[9px] font-bold text-rose-500">{errors.bankCode}</p>}
+                </div>
+
+                <FormField label="Flutterwave Settlement Email" icon={<Mail className="w-3 h-3" />} hint="Email for automated Flutterwave payout notifications.">
+                  <input 
+                    type="email" 
+                    value={vendorForm.businessEmail || vendorForm.email}
+                    onChange={e => setVendorForm({...vendorForm, businessEmail: e.target.value})}
+                    placeholder="vendor.payout@efado.com"
+                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-emerald-500 outline-none transition-all font-bold"
+                  />
+                </FormField>
+
+                <FormField label="Settlement Notification Mobile" icon={<Phone className="w-3 h-3" />} required={false} hint="Phone number for SMS alerts when 95% payout hits bank.">
+                  <input 
+                    type="tel" 
+                    value={vendorForm.businessMobile || vendorForm.phone}
+                    onChange={e => setVendorForm({...vendorForm, businessMobile: e.target.value})}
+                    placeholder="+234 800 000 0000"
+                    className="w-full bg-slate-800/50 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-emerald-500 outline-none transition-all font-bold"
+                  />
+                </FormField>
+
+                <input type="hidden" name="split_percentage" value={vendorForm.splitPercentage} />
+                <input type="hidden" name="currency" value={vendorForm.currency} />
             </div>
 
             <div className="flex items-center gap-3 p-4 bg-slate-800/30 rounded-2xl border border-white/5">

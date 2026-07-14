@@ -10,7 +10,7 @@ interface PayPalHostedButtonProps {
 export const PayPalHostedButton: React.FC<PayPalHostedButtonProps> = ({
   amount = 50,
   onSuccess,
-  hostedButtonId = import.meta.env.VITE_PAYPAL_HOSTED_BUTTON_ID || 'BG8UTPC9YVDEA'
+  hostedButtonId = (import.meta as any).env?.VITE_PAYPAL_HOSTED_BUTTON_ID || 'BG8UTPC9YVDEA'
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export const PayPalHostedButton: React.FC<PayPalHostedButtonProps> = ({
 
   const activeButtonId = hostedButtonId || 'BG8UTPC9YVDEA';
   const containerId = `paypal-container-${activeButtonId}`;
-  const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'BAAjkL41DLR8bdidx17SpmQJTexh6IRx1PCS5a0rwhtN-b1Uh6WQGgSRa72LoNRPtmOMo-Q6JJ5ia19_X0';
+  const clientId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || 'BAAjkL41DLR8bdidx17SpmQJTexh6IRx1PCS5a0rwhtN-b1Uh6WQGgSRa72LoNRPtmOMo-Q6JJ5ia19_X0';
 
   useEffect(() => {
     let mounted = true;

@@ -189,7 +189,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
     setIsProcessingStripePayment(true);
     setStripePaymentSuccess(false);
 
-    // Approve package addition after verified Paystack notification
+    // Approve package addition after verified Flutterwave notification
     setTimeout(() => {
       setIsProcessingStripePayment(false);
       setStripePaymentSuccess(true);
@@ -827,14 +827,14 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 ))}
               </div>
 
-              {/* Paystack Checkout Active Guidelines block */}
+              {/* Flutterwave Checkout Active Guidelines block */}
               <div className="bg-slate-900/50 border border-indigo-500/10 rounded-2xl p-6 text-center mt-6">
                  <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Secure Payment Nodes Connection</h4>
                  <p className="text-[11px] text-slate-350 leading-relaxed max-w-md mx-auto mb-4">
-                   We utilize Paystack to securely accept debit cards, instant USSD codes, mobile bank apps, and unique local bank transfers. Click <strong className="text-yellow-500 bg-yellow-550/10 px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Procure</strong> above to select your plan.
+                   We utilize Flutterwave to securely accept debit cards, instant USSD codes, mobile bank apps, and unique local bank transfers. Click <strong className="text-yellow-500 bg-yellow-550/10 px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Procure</strong> above to select your plan.
                  </p>
                  <div className="pt-3 border-t border-white/5 flex items-center justify-between text-left">
-                    <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Paystack Engine</p>
+                    <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Flutterwave Engine</p>
                     <span className="text-[9px] font-black text-emerald-450 uppercase">Instant Activation Active</span>
                  </div>
               </div>

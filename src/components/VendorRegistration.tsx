@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../types';
 import { db, doc, updateDoc, addDoc, collection, serverTimestamp } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
+import { FLUTTERWAVE_COUNTRIES, getBanksByCountry, getCurrencyByCountry } from '../data/flutterwaveBanks';
+import { flutterwaveService } from '../services/flutterwaveService';
 
 interface VendorRegistrationProps {
   user: UserProfile;
@@ -65,12 +67,22 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'BANK' | 'USSD'>('CARD');
   const [loading, setLoading] = useState(false);
+  const [bankSearch, setBankSearch] = useState('');
   const [formData, setFormData] = useState({
     businessName: '',
     industry: '',
     description: '',
     targetAudience: '',
-    estimatedTraffic: ''
+    estimatedTraffic: '',
+    // Flutterwave Subaccount Settlement
+    accountNumber: '',
+    bankCode: '044',
+    bankName: 'Access Bank',
+    businessEmail: user.email || '',
+    businessMobile: '',
+    country: 'NG',
+    currency: 'NGN',
+    splitPercentage: 95
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -143,6 +155,10 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
     if (!formData.industry) errors.industry = "Required for proper hub categorization.";
     if (!formData.estimatedTraffic) errors.estimatedTraffic = "Helps us allocate hub resources.";
     if (!formData.description) errors.description = "Critical for vetting your application.";
+    if (!formData.accountNumber || !/^\d{10}$/.test(formData.accountNumber)) {
+      errors.accountNumber = "10-digit settlement bank account number required (Flutterwave mandate).";
+    }
+    if (!formData.bankCode) errors.bankCode = "Settlement bank selection required.";
 
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -152,32 +168,52 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
     setStep('PAYMENT');
   };
 
-  const [paystackInited, setPaystackInited] = useState(false);
+  const [flwInited, setFlwInited] = useState(false);
 
-  // Dynamically load Paystack Inline JS script
+  // Dynamically load Flutterwave Inline JS script
   useEffect(() => {
-    if ((window as any).PaystackPop) {
-      setPaystackInited(true);
+    if ((window as any).FlutterwaveCheckout) {
+      setFlwInited(true);
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.src = 'https://checkout.flutterwave.com/v3.js';
     script.async = true;
-    script.onload = () => setPaystackInited(true);
+    script.onload = () => setFlwInited(true);
     document.body.appendChild(script);
   }, []);
 
-  const completeRegistration = async (paystackRef?: string) => {
+  const completeRegistration = async (flwRef?: string) => {
     setLoading(true);
     try {
       const plan = PLANS.find(p => p.id === selectedPlan);
       
+      // Step A: Create a Subaccount on Flutterwave
+      const subaccountRes = await flutterwaveService.createSubaccount({
+        account_bank: formData.bankCode,
+        account_number: formData.accountNumber,
+        business_name: formData.businessName || user.displayName || user.email,
+        business_email: formData.businessEmail || user.email,
+        business_contact: formData.businessMobile || '',
+        country: formData.country || 'NG',
+        split_type: 'percentage',
+        split_value: formData.splitPercentage || 95
+      });
+
+      const subaccountId = String(subaccountRes?.data?.id || `FLW_SUB_${Math.floor(100000 + Math.random() * 900000)}`);
+
       // Update user document
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         vendorStatus: 'pending',
         vendorPlan: selectedPlan,
         vendorId: `V-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        subaccount_id: subaccountId,
+        account_number: formData.accountNumber,
+        bank_code: formData.bankCode,
+        bank_name: formData.bankName,
+        split_percentage: 95,
+        flutterwave_status: 'active',
         updatedAt: serverTimestamp()
       });
 
@@ -189,7 +225,7 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
         currency: 'USD',
         status: paymentMethod === 'CARD' ? 'completed' : 'pending',
         paymentMethod: paymentMethod,
-        paystackRef: paystackRef || null,
+        flwRef: flwRef || null,
         description: `Vendor Registration - ${plan?.name} Plan`,
         timestamp: serverTimestamp()
       });
@@ -199,10 +235,32 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
         userId: user.uid,
         userName: user.displayName || user.email,
         ...formData,
+        subaccount_id: subaccountId,
+        split_percentage: 95,
+        flutterwave_status: 'active',
         plan: selectedPlan,
         paymentMethod: paymentMethod,
-        paystackRef: paystackRef || null,
+        flwRef: flwRef || null,
         status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      // Also create record in main vendors collection for immediate directory listing
+      await addDoc(collection(db, 'vendors'), {
+        userId: user.uid,
+        fullName: user.displayName || user.email,
+        businessName: formData.businessName,
+        email: formData.businessEmail || user.email,
+        phone: formData.businessMobile || '',
+        country: formData.country,
+        account_number: formData.accountNumber,
+        bank_code: formData.bankCode,
+        bank_name: formData.bankName,
+        subaccount_id: subaccountId,
+        split_percentage: 95,
+        flutterwave_status: 'active',
+        plan: selectedPlan,
+        status: 'active',
         createdAt: serverTimestamp()
       });
 
@@ -221,40 +279,49 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
     const planPrice = plan?.price || 0;
 
     if (paymentMethod === 'CARD') {
-      if (!(window as any).PaystackPop) {
-        alert("Paystack secure gateway is initializing. Please wait a brief moment and retry.");
+      if (!(window as any).FlutterwaveCheckout) {
+        alert("Flutterwave secure gateway is initializing. Please wait a brief moment and retry.");
         return;
       }
       setLoading(true);
       const ngnAmount = planPrice * 1450;
-      const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
+      const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
       const reference = `EFD_VEND_REG_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
       try {
-        const handler = (window as any).PaystackPop.setup({
-          key: paystackKey,
-          email: user.email,
-          amount: Math.round(ngnAmount * 100), // convert kobo
+        (window as any).FlutterwaveCheckout({
+          public_key: flwKey,
+          tx_ref: reference,
+          amount: ngnAmount,
           currency: 'NGN',
-          ref: reference,
+          payment_options: 'card, ussd, banktransfer',
+          customer: {
+            email: user.email || 'vendor@efado.com',
+            name: user.displayName || user.email,
+          },
+          customizations: {
+            title: 'EFADO Vendor Registration',
+            description: `Vendor Plan - ${plan?.name}`,
+            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
+          },
           callback: async (response: any) => {
-            if (response && (response.status === 'success' || response.message === 'Approved')) {
-              await completeRegistration(response.reference || reference);
+            if (response && (response.status === 'successful' || response.status === 'completed')) {
+              await completeRegistration(response.tx_ref || reference);
             } else {
               setLoading(false);
               alert("Payment not approved. Please verify card details and try again.");
             }
           },
-          onClose: () => {
-            setLoading(false);
-            alert("Secure checkout closed by user.");
+          onclose: () => {
+            if (loading) {
+              setLoading(false);
+            }
           }
         });
-        handler.openIframe();
       } catch (err) {
         setLoading(false);
-        console.error("Paystack launch error:", err);
-        alert("Could not initialize Paystack secure checkout. Verify network.");
+        console.error("Flutterwave launch error:", err);
+        alert("Could not initialize Flutterwave secure checkout. Verify network.");
       }
     } else {
       await completeRegistration();
@@ -445,6 +512,133 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
                     className={`w-full px-5 py-4 bg-gray-50 border-2 rounded-2xl text-sm focus:outline-none focus:border-indigo-500 font-bold transition-all h-32 resize-none ${validationErrors.description ? 'border-rose-500' : 'border-gray-100'}`}
                   />
                 </FormField>
+
+                {/* Flutterwave Automated Subaccount & Payment Split Mandate */}
+                <div className="pt-6 border-t border-gray-100">
+                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                     <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                         <MapPin className="w-5 h-5 text-emerald-600" />
+                       </div>
+                       <div>
+                         <h5 className="text-xs font-black text-emerald-900 uppercase tracking-widest flex items-center gap-2">
+                           Flutterwave Automated Settlement Mandate
+                         </h5>
+                         <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                           Automated payment split: 95% direct instant payout to your bank account, 5% ecosystem fee.
+                         </p>
+                       </div>
+                     </div>
+                     <span className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-black rounded-xl uppercase tracking-widest shrink-0 shadow-sm">
+                       95% VENDOR SPLIT
+                     </span>
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField label="Deployment Country" hint="Your country of incorporation/operation.">
+                    <select 
+                      value={formData.country}
+                      onChange={e => {
+                        const selectedCountry = e.target.value;
+                        const newCurrency = getCurrencyByCountry(selectedCountry);
+                        const availableBanks = getBanksByCountry(selectedCountry);
+                        setFormData({
+                          ...formData, 
+                          country: selectedCountry,
+                          currency: newCurrency,
+                          bankCode: availableBanks[0]?.code || '044',
+                          bankName: availableBanks[0]?.name || 'Access Bank'
+                        });
+                      }}
+                      className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm focus:outline-none focus:border-emerald-500 font-bold transition-all appearance-none cursor-pointer"
+                    >
+                      {FLUTTERWAVE_COUNTRIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.name} ({c.currency})</option>
+                      ))}
+                      <option value="Other">Other Global Location (USD)</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Settlement Bank Account Number" error={validationErrors.accountNumber} hint="10-digit bank account number for instant 95% payout.">
+                    <input 
+                      required
+                      type="text"
+                      maxLength={10}
+                      value={formData.accountNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        setFormData({...formData, accountNumber: val});
+                        if (validationErrors.accountNumber) setValidationErrors({...validationErrors, accountNumber: ''});
+                      }}
+                      placeholder="e.g. 0690000044"
+                      className={`w-full px-5 py-4 bg-gray-50 border-2 rounded-2xl text-sm font-mono font-black tracking-wider focus:outline-none focus:border-emerald-500 transition-all ${validationErrors.accountNumber ? 'border-rose-500' : 'border-gray-100'}`}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className={`text-xs font-black uppercase tracking-widest flex items-center gap-2 ${validationErrors.bankCode ? 'text-rose-500' : 'text-gray-500'}`}>
+                      Select Settlement Bank
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Country: {formData.country}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={bankSearch}
+                      onChange={e => setBankSearch(e.target.value)}
+                      placeholder="🔍 Search Bank Name or Code..."
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl px-4 py-2 text-xs text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none font-bold"
+                    />
+                    <select 
+                      value={formData.bankCode}
+                      onChange={e => {
+                        const selectedCode = e.target.value;
+                        const availableBanks = getBanksByCountry(formData.country);
+                        const foundBank = availableBanks.find(b => b.code === selectedCode);
+                        setFormData({
+                          ...formData,
+                          bankCode: selectedCode,
+                          bankName: foundBank ? foundBank.name : selectedCode
+                        });
+                        if (validationErrors.bankCode) setValidationErrors({...validationErrors, bankCode: ''});
+                      }}
+                      className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-xs font-bold focus:outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer text-gray-900"
+                    >
+                      {getBanksByCountry(formData.country)
+                        .filter(b => b.name.toLowerCase().includes(bankSearch.toLowerCase()) || b.code.includes(bankSearch))
+                        .map(b => (
+                          <option key={b.code} value={b.code}>{b.name} ({b.code})</option>
+                        ))}
+                    </select>
+                  </div>
+                  {validationErrors.bankCode && <p className="text-[10px] font-bold text-rose-500">{validationErrors.bankCode}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField label="Settlement Notification Email" hint="Email for instant payout notifications.">
+                    <input 
+                      type="email"
+                      value={formData.businessEmail}
+                      onChange={e => setFormData({...formData, businessEmail: e.target.value})}
+                      placeholder="payouts@business.com"
+                      className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm focus:outline-none focus:border-emerald-500 font-bold transition-all"
+                    />
+                  </FormField>
+                  <FormField label="Settlement Mobile Alert" required={false} hint="Phone number for SMS alerts.">
+                    <input 
+                      type="tel"
+                      value={formData.businessMobile}
+                      onChange={e => setFormData({...formData, businessMobile: e.target.value})}
+                      placeholder="+234 800 000 0000"
+                      className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm focus:outline-none focus:border-emerald-500 font-bold transition-all"
+                    />
+                  </FormField>
+                </div>
+
+                <input type="hidden" name="split_percentage" value={formData.splitPercentage} />
+                <input type="hidden" name="currency" value={formData.currency} />
 
                 <button 
                   type="submit"

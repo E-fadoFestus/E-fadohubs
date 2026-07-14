@@ -43,14 +43,17 @@ import {
   ArrowDownLeft,
   Coins,
   Volume2,
-  MicOff
+  MicOff,
+  Shield,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CSCCGroup, CSCCMembership, CSCCCycle, CSCCContribution, ChatMessage } from '../types';
 import { db, auth, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc, getDocs, getDoc, runTransaction, increment, deleteDoc } from '../firebase';
 import { VendorRegistration } from './VendorRegistration';
-import { PaystackDeposit } from './PaystackDeposit';
+import { FlutterwaveDeposit } from './FlutterwaveDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
+import { PayPalHostedButton } from './PayPalHostedButton';
 import { StrategicReceipt } from './StrategicReceipt';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
@@ -97,7 +100,8 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
   const [completedHubPayment, setCompletedHubPayment] = useState<any | null>(null);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [activeFundTab, setActiveFundTab] = useState<'paystack' | 'bank_transfer'>('paystack');
+  const [activeFundTab, setActiveFundTab] = useState<'flutterwave' | 'bank_transfer' | 'diaspora'>('flutterwave');
+  const [remitaRRR, setRemitaRRR] = useState('RRR-9281-0029-4819');
 
   // Peer Transfer States
   const [transferTargetEmail, setTransferTargetEmail] = useState('');
@@ -126,8 +130,8 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       
       const timer = setTimeout(() => {
         let resolvedName = '';
-        if (withdrawAccNum === '000122668') {
-          resolvedName = 'OKHAWERE FESTUS';
+        if (withdrawAccNum === '000122668' || withdrawAccNum === '2120742200' || withdrawAccNum === '0001304979' || withdrawAccNum === '0011629991') {
+          resolvedName = 'OKHAWERE FESTUS DANIEL';
         } else {
           // Stable pseudo-random Name based on account digits
           const sum = withdrawAccNum.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
@@ -2434,45 +2438,87 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 </button>
 
                 <div className="mb-8">
-                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-4">Fund Capital Wallet</h3>
-                  <div className="flex gap-4 border-b border-gray-150 mb-6">
+                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight mb-4">Fund Capital Wallet (CSCC Segregated)</h3>
+                  <div className="flex flex-wrap gap-4 border-b border-gray-150 mb-6">
                     <button 
                       type="button"
-                      onClick={() => setActiveFundTab('paystack')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'paystack' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-gray-400 hover:text-gray-650'}`}
+                      onClick={() => setActiveFundTab('flutterwave')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'flutterwave' ? 'border-b-4 border-indigo-600 text-indigo-600' : 'text-gray-400 hover:text-gray-650'}`}
                     >
-                      ⚡ Instant Paystack Inline
+                      ⚡ Flutterwave Checkout (Auto-Credit)
                     </button>
                     <button 
                       type="button"
                       onClick={() => setActiveFundTab('bank_transfer')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'bank_transfer' ? 'border-b-4 border-emerald-600 text-emerald-600' : 'text-gray-400 hover:text-gray-650'}`}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'bank_transfer' ? 'border-b-4 border-indigo-600 text-indigo-600' : 'text-gray-400 hover:text-gray-650'}`}
                     >
-                      🏦 Direct Bank / Wire Transfer
+                      🏦 Direct Bank Wire (11 CEO Accounts)
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setActiveFundTab('diaspora')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'diaspora' ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-400 hover:text-gray-650'}`}
+                    >
+                      🌐 Diaspora Wire / Crypto
                     </button>
                   </div>
                 </div>
 
-                {activeFundTab === 'paystack' ? (
-                  <PaystackDeposit 
-                    user={user} 
-                    onSuccess={(paymentInfo) => {
-                      setFundingModalOpen(false);
-                      setCompletedHubPayment({
-                        id: paymentInfo.reference,
-                        userId: user.uid,
-                        type: 'deposit',
-                        amount: paymentInfo.amount,
-                        currency: 'NGN',
-                        status: 'completed',
-                        method: 'Paystack Gateways',
-                        purpose: 'Community Hub Deposit',
-                        reference: paymentInfo.reference,
-                        timestamp: { seconds: Math.floor(Date.now() / 1000) },
-                        description: `Deposit processed securely via custom Paystack inline channels.`
-                      });
-                    }} 
-                  />
+                {activeFundTab === 'flutterwave' ? (
+                  <div className="space-y-4">
+                    <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-2.5 text-left">
+                      <Zap className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-indigo-950 font-bold uppercase leading-snug">
+                        <b>Secure Automated Checkout:</b> Pay instantly via your card, USSD, or Bank Transfer using our compliant Flutterwave integration.
+                      </p>
+                    </div>
+                    <FlutterwaveDeposit 
+                      user={user} 
+                      onSuccess={(paymentInfo) => {
+                        setFundingModalOpen(false);
+                        setCompletedHubPayment({
+                          id: paymentInfo.reference,
+                          userId: user.uid,
+                          type: 'deposit',
+                          amount: paymentInfo.amount,
+                          currency: 'NGN',
+                          status: 'completed',
+                          method: 'Flutterwave Gateways',
+                          purpose: 'Community Hub Deposit',
+                          reference: paymentInfo.reference,
+                          timestamp: { seconds: Math.floor(Date.now() / 1000) },
+                          description: `Deposit processed securely via custom Flutterwave inline channels.`
+                        });
+                      }} 
+                    />
+                  </div>
+                ) : activeFundTab === 'diaspora' ? (
+                  <div className="space-y-6 text-left">
+                    <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl flex gap-3 shadow-sm mb-2">
+                      <Globe className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[10px] font-black tracking-widest text-blue-800 uppercase">DIASPORA DIRECT WIRE & CRYPTO SETTLEMENT</span>
+                        <p className="text-[11px] text-blue-950 font-bold uppercase leading-normal mt-0.5">
+                          To protect CSCC from international payment processor flags, PayPal is reserved for Marketplace & Education. For CSCC savings, please use International Bank Wire or USDT/BTC Wallet Transfer below.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-white p-6 rounded-3xl space-y-4 border border-white/10">
+                      <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Option 1: USDT (TRC-20 / BEP-20)</span>
+                        <code className="text-sm font-mono text-gray-200 block break-all">TJ8Y9...EFADO...CRYPTO...TREASURY...9281</code>
+                        <p className="text-[10px] text-gray-400">Instant automated wallet settlement at parallel market rate.</p>
+                      </div>
+
+                      <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: USD / GBP / EUR SWIFT Wire</span>
+                        <p className="text-xs text-gray-300 font-bold">Bank Name: Access Bank Plc / UBA Corporate</p>
+                        <p className="text-xs text-gray-300 font-bold">Account Name: EFADO Technology & Digital Ecosystem</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Submit your wire receipt to CEO Support for instant ledger credit.</p>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <DirectBankDeposit 
                     user={user} 

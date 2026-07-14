@@ -289,7 +289,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           {hubs.map((hub, i) => (
             <motion.div
-              key={hub.id}
+              key={`${hub.id}-${i}`}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               whileHover={{ scale: 1.02, y: -8 }}

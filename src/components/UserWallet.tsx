@@ -22,6 +22,7 @@ import {
   Fingerprint,
   Building2,
   User,
+  Camera,
   FileText,
   SearchCode,
   Smartphone,
@@ -42,12 +43,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
-import { db, doc, updateDoc } from '../firebase';
+import { db, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
-import { PaystackDeposit } from './PaystackDeposit';
+import { FlutterwaveDeposit } from './FlutterwaveDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -60,9 +61,9 @@ interface UserWalletProps {
 }
 
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
-  const { selectedCurrency } = useCurrency();
+  const { selectedCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'paystack' | 'bank_transfer' | 'remita' | 'paypal'>('paystack');
+  const [depositMethod, setDepositMethod] = useState<'flutterwave' | 'bank_transfer' | 'diaspora'>('flutterwave');
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string>('');
@@ -73,6 +74,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   
   // Profile edit field states
   const [profileDisplayName, setProfileDisplayName] = useState(user.displayName || '');
+  const [profileFullName, setProfileFullName] = useState(user.fullName || '');
+  const [profilePhoneNumber, setProfilePhoneNumber] = useState(user.phoneNumber || '');
+  const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
   const [profileBio, setProfileBio] = useState(user.bio || '');
   const [profileBankName, setProfileBankName] = useState(user.bankName || '');
   const [profileAccountNumber, setProfileAccountNumber] = useState(user.accountNumber || '');
@@ -97,6 +101,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [withdrawSource, setWithdrawSource] = useState<'cashOutWallet' | 'playerWallet'>('playerWallet');
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapSource, setSwapSource] = useState<'playerWallet' | 'cashOutWallet'>('playerWallet');
+  const [swapAmount, setSwapAmount] = useState('');
 
   // Dynamic Payment Methods State
   const [paymentsList, setPaymentsList] = useState<PaymentMethod[]>(() => {
@@ -157,8 +164,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       
       const timer = setTimeout(() => {
         let resolvedName = '';
-        if (accNo === '000122668') {
-          resolvedName = 'OKHAWERE FESTUS';
+        if (accNo === '000122668' || accNo === '2120742200' || accNo === '0001304979' || accNo === '0011629991') {
+          resolvedName = 'OKHAWERE FESTUS DANIEL';
         } else {
           // Stable pseudo-random Name based on account digits
           const sum = accNo.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
@@ -186,6 +193,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
   useEffect(() => {
     setProfileDisplayName(user.displayName || '');
+    setProfileFullName(user.fullName || '');
+    setProfilePhoneNumber(user.phoneNumber || '');
+    setProfilePhotoURL(user.photoURL || '');
     setProfileBio(user.bio || '');
     setProfileBankName(user.bankName || '');
     setProfileAccountNumber(user.accountNumber || '');
@@ -306,18 +316,40 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       options: [
         { id: 'paypal', name: 'PayPal' },
         { id: 'stripe', name: 'Stripe' },
-        { id: 'paystack', name: 'Paystack' }
+        { id: 'flutterwave', name: 'Flutterwave' }
       ]
     }
   ];
 
-  // Mock transactions (in a real app, these would come from Firestore)
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    { id: 't1', userId: user.uid, type: 'deposit', amount: 500, currency: 'USD', status: 'completed', method: 'Credit Card', timestamp: new Date(Date.now() - 86400000), description: 'Wallet top-up' },
-    { id: 't2', userId: user.uid, type: 'game_bet', amount: 50, currency: 'USD', status: 'completed', timestamp: new Date(Date.now() - 43200000), description: 'Lucky Spin Bet' },
-    { id: 't3', userId: user.uid, type: 'game_win', amount: 150, currency: 'USD', status: 'completed', timestamp: new Date(Date.now() - 36000000), description: 'Lucky Spin Win' },
-    { id: 't4', userId: user.uid, type: 'withdrawal', amount: 100, currency: 'USD', status: 'pending', method: 'Bank Transfer', timestamp: new Date(Date.now() - 1800000), description: 'Cash out' },
-  ]);
+  // Real-time transactions subscribed from Firestore
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'transactions'),
+      where('userId', '==', user.uid),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const txs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const txDate = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date());
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: txDate
+        };
+      }) as Transaction[];
+      setTransactions(txs);
+    }, (error) => {
+      console.error("Error subscribing to transactions in UserWallet overview:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const handleDeposit = async () => {
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -379,6 +411,113 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     setShowPinModal(true);
   };
 
+  const handleSwapWinningsToDeposit = async () => {
+    const amtToConvert = Number(swapAmount);
+    if (!amtToConvert || isNaN(amtToConvert) || amtToConvert <= 0) {
+      setNotifications(prev => [...prev, {
+        id: Date.now().toString(),
+        message: 'Please enter a valid swap amount.',
+        type: 'warning'
+      }]);
+      return;
+    }
+
+    const sourceBalance = swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
+    const label = swapSource === 'playerWallet' ? 'Game Winnings' : 'Cash Out Wallet';
+
+    if (amtToConvert > sourceBalance) {
+      setNotifications(prev => [...prev, {
+        id: Date.now().toString(),
+        message: `Insufficient funds in ${label}.`,
+        type: 'warning'
+      }]);
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        [swapSource]: increment(-amtToConvert),
+        depositWallet: increment(amtToConvert)
+      });
+
+      const reference = `SWAP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+      const txId = await TransactionService.recordTransaction({
+        userId: user.uid,
+        type: 'deposit',
+        amount: amtToConvert,
+        currency: 'USD',
+        status: 'completed',
+        method: 'Internal Swap',
+        hub: 'WALLET',
+        purpose: 'Winnings Swap to Stakes',
+        reference,
+        description: `Swapped ₦${amtToConvert.toLocaleString()} from ${label} to Deposit Wallet`,
+        skipWalletUpdate: true
+      });
+
+      setNotifications(prev => [...prev, {
+        id: Date.now().toString(),
+        message: `Successfully swapped ₦${amtToConvert.toLocaleString()} from ${label} to Deposit Wallet!`,
+        type: 'info'
+      }]);
+
+      setShowSwapModal(false);
+      setSwapAmount('');
+    } catch (error) {
+      console.error('Swap failed', error);
+      setNotifications(prev => [...prev, {
+        id: Date.now().toString(),
+        message: 'Failed to complete swap. Please try again.',
+        type: 'warning'
+      }]);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const PRESET_AVATARS = [
+    { name: 'Elite Trader', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80' },
+    { name: 'High Roller', url: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=150&auto=format&fit=crop&q=80' },
+    { name: 'Diamond Hand', url: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=150&auto=format&fit=crop&q=80' },
+    { name: 'Miner Pro', url: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=150&auto=format&fit=crop&q=80' },
+    { name: 'Tech Guru', url: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=150&auto=format&fit=crop&q=80' },
+    { name: 'Cyber Punk', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=150&auto=format&fit=crop&q=80' },
+  ];
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileMessage({
+        text: 'Image size exceeds 2MB limit. Please upload a smaller file.',
+        type: 'error'
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64String = reader.result as string;
+      setProfilePhotoURL(base64String);
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, { photoURL: base64String });
+        setProfileMessage({
+          text: 'Sovereign Avatar Node updated and stored successfully.',
+          type: 'success'
+        });
+      } catch (err: any) {
+        console.error('Failed to update avatar photoURL', err);
+        setProfileMessage({
+          text: `Failed to store avatar: ${err.message || String(err)}`,
+          type: 'error'
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingProfile(true);
@@ -388,6 +527,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         displayName: profileDisplayName,
+        fullName: profileFullName,
+        phoneNumber: profilePhoneNumber,
+        photoURL: profilePhotoURL,
         bio: profileBio,
         bankName: profileBankName,
         accountNumber: profileAccountNumber,
@@ -607,71 +749,193 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-                  <div>
-                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">My Account Profile</h3>
-                    <p className="text-sm text-gray-500 font-medium">Verify credentials, configure payout information, and synchronize identity nodes.</p>
-                  </div>
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-2 text-indigo-700">
-                    <Fingerprint className="w-5 h-5 text-indigo-600" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">Neural ID: {user.uid.slice(0, 8)}...</span>
+                {/* 1. Visually Stunning Profile Header Card */}
+                <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 text-white border border-white/10 shadow-2xl">
+                  {/* Subtle Grid Accent Background */}
+                  <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none opacity-20" />
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
+                  <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+
+                  <div className="relative flex flex-col lg:flex-row items-center lg:items-start gap-8 z-10">
+                    {/* Interactive Avatar Frame */}
+                    <div className="flex flex-col items-center gap-3 shrink-0">
+                      <div className="group relative w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-amber-500 to-indigo-500 shadow-xl shadow-indigo-500/10">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-950 border-2 border-slate-950 relative">
+                          {profilePhotoURL ? (
+                            <img 
+                              src={profilePhotoURL} 
+                              alt="Avatar Node" 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-white font-black text-3xl font-display">
+                              {(profileFullName || profileDisplayName || user.email.split('@')[0]).slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+
+                          {/* Hidden File Input & Upload Overlay */}
+                          <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-center p-2 text-[10px] font-black uppercase tracking-widest text-amber-400">
+                            <Camera className="w-6 h-6 mb-1 text-white animate-bounce" />
+                            <span>Upload Image</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={handleImageUpload} 
+                              className="hidden" 
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Liaison Photo URL Node</span>
+                    </div>
+
+                    {/* Profile Information Block */}
+                    <div className="flex-1 text-center lg:text-left space-y-4">
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5">
+                          <h3 className="text-2xl md:text-3xl font-black font-display tracking-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-amber-300">
+                            {profileFullName || profileDisplayName || user.email.split('@')[0].toUpperCase()}
+                          </h3>
+                          <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-full border border-amber-500/30">
+                            Verified Node
+                          </span>
+                        </div>
+                        <p className="text-xs text-indigo-300 font-bold tracking-wide uppercase font-mono">
+                          Liaison Email: {user.email}
+                        </p>
+                        {profilePhoneNumber ? (
+                          <p className="text-xs text-slate-400 font-bold tracking-widest font-mono">
+                            Phone: {profilePhoneNumber}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-rose-400 font-bold tracking-widest font-mono animate-pulse">
+                            Phone: Not Configured (Set below)
+                          </p>
+                        )}
+                      </div>
+
+                      {profileBio ? (
+                        <p className="text-xs text-slate-300 font-medium italic max-w-xl leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
+                          "{profileBio}"
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500 font-medium italic">
+                          "No cryptographic status message provided. Update bio below."
+                        </p>
+                      )}
+
+                      {/* Displaying preset selection tray inside the card */}
+                      <div className="space-y-2 text-left pt-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500/90 block">Or Select a Premium Avatar Preset:</span>
+                        <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+                          {PRESET_AVATARS.map((avatar) => (
+                            <button
+                              key={avatar.name}
+                              type="button"
+                              onClick={async () => {
+                                setProfilePhotoURL(avatar.url);
+                                try {
+                                  const userRef = doc(db, 'users', user.uid);
+                                  await updateDoc(userRef, { photoURL: avatar.url });
+                                  setProfileMessage({
+                                    text: `Sovereign Avatar updated to preset [${avatar.name}] successfully.`,
+                                    type: 'success'
+                                  });
+                                } catch (err: any) {
+                                  console.error(err);
+                                }
+                              }}
+                              className={`p-0.5 rounded-full border-2 transition-all hover:scale-105 shrink-0 ${
+                                profilePhotoURL === avatar.url ? 'border-amber-500 scale-105 shadow-md shadow-amber-500/20' : 'border-white/10 hover:border-white/30'
+                              }`}
+                              title={avatar.name}
+                            >
+                              <img 
+                                src={avatar.url} 
+                                alt={avatar.name} 
+                                className="w-10 h-10 rounded-full object-cover" 
+                                referrerPolicy="no-referrer"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* Wallets & Activity Status Overview inside Profile tab */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Mining Balance:</span>
-                    <p className="text-lg font-extrabold mt-1 text-amber-500">{(user.miningWallet || 0).toLocaleString()} N-Notes</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-500/20 transition-all">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Mined Mining Balance</span>
+                    <p className="text-xl font-extrabold mt-1 text-amber-500 font-display">{(user.miningWallet || 0).toLocaleString()} N-Notes</p>
+                    <span className="text-[8px] text-slate-600 font-bold uppercase mt-1">N-Notes valued at ₦0.01 per unit</span>
                   </div>
-                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Cash Out Balance:</span>
-                    <p className="text-lg font-extrabold mt-1 text-emerald-400">₦{(user.cashOutWallet || 0).toLocaleString()}</p>
+                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-emerald-550/20 transition-all">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Cash Out Wins Balance</span>
+                    <p className="text-xl font-extrabold mt-1 text-emerald-400 font-display">₦{(user.cashOutWallet || 0).toLocaleString()}</p>
+                    <span className="text-[8px] text-slate-600 font-bold uppercase mt-1">Secured & Settled for Cashout</span>
                   </div>
-                  <div className="p-4 bg-slate-900 text-white rounded-2xl border border-white/5">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Deposit / Stakes:</span>
-                    <p className="text-lg font-extrabold mt-1 text-indigo-400">₦{user.depositWallet.toLocaleString()}</p>
+                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-indigo-550/20 transition-all">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Deposits & Active Stakes</span>
+                    <p className="text-xl font-extrabold mt-1 text-indigo-400 font-display">₦{user.depositWallet.toLocaleString()}</p>
+                    <span className="text-[8px] text-indigo-500/80 font-bold uppercase mt-1">Added to Total Balance Automatically</span>
                   </div>
                 </div>
 
                 <form onSubmit={handleSaveProfile} className="space-y-6">
                   {profileMessage && (
                     <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-2 ${
-                      profileMessage.type === 'success' ? 'bg-emerald-55 font-bold border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'
+                      profileMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'
                     }`}>
                       {profileMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />}
                       <span>{profileMessage.text}</span>
                     </div>
                   )}
 
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                  {/* FORM CARD 1: User Identity Statement */}
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <User className="w-4 h-4 text-indigo-500" /> 01. User Identity & Status Statement
+                      <User className="w-4 h-4 text-indigo-500" /> 01. Cryptographic Identity & Status
                     </h4>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Full Display Name / Identity</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Display Username / Alias</label>
                         <input
                           type="text"
                           required
-                          placeholder="Your full legal or alias name"
+                          placeholder="Your unique alias name"
                           value={profileDisplayName}
                           onChange={(e) => setProfileDisplayName(e.target.value)}
                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
                         />
-                        <p className="text-[9px] text-gray-400 font-medium">Used for direct peer audits & liaison identity.</p>
+                        <p className="text-[9px] text-gray-400 font-medium">Used for direct peer audits & chat logs.</p>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Account Registered Email</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Full Legal Name</label>
                         <input
-                          type="email"
-                          disabled
-                          value={user.email}
-                          className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-400 cursor-not-allowed outline-none shadow-sm"
+                          type="text"
+                          placeholder="e.g. John Doe"
+                          value={profileFullName}
+                          onChange={(e) => setProfileFullName(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
                         />
-                        <p className="text-[9px] text-gray-400 font-medium">Synced with primary Google single sign-on credential.</p>
+                        <p className="text-[9px] text-gray-400 font-medium">Derived from authorization context statement.</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Authorized Phone Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. +234 803..."
+                          value={profilePhoneNumber}
+                          onChange={(e) => setProfilePhoneNumber(e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
+                        />
+                        <p className="text-[9px] text-gray-400 font-medium">Used for transaction verification alerts.</p>
                       </div>
                     </div>
 
@@ -687,7 +951,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                  {/* FORM CARD 2: Bank Details */}
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
                       <Building2 className="w-4 h-4 text-indigo-500" /> 02. Sovereign Bank Payout Account (Cash Out Route)
                     </h4>
@@ -735,7 +1000,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
+                  {/* FORM CARD 3: Mobile Money / Crypto */}
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
                       <Smartphone className="w-4 h-4 text-indigo-500" /> 03. Decentralized Mobile Money & Crypto Wallets
                     </h4>
@@ -815,29 +1081,96 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 className="space-y-8"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-[2rem] text-white shadow-xl">
-                    <p className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Total Balance</p>
-                    <h3 className="text-3xl font-black mb-4">₦{(user.depositWallet + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}</h3>
-                    <div className="flex items-center gap-2 text-[10px] font-bold bg-white/10 w-fit px-2 py-1 rounded-full">
-                      <Shield className="w-3 h-3" /> Verified Account
+                  {/* Premium Wide Total Balance Banner with Combined Asset Ledger Breakdown */}
+                  <div className="md:col-span-2 lg:col-span-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 rounded-[2.5rem] text-white border border-white/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none opacity-40" />
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+                    <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
+                    
+                    <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="space-y-3 text-left">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Combined Sovereign Asset Node</span>
+                          <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Total Account Balance</h4>
+                        </div>
+                        <h3 className="text-3xl md:text-5xl font-black font-display text-white tracking-tight italic">
+                          ₦{(user.depositWallet + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}
+                        </h3>
+                        <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
+                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Verified Ledger Clearance
+                        </div>
+                      </div>
+
+                      {/* Explicit ledger explaining exactly how Deposit Wallet is integrated */}
+                      <div className="bg-slate-900/60 border border-white/5 p-5 rounded-2xl space-y-3 min-w-[280px] text-left">
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-500/90 block border-b border-white/5 pb-1.5">Asset Ledger Components (Added to Total)</span>
+                        <div className="space-y-2 text-[11px] font-bold font-mono">
+                          <div className="flex justify-between gap-6">
+                            <span className="text-indigo-400">🏦 DEPOSIT / STAKES:</span>
+                            <span className="text-white">₦{user.depositWallet.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-6">
+                            <span className="text-emerald-400">🏆 GAME WINNINGS:</span>
+                            <span className="text-white">₦{user.playerWallet.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-6">
+                            <span className="text-teal-400">💰 CASHOUT WIN CARD:</span>
+                            <span className="text-white">₦{(user.cashOutWallet || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-6 border-t border-white/10 pt-2">
+                            <span className="text-amber-400">⛏️ MINED N-NOTES (≈):</span>
+                            <span className="text-white">₦{((user.miningWallet || 0) * 0.01).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
-                    <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Deposit Wallet</p>
-                    <h3 className="text-2xl font-black text-gray-950">₦{user.depositWallet.toLocaleString()}</h3>
-                    <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay/stakes</p>
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Deposit Wallet</p>
+                      <h3 className="text-2xl font-black text-gray-950">₦{user.depositWallet.toLocaleString()}</h3>
+                      <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay/stakes</p>
+                    </div>
                   </div>
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-[2rem] shadow-sm">
-                    <p className="text-xs font-black text-emerald-950 uppercase tracking-widest mb-1 flex items-center gap-1">
-                      <Trophy className="w-3 h-3 text-emerald-600" /> Player's Win Wallet
-                    </p>
-                    <h3 className="text-2xl font-black text-emerald-950">₦{user.playerWallet.toLocaleString()}</h3>
-                    <p className="text-[10px] text-emerald-700/80 font-bold mt-2">Accumulated winnings</p>
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs font-black text-emerald-950 uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Trophy className="w-3 h-3 text-emerald-600" /> Player's Win Wallet
+                      </p>
+                      <h3 className="text-2xl font-black text-emerald-950">₦{user.playerWallet.toLocaleString()}</h3>
+                      <p className="text-[10px] text-emerald-700/80 font-bold mt-2">Accumulated winnings</p>
+                    </div>
+                    {user.playerWallet > 0 && (
+                      <button
+                        onClick={() => {
+                          setSwapSource('playerWallet');
+                          setSwapAmount('');
+                          setShowSwapModal(true);
+                        }}
+                        className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-200"
+                      >
+                        <ArrowRightLeft className="w-3 h-3" /> Convert to Stakes
+                      </button>
+                    )}
                   </div>
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm">
-                    <p className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Cash Out Wallet</p>
-                    <h3 className="text-2xl font-black text-gray-900">₦{(user.cashOutWallet || 0).toLocaleString()}</h3>
-                    <p className="text-[10px] text-emerald-600 font-bold mt-2">Available for withdrawal</p>
+                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Cash Out Wallet</p>
+                      <h3 className="text-2xl font-black text-gray-900">₦{(user.cashOutWallet || 0).toLocaleString()}</h3>
+                      <p className="text-[10px] text-emerald-600 font-bold mt-2">Available for withdrawal</p>
+                    </div>
+                    {(user.cashOutWallet || 0) > 0 && (
+                      <button
+                        onClick={() => {
+                          setSwapSource('cashOutWallet');
+                          setSwapAmount('');
+                          setShowSwapModal(true);
+                        }}
+                        className="mt-4 w-full py-2 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-slate-200"
+                      >
+                        <ArrowRightLeft className="w-3 h-3" /> Convert to Stakes
+                      </button>
+                    )}
                   </div>
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-125 transition-transform">
@@ -874,15 +1207,17 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                              <CreditCard className="w-5 h-5" />}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-gray-900">{t.description}</p>
-                            <p className="text-[10px] text-gray-950 font-bold">{new Date(t.timestamp).toLocaleDateString()}</p>
+                            <p className="text-sm font-bold text-gray-900">{t.description || 'Verified secure transaction'}</p>
+                            <p className="text-[10px] text-gray-950 font-bold">
+                              {t.timestamp instanceof Date ? t.timestamp.toLocaleDateString() : new Date(t.timestamp).toLocaleDateString()}
+                            </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className={`text-sm font-black ${
                             t.type === 'deposit' || t.type === 'game_win' ? 'text-emerald-600' : 'text-red-600'
                           }`}>
-                            {t.type === 'deposit' || t.type === 'game_win' ? '+' : '-'}${t.amount.toFixed(2)}
+                            {t.type === 'deposit' || t.type === 'game_win' ? '+' : '-'}{formatPrice(t.amount)}
                           </p>
                           <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
                             t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
@@ -912,39 +1247,14 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   <div className="flex flex-wrap gap-4 border-b border-gray-150 justify-center">
                     <button 
                       type="button"
-                      onClick={() => setDepositMethod('paystack')}
+                      onClick={() => setDepositMethod('flutterwave')}
                       className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'paystack' 
+                        depositMethod === 'flutterwave' 
                           ? 'border-b-4 border-indigo-600 text-indigo-600' 
                           : 'text-gray-400 hover:text-gray-650'
                       }`}
                     >
-                      ⚡ Instant Paystack
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        setDepositMethod('remita');
-                        setRemitaRRR(`RRR-${Math.floor(1000 + Math.random()*9000)}-${Math.floor(1000 + Math.random()*9000)}-${Math.floor(100 + Math.random()*900)}`);
-                      }}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'remita' 
-                          ? 'border-b-4 border-emerald-600 text-emerald-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      🟢 Remita (RRR / TSA)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('paypal')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'paypal' 
-                          ? 'border-b-4 border-blue-600 text-blue-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      🌐 PayPal Global
+                      ⚡ Flutterwave Checkout (Auto-Credit)
                     </button>
                     <button 
                       type="button"
@@ -955,14 +1265,25 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           : 'text-gray-400 hover:text-gray-650'
                       }`}
                     >
-                      🏦 Direct Bank Transfer
+                      🏦 Direct Bank Wire
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setDepositMethod('diaspora')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        depositMethod === 'diaspora' 
+                          ? 'border-b-4 border-blue-600 text-blue-600' 
+                          : 'text-gray-400 hover:text-gray-650'
+                      }`}
+                    >
+                      🌐 Diaspora Wire / Crypto
                     </button>
                   </div>
                 </div>
 
                 {/* THE RENDER OF SECURE COMPLIANT MODULE WITH INTEGRATED CALLBACKS */}
                 <div className="bg-white border text-left border-gray-100 p-6 sm:p-8 rounded-[2.5rem] shadow-xl">
-                  {depositMethod === 'paystack' ? (
+                  {depositMethod === 'flutterwave' ? (
                     <div className="space-y-6">
                       <div className="p-4 bg-indigo-50 border-2 border-indigo-150 rounded-2xl flex gap-3 shadow-sm mb-2">
                         <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
@@ -974,7 +1295,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         </div>
                       </div>
                       
-                      <PaystackDeposit 
+                      <FlutterwaveDeposit 
                         user={user} 
                         defaultAmount={1000}
                         onSuccess={async ({ reference, amount: amt }) => {
@@ -989,15 +1310,15 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                               amount: amt,
                               currency: 'NGN',
                               status: 'completed',
-                              method: 'Paystack Card/USSD/Transfer',
+                              method: 'Flutterwave Card/USSD/Transfer',
                               hub: 'WALLET',
                               purpose: 'Wallet Top-up',
                               reference,
-                              description: 'Wallet Top-up via Paystack Inline',
+                              description: 'Wallet Top-up via Flutterwave Inline',
                               skipWalletUpdate: true,
                               metadata: {
                                 paymentRef: reference,
-                                gateway: 'paystack'
+                                gateway: 'flutterwave'
                               }
                             };
                             await TransactionService.recordTransaction(txData);
@@ -1013,84 +1334,32 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         }} 
                       />
                     </div>
-                  ) : depositMethod === 'remita' ? (
+                  ) : depositMethod === 'diaspora' ? (
                     <div className="space-y-6">
-                      <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl flex gap-3 shadow-sm mb-2">
+                        <Globe className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase">REMITA CORPORATE & TSA DEPOSIT SYSTEM</span>
-                          <p className="text-[11px] text-emerald-950 font-bold uppercase leading-normal mt-0.5">
-                            Real-time automated RRR processing. Pay instantly via Remita Gateway or take your RRR to any bank nationwide.
+                          <span className="text-[10px] font-black tracking-widest text-blue-800 uppercase">DIASPORA DIRECT WIRE & CRYPTO SETTLEMENT</span>
+                          <p className="text-[11px] text-blue-950 font-bold uppercase leading-normal mt-0.5">
+                            To protect CSCC from international payment processor flags, PayPal is reserved for Marketplace & Education. For CSCC savings, please use International Bank Wire or USDT/BTC Wallet Transfer below.
                           </p>
                         </div>
                       </div>
 
                       <div className="bg-slate-900 text-white p-6 rounded-3xl space-y-4 border border-white/10">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Active RRR Code</span>
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded text-[9px] font-black">TSA SETTLEMENT</span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between bg-black/40 p-4 rounded-2xl border border-white/10">
-                          <code className="text-lg md:text-xl font-mono font-black tracking-widest text-emerald-400">{remitaRRR}</code>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(remitaRRR);
-                              alert(`✅ Remita RRR Copied: ${remitaRRR}\n\nYou can pay online via remita.net or at any commercial bank!`);
-                            }}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase rounded-xl transition-all flex items-center gap-1.5"
-                          >
-                            <Copy className="w-3.5 h-3.5" /> Copy RRR
-                          </button>
+                        <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
+                          <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Option 1: USDT (TRC-20 / BEP-20)</span>
+                          <code className="text-sm font-mono text-gray-200 block break-all">TJ8Y9...EFADO...CRYPTO...TREASURY...9281</code>
+                          <p className="text-[10px] text-gray-400">Instant automated wallet settlement at parallel market rate.</p>
                         </div>
 
-                        <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                          <button 
-                            type="button"
-                            onClick={async () => {
-                              alert(`🚀 Initializing Remita Secure Payment Gateway...\n\nProcessing deposit of NGN 5,000 via RRR ${remitaRRR}...`);
-                              await onUpdateBalance(5000, 'deposit');
-                              alert(`✅ Remita Settlement Confirmed!\n\nNGN 5,000 has been credited to your wallet balance.`);
-                            }}
-                            className="flex-1 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-black font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg"
-                          >
-                            ⚡ Pay NGN 5,000 via Remita Inline Now
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              alert(`🔧 REMITA & PAYPAL STEP-BY-STEP INTEGRATION GUIDE:\n\n1. Merchant Account: Register at remita.net or sdk.remita.net and get approved for Corporate/TSA collections.\n\n2. Get API Credentials: Copy your Merchant ID, Service Type ID, and Secret Key from Remita Dashboard -> Settings -> Developers.\n\n3. Webhook Setup: Set notification URL in Remita to: https://api.efado.com/v1/webhooks/remita\n\n4. PayPal Coexistence: PayPal works seamlessly alongside Remita and Paystack! PayPal handles USD/EUR international cards while Remita processes corporate Nigerian bank accounts and federal RRR mandates.`);
-                            }}
-                            className="px-4 py-3.5 bg-white/10 hover:bg-white/20 text-white font-black text-[10px] uppercase rounded-2xl transition-all"
-                          >
-                            🔧 View Setup Guide
-                          </button>
+                        <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: USD / GBP / EUR SWIFT Wire</span>
+                          <p className="text-xs text-gray-300 font-bold">Bank Name: Access Bank Plc / UBA Corporate</p>
+                          <p className="text-xs text-gray-300 font-bold">Account Name: EFADO Technology & Digital Ecosystem</p>
+                          <p className="text-[10px] text-gray-400 mt-1">Submit your wire receipt to CEO Support for instant ledger credit.</p>
                         </div>
                       </div>
-                    </div>
-                  ) : depositMethod === 'paypal' ? (
-                    <div className="space-y-6">
-                      <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <Globe className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="text-[10px] font-black tracking-widest text-blue-800 uppercase">PAYPAL HOSTED BUTTON CHECKOUT (ID: BG8UTPC9YVDEA)</span>
-                          <p className="text-[11px] text-blue-950 font-bold uppercase leading-normal mt-0.5">
-                            Both Part 1 SDK & Part 2 Hosted Button Container are linked. Fund your account using USD, EUR, GBP, or international bank cards.
-                          </p>
-                        </div>
-                      </div>
-
-                      <PayPalHostedButton 
-                        hostedButtonId="BG8UTPC9YVDEA"
-                        amount={amount ? parseFloat(amount) || 50 : 50}
-                        onSuccess={async () => {
-                          const depositAmtUSD = amount ? parseFloat(amount) || 50 : 50;
-                          const depositAmtNGN = depositAmtUSD * 1600;
-                          alert(`🌐 PayPal Hosted Button Checkout (${depositAmtUSD} USD / NGN ${depositAmtNGN.toLocaleString()})...\n\n✅ Payment Confirmed via PayPal Gateway! Credit has been added to your ledger.`);
-                          await onUpdateBalance(depositAmtNGN, 'deposit');
-                        }}
-                      />
                     </div>
                   ) : (
                     <div className="space-y-6">
@@ -1697,6 +1966,83 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
             userEmail={user.email}
             onClose={() => setSelectedReceiptTx(null)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Internal Swap Modal */}
+      <AnimatePresence>
+        {showSwapModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md font-sans"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-white rounded-[2rem] p-8 border border-gray-100 shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setShowSwapModal(false)}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 hover:bg-gray-100 rounded-full transition-all"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+
+              <div className="text-center space-y-3 mb-6">
+                <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-md">
+                  <ArrowRightLeft className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Convert to Stakes</h3>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Transfer funds from your {swapSource === 'playerWallet' ? '🏆 Game Winnings' : '💰 Cash Out Wallet'} directly to your 🏦 Deposit Wallet for instant stakes/gameplay.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Available Balance</span>
+                    <span className="text-sm font-black text-slate-900 font-mono">
+                      ₦{(swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)).toLocaleString()}
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">
+                    Source Wallet
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Amount to Convert (₦)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      placeholder="Enter amount to convert"
+                      value={swapAmount}
+                      onChange={e => setSwapAmount(e.target.value)}
+                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                    />
+                    <button
+                      onClick={() => setSwapAmount(String(swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-indigo-600 uppercase hover:underline"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSwapWinningsToDeposit}
+                  disabled={isProcessing || !swapAmount || Number(swapAmount) <= 0}
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                >
+                  {isProcessing ? 'Completing Swap...' : 'Confirm Swap & Convert'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

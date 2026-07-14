@@ -142,7 +142,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [newAnnouncementActionText, setNewAnnouncementActionText] = useState('');
   const [newAnnouncementActionUrl, setNewAnnouncementActionUrl] = useState('');
   const [creditAmount, setCreditAmount] = useState<number>(0);
-  const [creditType, setCreditType] = useState<'playerWallet' | 'cashOutWallet'>('playerWallet');
+  const [creditType, setCreditType] = useState<'playerWallet' | 'depositWallet' | 'cashOutWallet' | 'miningWallet'>('playerWallet');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
@@ -486,25 +486,29 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   useEffect(() => {
     if (!isUnlocked) return;
     
+    const handleSnapError = (err: any, col: string) => {
+      console.warn(`CeoPortal snapshot error for '${col}':`, err.message || err);
+    };
+
     // Fetch Users
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
-    });
+    }, (e) => handleSnapError(e, 'users'));
 
     // Fetch Withdrawals
     const unsubWithdrawals = onSnapshot(query(collection(db, 'withdrawals'), orderBy('timestamp', 'desc')), (snapshot) => {
       setWithdrawals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WithdrawalRequest)));
-    });
+    }, (e) => handleSnapError(e, 'withdrawals'));
 
     // Fetch Announcements
     const unsubAnnouncements = onSnapshot(query(collection(db, 'announcements'), orderBy('timestamp', 'desc')), (snapshot) => {
       setAnnouncements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement)));
-    });
+    }, (e) => handleSnapError(e, 'announcements'));
 
     // Hub Monitoring Subscriptions
     const unsubProviders = onSnapshot(collection(db, 'service_providers'), (snap) => {
       setServiceProviders(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceProvider)));
-    });
+    }, (e) => handleSnapError(e, 'service_providers'));
 
     // Fetch System Settings
     const unsubSettings = onSnapshot(doc(db, 'adminStats', 'settings'), (snap) => {
@@ -519,69 +523,69 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           maxLoanAmount: 5000
         });
       }
-    });
+    }, (e) => handleSnapError(e, 'adminStats/settings'));
 
     const unsubRequests = onSnapshot(collection(db, 'service_requests'), (snap) => {
       setServiceRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as ServiceRequest)));
-    });
+    }, (e) => handleSnapError(e, 'service_requests'));
     const unsubCSCC = onSnapshot(collection(db, 'cscc_groups'), (snap) => {
       setCsccGroups(snap.docs.map(d => ({ id: d.id, ...d.data() } as CSCCGroup)));
-    });
+    }, (e) => handleSnapError(e, 'cscc_groups'));
     const unsubLoans = onSnapshot(collection(db, 'loans'), (snap) => {
       setLoans(snap.docs.map(d => ({ id: d.id, ...d.data() } as Loan)));
-    });
+    }, (e) => handleSnapError(e, 'loans'));
     const unsubLoanApps = onSnapshot(collection(db, 'loan_applications'), (snap) => {
       setLoanApplications(snap.docs.map(d => ({ id: d.id, ...d.data() } as LoanApplication)));
-    });
+    }, (e) => handleSnapError(e, 'loan_applications'));
     const unsubLoanVendors = onSnapshot(collection(db, 'loan_vendors'), (snap) => {
       setLoanVendors(snap.docs.map(d => ({ id: d.id, ...d.data() } as LoanVendor)));
-    });
+    }, (e) => handleSnapError(e, 'loan_vendors'));
     const unsubDomainSellers = onSnapshot(collection(db, 'domain_sellers'), (snap) => {
       setDomainSellers(snap.docs.map(d => ({ id: d.id, ...d.data() } as DomainSeller)));
-    });
+    }, (e) => handleSnapError(e, 'domain_sellers'));
     const unsubDomainOrders = onSnapshot(collection(db, 'domain_orders'), (snap) => {
       setDomainOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as DomainOrder)));
-    });
+    }, (e) => handleSnapError(e, 'domain_orders'));
     const unsubQuizSessions = onSnapshot(collection(db, 'quiz_sessions'), (snap) => {
       setQuizSessions(snap.docs.map(d => ({ id: d.id, ...d.data() } as QuizSession)));
-    });
+    }, (e) => handleSnapError(e, 'quiz_sessions'));
     const unsubEmailAccounts = onSnapshot(collection(db, 'email_accounts'), (snap) => {
       setEmailAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as EmailAccount)));
-    });
+    }, (e) => handleSnapError(e, 'email_accounts'));
 
     const unsubLogs = onSnapshot(query(collection(db, 'admin_logs'), orderBy('timestamp', 'desc'), limit(50)), (snap) => {
       setAdminLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'admin_logs'));
 
     // Fetch All Transactions
     const unsubTransactions = onSnapshot(query(collection(db, 'transactions'), orderBy('timestamp', 'desc'), limit(100)), (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
-    });
+    }, (e) => handleSnapError(e, 'transactions'));
 
     // Fetch Hub Content
     const unsubPosts = onSnapshot(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(50)), (snap) => {
       setPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'posts'));
 
     const unsubAds = onSnapshot(collection(db, 'ads'), (snap) => {
       setAds(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'ads'));
 
     const unsubVendors = onSnapshot(collection(db, 'vendors'), (snap) => {
       setVendors(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'vendors'));
     const unsubMarketProducts = onSnapshot(collection(db, 'marketProducts'), (snap) => {
       setMarketProducts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'market_products'));
     const unsubMarketOrders = onSnapshot(collection(db, 'market_orders'), (snap) => {
       setMarketOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'market_orders'));
     const unsubAdListings = onSnapshot(collection(db, 'ad_listings'), (snap) => {
       setAdListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'ad_listings'));
     const unsubSocialPosts = onSnapshot(collection(db, 'social_posts'), (snap) => {
       setSocialPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'social_posts'));
 
     // Fetch Help Requests Support Tickets (CEO support hub)
     const unsubSupport = onSnapshot(collection(db, 'help_requests'), (snap) => {
@@ -592,17 +596,17 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         return tB - tA;
       });
       setSupportTickets(list);
-    });
+    }, (e) => handleSnapError(e, 'help_requests'));
 
     // Fetch Incubator Innovation pitches
     const unsubIdeas = onSnapshot(collection(db, 'incubator_ideas'), (snap) => {
       setIncubatorIdeas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'incubator_ideas'));
 
     // Fetch Live zoom classes broadcast records
     const unsubLiveClasses = onSnapshot(collection(db, 'live_classes'), (snap) => {
       setLiveBroadcastClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (e) => handleSnapError(e, 'live_classes'));
 
     return () => {
       unsubUsers();
@@ -711,7 +715,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         const adminData = adminSnap.data() as AdminStats;
 
         transaction.update(userRef, {
-          [creditType]: (user as any)[creditType] + creditAmount
+          [creditType]: ((user as any)[creditType] || 0) + creditAmount
         });
 
         transaction.update(adminRef, {
@@ -721,11 +725,13 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
         transaction.set(txRef, {
           userId: user.uid,
+          userEmail: user.email || '',
           type: creditType === 'playerWallet' ? 'deposit' : 'game_win',
           amount: creditAmount,
           status: 'completed',
           timestamp: serverTimestamp(),
-          adminNote: 'CEO Credit'
+          description: 'Sovereign wallet credited manually by CEO',
+          purpose: 'CEO Manual Credit Adjustment'
         });
 
         // Audit Log
@@ -819,7 +825,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         // WRITE STATUS TO TRANSACTION 
         transaction.update(txRef, { 
           status,
-          adminNote: `Manual Deposit processed by CEO`
+          description: `Manual Deposit processed by CEO`
         });
 
         if (status === 'completed') {
@@ -1449,18 +1455,31 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="flex gap-4">
-                              <div className="flex flex-col">
-                                <span className="text-[8px] font-bold text-slate-500 uppercase">Player</span>
-                                <span className="text-xs font-bold text-indigo-400">${user.playerWallet.toLocaleString()}</span>
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="text-[8px] font-bold text-slate-500 uppercase">Cash Out</span>
-                                <span className="text-xs font-bold text-emerald-400">${user.cashOutWallet.toLocaleString()}</span>
-                              </div>
-                            </div>
-                          </td>
+                           <td className="px-6 py-4">
+                             <div className="flex flex-col gap-1">
+                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                 <div className="flex flex-col">
+                                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">🏦 Deposit</span>
+                                   <span className="text-xs font-black text-amber-400">₦{(user.depositWallet || 0).toLocaleString()}</span>
+                                 </div>
+                                 <div className="flex flex-col">
+                                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">🏆 Player (Play)</span>
+                                   <span className="text-xs font-black text-indigo-400">₦{(user.playerWallet || 0).toLocaleString()}</span>
+                                 </div>
+                                 <div className="flex flex-col">
+                                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">💰 Cash Out</span>
+                                   <span className="text-xs font-black text-emerald-400">₦{(user.cashOutWallet || 0).toLocaleString()}</span>
+                                 </div>
+                                 <div className="flex flex-col">
+                                   <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider">⛏️ Mined</span>
+                                   <span className="text-xs font-black text-teal-400">₦{(user.miningWallet || 0).toLocaleString()}</span>
+                                 </div>
+                               </div>
+                               <div className="text-[9px] font-bold text-slate-400 mt-1 bg-slate-900/30 px-2.5 py-1 rounded-lg w-fit border border-white/5">
+                                 Combined Sovereign Asset Balance: <span className="text-white font-black">₦{((user.depositWallet || 0) + (user.playerWallet || 0) + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}</span>
+                               </div>
+                             </div>
+                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
                               user.role === 'admin' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-700/50 text-slate-400'
@@ -3392,40 +3411,78 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
               exit={{ scale: 0.9, y: 20 }}
               className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl"
             >
-              <h3 className="text-xl font-black text-white mb-2 uppercase">Credit Player Wallet</h3>
-              <p className="text-sm text-slate-400 mb-6 font-bold">{selectedUser.email}</p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Wallet Type</label>
-                  <div className="flex gap-2 p-1 bg-slate-800 rounded-2xl border border-white/10">
-                    <button
-                      onClick={() => setCreditType('playerWallet')}
-                      className={`flex-grow py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'playerWallet' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
-                    >
-                      PLAYER WALLET
-                    </button>
-                    <button
-                      onClick={() => setCreditType('cashOutWallet')}
-                      className={`flex-grow py-3 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'cashOutWallet' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
-                    >
-                      CASH OUT WALLET
-                    </button>
+               <h3 className="text-xl font-black text-white mb-2 uppercase">Adjust User Wallet</h3>
+               <p className="text-sm text-slate-400 mb-4 font-bold">{selectedUser.email}</p>
+               
+               <div className="space-y-4">
+                {/* Real-time wallet readout for tracking individual wallets */}
+                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-2 text-[11px] font-mono">
+                  <span className="text-[8px] font-black uppercase text-amber-500 tracking-wider block border-b border-white/5 pb-1">Current User Wallets</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">🏦 DEPOSIT WALLET:</span>
+                    <span className="text-white font-black">₦{(selectedUser.depositWallet || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">🏆 PLAYER (PLAY) WALLET:</span>
+                    <span className="text-white font-black">₦{(selectedUser.playerWallet || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">💰 CASH OUT WALLET:</span>
+                    <span className="text-white font-black">₦{(selectedUser.cashOutWallet || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">⛏️ MINING WALLET:</span>
+                    <span className="text-white font-black">₦{(selectedUser.miningWallet || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-white/10 pt-2 font-bold text-indigo-400">
+                    <span>COMBINED SOVEREIGN ASSETS:</span>
+                    <span>₦{((selectedUser.depositWallet || 0) + (selectedUser.playerWallet || 0) + (selectedUser.cashOutWallet || 0) + (selectedUser.miningWallet || 0) * 0.01).toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Enter Amount ($)</label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
-                    <input 
-                      type="number"
-                      value={creditAmount}
-                      onChange={(e) => setCreditAmount(Number(e.target.value))}
-                      className="w-full bg-slate-800 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-indigo-500 outline-none transition-all text-xl font-black font-display"
-                    />
-                  </div>
-                </div>
+                 <div>
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Wallet Type</label>
+                   <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-white/10">
+                     <button
+                       onClick={() => setCreditType('playerWallet')}
+                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'playerWallet' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       PLAYER
+                     </button>
+                     <button
+                       onClick={() => setCreditType('depositWallet')}
+                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'depositWallet' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       DEPOSIT
+                     </button>
+                     <button
+                       onClick={() => setCreditType('cashOutWallet')}
+                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'cashOutWallet' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       CASH OUT
+                     </button>
+                     <button
+                       onClick={() => setCreditType('miningWallet')}
+                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'miningWallet' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       MINED
+                     </button>
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Enter Credit Amount (₦)</label>
+                   <div className="relative">
+                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-amber-500 font-mono select-none">₦</div>
+                     <input 
+                       type="number"
+                       value={creditAmount || ''}
+                       onChange={(e) => setCreditAmount(Number(e.target.value))}
+                       placeholder="0.00"
+                       className="w-full bg-slate-800 border border-white/10 rounded-2xl pl-10 pr-6 py-4 text-white focus:border-indigo-500 outline-none transition-all text-xl font-black font-display"
+                     />
+                   </div>
+                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <button 

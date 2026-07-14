@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, CreditCard, Shield, AlertTriangle } from 'lucide-react';
 import { UserProfile } from '../types';
 
-interface PaystackDepositProps {
+interface FlutterwaveDepositProps {
   user: UserProfile;
   onSuccess: (paymentInfo: { reference: string; amount: number }) => void;
   onCancel?: () => void;
@@ -11,11 +11,11 @@ interface PaystackDepositProps {
 
 declare global {
   interface Window {
-    PaystackPop: any;
+    FlutterwaveCheckout: any;
   }
 }
 
-export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
+export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   user,
   onSuccess,
   onCancel,
@@ -27,15 +27,15 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   const [isPaying, setIsPaying] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'all' | 'card' | 'ussd' | 'transfer'>('all');
 
-  // Dynamically load Paystack Inline JS script
+  // Dynamically load Flutterwave Inline JS script
   useEffect(() => {
-    if (window.PaystackPop) {
+    if (window.FlutterwaveCheckout) {
       setScriptLoaded(true);
       return;
     }
 
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.src = 'https://checkout.flutterwave.com/v3.js';
     script.async = true;
 
     script.onload = () => {
@@ -43,20 +43,18 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     };
 
     script.onerror = () => {
-      console.error('Failed to load Paystack Inline script.');
+      console.error('Failed to load Flutterwave Inline script.');
       setScriptError(true);
     };
 
     document.body.appendChild(script);
 
-    return () => {
-      // Keep script in body to avoid multiple loads across mounts if unnecessary
-    };
+    return () => {};
   }, []);
 
   const quickAmounts = [500, 1000, 5000, 10000];
 
-  const handlePaystackPayment = () => {
+  const handleFlutterwavePayment = () => {
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       alert('Please enter a valid deposit amount greater than zero.');
@@ -64,59 +62,67 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     }
 
     if (!scriptLoaded) {
-      alert('Paystack secure gateway is initializing. Please wait a moment.');
+      alert('Flutterwave secure gateway is initializing. Please wait a moment.');
       return;
     }
 
     setIsPaying(true);
 
-    // Retrieve Paystack Public Key from environment, or use sandboxed fallback
-    const paystackKey = (import.meta as any).env?.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_d3bd3cdb2b2b10931eb6ea637be5c0d68fbd6e78';
-    
-    const reference = `EFD_PSTK_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+    const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
-    // Restrict Paystack channels dynamically based on user click
-    const paystackChannels = selectedMethod === 'all'
-      ? ['card', 'ussd', 'bank_transfer', 'bank']
+    const paymentOptions = selectedMethod === 'all'
+      ? 'card, ussd, banktransfer'
       : selectedMethod === 'transfer'
-        ? ['bank_transfer']
-        : [selectedMethod];
+        ? 'banktransfer'
+        : selectedMethod;
 
     try {
-      const handler = window.PaystackPop.setup({
-        key: paystackKey,
-        email: user.email,
-        amount: Math.round(numericAmount * 100), // convert to kobo
-        currency: 'NGN',
-        ref: reference,
-        channels: paystackChannels,
-        callback: (response: any) => {
-          setIsPaying(false);
-          if (response && (response.status === 'success' || response.message === 'Approved')) {
-            onSuccess({
-              reference: response.reference || reference,
-              amount: numericAmount
-            });
-          } else {
-            alert('Payment execution did not return a successful receipt. Please verify details.');
+      if (typeof window.FlutterwaveCheckout === 'function') {
+        window.FlutterwaveCheckout({
+          public_key: flwKey,
+          tx_ref: reference,
+          amount: numericAmount,
+          currency: 'NGN',
+          payment_options: paymentOptions,
+          customer: {
+            email: user.email || 'customer@efado.com',
+            name: user.displayName || 'EFADO Member',
+          },
+          customizations: {
+            title: 'EFADO Wallet Topup',
+            description: 'Instant Wallet Deposit',
+            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
+          },
+          callback: (response: any) => {
+            setIsPaying(false);
+            if (response && (response.status === 'successful' || response.status === 'completed')) {
+              onSuccess({
+                reference: response.tx_ref || reference,
+                amount: numericAmount
+              });
+            } else {
+              alert('Payment execution did not return a successful receipt. Please verify details.');
+            }
+          },
+          onclose: () => {
+            setIsPaying(false);
+            if (onCancel) onCancel();
           }
-        },
-        onClose: () => {
-          setIsPaying(false);
-          if (onCancel) onCancel();
-        }
-      });
-
-      handler.openIframe();
+        });
+      } else {
+        setIsPaying(false);
+        alert('Could not launch Flutterwave checkout.');
+      }
     } catch (err) {
-      console.error('Error invoking Paystack Pop Client:', err);
+      console.error('Error invoking Flutterwave Client:', err);
       setIsPaying(false);
-      alert('Could not start Paystack checkout process. Ensure your internet connection is active.');
+      alert('Could not start Flutterwave checkout process. Ensure your internet connection is active.');
     }
   };
 
   return (
-    <div id="paystack-deposit-container" className="space-y-6">
+    <div id="flutterwave-deposit-container" className="space-y-6">
       {/* Section A: Amount Input */}
       <div className="space-y-3">
         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
@@ -125,7 +131,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         <div className="relative">
           <span className="absolute left-5 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">₦</span>
           <input
-            id="paystack-amount-input"
+            id="flutterwave-amount-input"
             type="number"
             min="100"
             placeholder="e.g. 5000"
@@ -212,7 +218,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <p className="font-medium leading-relaxed">
-            Failed to connect with Paystack security nodes. Please reload or check if a browser ad blocker is blocking paystack.co.
+            Failed to connect with Flutterwave security nodes. Please reload or check if a browser ad blocker is blocking checkout.flutterwave.com.
           </p>
         </div>
       )}
@@ -220,16 +226,16 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       {/* Section C: Action Button */}
       <div className="pt-2">
         <button
-          id="paystack-secure-pay-btn"
+          id="flutterwave-secure-pay-btn"
           type="button"
           disabled={!scriptLoaded || isPaying}
-          onClick={handlePaystackPayment}
-          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 animate-pulse"
+          onClick={handleFlutterwavePayment}
+          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15"
         >
           {isPaying ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Opening Paystack Terminal...
+              Opening Flutterwave Terminal...
             </>
           ) : !scriptLoaded ? (
             <>
@@ -237,33 +243,14 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
               Syncing Security Credentials...
             </>
           ) : (
-            'Pay Now Securely with Paystack'
+            'Pay Now Securely with Flutterwave'
           )}
         </button>
       </div>
 
-      {/* Section D: Direct Paystack Shop Custom Payment Link */}
-      <div className="pt-4 border-t border-slate-200/60 flex flex-col items-center space-y-2">
-        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest text-center">
-          Or Pay via Direct Web Link
-        </p>
-        <a
-          id="paystack-shop-link-btn"
-          href="https://paystack.shop/pay/oou1q0y05p"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-750 hover:to-teal-850 text-white rounded-2xl text-xs font-black uppercase tracking-widest text-center transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 hover:scale-[1.01] active:scale-[0.99]"
-        >
-          <span>🛍️ Go to EFADO Paystack Shop Page</span>
-        </a>
-        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center">
-          Instant Checkout via Secure Paystack Shop Link
-        </p>
-      </div>
-
       <div className="flex items-center justify-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
         <Shield className="w-3 h-3 text-emerald-500" />
-        Funds reflect in 3-5 seconds. Powered by Paystack
+        Funds reflect in 3-5 seconds. Powered by Flutterwave
       </div>
     </div>
   );
