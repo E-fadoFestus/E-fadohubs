@@ -47,6 +47,7 @@ import { EfadoHelpChat } from './components/EfadoHelpChat';
 import { EfadoZoomPlanSelection } from './components/EfadoZoomPlanSelection';
 import { EfadoLogo } from './components/EfadoLogo';
 import { EfadoPartnerHub } from './components/EfadoPartnerHub';
+import { EfadoDigitalServicesHub } from './components/EfadoDigitalServicesHub';
 import { CSCCRegistration } from './components/CSCCRegistration';
 import { HubHeroCarousel } from './components/HubHeroCarousel';
 import { UserWallet } from './components/UserWallet';
@@ -578,7 +579,8 @@ function AppContent() {
   const [activeZoomSession, setActiveZoomSession] = useState<any>(null);
   const [gistInitialView, setGistInitialView] = useState<'FEED' | 'REELS' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS'>('FEED');
   const [gistAutoStartLive, setGistAutoStartLive] = useState(false);
-  const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED'>('HOME');
+  const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED' | 'DIGITAL_SERVICES_HUB'>('HOME');
+  const [digitalServicesSection, setDigitalServicesSection] = useState<'crypto' | 'money' | 'vending'>('crypto');
   const [activeReferralCode, setActiveReferralCode] = useState<string | null>(() => localStorage.getItem('efado_referral_code'));
   const [showAgeGate, setShowAgeGate] = useState(false);
   const [isAgeVerified, setIsAgeVerified] = useState(false);
@@ -593,6 +595,12 @@ function AppContent() {
     if (hub !== 'ADVERTISING') setShowAdvertisingHub(false);
     if (hub !== 'DOMAIN_HUB') setShowDomainHub(false);
     if (hub !== 'ZOOM') setShowZoomPlans(false);
+
+    if (hub === 'DIGITAL_SERVICES_HUB') {
+      setDigitalServicesSection(subview || 'crypto');
+      setActiveHub('DIGITAL_SERVICES_HUB');
+      return;
+    }
 
     if (hub === 'COMMUNITY_HUBS') {
       if (user && !user.csccRegistered) {
@@ -2237,6 +2245,7 @@ function AppContent() {
               { id: 'TECH_HUB', label: 'TechHub', icon: Cpu, gradient: 'from-fuchsia-500 via-fuchsia-600 to-fuchsia-700', border: 'border-fuchsia-800/80', ring: 'ring-fuchsia-400/40' },
               { id: 'PARTNER_HUB', label: 'Partners', icon: Handshake, gradient: 'from-yellow-500 via-yellow-600 to-yellow-700', border: 'border-yellow-800/80', ring: 'ring-yellow-400/40' },
               { id: 'DOMAIN_HUB', label: 'DomainHub', icon: Globe, gradient: 'from-teal-500 via-teal-600 to-teal-700', border: 'border-teal-800/80', ring: 'ring-teal-400/40' },
+              { id: 'DIGITAL_SERVICES_HUB', label: 'ServicesHub', icon: Coins, gradient: 'from-amber-500 via-amber-600 to-amber-700', border: 'border-amber-800/80', ring: 'ring-amber-400/40' },
             ].map((item) => {
               const isActive = (activeHub === item.id || 
                                (item.id === 'ADVERTISING' && showAdvertisingHub && adInitialType === 'ADVERT') ||
@@ -2255,6 +2264,7 @@ function AppContent() {
                     else if (item.id === 'ZOOM') handleNavigate('ZOOM');
                     else if (item.id === 'GIST') handleNavigate('GIST');
                     else if (item.id === 'COMMUNITY_HUBS') handleNavigate('COMMUNITY_HUBS');
+                    else if (item.id === 'DIGITAL_SERVICES_HUB') handleNavigate('DIGITAL_SERVICES_HUB');
                     else setActiveHub(item.id as any);
                   }}
                   className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border ${item.border} ${
@@ -3336,6 +3346,15 @@ function AppContent() {
                 animate={{ opacity: 1, scale: 1 }}
               >
                 <EfadoPartnerHub user={user} onNavigate={(hub) => setActiveHub(hub as any)} />
+              </motion.div>
+            )}
+
+            {activeHub === 'DIGITAL_SERVICES_HUB' && user && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <EfadoDigitalServicesHub user={user} initialSection={digitalServicesSection} />
               </motion.div>
             )}
 

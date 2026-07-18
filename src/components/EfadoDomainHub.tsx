@@ -2992,30 +2992,6 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveLandingSection('vending')}
-                  className={`flex-1 min-w-[145px] py-3.5 px-3 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeLandingSection === 'vending'
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-650/40 font-bold'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400 animate-pulse" />
-                  Airtime & Data
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveLandingSection('otc')}
-                  className={`flex-1 min-w-[145px] py-3.5 px-3 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeLandingSection === 'otc'
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-650/40'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Coins className="w-4 h-4 text-emerald-400" />
-                  OTC Desk
-                </button>
-                <button
-                  type="button"
                   onClick={() => setActiveLandingSection('sourcing')}
                   className={`flex-1 min-w-[160px] py-3.5 px-3 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 relative overflow-hidden cursor-pointer ${
                     activeLandingSection === 'sourcing'

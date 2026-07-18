@@ -42,6 +42,7 @@ import { db, doc, updateDoc, collection, runTransaction, serverTimestamp, increm
 import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { PayPalHostedButton } from './PayPalHostedButton';
 import { FlutterwaveDeposit } from './FlutterwaveDeposit';
+import { PaystackDeposit } from './PaystackDeposit';
 import { seerbitService } from '../services/seerbitService';
 
 export interface WorldBank {
@@ -129,7 +130,7 @@ interface PaymentPlatformProps {
   hub?: string;
 }
 
-type PaymentMethodType = 'bank_transfer' | 'remita' | 'paypal' | 'flutterwave' | 'ussd' | 'crypto_btc' | 'crypto_eth' | 'mining_wallet' | 'player_wallet' | string;
+type PaymentMethodType = 'bank_transfer' | 'remita' | 'paypal' | 'flutterwave' | 'paystack' | 'ussd' | 'crypto_btc' | 'crypto_eth' | 'mining_wallet' | 'player_wallet' | string;
 
 export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({ 
   user, 
@@ -154,6 +155,11 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
     ];
     const isUnsafe = unsafeKeywords.some(keyword => lowerPurpose.includes(keyword) || lowerHub.includes(keyword));
     return !isUnsafe;
+  };
+
+  const isWalletLockedOut = () => {
+    const safeHubs = ['advertising', 'education', 'domain', 'market', 'fairly_used', 'zoom'];
+    return safeHubs.includes((hub || '').toLowerCase());
   };
   const [step, setStep] = useState<'method' | 'details' | 'verification' | 'processing' | 'success' | 'failed'>('method');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethodType | null>(null);
@@ -224,7 +230,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
   const isExternalCashout = type === 'withdraw' && (
     selectedMethod === 'bank_transfer' ||
     selectedMethod === 'ussd' ||
-    ['opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba', 'visa', 'mastercard', 'verve', 'stripe', 'paypal', 'remita', 'flutterwave'].includes(selectedMethod || '')
+    ['opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba', 'visa', 'mastercard', 'verve', 'stripe', 'paypal', 'remita', 'flutterwave', 'paystack'].includes(selectedMethod || '')
   );
 
   const handleCopy = (text: string, id: string) => {
@@ -377,6 +383,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
         { id: 'paypal', name: 'PayPal' },
         { id: 'stripe', name: 'Stripe' },
         { id: 'flutterwave', name: 'Flutterwave' },
+        { id: 'paystack', name: 'Paystack' },
         { id: 'seerbit', name: 'SeerBit Standard' }
       ]
     }
@@ -790,7 +797,7 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                       <ul className="list-disc pl-12 text-xs text-slate-300 space-y-2 mt-2 font-medium">
                         <li><strong>Bank Transfer:</strong> Transfer the exact amount to the displayed EFADO Bank Account. Include the unique ID shown in your description/narration. Go to the verification screen, paste your payment transaction reference or code, and hit submit.</li>
                         <li><strong>USSD Code option:</strong> Dial the unique phone string code directly on your registered mobile carrier to approve automatic billing on-the-fly.</li>
-                        <li><strong>Credit/Debit cards:</strong> Pay via Flutterwave instant gateway, with live automated balance top-up.</li>
+                        <li><strong>Credit/Debit cards:</strong> Pay via Flutterwave or Paystack instant gateways, with live automated balance top-up.</li>
                       </ul>
                     </div>
 
@@ -852,65 +859,76 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 overflow-y-auto pr-2 payment-scrollbar flex-1 pb-6">
-                  {paymentCategories.map((cat, idx) => (
-                    <motion.div 
-                      key={cat.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-6 hover:border-indigo-500/40 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group cursor-default"
-                    >
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-50 transition-all">
-                          {cat.icon}
+                  {paymentCategories
+                    .filter(cat => !(cat.id === 'internal_wallets' && isWalletLockedOut()))
+                    .map((cat, idx) => (
+                      <motion.div 
+                        key={cat.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-6 hover:border-indigo-500/40 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all group cursor-default"
+                      >
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-50 transition-all">
+                            {cat.icon}
+                          </div>
+                          <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-[0.25em]">{cat.title}</h4>
                         </div>
-                        <h4 className="text-[10px] font-black text-slate-950 uppercase tracking-[0.25em]">{cat.title}</h4>
-                      </div>
 
-                      <div className="flex flex-wrap gap-2.5">
-                        {cat.options.map(opt => {
-                          const isSeerbit = opt.id === 'seerbit';
-                          const isSafe = !isSeerbit || isSeerBitSafe();
-                          
-                          return (
-                            <motion.button
-                              key={opt.id}
-                              whileHover={isSafe ? { y: -2, scale: 1.05 } : {}}
-                              whileTap={isSafe ? { scale: 0.95 } : {}}
-                              disabled={!isSafe}
-                              onClick={() => {
-                                setSelectedMethod(opt.id as PaymentMethodType);
-                                if (type === 'withdraw') {
-                                  const matchingBank = globalAndLocalBanks.find(b => 
-                                    b.name.toLowerCase().includes(opt.name.toLowerCase()) || 
-                                    opt.name.toLowerCase().includes(b.name.toLowerCase())
-                                  );
-                                  const bankName = matchingBank ? matchingBank.name : opt.name;
-                                  setAccountDetails(prev => ({
-                                    ...prev,
-                                    bankName: prev.bankName || bankName
-                                  }));
-                                  if (!bankSearch) {
-                                    setBankSearch(user.bankName || bankName);
+                        <div className="flex flex-wrap gap-2.5">
+                          {cat.options.map(opt => {
+                            const isSeerbit = opt.id === 'seerbit';
+                            const isSafe = !isSeerbit || isSeerBitSafe();
+                            
+                            // Geo-fenced wallet lockout check
+                            const isInternalWallet = ['mining_wallet', 'player_wallet'].includes(opt.id);
+                            const isWalletDisabled = isInternalWallet && isWalletLockedOut();
+                            
+                            const isOptionEnabled = isSafe && !isWalletDisabled;
+                            
+                            return (
+                              <motion.button
+                                key={opt.id}
+                                whileHover={isOptionEnabled ? { y: -2, scale: 1.05 } : {}}
+                                whileTap={isOptionEnabled ? { scale: 0.95 } : {}}
+                                disabled={!isOptionEnabled}
+                                onClick={() => {
+                                  if (!isOptionEnabled) return;
+                                  setSelectedMethod(opt.id as PaymentMethodType);
+                                  if (type === 'withdraw') {
+                                    const matchingBank = globalAndLocalBanks.find(b => 
+                                      b.name.toLowerCase().includes(opt.name.toLowerCase()) || 
+                                      opt.name.toLowerCase().includes(b.name.toLowerCase())
+                                    );
+                                    const bankName = matchingBank ? matchingBank.name : opt.name;
+                                    setAccountDetails(prev => ({
+                                      ...prev,
+                                      bankName: prev.bankName || bankName
+                                    }));
+                                    if (!bankSearch) {
+                                      setBankSearch(user.bankName || bankName);
+                                    }
                                   }
+                                  setStep('details');
+                                }}
+                                className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+                                  !isOptionEnabled 
+                                    ? 'bg-red-50/70 border-2 border-red-200/50 text-red-400 cursor-not-allowed opacity-60' 
+                                    : 'bg-indigo-50 border-2 border-indigo-100/50 hover:bg-slate-950 hover:text-white hover:border-slate-950 text-slate-950'
+                                }`}
+                                title={
+                                  !isSafe ? "SeerBit is restricted for high-risk domains like loans, crypto, and gaming to prevent account freezing." : undefined
                                 }
-                                setStep('details');
-                              }}
-                              className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1.5 ${
-                                !isSafe 
-                                  ? 'bg-red-50/70 border-2 border-red-200/50 text-red-400 cursor-not-allowed opacity-60' 
-                                  : 'bg-indigo-50 border-2 border-indigo-100/50 hover:bg-slate-950 hover:text-white hover:border-slate-950 text-slate-950'
-                              }`}
-                              title={!isSafe ? "SeerBit is restricted for high-risk domains like loans, crypto, and gaming to prevent account freezing." : undefined}
-                            >
-                              {opt.name}
-                              {!isSafe && <Lock className="w-3 h-3 text-red-400 shrink-0" />}
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  ))}
+                              >
+                                {opt.name}
+                                {!isOptionEnabled && <Lock className="w-3 h-3 text-red-400 shrink-0" />}
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    ))}
                 </div>
               </motion.div>
             )}
@@ -1546,6 +1564,43 @@ export const PaymentPlatform: React.FC<PaymentPlatformProps> = ({
                               }
                               if (onSuccess) onSuccess();
                               alert(`🟢 FLUTTERWAVE INSTANT CREDIT CONFIRMED!\n\n₦${amt.toLocaleString()} has been credited via Ref: ${reference}.`);
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedMethod === 'paystack' && (
+                    <div className="p-6 bg-slate-900 text-white rounded-[2rem] border-2 border-indigo-500/30 relative overflow-hidden space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 bg-indigo-600 text-white font-black text-[9px] rounded-full uppercase tracking-widest">Paystack Gateway</span>
+                          <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">SECURE CHANNEL APPROVED</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+                          <span className="text-[8px] font-black text-emerald-300 uppercase">Live Node</span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-[11px] font-bold text-slate-300 leading-normal text-left">
+                        Fund your wallet seamlessly using Paystack. Pay with your Card, Bank Transfer, USSD, or Bank Account.
+                      </p>
+
+                      <div className="bg-slate-950 p-6 rounded-2xl border border-white/5 text-left">
+                        <PaystackDeposit 
+                          user={user} 
+                          defaultAmount={Number(amount) || 1000}
+                          onSuccess={async ({ reference, amount: amt }) => {
+                            try {
+                              if (onComplete) {
+                                await onComplete(amt, 'Paystack Deposit');
+                              }
+                              if (onSuccess) onSuccess();
+                              alert(`🟢 PAYSTACK INSTANT CREDIT CONFIRMED!\n\n₦${amt.toLocaleString()} has been credited via Ref: ${reference}.`);
                             } catch (err) {
                               console.error(err);
                             }

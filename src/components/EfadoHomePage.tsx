@@ -43,10 +43,11 @@ import { MiningMiniCard } from './EfadoMining';
 import { EfadoIntelligenceFeed } from './EfadoIntelligenceFeed';
 import { UserProfile } from '../types';
 import { OFFICE_ADDRESSES, PHONE_NUMBERS, SUPPORT_EMAILS } from '../constants/businessProfile';
+import { AmlPolicyModal } from './AmlPolicyModal';
 
 interface EfadoHomePageProps {
   user: UserProfile;
-  onNavigate: (hub: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'ADVERTISING' | 'PARTNER_HUB', subview?: string) => void;
+  onNavigate: (hub: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'ADVERTISING' | 'PARTNER_HUB' | 'DIGITAL_SERVICES_HUB', subview?: string) => void;
   onOpenMining: () => void;
 }
 
@@ -117,14 +118,14 @@ const HUBS_DATA = [
   {
     id: 'DOMAIN_HUB',
     title: 'Domain Hub',
-    description: 'Register and manage domains from top global registrars. Earn commissions on every purchase.',
+    description: 'Register and manage domains from top global registrars. Access safe digital integrations like China factories and sourcing.',
     icon: Globe,
     color: 'from-indigo-600 to-blue-800',
     tag: 'EFADO Mail',
     stats: 'Top Sellers'
   },
   {
-    id: 'DOMAIN_HUB',
+    id: 'DIGITAL_SERVICES_HUB',
     subview: 'vending',
     title: 'Airtime & Data Vending',
     description: 'Instant global top-up and airtime vending for over 120 countries. Quick recharging for data plans with payment gateway integrations.',
@@ -144,8 +145,8 @@ const HUBS_DATA = [
     stats: 'Factory Sourcing'
   },
   {
-    id: 'DOMAIN_HUB',
-    subview: 'otc',
+    id: 'DIGITAL_SERVICES_HUB',
+    subview: 'crypto',
     title: 'Crypto OTC & Convert',
     description: 'Exchange digital assets seamlessly for standard local fiat or global bank transfers. Features instant rates and safe escrow pipelines.',
     icon: Coins,
@@ -177,6 +178,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
   const { formatPrice } = useCurrency();
   const [showUniversalSearch, setShowUniversalSearch] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
+  const [showAmlModal, setShowAmlModal] = useState(false);
   const hubs = HUBS_DATA;
 
   return (
@@ -838,6 +840,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
               &copy; {new Date().getFullYear()} EFADO TECHNOLOGY HUB. ALL RIGHTS RESERVED. SOVEREIGN ACCESS ONLY.
             </p>
             <div className="flex gap-8">
+               <button onClick={() => setShowAmlModal(true)} className="text-[10px] font-black text-amber-500 uppercase tracking-widest hover:text-amber-400 transition-colors">AML Policy</button>
                <button onClick={() => onNavigate('GIST')} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Privacy Policy</button>
                <button onClick={() => onNavigate('GIST')} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Tactical Terms</button>
                <button onClick={() => onNavigate('GIST')} className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors">Escrow Protection</button>
@@ -849,6 +852,9 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
       <AnimatePresence>
         {showUniversalSearch && (
           <UniversalSearch onClose={() => setShowUniversalSearch(false)} />
+        )}
+        {showAmlModal && (
+          <AmlPolicyModal onClose={() => setShowAmlModal(false)} />
         )}
       </AnimatePresence>
     </div>
