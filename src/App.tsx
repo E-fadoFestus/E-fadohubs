@@ -58,6 +58,7 @@ import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
+import { GameManualPayment } from './components/GameManualPayment';
 import { 
   Info,  Wallet, Lock,
   LogOut, 
@@ -2663,6 +2664,10 @@ function AppContent() {
                     </div>
                   </div>
                 </div>
+
+                {user && (
+                  <GameManualPayment user={user} />
+                )}
               </motion.section>
             )}
 

@@ -484,5 +484,8 @@ service cloud.firestore {
     match /jamb_candidates/{candidateId} {
       allow read, write: if isAuthenticated();
     }
+    match /manual_game_pins/{pinId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

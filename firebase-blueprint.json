@@ -647,6 +647,22 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "type", "message", "isRead", "createdAt"]
+    },
+    "ManualGamePin": {
+      "title": "Manual Game Pin",
+      "description": "Secure activation codes generated for game hubs manual payments.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_payment", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "number" }
+      },
+      "required": ["code", "userId", "userEmail", "amount", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -801,6 +817,10 @@
     "/efado_notifications/{notificationId}": {
       "schema": "FreelanceNotification",
       "description": "In-app notifications."
+    },
+    "/manual_game_pins/{pinId}": {
+      "schema": "ManualGamePin",
+      "description": "Secure manual game payment activation codes."
     }
   }
 }
