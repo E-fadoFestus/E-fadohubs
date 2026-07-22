@@ -68,7 +68,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
 
     setIsPaying(true);
 
-    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || import.meta.env.VITE_FLW_CLIENT_ID || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
     const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
     const paymentOptions = selectedMethod === 'all'
