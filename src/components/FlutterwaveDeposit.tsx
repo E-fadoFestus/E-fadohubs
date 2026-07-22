@@ -26,6 +26,30 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const [scriptError, setScriptError] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'all' | 'card' | 'ussd' | 'transfer'>('all');
+  
+  // Custom Public Key override state (stored in localStorage)
+  const [customKey, setCustomKey] = useState<string>(() => {
+    return localStorage.getItem('efado_flw_public_key') || '';
+  });
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
+
+  // Compute active key
+  const envKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || '').trim();
+  const activeKey = (customKey.trim() || envKey || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X').trim();
+
+  // Validate if active key matches expected Flutterwave Public Key format (FLWPUBK...)
+  const isValidPublicKeyFormat = activeKey.toUpperCase().startsWith('FLWPUBK');
+
+  // Save custom key
+  const handleSaveCustomKey = (key: string) => {
+    const trimmed = key.trim();
+    setCustomKey(trimmed);
+    if (trimmed) {
+      localStorage.setItem('efado_flw_public_key', trimmed);
+    } else {
+      localStorage.removeItem('efado_flw_public_key');
+    }
+  };
 
   // Dynamically load Flutterwave Inline JS script
   useEffect(() => {
@@ -66,9 +90,15 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       return;
     }
 
+    if (!isValidPublicKeyFormat) {
+      setShowKeyConfig(true);
+      alert('Your configured key is not a valid Flutterwave Public Key. Flutterwave Public Keys start with "FLWPUBK...". Please check the key input box below.');
+      return;
+    }
+
     setIsPaying(true);
 
-    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || import.meta.env.VITE_FLW_CLIENT_ID || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+    const flwKey = activeKey;
     const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
     const paymentOptions = selectedMethod === 'all'
@@ -221,6 +251,65 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
             Failed to connect with Flutterwave security nodes. Please reload or check if a browser ad blocker is blocking checkout.flutterwave.com.
           </p>
         </div>
+      )}
+
+      {/* Key Validation Alert & Config drawer */}
+      {(!isValidPublicKeyFormat || showKeyConfig) && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h5 className="text-xs font-black uppercase text-amber-600 tracking-wide">
+                Flutterwave Public Key Required
+              </h5>
+              <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
+                Flutterwave Inline payment modal requires a <strong>Public Key</strong> starting with <code className="bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold">FLWPUBK...</code> (or <code className="bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold">FLWPUBK_TEST...</code>).
+                {activeKey && !isValidPublicKeyFormat && (
+                  <span className="block mt-1 text-red-600 font-bold">
+                    ⚠️ Current Key (<code className="font-mono text-[10px]">{activeKey.substring(0, 16)}...</code>) is a Client ID, not a Flutterwave Public Key.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-1 border-t border-amber-200/60">
+            <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
+              Paste Your Flutterwave Public Key (Starts with FLWPUBK):
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customKey}
+                onChange={(e) => handleSaveCustomKey(e.target.value)}
+                placeholder="FLWPUBK-xxxxxxxxxxxxxxxxxxxxxxxx-X"
+                className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+              />
+              {customKey && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveCustomKey('')}
+                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-all"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500">
+              💡 Where to find it? Log into your Flutterwave Dashboard &rarr; <strong>Settings &rarr; API keys</strong> &rarr; copy <strong>Public Key</strong> (starts with FLWPUBK).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!isValidPublicKeyFormat && !showKeyConfig && (
+        <button
+          type="button"
+          onClick={() => setShowKeyConfig(true)}
+          className="text-[10px] font-black uppercase text-amber-600 hover:text-amber-800 underline block"
+        >
+          ⚙️ Need to update Flutterwave Public Key? Click here
+        </button>
       )}
 
       {/* Section C: Action Button */}
