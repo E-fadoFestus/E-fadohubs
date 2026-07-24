@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { InternalScrollController } from './InternalScrollController';
 import { 
   FileText, 
   Upload, 
@@ -42,6 +43,7 @@ export const SeminarPortal: React.FC<{
   onClose: () => void;
   user: UserProfile;
 }> = ({ onClose, user }) => {
+  const seminarPortalRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'materials' | 'agenda' | 'preview'>('materials');
   
   // Persistence logic
@@ -128,11 +130,13 @@ export const SeminarPortal: React.FC<{
 
   return (
     <motion.div 
+      ref={seminarPortalRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-[#0F172A] flex flex-col"
+      className="fixed inset-0 z-[100] bg-[#0F172A] flex flex-col overflow-y-auto"
     >
+      <InternalScrollController containerRef={seminarPortalRef} label="Seminar Nav" />
       {/* Portal Header */}
       <div className="bg-slate-900 border-b border-white/5 p-6 shadow-2xl">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

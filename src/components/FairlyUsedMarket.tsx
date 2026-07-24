@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getFlutterwavePublicKey } from '../utils/flutterwave';
 import { VendorRegistrationFlow } from './VendorRegistrationFlow';
 import { 
   ShoppingBag, 
@@ -435,7 +436,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       return;
     }
 
-    const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+    const flwKey = getFlutterwavePublicKey();
     const reference = `EFD_MARK_USED_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
     try {

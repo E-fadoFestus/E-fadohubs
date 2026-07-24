@@ -48,6 +48,7 @@ import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
+import { PaystackDeposit } from './PaystackDeposit';
 import { FlutterwaveDeposit } from './FlutterwaveDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
@@ -63,7 +64,7 @@ interface UserWalletProps {
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
   const { selectedCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'flutterwave' | 'bank_transfer' | 'diaspora'>('flutterwave');
+  const [depositMethod, setDepositMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('paystack');
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string>('');
@@ -1241,7 +1242,18 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">FUND YOUR ACCOUNT</h3>
                   
                   {/* BEAUTIFUL SWITCHER TABS FOR ULTRA-CLEAR SELECTION */}
-                  <div className="flex flex-wrap gap-4 border-b border-gray-150 justify-center">
+                  <div className="flex flex-wrap gap-3 border-b border-gray-150 justify-center">
+                    <button 
+                      type="button"
+                      onClick={() => setDepositMethod('paystack')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        depositMethod === 'paystack' 
+                          ? 'border-b-4 border-indigo-600 text-indigo-600' 
+                          : 'text-gray-400 hover:text-gray-650'
+                      }`}
+                    >
+                      💳 Paystack (Cards/Transfer/USSD)
+                    </button>
                     <button 
                       type="button"
                       onClick={() => setDepositMethod('flutterwave')}
@@ -1251,7 +1263,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           : 'text-gray-400 hover:text-gray-650'
                       }`}
                     >
-                      ⚡ Flutterwave Checkout (Auto-Credit)
+                      ⚡ Flutterwave Checkout
                     </button>
                     <button 
                       type="button"
@@ -1273,14 +1285,62 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           : 'text-gray-400 hover:text-gray-650'
                       }`}
                     >
-                      🌐 Diaspora Wire / Crypto
+                      🌐 Diaspora / Crypto
                     </button>
                   </div>
                 </div>
 
                 {/* THE RENDER OF SECURE COMPLIANT MODULE WITH INTEGRATED CALLBACKS */}
                 <div className="bg-white border text-left border-gray-100 p-6 sm:p-8 rounded-[2.5rem] shadow-xl">
-                  {depositMethod === 'flutterwave' ? (
+                  {depositMethod === 'paystack' ? (
+                    <div className="space-y-6">
+                      <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex gap-3 shadow-sm mb-2">
+                        <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase">PAYSTACK SECURE AUTOMATED GATEWAY</span>
+                          <p className="text-[11px] text-emerald-950 font-bold uppercase leading-normal mt-0.5">
+                            Real-time Paystack processing with Debit Card, Bank Transfer, USSD & Bank Account. Instant wallet credit upon checkout.
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <PaystackDeposit 
+                        user={user} 
+                        defaultAmount={1000}
+                        onSuccess={async ({ reference, amount: amt }) => {
+                          try {
+                            await onUpdateBalance(amt, 'deposit');
+                            
+                            const txData: any = {
+                              userId: user.uid,
+                              type: 'deposit',
+                              amount: amt,
+                              currency: 'NGN',
+                              status: 'completed',
+                              method: 'Paystack Card/USSD/Transfer',
+                              hub: 'WALLET',
+                              purpose: 'Wallet Top-up',
+                              reference,
+                              description: 'Wallet Top-up via Paystack Inline Gateway',
+                              skipWalletUpdate: true,
+                              metadata: {
+                                paymentRef: reference,
+                                gateway: 'paystack'
+                              }
+                            };
+                            await TransactionService.recordTransaction(txData);
+
+                            setSelectedReceiptTx({
+                              ...txData,
+                              timestamp: { seconds: Math.floor(Date.now() / 1000) }
+                            });
+                          } catch (err: any) {
+                            console.error("Ledger write error:", err);
+                          }
+                        }} 
+                      />
+                    </div>
+                  ) : depositMethod === 'flutterwave' ? (
                     <div className="space-y-6">
                       <div className="p-4 bg-indigo-50 border-2 border-indigo-150 rounded-2xl flex gap-3 shadow-sm mb-2">
                         <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />

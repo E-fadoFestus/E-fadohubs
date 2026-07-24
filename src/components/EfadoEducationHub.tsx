@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { InternalScrollController } from './education/InternalScrollController';
 import { 
   GraduationCap, 
   Search, 
@@ -351,6 +352,7 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
 
   return (
     <div className="min-h-screen bg-[#0F172A] text-white">
+      <InternalScrollController label="Education Nav" />
       <AnimatePresence>
         {showGuide && (
           <motion.div 

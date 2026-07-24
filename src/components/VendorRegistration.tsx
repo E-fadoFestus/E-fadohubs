@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getFlutterwavePublicKey } from '../utils/flutterwave';
 import { 
   Building2,
   Smartphone,
@@ -285,7 +286,7 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
       }
       setLoading(true);
       const ngnAmount = planPrice * 1450;
-      const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+      const flwKey = getFlutterwavePublicKey();
       const reference = `EFD_VEND_REG_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
       try {

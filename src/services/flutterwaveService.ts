@@ -1,4 +1,5 @@
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
+import { getFlutterwavePublicKey } from '../utils/flutterwave';
 
 export interface CreateSubaccountRequest {
   account_bank: string;      // Bank code e.g., '044'
@@ -130,7 +131,7 @@ export const flutterwaveService = {
    * Initiates payment with transaction split ratio (95% to vendor, 5% platform)
    */
   async initiateSplitCheckout(request: CheckoutPaymentRequest, onSuccess: (res: any) => void, onClose?: () => void) {
-    const publicKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+    const publicKey = getFlutterwavePublicKey();
     
     // Check if Flutterwave script is loaded
     if (typeof (window as any).FlutterwaveCheckout === 'function') {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CreditCard, Shield, AlertTriangle } from 'lucide-react';
 import { UserProfile } from '../types';
+import { getFlutterwavePublicKey, saveFlutterwavePublicKey, isDefaultOrInvalidKey } from '../utils/flutterwave';
 
 interface FlutterwaveDepositProps {
   user: UserProfile;
@@ -34,8 +35,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const [showKeyConfig, setShowKeyConfig] = useState(false);
 
   // Compute active key
-  const envKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || '').trim();
-  const activeKey = (customKey.trim() || envKey || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X').trim();
+  const activeKey = getFlutterwavePublicKey();
 
   // Validate if active key matches expected Flutterwave Public Key format (FLWPUBK...)
   const isValidPublicKeyFormat = activeKey.toUpperCase().startsWith('FLWPUBK');
@@ -44,11 +44,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const handleSaveCustomKey = (key: string) => {
     const trimmed = key.trim();
     setCustomKey(trimmed);
-    if (trimmed) {
-      localStorage.setItem('efado_flw_public_key', trimmed);
-    } else {
-      localStorage.removeItem('efado_flw_public_key');
-    }
+    saveFlutterwavePublicKey(trimmed);
   };
 
   // Dynamically load Flutterwave Inline JS script

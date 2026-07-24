@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { InternalScrollController } from './InternalScrollController';
 import { 
   BookOpen, 
   Info, 
@@ -73,6 +74,7 @@ const courseCombinations = [
 ];
 
 export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose }) => {
+  const guideRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState('site_guide');
   const [subjectSearch, setSubjectSearch] = useState('');
 
@@ -879,7 +881,8 @@ export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose })
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto no-scrollbar p-12 bg-slate-50/50">
+      <div ref={guideRef} className="flex-1 overflow-y-auto no-scrollbar p-12 bg-slate-50/50">
+        <InternalScrollController containerRef={guideRef} label="Guide Nav" />
         <div className="max-w-5xl mx-auto pb-32">
           <AnimatePresence mode="wait">
             <motion.div

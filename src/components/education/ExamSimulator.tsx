@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { InternalScrollController } from './InternalScrollController';
 import { 
   Trophy, 
   Clock, 
@@ -296,7 +297,8 @@ export const ExamSimulator: React.FC<{
     };
 
     return (
-      <div className="w-full bg-slate-900/60 backdrop-blur-2xl border border-white/5 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 rounded-3xl shadow-xl z-50">
+      <div className="w-full bg-slate-900/60 backdrop-blur-2xl border border-white/5 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 rounded-3xl shadow-xl z-50 relative">
+        <InternalScrollController label="CBT Nav" />
         <div className="flex items-center gap-3">
           <button 
             type="button"

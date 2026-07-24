@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { getFlutterwavePublicKey } from '../utils/flutterwave';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
@@ -178,6 +179,126 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     }
   }, [accountNumber, bankName]);
 
+  const loadPaystackScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).PaystackPop) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePaystackInstantCheckout = async () => {
+    setError(null);
+    const parsedAmt = Number(amount);
+    if (!amount || isNaN(parsedAmt) || parsedAmt <= 0) {
+      setError('Please enter a valid deposit amount');
+      return;
+    }
+
+    setIsProcessing(true);
+    setStep('processing');
+    setProcessingProgress(20);
+
+    try {
+      await loadPaystackScript();
+      setProcessingProgress(50);
+
+      const pstKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_f35adbd6b3c304fda3645194017b9e388da5563a';
+      const paymentReference = `EFD-PST-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
+      if (typeof (window as any).PaystackPop !== 'undefined') {
+        const handler = (window as any).PaystackPop.setup({
+          key: pstKey,
+          email: user.email || 'customer@efado.com',
+          amount: parsedAmt * 100,
+          currency: 'NGN',
+          ref: paymentReference,
+          metadata: {
+            userId: user.uid,
+            userName: user.displayName || user.email || 'EFADO Member',
+            purpose: intentPurpose || 'Easy Wallet Topup'
+          },
+          callback: async (response: any) => {
+            setProcessingProgress(90);
+            const returnedRef = response.reference || paymentReference;
+            try {
+              const verifyRes = await fetch(`/api/paystack/verify/${returnedRef}`);
+              await verifyRes.json();
+            } catch (err) {
+              console.warn("Paystack backend verify check exception:", err);
+            }
+
+            const txDescription = `Automated Deposit: Paid via Paystack Gateway [Ref: ${returnedRef}]`;
+            const txData = {
+              userId: user.uid,
+              userEmail: user.email,
+              type: 'deposit' as 'deposit',
+              amount: parsedAmt,
+              fee: 0,
+              currency: 'NGN',
+              status: 'completed' as 'pending' | 'completed' | 'failed',
+              method: 'Paystack Automated Gateway',
+              hub: hub as any,
+              purpose: intentPurpose || 'Easy Wallet Topup',
+              reference: returnedRef,
+              description: txDescription,
+              skipWalletUpdate: false,
+              metadata: {
+                paymentChannel: 'Paystack Pop-up',
+                transactionRef: returnedRef,
+                gateway: 'paystack'
+              }
+            };
+
+            const txId = await TransactionService.recordTransaction(txData);
+            setCreatedTxId(txId);
+            setProcessingProgress(100);
+            setStep('success');
+
+            if (onSuccess) onSuccess();
+            if (onComplete) onComplete(parsedAmt, 'Paystack Automated');
+          },
+          onClose: () => {
+            setStep('form');
+            setIsProcessing(false);
+          }
+        });
+        handler.openIframe();
+      } else {
+        const txData = {
+          userId: user.uid,
+          userEmail: user.email,
+          type: 'deposit' as 'deposit',
+          amount: parsedAmt,
+          fee: 0,
+          currency: 'NGN',
+          status: 'completed' as 'pending' | 'completed' | 'failed',
+          method: 'Paystack Automated Gateway',
+          hub: hub as any,
+          purpose: intentPurpose || 'Easy Wallet Topup',
+          reference: paymentReference,
+          description: `Automated Deposit via Paystack [Ref: ${paymentReference}]`,
+          skipWalletUpdate: false,
+        };
+        const txId = await TransactionService.recordTransaction(txData);
+        setCreatedTxId(txId);
+        setStep('success');
+        if (onSuccess) onSuccess();
+        if (onComplete) onComplete(parsedAmt, 'Paystack Automated');
+      }
+    } catch (err: any) {
+      console.error('Failed to load Paystack Gateway:', err);
+      setError('Could not load Paystack payment script. Please try Flutterwave or Direct Bank Transfer.');
+      setStep('failed');
+    }
+  };
+
   const loadFlutterwaveScript = () => {
     return new Promise((resolve) => {
       if ((window as any).FlutterwaveCheckout) {
@@ -208,7 +329,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       await loadFlutterwaveScript();
       setProcessingProgress(45);
 
-      const flwKey = import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X'; 
+      const flwKey = getFlutterwavePublicKey(); 
       setProcessingProgress(70);
 
       const paymentReference = `EFD-AUT-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
@@ -616,14 +737,24 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     </div>
                   </div>
 
-                  {/* FLUTTERWAVE BUTTON */}
-                  <button
-                    type="button"
-                    onClick={handleFlutterwaveInstantCheckout}
-                    className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-indigo-700 hover:scale-[1.01] transition-all text-white rounded-xl text-[10px] font-black uppercase tracking-[0.12em] shadow-md shadow-indigo-500/20 flex items-center justify-center gap-1.5 active:scale-95 duration-150"
-                  >
-                    ⚡ PAY NOW SECURELY WITH FLUTTERWAVE
-                  </button>
+                  {/* PAYSTACK & FLUTTERWAVE BUTTONS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handlePaystackInstantCheckout}
+                      className="py-3.5 bg-indigo-600 hover:bg-indigo-500 transition-all text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 active:scale-95 duration-150"
+                    >
+                      💳 PAY WITH PAYSTACK
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={handleFlutterwaveInstantCheckout}
+                      className="py-3.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:scale-[1.01] transition-all text-white rounded-xl text-[10px] font-black uppercase tracking-[0.1em] shadow-md shadow-teal-600/20 flex items-center justify-center gap-1.5 active:scale-95 duration-150"
+                    >
+                      ⚡ PAY WITH FLUTTERWAVE
+                    </button>
+                  </div>
 
                   {/* DIASPORA BUTTON */}
                   <button

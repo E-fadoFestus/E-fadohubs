@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { InternalScrollController } from './InternalScrollController';
 import { 
   X, 
   CheckCircle2, 
@@ -258,6 +259,7 @@ const DEFAULT_CANDIDATES = [
 ];
 
 export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, user }) => {
+  const portalContainerRef = useRef<HTMLDivElement>(null);
   // Operator / Agent states
   const [isAgentConsole, setIsAgentConsole] = useState(true);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
@@ -619,7 +621,8 @@ export const JambPaymentPortal: React.FC<JambPaymentPortalProps> = ({ onClose, u
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md p-2 md:p-6 flex items-center justify-center overflow-y-auto font-sans">
+    <div ref={portalContainerRef} className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md p-2 md:p-6 flex items-center justify-center overflow-y-auto font-sans">
+      <InternalScrollController containerRef={portalContainerRef} label="JAMB Portal Nav" />
       <motion.div 
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
