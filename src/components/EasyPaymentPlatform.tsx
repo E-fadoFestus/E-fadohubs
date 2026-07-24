@@ -662,6 +662,26 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   </label>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {/* Primary Access Bank Corporate */}
+                    <div className="bg-white border-2 border-amber-300 hover:border-amber-500 p-3 rounded-2xl transition-all relative flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 bg-gradient-to-r from-amber-50/50 to-emerald-50/30">
+                      <div>
+                        <span className="text-[7px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest">★ Primary Verified Corporate Account</span>
+                        <p className="text-xs font-black text-slate-900 mt-1">ACCESS BANK PLC</p>
+                        <p className="text-[9px] text-slate-700 font-bold uppercase leading-tight mt-0.5">SOGUNRO FESTUS OLUSEGUN / EFADO</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-2 bg-white p-2 rounded-xl border border-amber-200 shadow-sm">
+                        <span className="text-sm font-mono font-black text-slate-900 tracking-wider">0081204179</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy('0081204179', 'acc_access_primary')}
+                          className="px-3 py-1 text-[9px] bg-amber-500 text-slate-950 font-black uppercase rounded-lg hover:bg-amber-400 transition-all active:scale-90 shadow-sm"
+                        >
+                          {copySuccess === 'acc_access_primary' ? 'Copied ✓' : 'Copy Number'}
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Access Bank Savings */}
                     <div className="bg-white border-2 border-slate-200 hover:border-emerald-400 p-3 rounded-2xl transition-all relative flex flex-col justify-between shadow-sm">
                       <div>

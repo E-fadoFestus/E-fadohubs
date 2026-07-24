@@ -1081,16 +1081,7 @@ function AppContent() {
     }
     setLoading(true);
     try {
-      const cred = await signInWithEmailAndPassword(auth, standardEmail, standardPassword);
-      if (cred.user) {
-        const isCEO = cred.user.email === 'efado226@gmail.com' || cred.user.email === 'efadofestus@gmail.com';
-        if (!cred.user.emailVerified && !isCEO) {
-          await auth.signOut();
-          setError('Your email address is not verified yet. Please check your inbox for the verification link.');
-          setLoading(false);
-          return;
-        }
-      }
+      await signInWithEmailAndPassword(auth, standardEmail, standardPassword);
       setLoading(false);
     } catch (e: any) {
       setLoading(false);
@@ -1123,7 +1114,8 @@ function AppContent() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, standardEmail, standardPassword);
       if (cred.user) {
-        await sendEmailVerification(cred.user);
+        // Send verification email in background without blocking login
+        sendEmailVerification(cred.user).catch(() => {});
         await updateProfile(cred.user, {
           displayName: standardDisplayName
         });
@@ -1133,7 +1125,7 @@ function AppContent() {
           uid: cred.user.uid,
           email: cred.user.email || '',
           displayName: standardDisplayName,
-          playerWallet: 0, // No starting bonus until first deposit
+          playerWallet: 0,
           depositWallet: 0,
           cashOutWallet: 0,
           miningWallet: 0,
@@ -1143,8 +1135,7 @@ function AppContent() {
           hasReceivedSignupBonus: false
         };
         await setDoc(userRef, newUser);
-        await auth.signOut();
-        setStandardRegisterSuccess('Ecosystem portfolio initialized! A verification email has been sent. Please verify your email before logging in.');
+        setStandardRegisterSuccess('Account created successfully! Welcome to EFADO.');
       }
       setLoading(false);
     } catch (e: any) {
@@ -1155,7 +1146,7 @@ function AppContent() {
       } else if (e?.code === 'auth/invalid-email') {
         setError('Invalid email address format.');
       } else if (e?.code === 'auth/weak-password') {
-        setError('Security threshold not met: password must be at least 6 characters.');
+        setError('Password must be at least 6 characters.');
       } else if (e?.message) {
         setError(`Registration failed: ${e.message}`);
       } else {
@@ -1829,28 +1820,28 @@ function AppContent() {
           </div>
         )}
 
-        <div className="bg-slate-900/80 backdrop-blur-2xl p-12 rounded-[3rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 golden-card-border">
-          <EfadoLogo size="lg" className="mb-8" />
-          <h2 className="text-2xl font-bold text-white mb-2 tracking-tight">Access Ecosystem</h2>
-          <p className="text-slate-400 mb-6 text-sm font-medium leading-relaxed">
-            Connect your global identity or authenticate administrative protocols to synchronize with EFADO's tactical financial network.
+        <div className="bg-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 rounded-3xl sm:rounded-[2.5rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 my-auto mx-auto golden-card-border">
+          <EfadoLogo size="lg" className="mb-4 mx-auto" />
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-2 tracking-tight">Welcome to EFADO</h2>
+          <p className="text-slate-300 mb-6 text-xs sm:text-sm font-medium leading-relaxed">
+            Connect your account or tap Instant Access to enter the platform immediately.
           </p>
 
-          {/* Secure Login Mode Tabs */}
-          <div className="flex border-b border-white/5 mb-6 p-1 bg-slate-950/40 rounded-2xl">
+          {/* Login Mode Tabs */}
+          <div className="flex border-b border-white/10 mb-6 p-1 bg-slate-950/60 rounded-2xl">
             <button
               onClick={() => { setLoginMode('STANDARD'); setOtpStep(false); setError(null); }}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${loginMode === 'STANDARD' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-wider rounded-xl transition-all ${loginMode === 'STANDARD' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
               id="login-mode-standard"
             >
-              Standard Link
+              User Access
             </button>
             <button
               onClick={() => { setLoginMode('CEO'); setError(null); }}
-              className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${loginMode === 'CEO' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-wider rounded-xl transition-all ${loginMode === 'CEO' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
               id="login-mode-ceo"
             >
-              CEO Console
+              CEO / Admin
             </button>
           </div>
 
@@ -1866,61 +1857,61 @@ function AppContent() {
 
           {loginMode === 'STANDARD' ? (
             <div className="space-y-4">
-              {/* Sub-selector for Google vs Email Backup */}
-              <div className="flex bg-slate-950/40 p-1 rounded-xl border border-white/5 text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+              {/* Sub-selector */}
+              <div className="flex bg-slate-950/60 p-1 rounded-xl border border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                 <button
                   type="button"
                   onClick={() => { setStandardEmailMode('GOOGLE'); setError(null); }}
-                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'GOOGLE' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'GOOGLE' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
                 >
-                  Google Link
+                  ⚡ Fast Access
                 </button>
                 <button
                   type="button"
                   onClick={() => { setStandardEmailMode('EMAIL_LOGIN'); setError(null); }}
-                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'EMAIL_LOGIN' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'EMAIL_LOGIN' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
                 >
-                  Email login
+                  Email Login
                 </button>
                 <button
                   type="button"
                   onClick={() => { setStandardEmailMode('EMAIL_REGISTER'); setError(null); }}
-                  className={`flex-1 py-1.5 rounded-lg transition-all ${standardEmailMode === 'EMAIL_REGISTER' ? 'bg-indigo-600/30 text-indigo-300' : 'hover:text-slate-300'}`}
+                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'EMAIL_REGISTER' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
                 >
-                  Email signup
+                  Register
                 </button>
               </div>
 
               {standardEmailMode === 'GOOGLE' && (
                 <div className="space-y-4">
                   {/* High-speed Seamless Connection Pass */}
-                  <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl text-center space-y-3">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-3">
                     <button 
                       onClick={handleInstantGuestLogin}
-                      className="w-full py-5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:via-amber-305 hover:to-amber-550 text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/10 active:scale-95 border-b-4 border-amber-700/50"
+                      className="w-full py-4 sm:py-5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/20 active:scale-95 border-b-4 border-amber-700/50"
                       id="login-instant-btn"
                     >
                       <Zap className="w-5 h-5 text-slate-950 fill-current animate-pulse" />
-                      ⚡ INSTANT FASTRACK CONNECTION
+                      ⚡ INSTANT ONE-CLICK ENTRANCE
                     </button>
-                    <p className="text-[10px] text-slate-400 font-extrabold tracking-wide uppercase leading-tight">
-                      Instant Access in 1.5 seconds • No forms required
+                    <p className="text-[11px] text-amber-200/90 font-bold tracking-wide leading-tight">
+                      Instant Access in 1 Second • No Form Required
                     </p>
                   </div>
 
-                  <div className="relative flex py-1.5 items-center">
-                    <div className="flex-grow border-t border-white/5"></div>
-                    <span className="flex-shrink mx-4 text-[9px] font-black text-slate-650 uppercase tracking-widest">Or connect via</span>
-                    <div className="flex-grow border-t border-white/5"></div>
+                  <div className="relative flex py-1 items-center">
+                    <div className="flex-grow border-t border-white/10"></div>
+                    <span className="flex-shrink mx-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Or sign in with Google</span>
+                    <div className="flex-grow border-t border-white/10"></div>
                   </div>
 
                   <button 
                     onClick={handleLogin}
-                    className="w-full py-4 bg-slate-950 text-indigo-300 border border-indigo-500/20 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 hover:bg-slate-950/80 hover:text-white transition-all active:scale-95"
+                    className="w-full py-4 bg-white text-slate-900 border border-slate-200 rounded-2xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-3 hover:bg-slate-100 transition-all shadow-md active:scale-95"
                     id="login-standard-btn"
                   >
-                    <LogIn className="w-4 h-4 shrink-0" />
-                    ESTABLISH SECURE GOOGLE CONNECTION
+                    <LogIn className="w-4 h-4 shrink-0 text-indigo-600" />
+                    CONTINUE WITH GOOGLE
                   </button>
 
                   <button
@@ -1933,10 +1924,10 @@ function AppContent() {
                         setError(`Redirect Connection failed: ${e.message || e}`);
                       }
                     }}
-                    className="w-full py-3 text-[9px] font-black uppercase tracking-[0.15em] text-slate-500 hover:text-indigo-400 transition-all active:scale-95 bg-slate-950/10 rounded-xl hover:bg-slate-950/20"
+                    className="w-full py-2.5 text-[10px] font-bold text-slate-400 hover:text-indigo-300 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
                     id="login-redirect-btn"
                   >
-                    Having issues? Try Redirect Connection
+                    Having trouble with popups? Click here to redirect
                   </button>
                 </div>
               )}

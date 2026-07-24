@@ -35,16 +35,24 @@ const BANK_DATA: Record<string, { country: string; symbol: string; banks: string
   }
 };
 
+const OFFICIAL_NGN_ACCOUNTS = [
+  { bankName: 'ACCESS BANK PLC', accountName: 'SOGUNRO FESTUS OLUSEGUN / EFADO', accountNo: '0081204179', badge: 'Primary Corporate' },
+  { bankName: 'GTBANK PLC', accountName: 'EFADO Technology Computer Engineering Training', accountNo: '3001964082', badge: 'GTB Corporate NGN' },
+  { bankName: 'OPAY DIGITAL MFB', accountName: 'EFADO Technology Computer Engineering Training', accountNo: '8072456836', badge: 'OPay Business Instant' },
+  { bankName: 'ACCESS BANK PLC (SAVINGS)', accountName: 'Daniel F. Okhawere', accountNo: '0001304979', badge: 'Access Savings' },
+  { bankName: 'UBA BANK PLC', accountName: 'Daniel F. Okhawere', accountNo: '2120742200', badge: 'UBA Savings' },
+];
+
 const BANK_DETAILS: Record<string, { bankName: string; accountName: string; accountNo: string; extraLabel?: string; extraValue?: string }> = {
   NGN: {
-    bankName: 'Sterling Bank',
-    accountName: 'E-FADO TECH CO',
-    accountNo: '1122334455',
+    bankName: 'ACCESS BANK PLC',
+    accountName: 'SOGUNRO FESTUS OLUSEGUN / EFADO',
+    accountNo: '0081204179',
     extraLabel: 'Account Type',
-    extraValue: 'Corporate Current'
+    extraValue: 'Verified Bank Escrow'
   },
   USD: {
-    bankName: 'Chase Bank USA',
+    bankName: 'Chase Bank USA / Wire',
     accountName: 'E-FADO TECH LLC',
     accountNo: '123456789',
     extraLabel: 'SWIFT Code',
@@ -58,7 +66,7 @@ const BANK_DETAILS: Record<string, { bankName: string; accountName: string; acco
     extraValue: '20-30-40'
   },
   EUR: {
-    bankName: 'Deutsche Bank',
+    bankName: 'Deutsche Bank Europe',
     accountName: 'E-FADO TECH EUROPE GMBH',
     accountNo: 'DE55100700001234567890',
     extraLabel: 'BIC / SWIFT',
@@ -374,38 +382,75 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
           {/* Section: Bank details and Account Information */}
           <div className="p-6 bg-slate-900 border border-slate-800 text-white rounded-3xl space-y-4 shadow-xl">
             <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-[0.2em] block pl-1">
-              SOVEREIGN ESCROW ENDPOINT
+              OFFICIAL VERIFIED ESCROW ACCOUNTS
             </span>
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                <p className="text-[8px] font-bold text-slate-400 uppercase">Settlement Bank</p>
-                <p className="font-black text-slate-100">{currentDetails.bankName}</p>
-              </div>
-              <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                <p className="text-[8px] font-bold text-slate-400 uppercase">Account Name</p>
-                <p className="font-black text-slate-100 truncate">{currentDetails.accountName}</p>
-              </div>
-            </div>
 
-            <div className="p-4 bg-slate-950 rounded-2xl flex items-center justify-between border border-white/5">
-              <div>
-                <p className="text-[8px] font-bold text-slate-400 uppercase">Account Number / IBAN</p>
-                <p className="text-sm font-black font-mono text-[#DAA520]">{currentDetails.accountNo}</p>
+            {currency === 'NGN' ? (
+              <div className="space-y-3">
+                <p className="text-[10px] text-slate-300 font-bold uppercase leading-relaxed">
+                  Transfer exact amount to any of EFADO's official registered bank accounts below:
+                </p>
+                <div className="space-y-2.5">
+                  {OFFICIAL_NGN_ACCOUNTS.map((acc, idx) => (
+                    <div key={idx} className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[8px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          {acc.badge}
+                        </span>
+                        <span className="text-[10px] font-extrabold text-amber-400">{acc.bankName}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-mono font-black text-white">{acc.accountNo}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase">{acc.accountName}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(acc.accountNo, `acc_${idx}`)}
+                          className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1"
+                        >
+                          {copiedField === `acc_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span className="text-[9px] font-black uppercase">{copiedField === `acc_${idx}` ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCopyText(currentDetails.accountNo, 'acc')}
-                className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-300 hover:text-white transition-all flex items-center justify-center"
-              >
-                {copiedField === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">Settlement Bank</p>
+                    <p className="font-black text-slate-100">{currentDetails.bankName}</p>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">Account Name</p>
+                    <p className="font-black text-slate-100 truncate">{currentDetails.accountName}</p>
+                  </div>
+                </div>
 
-            {currentDetails.extraLabel && (
-              <div className="p-4 bg-slate-950/60 rounded-xl flex items-center justify-between text-xs border border-white/5">
-                <span className="text-slate-400 font-bold uppercase text-[9px]">{currentDetails.extraLabel}</span>
-                <span className="font-black text-slate-200">{currentDetails.extraValue}</span>
-              </div>
+                <div className="p-4 bg-slate-950 rounded-2xl flex items-center justify-between border border-white/5">
+                  <div>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">Account Number / IBAN</p>
+                    <p className="text-sm font-black font-mono text-[#DAA520]">{currentDetails.accountNo}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(currentDetails.accountNo, 'acc')}
+                    className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-300 hover:text-white transition-all flex items-center justify-center"
+                  >
+                    {copiedField === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {currentDetails.extraLabel && (
+                  <div className="p-4 bg-slate-950/60 rounded-xl flex items-center justify-between text-xs border border-white/5">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">{currentDetails.extraLabel}</span>
+                    <span className="font-black text-slate-200">{currentDetails.extraValue}</span>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Crucial unique transaction reference */}
