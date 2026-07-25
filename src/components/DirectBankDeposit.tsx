@@ -85,6 +85,8 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
   const [selectedBank, setSelectedBank] = useState<string>('');
   const [customBankName, setCustomBankName] = useState<string>('');
+  const [senderAccountNumber, setSenderAccountNumber] = useState<string>('');
+  const [senderAccountName, setSenderAccountName] = useState<string>('');
   const [reference, setReference] = useState<string>('');
   const [transactionId, setTransactionId] = useState<string>('');
   
@@ -98,7 +100,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [showManualReceipt, setShowManualReceipt] = useState(false);
 
   // Re-generate Reference and sync country on Currency Change
@@ -221,6 +223,26 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
 
   return (
     <div id="direct-bank-deposit-container" className="space-y-6">
+      {/* 3-Step Visual Progress Bar */}
+      {!statusMessage && (
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-2">
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
+            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">1. Sender & Amount</span>
+          </div>
+          <div className="w-8 h-[2px] bg-slate-200" />
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
+            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">2. Escrow Details</span>
+          </div>
+          <div className="w-8 h-[2px] bg-slate-200" />
+          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
+            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 3 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
+            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">3. Confirm Code & Proof</span>
+          </div>
+        </div>
+      )}
+
       {statusMessage ? (
         <div 
           id="deposit-receipt-screen" 
@@ -258,7 +280,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
           </p>
         </div>
       ) : step === 1 ? (
-        /* Step 1: Currency selection and amount */
+        /* Step 1: Currency selection, Amount, and Sender Account Inputs */
         <div id="step-1-deposit-form" className="space-y-5 animate-fade-in">
           <div className="grid grid-cols-2 gap-4">
             {/* Selective Currency Dropdown */}
@@ -310,7 +332,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
               <input
                 id="deposit-amount-input"
                 type="number"
-                placeholder="e.g. 50"
+                placeholder="e.g. 1000"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 className="w-full pl-10 pr-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 text-black placeholder:text-slate-400"
@@ -349,6 +371,44 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             )}
           </div>
 
+          {/* CRITICAL MISSING INPUTS: Sending Account Number & Sender Account Holder Name */}
+          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider">YOUR SENDER ACCOUNT DETAILS</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest block">
+                  Your 10-Digit Sending Account Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  maxLength={10}
+                  placeholder="Enter 10-digit account number"
+                  value={senderAccountNumber}
+                  onChange={(e) => setSenderAccountNumber(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-black focus:outline-none focus:border-indigo-600 placeholder:text-slate-400"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest block">
+                  Your Sender Account Holder Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Enter sender bank account name"
+                  value={senderAccountName}
+                  onChange={(e) => setSenderAccountName(e.target.value)}
+                  className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-black uppercase text-black focus:outline-none focus:border-indigo-600 placeholder:text-slate-400"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button
               id="deposit-proceed-button"
@@ -356,66 +416,78 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
               onClick={() => {
                 const num = parseFloat(amount);
                 if (isNaN(num) || num <= 0) {
-                  alert('Please enter a positive amount first.');
+                  alert('Please enter a valid deposit amount first.');
+                  return;
+                }
+                if (currency === 'NGN' && (!senderAccountNumber || senderAccountNumber.length < 8)) {
+                  alert('Please enter a valid sending account number before proceeding.');
+                  return;
+                }
+                if (!senderAccountName.trim()) {
+                  alert('Please enter your sender account holder name.');
                   return;
                 }
                 setStep(2);
               }}
-              className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center gap-2"
+              className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center gap-2 active:scale-95"
             >
-              Continue to Bank Details <ArrowRight className="w-4 h-4" />
+              Continue to Destination Bank Escrow Details <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
-      ) : (
-        /* Step 2: Show Bank details, Reference, and Upload form */
-        <form onSubmit={handleSubmitDeposit} id="step-2-deposit-form" className="space-y-5 animate-fade-in">
+      ) : step === 2 ? (
+        /* Step 2: Show Official Destination Escrow Details & Instructions */
+        <div id="step-2-deposit-form" className="space-y-5 animate-fade-in">
           {/* Back reference link */}
           <button
             type="button"
             onClick={() => setStep(1)}
             className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors flex items-center gap-1.5"
           >
-            ← Back to amount
+            ← Back to Sender Details
           </button>
 
           {/* Section: Bank details and Account Information */}
           <div className="p-6 bg-slate-900 border border-slate-800 text-white rounded-3xl space-y-4 shadow-xl">
-            <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-[0.2em] block pl-1">
-              OFFICIAL VERIFIED ESCROW ACCOUNTS
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-[0.2em] block">
+                OFFICIAL VERIFIED ESCROW ACCOUNTS
+              </span>
+              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase font-black">
+                Step 2: Transfer Funds Now
+              </span>
+            </div>
+
+            <p className="text-[10px] text-slate-300 font-bold uppercase leading-relaxed">
+              Open your bank app, transfer exact amount <span className="text-amber-400 font-black">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> to any of EFADO's official registered bank accounts below, and include the narration code:
+            </p>
 
             {currency === 'NGN' ? (
-              <div className="space-y-3">
-                <p className="text-[10px] text-slate-300 font-bold uppercase leading-relaxed">
-                  Transfer exact amount to any of EFADO's official registered bank accounts below:
-                </p>
-                <div className="space-y-2.5">
-                  {OFFICIAL_NGN_ACCOUNTS.map((acc, idx) => (
-                    <div key={idx} className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          {acc.badge}
-                        </span>
-                        <span className="text-[10px] font-extrabold text-amber-400">{acc.bankName}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-mono font-black text-white">{acc.accountNo}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase">{acc.accountName}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(acc.accountNo, `acc_${idx}`)}
-                          className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1"
-                        >
-                          {copiedField === `acc_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span className="text-[9px] font-black uppercase">{copiedField === `acc_${idx}` ? 'Copied' : 'Copy'}</span>
-                        </button>
-                      </div>
+              <div className="space-y-2.5">
+                {OFFICIAL_NGN_ACCOUNTS.map((acc, idx) => (
+                  <div key={idx} className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {acc.badge}
+                      </span>
+                      <span className="text-[10px] font-extrabold text-amber-400">{acc.bankName}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-mono font-black text-white">{acc.accountNo}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">{acc.accountName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(acc.accountNo, `acc_${idx}`)}
+                        className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1 active:scale-95"
+                      >
+                        {copiedField === `acc_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span className="text-[9px] font-black uppercase">{copiedField === `acc_${idx}` ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <>
@@ -468,6 +540,11 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
               </button>
             </div>
 
+            <div className="p-3 bg-slate-950/40 rounded-xl text-xs space-y-1">
+              <span className="text-[9px] font-black text-slate-400 uppercase block">Registered Sender Account:</span>
+              <p className="text-emerald-400 font-bold font-mono text-[11px]">{senderAccountName} ({senderAccountNumber} - {selectedBank === 'Other' ? customBankName : selectedBank})</p>
+            </div>
+
             <div className="p-4 bg-slate-950/20 text-center border-t border-slate-800">
               <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
                 Required Deposit: <span className="font-black text-white text-lg">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
@@ -478,11 +555,71 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             </div>
           </div>
 
-          {/* Form items for Screenshot upload & Txn ID */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="px-6 py-4 border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(3)}
+              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 active:scale-95"
+            >
+              I Have Made The Transfer (Proceed to Confirmation) <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Step 3: Confirmation Code & Proof Submission */
+        <form onSubmit={handleSubmitDeposit} id="step-3-deposit-form" className="space-y-5 animate-fade-in">
+          {/* Back link */}
+          <button
+            type="button"
+            onClick={() => setStep(2)}
+            className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors flex items-center gap-1.5"
+          >
+            ← Back to Escrow Details
+          </button>
+
+          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 border border-slate-800">
+            <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block">TRANSFER SUMMARY</span>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Amount Paid:</span>
+              <span className="font-black text-white">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Reference:</span>
+              <span className="font-mono text-indigo-300 font-bold">{reference}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-400">Sender Account:</span>
+              <span className="text-slate-300 font-bold">{senderAccountName} ({senderAccountNumber})</span>
+            </div>
+          </div>
+
+          {/* Form items for Bank Transaction ID & Screenshot upload */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <label id="upload-label" className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
-                Proof of Transfer (Screenshot / Image)
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest block">
+                Bank Transaction ID / Ref Code / Session ID <span className="text-red-500">*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="Enter transaction code from your bank app e.g. T20261111832049"
+                value={transactionId}
+                onChange={(e) => setTransactionId(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border-2 border-indigo-300 rounded-2xl text-xs font-mono font-black text-black focus:outline-none focus:border-indigo-600 transition-all placeholder:text-slate-400"
+              />
+              <p className="text-[9px] text-slate-500">Paste or type the transaction ref / session code provided in your bank transfer receipt.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label id="upload-label" className="text-[10px] font-black text-slate-700 uppercase tracking-widest block">
+                Proof of Transfer (Screenshot / Image) <span className="text-red-500">*</span>
               </label>
               
               <div id="file-picker-container" className="relative group">
@@ -496,7 +633,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
                 />
                 <label
                   htmlFor="screenshot-file-input"
-                  className="w-full h-32 border-2 border-dashed border-slate-200 hover:border-indigo-500 bg-slate-50 rounded-2xl cursor-pointer flex flex-col items-center justify-center p-4 text-center transition-all group-hover:bg-slate-100"
+                  className="w-full h-32 border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 rounded-2xl cursor-pointer flex flex-col items-center justify-center p-4 text-center transition-all group-hover:bg-slate-100"
                 >
                   {uploadProgress ? (
                     <div className="space-y-2">
@@ -519,25 +656,12 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
                 </label>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
-                Bank Transaction ID / Narration details
-              </label>
-              <input
-                type="text"
-                placeholder="Optional - e.g. T20261111832049"
-                value={transactionId}
-                onChange={(e) => setTransactionId(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs font-black text-black focus:outline-none focus:border-indigo-600 transition-all placeholder:text-slate-400"
-              />
-            </div>
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="px-6 py-4 border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
             >
               Back
@@ -546,7 +670,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
               id="deposit-submit-button"
               type="submit"
               disabled={isSubmitting || uploadProgress}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center gap-2"
+              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center gap-2 active:scale-95"
             >
               {isSubmitting ? (
                 <>
@@ -554,7 +678,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
                   Broadcasting Ledger...
                 </>
               ) : (
-                'I Have Made Payment'
+                'Confirm & Submit Payment for Clearance ✓'
               )}
             </button>
           </div>
@@ -574,7 +698,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             purpose: `Corporate Account Deposit - Reference: ${reference}`,
             reference: reference || 'N/A',
             timestamp: { seconds: Math.floor(Date.now() / 1000) },
-            description: `Manual submission awaiting administrator clearance. Sending Bank: ${selectedBank === 'Other' ? customBankName : selectedBank}. Reference generated code: ${reference}.`
+            description: `Manual submission awaiting administrator clearance. Sending Bank: ${selectedBank === 'Other' ? customBankName : selectedBank}. Sender Account: ${senderAccountName} (${senderAccountNumber}). Reference generated code: ${reference}.`
           }}
           userEmail={user.email}
           onClose={() => setShowManualReceipt(false)}

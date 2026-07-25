@@ -1,14 +1,29 @@
+function sanitizeKey(rawKey: string): string {
+  let cleaned = rawKey.trim();
+  if (cleaned.includes('=')) {
+    cleaned = cleaned.split('=').pop() || '';
+  }
+  cleaned = cleaned.replace(/['";]/g, '').trim();
+  return cleaned;
+}
+
 export function getFlutterwavePublicKey(): string {
   // 1. Check browser localStorage override set by user in UI
   const localKey = localStorage.getItem('efado_flw_public_key');
   if (localKey && localKey.trim()) {
-    return localKey.trim();
+    return sanitizeKey(localKey);
   }
   
-  // 2. Check environment variables
-  const envKey = (import.meta.env.VITE_FLW_PUBLIC_KEY || import.meta.env.VITE_FLW_PUBLIC_KE || '').trim();
-  if (envKey) {
-    return envKey;
+  // 2. Check environment variables (supporting both correct and truncated secret names)
+  const rawEnvKey = (
+    import.meta.env.VITE_FLW_PUBLIC_KEY || 
+    import.meta.env.VITE_FLW_PUBLIC_KE || 
+    ''
+  ).trim();
+
+  if (rawEnvKey) {
+    const sanitized = sanitizeKey(rawEnvKey);
+    if (sanitized) return sanitized;
   }
   
   // 3. Fallback key placeholder
