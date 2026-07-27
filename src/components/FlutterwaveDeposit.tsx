@@ -250,63 +250,83 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       )}
 
       {/* Key Validation Alert & Config drawer */}
-      {(!isValidPublicKeyFormat || showKeyConfig) && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-3">
-          <div className="flex items-start gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h5 className="text-xs font-black uppercase text-amber-600 tracking-wide">
-                Flutterwave Public Key Required
-              </h5>
-              <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                Flutterwave Inline payment modal requires a <strong>Public Key</strong> starting with <code className="bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold">FLWPUBK...</code> (or <code className="bg-amber-100 text-amber-800 px-1 py-0.5 rounded font-mono font-bold">FLWPUBK_TEST...</code>).
-                {activeKey && !isValidPublicKeyFormat && (
-                  <span className="block mt-1 text-red-600 font-bold">
-                    ⚠️ Current Key (<code className="font-mono text-[10px]">{activeKey.substring(0, 16)}...</code>) is a Client ID, not a Flutterwave Public Key.
-                  </span>
+      <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
+              Active Flutterwave Key Status:
+            </span>
+            <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-full uppercase ${
+              activeKey.startsWith('FLWPUBK_TEST')
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : activeKey.startsWith('FLWPUBK')
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                  : 'bg-red-100 text-red-800 border border-red-300'
+            }`}>
+              {activeKey.startsWith('FLWPUBK_TEST') ? 'TEST MODE KEY' : activeKey.startsWith('FLWPUBK') ? 'LIVE MODE KEY' : 'INVALID KEY'}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowKeyConfig(!showKeyConfig)}
+            className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
+          >
+            ⚙️ {showKeyConfig ? 'Hide Key Settings' : 'Configure / Reset Key'}
+          </button>
+        </div>
+
+        {showKeyConfig && (
+          <div className="space-y-3 pt-3 border-t border-slate-200">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-900">
+              <p className="font-bold flex items-center gap-1.5 text-[11px]">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                Why Flutterwave says "Invalid public key passed":
+              </p>
+              <ul className="list-disc list-inside text-[10px] space-y-1 font-medium text-amber-800">
+                <li><strong>Test vs Live Mismatch:</strong> If Flutterwave modal displays <em>"You're currently in test mode"</em>, passing a Live key (<code className="font-mono">FLWPUBK-...</code>) causes this error. You MUST use a Test key (<code className="font-mono">FLWPUBK_TEST-...</code>).</li>
+                <li><strong>Missing Suffix:</strong> Flutterwave Public Keys must end with <code className="font-mono">-X</code> (e.g. <code className="font-mono">...-X</code>).</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                Enter Custom Flutterwave Public Key:
+              </label>
+              <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                <input
+                  type="text"
+                  value={customKey}
+                  onChange={(e) => handleSaveCustomKey(e.target.value)}
+                  placeholder="FLWPUBK_TEST-a3e7403487...-X"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSaveCustomKey('FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X');
+                  }}
+                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
+                >
+                  ⚡ Use Default Test Key
+                </button>
+                {customKey && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCustomKey('')}
+                    className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10px] uppercase rounded-xl transition-all flex-shrink-0"
+                  >
+                    Clear Override
+                  </button>
                 )}
+              </div>
+              <p className="text-[10px] text-slate-500 font-medium">
+                Active Key in use: <code className="font-mono font-bold text-indigo-700">{activeKey}</code>
               </p>
             </div>
           </div>
-
-          <div className="space-y-2 pt-1 border-t border-amber-200/60">
-            <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
-              Paste Your Flutterwave Public Key (Starts with FLWPUBK):
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customKey}
-                onChange={(e) => handleSaveCustomKey(e.target.value)}
-                placeholder="FLWPUBK-xxxxxxxxxxxxxxxxxxxxxxxx-X"
-                className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-              />
-              {customKey && (
-                <button
-                  type="button"
-                  onClick={() => handleSaveCustomKey('')}
-                  className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition-all"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500">
-              💡 Where to find it? Log into your Flutterwave Dashboard &rarr; <strong>Settings &rarr; API keys</strong> &rarr; copy <strong>Public Key</strong> (starts with FLWPUBK).
-            </p>
-          </div>
-        </div>
-      )}
-
-      {!isValidPublicKeyFormat && !showKeyConfig && (
-        <button
-          type="button"
-          onClick={() => setShowKeyConfig(true)}
-          className="text-[10px] font-black uppercase text-amber-600 hover:text-amber-800 underline block"
-        >
-          ⚙️ Need to update Flutterwave Public Key? Click here
-        </button>
-      )}
+        )}
+      </div>
 
       {/* Section C: Action Button */}
       <div className="pt-2">

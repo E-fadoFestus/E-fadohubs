@@ -4,6 +4,16 @@ function sanitizeKey(rawKey: string): string {
     cleaned = cleaned.split('=').pop() || '';
   }
   cleaned = cleaned.replace(/['";]/g, '').trim();
+
+  // If user pasted a key starting with FLWPUBK_TEST or FLWPUBK but forgot the trailing '-X'
+  if (
+    (cleaned.startsWith('FLWPUBK_TEST') || cleaned.startsWith('FLWPUBK-')) &&
+    !cleaned.endsWith('-X') &&
+    !cleaned.endsWith('-x')
+  ) {
+    cleaned = `${cleaned}-X`;
+  }
+
   return cleaned;
 }
 
@@ -11,7 +21,8 @@ export function getFlutterwavePublicKey(): string {
   // 1. Check browser localStorage override set by user in UI
   const localKey = localStorage.getItem('efado_flw_public_key');
   if (localKey && localKey.trim()) {
-    return sanitizeKey(localKey);
+    const sanitizedLocal = sanitizeKey(localKey);
+    if (sanitizedLocal) return sanitizedLocal;
   }
   
   // 2. Check environment variables (supporting both correct and truncated secret names)
@@ -26,7 +37,7 @@ export function getFlutterwavePublicKey(): string {
     if (sanitized) return sanitized;
   }
   
-  // 3. Fallback key placeholder
+  // 3. Fallback working test key placeholder
   return 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
 }
 
@@ -39,6 +50,15 @@ export function saveFlutterwavePublicKey(key: string): void {
   }
 }
 
+export function clearFlutterwavePublicKey(): void {
+  localStorage.removeItem('efado_flw_public_key');
+}
+
+export function isTestKey(key?: string): boolean {
+  const activeKey = key || getFlutterwavePublicKey();
+  return activeKey.toUpperCase().includes('FLWPUBK_TEST');
+}
+
 export function isDefaultOrInvalidKey(key?: string): boolean {
   const activeKey = key || getFlutterwavePublicKey();
   if (!activeKey || !activeKey.toUpperCase().startsWith('FLWPUBK')) {
@@ -49,3 +69,4 @@ export function isDefaultOrInvalidKey(key?: string): boolean {
   }
   return false;
 }
+
