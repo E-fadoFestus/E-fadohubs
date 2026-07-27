@@ -258,12 +258,12 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
             </span>
             <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-full uppercase ${
               activeKey.startsWith('FLWPUBK_TEST')
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                ? 'bg-amber-100 text-amber-800 border border-amber-300'
                 : activeKey.startsWith('FLWPUBK')
-                  ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : 'bg-red-100 text-red-800 border border-red-300'
             }`}>
-              {activeKey.startsWith('FLWPUBK_TEST') ? 'TEST MODE KEY' : activeKey.startsWith('FLWPUBK') ? 'LIVE MODE KEY' : 'INVALID KEY'}
+              {activeKey.startsWith('FLWPUBK_TEST') ? '⚠️ TEST MODE KEY' : activeKey.startsWith('FLWPUBK') ? '🟢 LIVE PRODUCTION KEY' : 'INVALID KEY'}
             </span>
           </div>
 
@@ -272,21 +272,20 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
             onClick={() => setShowKeyConfig(!showKeyConfig)}
             className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
           >
-            ⚙️ {showKeyConfig ? 'Hide Key Settings' : 'Configure / Reset Key'}
+            ⚙️ {showKeyConfig ? 'Hide Key Settings' : 'Configure / Switch Key'}
           </button>
         </div>
 
         {showKeyConfig && (
           <div className="space-y-3 pt-3 border-t border-slate-200">
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-900">
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1 text-xs text-emerald-900">
               <p className="font-bold flex items-center gap-1.5 text-[11px]">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                Why Flutterwave says "Invalid public key passed":
+                <Shield className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                Live Production Mode Active:
               </p>
-              <ul className="list-disc list-inside text-[10px] space-y-1 font-medium text-amber-800">
-                <li><strong>Test vs Live Mismatch:</strong> If Flutterwave modal displays <em>"You're currently in test mode"</em>, passing a Live key (<code className="font-mono">FLWPUBK-...</code>) causes this error. You MUST use a Test key (<code className="font-mono">FLWPUBK_TEST-...</code>).</li>
-                <li><strong>Missing Suffix:</strong> Flutterwave Public Keys must end with <code className="font-mono">-X</code> (e.g. <code className="font-mono">...-X</code>).</li>
-              </ul>
+              <p className="text-[10px] leading-relaxed text-emerald-800">
+                To collect real money from customers, Flutterwave uses your live public key (<code className="font-mono font-bold">FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X</code>).
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -298,17 +297,26 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
                   type="text"
                   value={customKey}
                   onChange={(e) => handleSaveCustomKey(e.target.value)}
-                  placeholder="FLWPUBK_TEST-a3e7403487...-X"
+                  placeholder="c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873"
                   className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
                 />
                 <button
                   type="button"
                   onClick={() => {
+                    handleSaveCustomKey('FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X');
+                  }}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
+                >
+                  🟢 Use Live Key
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
                     handleSaveCustomKey('FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X');
                   }}
-                  className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
+                  className="px-3.5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
                 >
-                  ⚡ Use Default Test Key
+                  ⚠️ Test Key
                 </button>
                 {customKey && (
                   <button

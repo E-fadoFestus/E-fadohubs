@@ -5,12 +5,15 @@ function sanitizeKey(rawKey: string): string {
   }
   cleaned = cleaned.replace(/['";]/g, '').trim();
 
-  // If user pasted a key starting with FLWPUBK_TEST or FLWPUBK but forgot the trailing '-X'
-  if (
-    (cleaned.startsWith('FLWPUBK_TEST') || cleaned.startsWith('FLWPUBK-')) &&
-    !cleaned.endsWith('-X') &&
-    !cleaned.endsWith('-x')
-  ) {
+  if (!cleaned) return '';
+
+  // If user passed a raw key without FLWPUBK prefix (e.g. c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873)
+  if (!cleaned.toUpperCase().startsWith('FLWPUBK')) {
+    cleaned = `FLWPUBK-${cleaned}`;
+  }
+
+  // Ensure trailing -X
+  if (!cleaned.endsWith('-X') && !cleaned.endsWith('-x')) {
     cleaned = `${cleaned}-X`;
   }
 
@@ -22,10 +25,13 @@ export function getFlutterwavePublicKey(): string {
   const localKey = localStorage.getItem('efado_flw_public_key');
   if (localKey && localKey.trim()) {
     const sanitizedLocal = sanitizeKey(localKey);
-    if (sanitizedLocal) return sanitizedLocal;
+    // Ignore legacy test key if user wants live production payments
+    if (sanitizedLocal && !sanitizedLocal.startsWith('FLWPUBK_TEST')) {
+      return sanitizedLocal;
+    }
   }
   
-  // 2. Check environment variables (supporting both correct and truncated secret names)
+  // 2. Check environment variables (supporting both VITE_FLW_PUBLIC_KEY and variations)
   const rawEnvKey = (
     import.meta.env.VITE_FLW_PUBLIC_KEY || 
     import.meta.env.VITE_FLW_PUBLIC_KE || 
@@ -37,8 +43,8 @@ export function getFlutterwavePublicKey(): string {
     if (sanitized) return sanitized;
   }
   
-  // 3. Fallback working test key placeholder
-  return 'FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X';
+  // 3. Live Mode default public key formatted from user's live public key: c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873
+  return 'FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X';
 }
 
 export function saveFlutterwavePublicKey(key: string): void {
