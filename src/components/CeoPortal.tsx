@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { 
   ShieldCheck, 
   Users, 
@@ -83,6 +84,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'players' | 'transactions' | 'withdrawals' | 'hubs' | 'monetization' | 'announcements' | 'settings' | 'detective' | 'support'>('dashboard');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showPatronageTracker, setShowPatronageTracker] = useState(false);
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordSaveStatus, setPasswordSaveStatus] = useState<string | null>(null);
@@ -1276,12 +1278,21 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Master Control Center</p>
                 </div>
               </div>
-              <button 
-                onClick={onClose}
-                className="p-3 hover:bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-all"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowGuidelinesModal(true)}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+                >
+                  <FileText className="w-4 h-4 text-slate-950" />
+                  <span>📖 Payment Guide</span>
+                </button>
+                <button 
+                  onClick={onClose}
+                  className="p-3 hover:bg-white/5 rounded-2xl text-slate-400 hover:text-white transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
         {/* Navigation Tabs */}
@@ -4737,6 +4748,12 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
         </motion.div>
       )}
+
+      {/* COMPREHENSIVE PAYMENT & PAYOUT GUIDELINES MODAL FOR CEO OVERVIEW */}
+      <PaymentGuidelinesModal
+        isOpen={showGuidelinesModal}
+        onClose={() => setShowGuidelinesModal(false)}
+      />
     </AnimatePresence>
   );
 };

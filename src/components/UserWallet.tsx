@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { 
   Wallet, 
   ArrowDownCircle, 
@@ -64,7 +65,8 @@ interface UserWalletProps {
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
   const { selectedCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('paystack');
+  const [depositMethod, setDepositMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('bank_transfer');
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
   const [amount, setAmount] = useState('');
   const [selectedMethod, setSelectedMethod] = useState<string>('');
@@ -118,7 +120,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     }
     return [
       { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
-      { id: 'pm2', type: 'bank_transfer', name: 'GTBank Account', details: '0123456789', isDefault: false },
+      { id: 'pm2', type: 'bank_transfer', name: 'GTBank Corporate NGN', details: '3001964082', isDefault: false },
       { id: 'pm3', type: 'crypto', name: 'Bitcoin Wallet', details: 'bc1qxy2kg...z7v', isDefault: false },
     ];
   });
@@ -166,12 +168,10 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       const timer = setTimeout(() => {
         let resolvedName = accountDetails.accountName || user.fullName || user.displayName || '';
         
-        if (accNo === '0081204179') {
-          resolvedName = 'SOGUNRO FESTUS OLUSEGUN / EFADO';
-        } else if (accNo === '3001964082' || accNo === '8072456836') {
-          resolvedName = 'EFADO Technology Computer Engineering Training';
-        } else if (accNo === '0001304979' || accNo === '2120742200') {
-          resolvedName = 'Daniel F. Okhawere';
+        if (accNo === '3001964082' || accNo === '8072456836' || accNo === '3001964109' || accNo === '3001964123' || accNo === '3001964147') {
+          resolvedName = 'EFADO Technology Computer Engineering Training & Services';
+        } else if (accNo === '0001304979' || accNo === '2120742200' || accNo === '0424168460' || accNo === '0424168587') {
+          resolvedName = 'Okhawere Festus Daniel';
         }
         
         setAccountDetails(prev => ({
@@ -1239,10 +1239,31 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 className="max-w-2xl mx-auto space-y-8"
               >
                 <div className="text-center space-y-4">
-                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">FUND YOUR ACCOUNT</h3>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <h3 className="text-2xl sm:text-3xl font-black text-gray-900 uppercase tracking-tighter italic">FUND YOUR ACCOUNT</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowGuidelinesModal(true)}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+                    >
+                      <FileText className="w-4 h-4 text-slate-950" />
+                      <span>📖 Payment & Payout Guidelines</span>
+                    </button>
+                  </div>
                   
-                  {/* BEAUTIFUL SWITCHER TABS FOR ULTRA-CLEAR SELECTION */}
+                  {/* BEAUTIFUL SWITCHER TABS FOR ULTRA-CLEAR SELECTION - DEFAULT: DIRECT BANK WIRE */}
                   <div className="flex flex-wrap gap-3 border-b border-gray-150 justify-center">
+                    <button 
+                      type="button"
+                      onClick={() => setDepositMethod('bank_transfer')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        depositMethod === 'bank_transfer' 
+                          ? 'border-b-4 border-emerald-600 text-emerald-600 font-extrabold' 
+                          : 'text-gray-400 hover:text-gray-650'
+                      }`}
+                    >
+                      🏦 Direct Bank Deposit (DEFAULT)
+                    </button>
                     <button 
                       type="button"
                       onClick={() => setDepositMethod('paystack')}
@@ -1264,17 +1285,6 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       }`}
                     >
                       ⚡ Flutterwave Checkout
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('bank_transfer')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'bank_transfer' 
-                          ? 'border-b-4 border-indigo-600 text-indigo-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      🏦 Direct Bank Wire
                     </button>
                     <button 
                       type="button"
@@ -2204,6 +2214,12 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* COMPREHENSIVE PAYMENT & PAYOUT GUIDELINES MODAL */}
+      <PaymentGuidelinesModal
+        isOpen={showGuidelinesModal}
+        onClose={() => setShowGuidelinesModal(false)}
+      />
     </div>
   );
 };

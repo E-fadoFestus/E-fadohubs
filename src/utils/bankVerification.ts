@@ -61,7 +61,7 @@ export async function resolveBankAccount(
     console.warn('Backend API call failed, falling back to client-side NIBSS lookup:', err);
     // Client-side fallback if backend API endpoint is unreachable
     const sampleFirstNames = ['CHINEDU', 'BOLA', 'TUNDE', 'EMEKA', 'OLAMIDE', 'AMINA', 'DANIEL', 'FESTUS', 'IBRAHIM', 'NKECHI'];
-    const sampleLastNames = ['OKONKWO', 'ADEBAYO', 'SOGUNRO', 'DANJUMA', 'OKHAWERE', 'EZE', 'BALOGUN', 'BELLO', 'IBRAHIM'];
+    const sampleLastNames = ['OKONKWO', 'ADEBAYO', 'OKAFOR', 'DANJUMA', 'OKHAWERE', 'EZE', 'BALOGUN', 'BELLO', 'IBRAHIM'];
     
     const seed = cleanNumber.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const firstName = sampleFirstNames[seed % sampleFirstNames.length].toUpperCase();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { 
   Building2, 
   Copy, 
@@ -105,6 +106,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>(initialType);
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [amount, setAmount] = useState(fixedAmount ? fixedAmount.toString() : '');
   const [bankName, setBankName] = useState(user.bankName || '');
   const [isCustomBankSelected, setIsCustomBankSelected] = useState(() => {
@@ -642,10 +644,21 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
           </div>
         </div>
         
-        {/* Safe Badge */}
-        <div className="flex items-center gap-1 bg-[#047857] px-2.5 py-1 rounded-full border border-white/10">
-          <ShieldCheck className="w-3 h-3 text-white" />
-          <span className="text-[8px] font-black uppercase tracking-wider text-white">Safe Hub</span>
+        {/* Guidelines Button & Safe Badge */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowGuidelinesModal(true)}
+            className="flex items-center gap-1 bg-amber-400 text-slate-950 hover:bg-amber-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all shadow-sm active:scale-95"
+          >
+            <FileText className="w-3.5 h-3.5 text-slate-950" />
+            <span>📖 Guide</span>
+          </button>
+          
+          <div className="hidden sm:flex items-center gap-1 bg-[#047857] px-2.5 py-1 rounded-full border border-white/10">
+            <ShieldCheck className="w-3 h-3 text-white" />
+            <span className="text-[8px] font-black uppercase tracking-wider text-white">Safe Hub</span>
+          </div>
         </div>
       </div>
 
@@ -793,22 +806,62 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                   </label>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {/* Primary Access Bank Corporate */}
+                    {/* Primary GTBank Corporate NGN */}
                     <div className="bg-white border-2 border-amber-300 hover:border-amber-500 p-3 rounded-2xl transition-all relative flex flex-col justify-between shadow-sm col-span-1 md:col-span-2 bg-gradient-to-r from-amber-50/50 to-emerald-50/30">
                       <div>
-                        <span className="text-[7px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest">★ Primary Verified Corporate Account</span>
-                        <p className="text-xs font-black text-slate-900 mt-1">ACCESS BANK PLC</p>
-                        <p className="text-[9px] text-slate-700 font-bold uppercase leading-tight mt-0.5">SOGUNRO FESTUS OLUSEGUN / EFADO</p>
+                        <span className="text-[7px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full uppercase tracking-widest">★ Primary Verified Corporate Account (NGN)</span>
+                        <p className="text-xs font-black text-slate-900 mt-1">GTBANK PLC</p>
+                        <p className="text-[9px] text-slate-700 font-bold uppercase leading-tight mt-0.5">EFADO Technology Computer Engineering Training & Services</p>
                       </div>
                       
                       <div className="flex items-center justify-between mt-2 bg-white p-2 rounded-xl border border-amber-200 shadow-sm">
-                        <span className="text-sm font-mono font-black text-slate-900 tracking-wider">0081204179</span>
+                        <span className="text-sm font-mono font-black text-slate-900 tracking-wider">3001964082</span>
                         <button
                           type="button"
-                          onClick={() => handleCopy('0081204179', 'acc_access_primary')}
+                          onClick={() => handleCopy('3001964082', 'acc_gtb_primary')}
                           className="px-3 py-1 text-[9px] bg-amber-500 text-slate-950 font-black uppercase rounded-lg hover:bg-amber-400 transition-all active:scale-90 shadow-sm"
                         >
-                          {copySuccess === 'acc_access_primary' ? 'Copied ✓' : 'Copy Number'}
+                          {copySuccess === 'acc_gtb_primary' ? 'Copied ✓' : 'Copy Number'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* GTBANK USD Corporate Domiciliary */}
+                    <div className="bg-white border-2 border-slate-200 hover:border-indigo-400 p-3 rounded-2xl transition-all relative flex flex-col justify-between shadow-sm">
+                      <div>
+                        <span className="text-[7px] font-black bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded uppercase tracking-widest">USD Corporate Wire</span>
+                        <p className="text-xs font-black text-slate-800 mt-1">GTBANK PLC (USD)</p>
+                        <p className="text-[8px] text-slate-500 font-bold uppercase leading-tight mt-0.5 truncate">EFADO Technology Computer Engineering</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-2.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                        <span className="text-xs font-mono font-bold text-slate-800 tracking-wider">3001964109</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy('3001964109', 'acc_gtb_usd')}
+                          className="px-2 py-1 text-[8px] bg-indigo-50 text-indigo-700 font-black uppercase rounded hover:bg-indigo-100 transition-all active:scale-90"
+                        >
+                          {copySuccess === 'acc_gtb_usd' ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* GTBANK GBP / EUR Domiciliary Wire */}
+                    <div className="bg-white border-2 border-slate-200 hover:border-indigo-400 p-3 rounded-2xl transition-all relative flex flex-col justify-between shadow-sm">
+                      <div>
+                        <span className="text-[7px] font-black bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded uppercase tracking-widest">GBP / EUR Corporate Wire</span>
+                        <p className="text-xs font-black text-slate-800 mt-1">GTBANK PLC (GBP/EUR)</p>
+                        <p className="text-[8px] text-slate-500 font-bold uppercase leading-tight mt-0.5 truncate">GBP: 3001964123 | EUR: 3001964147</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-2.5 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                        <span className="text-xs font-mono font-bold text-slate-800 tracking-wider">3001964123</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy('3001964123', 'acc_gtb_gbp')}
+                          className="px-2 py-1 text-[8px] bg-indigo-50 text-indigo-700 font-black uppercase rounded hover:bg-indigo-100 transition-all active:scale-90"
+                        >
+                          {copySuccess === 'acc_gtb_gbp' ? 'Copied' : 'Copy'}
                         </button>
                       </div>
                     </div>
@@ -1395,6 +1448,12 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
           </button>
         </div>
       )}
+
+      {/* COMPREHENSIVE PAYMENT & PAYOUT GUIDELINES MODAL */}
+      <PaymentGuidelinesModal
+        isOpen={showGuidelinesModal}
+        onClose={() => setShowGuidelinesModal(false)}
+      />
     </div>
   );
 };

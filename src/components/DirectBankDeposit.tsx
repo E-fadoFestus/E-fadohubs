@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, Copy, Check, Upload, ArrowRight, ShieldCheck, AlertCircle, FileText, CheckCircle2, Building2, Banknote, ShieldAlert } from 'lucide-react';
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { UserProfile } from '../types';
@@ -14,34 +15,33 @@ interface DirectBankDepositProps {
 }
 
 const OFFICIAL_NGN_ACCOUNTS = [
-  { bankName: 'ACCESS BANK PLC', accountName: 'SOGUNRO FESTUS OLUSEGUN / EFADO', accountNo: '0081204179', badge: 'Primary Corporate' },
-  { bankName: 'GTBANK PLC', accountName: 'EFADO Technology Computer Engineering Training', accountNo: '3001964082', badge: 'GTB Corporate NGN' },
-  { bankName: 'OPAY DIGITAL MFB', accountName: 'EFADO Technology Computer Engineering Training', accountNo: '8072456836', badge: 'OPay Business Instant' },
-  { bankName: 'ACCESS BANK PLC (SAVINGS)', accountName: 'Daniel F. Okhawere', accountNo: '0001304979', badge: 'Access Savings' },
-  { bankName: 'UBA BANK PLC', accountName: 'Daniel F. Okhawere', accountNo: '2120742200', badge: 'UBA Savings' },
+  { bankName: 'GTBANK PLC', accountName: 'EFADO Technology Computer Engineering Training and Services', accountNo: '3001964082', badge: 'Primary Corporate NGN' },
+  { bankName: 'OPAY DIGITAL MFB', accountName: 'EFADO Technology Computer Engineering Training and Services', accountNo: '8072456836', badge: 'OPay Business Instant' },
+  { bankName: 'ACCESS BANK PLC', accountName: 'Okhawere Festus Daniel', accountNo: '0001304979', badge: 'Access Corporate / Savings' },
+  { bankName: 'UBA BANK PLC', accountName: 'Okhawere Festus Daniel', accountNo: '2120742200', badge: 'UBA Corporate / Savings' },
 ];
 
 const INTERNATIONAL_ACCOUNTS: Record<string, { bankName: string; accountName: string; accountNo: string; extraLabel?: string; extraValue?: string }> = {
   USD: {
-    bankName: 'Chase Bank USA / Wire',
-    accountName: 'E-FADO TECH LLC',
-    accountNo: '123456789',
+    bankName: 'GTBANK PLC (USD Domiciliary / Wire)',
+    accountName: 'EFADO Technology Computer Engineering Training and Services',
+    accountNo: '3001964109',
     extraLabel: 'SWIFT / BIC Code',
-    extraValue: 'CHASUS33XXX'
+    extraValue: 'GTBIGBLA'
   },
   GBP: {
-    bankName: 'Barclays Bank UK',
-    accountName: 'E-FADO TECH LTD',
-    accountNo: '87654321',
-    extraLabel: 'Sort Code',
-    extraValue: '20-30-40'
+    bankName: 'GTBANK PLC (GBP Domiciliary / Wire)',
+    accountName: 'EFADO Technology Computer Engineering Training and Services',
+    accountNo: '3001964123',
+    extraLabel: 'SWIFT / BIC Code',
+    extraValue: 'GTBIGBLA'
   },
   EUR: {
-    bankName: 'Deutsche Bank Europe',
-    accountName: 'E-FADO TECH EUROPE GMBH',
-    accountNo: 'DE55100700001234567890',
-    extraLabel: 'BIC / SWIFT',
-    extraValue: 'DEUTDEDBAXX'
+    bankName: 'GTBANK PLC (EUR Domiciliary / Wire)',
+    accountName: 'EFADO Technology Computer Engineering Training and Services',
+    accountNo: '3001964147',
+    extraLabel: 'SWIFT / BIC Code',
+    extraValue: 'GTBIGBLA'
   }
 };
 
@@ -60,6 +60,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
   const [currency, setCurrency] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
   const [reference, setReference] = useState<string>('');
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState<boolean>(false);
 
   // Step 2: Sender Account Verification States
   const [senderBankCode, setSenderBankCode] = useState<string>('044'); // Access Bank default
@@ -224,8 +225,8 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
         proof_name: proofFileName,
         status: 'pending', // 'Pending Review'
         created_at: serverTimestamp(),
-        destination_bank: currency === 'NGN' ? 'ACCESS BANK PLC / GTBANK / OPAY' : INTERNATIONAL_ACCOUNTS[currency]?.bankName || 'Escrow Bank',
-        destination_account: currency === 'NGN' ? '0081204179 / 3001964082' : INTERNATIONAL_ACCOUNTS[currency]?.accountNo || 'N/A'
+        destination_bank: currency === 'NGN' ? 'GTBANK PLC / OPAY / ACCESS / UBA' : INTERNATIONAL_ACCOUNTS[currency]?.bankName || 'GTBank Wire',
+        destination_account: currency === 'NGN' ? '3001964082 / 8072456836' : INTERNATIONAL_ACCOUNTS[currency]?.accountNo || '3001964109'
       };
 
       // 1. Save directly to 'deposits' collection
@@ -279,6 +280,24 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
 
   return (
     <div id="direct-bank-transfer-container" className="space-y-6">
+      {/* Guidelines Action Banner */}
+      <div className="flex items-center justify-between bg-slate-900 border border-amber-500/30 p-3.5 rounded-2xl flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-black uppercase text-amber-300 tracking-wider">
+            DEFAULT PAYMENT METHOD: DIRECT BANK DEPOSIT
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowGuidelinesModal(true)}
+          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase rounded-xl tracking-wider transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+        >
+          <FileText className="w-3.5 h-3.5 text-slate-950" />
+          <span>📖 Payment & Payout Guide</span>
+        </button>
+      </div>
+
       {/* Visual Step Indicator (2 Steps Only) */}
       {!statusMessage && (
         <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
@@ -817,6 +836,12 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
           onClose={() => setShowReceiptModal(false)}
         />
       )}
+
+      {/* COMPREHENSIVE PAYMENT & PAYOUT GUIDELINES MODAL */}
+      <PaymentGuidelinesModal
+        isOpen={showGuidelinesModal}
+        onClose={() => setShowGuidelinesModal(false)}
+      />
     </div>
   );
 };
