@@ -710,7 +710,7 @@ export interface AdListing {
   };
   plan: 'Free' | 'Weekly' | 'Monthly' | 'Quarterly' | 'BiAnnual' | 'Yearly' | 'Express';
   expiryDate: any;
-  status: 'active' | 'expired' | 'pending';
+  status: 'active' | 'expired' | 'pending' | 'sold_out';
   createdAt: any;
 }
 

@@ -11,8 +11,10 @@ import {
   ShieldCheck, 
   AlertTriangle,
   History,
-  QrCode
+  QrCode,
+  FileText
 } from 'lucide-react';
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { UserProfile } from '../types';
 import { db, collection, addDoc, doc, updateDoc, getDoc, serverTimestamp, increment } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
@@ -27,6 +29,7 @@ export const GameManualPayment: React.FC<GameManualPaymentProps> = ({ user, onSu
   const [amount, setAmount] = useState<string>('2000');
   const [email, setEmail] = useState<string>(user.email || '');
   const [phoneNumber, setPhoneNumber] = useState<string>(user.phoneNumber || '');
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState<boolean>(false);
   
   // App states
   const [isGenerating, setIsGenerating] = useState(false);
@@ -218,8 +221,18 @@ export const GameManualPayment: React.FC<GameManualPaymentProps> = ({ user, onSu
             Generate a secure matching PIN code, transfer funds to the CEO bank account, and unlock instant game tokens!
           </p>
         </div>
-        <div className="px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-orange-400 self-start md:self-center">
-          Manual Settle Protocol
+        <div className="flex items-center gap-3 self-start md:self-center flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowGuidelinesModal(true)}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+          >
+            <FileText className="w-4 h-4 text-slate-950" />
+            <span>📖 Activator & Payment Guide</span>
+          </button>
+          <div className="px-3.5 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-orange-400">
+            Manual Settle Protocol
+          </div>
         </div>
       </div>
 
@@ -493,6 +506,12 @@ export const GameManualPayment: React.FC<GameManualPaymentProps> = ({ user, onSu
 
         </div>
       </div>
+
+      {/* Payment & Activator Guidelines Modal */}
+      <PaymentGuidelinesModal
+        isOpen={showGuidelinesModal}
+        onClose={() => setShowGuidelinesModal(false)}
+      />
     </div>
   );
 };

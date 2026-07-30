@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
+import { CurrencySelector } from './CurrencySelector';
+import { useCurrency } from '../lib/CurrencyContext';
 import { 
   ShieldCheck, 
   Users, 
@@ -81,6 +83,7 @@ interface CeoPortalProps {
 }
 
 export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => {
+  const { formatPrice, selectedCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'players' | 'transactions' | 'withdrawals' | 'hubs' | 'monetization' | 'announcements' | 'settings' | 'detective' | 'support'>('dashboard');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showPatronageTracker, setShowPatronageTracker] = useState(false);
@@ -88,6 +91,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordSaveStatus, setPasswordSaveStatus] = useState<string | null>(null);
+  const [announcementStatus, setAnnouncementStatus] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({
     username: '',
     email: '',
@@ -1075,9 +1079,14 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   };
 
   const handlePostAnnouncement = async () => {
-    if (!newAnnouncement.trim()) return;
+    if (!newAnnouncement.trim()) {
+      setAnnouncementStatus('⚠️ Please write message content before publishing.');
+      return;
+    }
+    setIsProcessing(true);
+    setAnnouncementStatus(null);
     try {
-      await addDoc(collection(db, 'announcements'), {
+      const docRef = await addDoc(collection(db, 'announcements'), {
         message: newAnnouncement.trim(),
         title: newAnnouncementTitle.trim() || null,
         type: newAnnouncementType,
@@ -1087,14 +1096,33 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         timestamp: serverTimestamp(),
         active: true
       });
+
+      const freshAnnouncement: Announcement = {
+        id: docRef.id,
+        message: newAnnouncement.trim(),
+        title: newAnnouncementTitle.trim() || null,
+        type: newAnnouncementType,
+        tier: newAnnouncementTier,
+        actionText: newAnnouncementActionText.trim() || null,
+        actionUrl: newAnnouncementActionUrl.trim() || null,
+        active: true,
+        timestamp: new Date()
+      };
+      setAnnouncements(prev => [freshAnnouncement, ...prev]);
+
       setNewAnnouncement('');
       setNewAnnouncementTitle('');
       setNewAnnouncementType('banner');
       setNewAnnouncementTier('info');
       setNewAnnouncementActionText('');
       setNewAnnouncementActionUrl('');
-    } catch (e) {
+      setAnnouncementStatus('✅ Broadcast payload successfully published live to all user platforms!');
+      setTimeout(() => setAnnouncementStatus(null), 5000);
+    } catch (e: any) {
       console.error("Error posting announcement:", e);
+      setAnnouncementStatus(`❌ Error posting announcement: ${e.message || 'Check network connection'}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1279,6 +1307,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <CurrencySelector />
                 <button
                   onClick={() => setShowGuidelinesModal(true)}
                   className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-95"
@@ -1386,7 +1415,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         </div>
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Admin Wallet</span>
                       </div>
-                      <p className="text-3xl font-black text-white font-display mb-3">${adminStats?.adminWallet.toLocaleString() || '0.00'}</p>
+                      <p className="text-3xl font-black text-white font-display mb-3">{formatPrice(adminStats?.adminWallet || 0)}</p>
                     </div>
                     <button 
                       onClick={() => setShowAdminWithdrawModal(true)}
@@ -1402,7 +1431,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                       </div>
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total House Gain</span>
                     </div>
-                    <p className="text-3xl font-black text-white font-display">${adminStats?.totalHouseGain.toLocaleString() || '0.00'}</p>
+                    <p className="text-3xl font-black text-white font-display">{formatPrice(adminStats?.totalHouseGain || 0)}</p>
                   </div>
                   <div className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 shadow-xl golden-card-border">
                     <div className="flex items-center gap-3 mb-4">
@@ -1748,21 +1777,21 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         <Coins className="w-5 h-5 text-indigo-400" />
                         <span className="text-sm font-bold text-slate-400">Lucky Spin Arena</span>
                       </div>
-                      <p className="text-2xl font-black text-white font-display">${adminStats?.gameWallets?.spinGame.toLocaleString() || '0.00'}</p>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.spinGame || 0)}</p>
                     </div>
                     <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
                       <div className="flex items-center gap-3 mb-4">
                         <CreditCard className="w-5 h-5 text-orange-400" />
                         <span className="text-sm font-bold text-slate-400">EFADO Money Card</span>
                       </div>
-                      <p className="text-2xl font-black text-white font-display">${adminStats?.gameWallets?.moneyCard.toLocaleString() || '0.00'}</p>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.moneyCard || 0)}</p>
                     </div>
                     <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
                       <div className="flex items-center gap-3 mb-4">
                         <Zap className="w-5 h-5 text-blue-400" />
                         <span className="text-sm font-bold text-slate-400">Digital Money Trading</span>
                       </div>
-                      <p className="text-2xl font-black text-white font-display">${adminStats?.gameWallets?.tradingGame.toLocaleString() || '0.00'}</p>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.tradingGame || 0)}</p>
                     </div>
                   </div>
                 </div>
@@ -1969,11 +1998,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   <div className="flex gap-4">
                     <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                       <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Inflow Volume</p>
-                      <p className="text-lg font-black text-white">${transactions.filter(t => t.type === 'deposit').reduce((a, t) => a + t.amount, 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-white">{formatPrice(transactions.filter(t => t.type === 'deposit').reduce((a, t) => a + t.amount, 0))}</p>
                     </div>
                     <div className="px-4 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                       <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Outflow Volume</p>
-                      <p className="text-lg font-black text-white">${transactions.filter(t => t.type === 'withdrawal').reduce((a, t) => a + t.amount, 0).toLocaleString()}</p>
+                      <p className="text-lg font-black text-white">{formatPrice(transactions.filter(t => t.type === 'withdrawal').reduce((a, t) => a + t.amount, 0))}</p>
                     </div>
                   </div>
                 </div>
@@ -2045,7 +2074,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                           </td>
                           <td className="px-6 py-4">
                             <span className={`text-sm font-black font-display ${tx.type === 'deposit' || tx.type === 'game_win' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {tx.type === 'deposit' || tx.type === 'game_win' ? '+' : '-'}${tx.amount.toLocaleString()}
+                              {tx.type === 'deposit' || tx.type === 'game_win' ? '+' : '-'}{formatPrice(tx.amount)}
                             </span>
                           </td>
                           <td className="px-6 py-4">
@@ -2481,13 +2510,22 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         </div>
                       </div>
 
+                      {announcementStatus && (
+                        <div className={`p-3 rounded-xl text-xs font-black uppercase tracking-wider text-center border ${
+                          announcementStatus.startsWith('✅') ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                        }`}>
+                          {announcementStatus}
+                        </div>
+                      )}
+
                       {/* Submit Broadcast button */}
                       <button 
                         onClick={handlePostAnnouncement}
-                        className="w-full py-4.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2"
+                        disabled={isProcessing}
+                        className="w-full py-4.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-indigo-600/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         <Megaphone className="w-4 h-4" />
-                        Push Broadcast payload
+                        {isProcessing ? 'Publishing Broadcast...' : 'Push Broadcast payload'}
                       </button>
                     </div>
                   </div>
@@ -4409,7 +4447,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                     />
                   </div>
                   <p className="text-[10px] text-slate-500 text-left mt-2">
-                    Available balance: <span className="text-white font-black">${adminStats?.adminWallet.toLocaleString() || '0.00'}</span>
+                    Available balance: <span className="text-white font-black">{formatPrice(adminStats?.adminWallet || 0)}</span>
                   </p>
                 </div>
 

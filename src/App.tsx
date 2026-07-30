@@ -608,11 +608,43 @@ function AppContent() {
         setShowCSCCRegistration(true);
       } else {
         setActiveHub('COMMUNITY_HUBS');
+        setShowCommunityHub(true);
       }
       return;
     }
 
     setActiveHub(hub);
+
+    if (hub === 'MARKET') {
+      setShowModernMarket(true);
+      return;
+    }
+
+    if (hub === 'FAIRLY_USED') {
+      setShowMarketHub(true);
+      return;
+    }
+
+    if (hub === 'SERVICE_CORPS') {
+      setShowServiceCorps(true);
+      return;
+    }
+
+    if (hub === 'EDUCATION') {
+      setShowEducationHub(true);
+      return;
+    }
+
+    if (hub === 'TECH_HUB' || hub === 'TECH') {
+      setShowTechHub(true);
+      return;
+    }
+
+    if (hub === 'HEPIHANDS_LOAN') {
+      setShowHepiHandsLoan(true);
+      return;
+    }
+
     if (hub === 'GAMES' && !isAgeVerified) {
       setShowAgeGate(true);
       return;
@@ -2251,14 +2283,7 @@ function AppContent() {
                     boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)"
                   }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={() => {
-                    if (item.id === 'ADVERTISING') handleNavigate('ADVERTISING', 'ADVERT');
-                    else if (item.id === 'ZOOM') handleNavigate('ZOOM');
-                    else if (item.id === 'GIST') handleNavigate('GIST');
-                    else if (item.id === 'COMMUNITY_HUBS') handleNavigate('COMMUNITY_HUBS');
-                    else if (item.id === 'DIGITAL_SERVICES_HUB') handleNavigate('DIGITAL_SERVICES_HUB');
-                    else setActiveHub(item.id as any);
-                  }}
+                  onClick={() => handleNavigate(item.id)}
                   className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border ${item.border} ${
                     isActive
                       ? `bg-gradient-to-b ${item.gradient} text-white ring-4 ring-white/30 scale-105 z-10 brightness-110 saturate-125 shadow-[inset_0_2px_0_0_rgba(255,255,255,0.6),0_15px_25px_-5px_rgba(0,0,0,0.5)]` 

@@ -25,7 +25,7 @@ interface PaymentGuidelinesModalProps {
 
 export const PaymentGuidelinesModal: React.FC<PaymentGuidelinesModalProps> = ({ isOpen, onClose }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'deposits' | 'payouts' | 'faq' | 'accounts'>('deposits');
+  const [activeTab, setActiveTab] = useState<'deposits' | 'payouts' | 'faq' | 'accounts' | 'activator'>('deposits');
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -113,6 +113,16 @@ export const PaymentGuidelinesModal: React.FC<PaymentGuidelinesModalProps> = ({ 
               }`}
             >
               <HelpCircle className="w-4 h-4" /> Advisory & FAQ
+            </button>
+            <button
+              onClick={() => setActiveTab('activator')}
+              className={`px-5 py-3 rounded-t-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 border-b-2 shrink-0 ${
+                activeTab === 'activator' 
+                  ? 'bg-orange-600/30 border-orange-400 text-orange-300' 
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Coins className="w-4 h-4 text-orange-400" /> Naira Manual Activator Guide
             </button>
           </div>
 
@@ -408,6 +418,67 @@ export const PaymentGuidelinesModal: React.FC<PaymentGuidelinesModalProps> = ({ 
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: NAIRA MANUAL WALLET ACTIVATOR GUIDE */}
+            {activeTab === 'activator' && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-orange-950/80 via-slate-900 to-slate-950 p-6 rounded-3xl border border-orange-500/40 space-y-3">
+                  <h3 className="text-base font-black text-orange-400 uppercase tracking-wide flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-orange-400" />
+                    How Naira Manual Wallet Activator Works
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                    The <strong>Naira Manual Wallet Activator</strong> is a high-speed manual settlement protocol designed for instantly funding your EFADO wallet balance and unlocking game tokens by pairing your direct CEO bank deposit with a unique, encrypted activation code (PIN).
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-950/80 p-5 rounded-2xl border border-orange-500/20 space-y-2">
+                    <div className="w-7 h-7 rounded-full bg-orange-600 text-white font-black text-xs flex items-center justify-center">1</div>
+                    <h4 className="text-xs font-black uppercase text-amber-300">Step 1: Pay to CEO Bank Account</h4>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Select your preferred corporate bank account (e.g. OPay Business <code className="text-orange-400 font-mono">8072456836</code>, GTBank, UBA, or Access Bank). Copy the account details and make your bank transfer using your mobile banking app.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-5 rounded-2xl border border-orange-500/20 space-y-2">
+                    <div className="w-7 h-7 rounded-full bg-orange-600 text-white font-black text-xs flex items-center justify-center">2</div>
+                    <h4 className="text-xs font-black uppercase text-amber-300">Step 2: Request & Generate PIN</h4>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Enter the exact amount you transferred (minimum ₦100), your email address, and phone number. Click <strong>"GENERATE ACTIVATION CODE"</strong> to create your unique PIN code (e.g. <code className="text-orange-400 font-mono">EFD-GPIN-849201</code>).
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-5 rounded-2xl border border-orange-500/20 space-y-2">
+                    <div className="w-7 h-7 rounded-full bg-green-600 text-white font-black text-xs flex items-center justify-center">3</div>
+                    <h4 className="text-xs font-black uppercase text-emerald-400">Step 3: Verify & Activate Wallet</h4>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">
+                      Paste or enter your generated PIN code into the verification box and click <strong>"VERIFY & CREATE WALLET BALANCE"</strong>. Your wallet is updated immediately with the matching funds!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950 p-5 rounded-2xl border border-white/10 space-y-3">
+                  <h4 className="text-xs font-black uppercase text-white tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" /> Key Operational Rules & Security
+                  </h4>
+                  <ul className="space-y-2 text-xs text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-400 font-black">•</span>
+                      <span><strong>Exact Amount Match:</strong> Ensure the deposit amount transferred matches the amount specified when generating your PIN code.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-400 font-black">•</span>
+                      <span><strong>Code Expiry:</strong> PIN codes remain valid for 2 hours after generation. Activate immediately after making your transfer.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-orange-400 font-black">•</span>
+                      <span><strong>Need Assistance?</strong> If you encounter any transfer delay, reach technical support at <code className="text-amber-300 font-mono">efadofestus@gmail.com</code> with your generated PIN.</span>
+                    </li>
+                  </ul>
                 </div>
               </div>
             )}
