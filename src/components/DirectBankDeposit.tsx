@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, Copy, Check, Upload, ArrowRight, ShieldCheck, AlertCircle, FileText } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Loader2, Copy, Check, Upload, ArrowRight, ShieldCheck, AlertCircle, FileText, CheckCircle2, Building2, Banknote, ShieldAlert } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { StrategicReceipt } from './StrategicReceipt';
+import { NIGERIAN_BANKS, resolveBankAccount } from '../utils/bankVerification';
 
 interface DirectBankDepositProps {
   user: UserProfile;
@@ -11,29 +12,6 @@ interface DirectBankDepositProps {
   onSuccess: () => void;
   onClose?: () => void;
 }
-
-const BANK_DATA: Record<string, { country: string; symbol: string; banks: string[] }> = {
-  NGN: {
-    country: 'Nigeria',
-    symbol: '₦',
-    banks: ['Access Bank', 'GTBank', 'Zenith Bank', 'First Bank of Nigeria', 'Kuda Bank', 'Moniepoint MFB', 'Other']
-  },
-  USD: {
-    country: 'USA',
-    symbol: '$',
-    banks: ['Chase Bank', 'Bank of America', 'Wells Fargo', 'Citigroup', 'Other']
-  },
-  GBP: {
-    country: 'UK',
-    symbol: '£',
-    banks: ['Barclays', 'HSBC UK', 'Lloyds Bank', 'NatWest', 'Other']
-  },
-  EUR: {
-    country: 'Europe',
-    symbol: '€',
-    banks: ['Deutsche Bank', 'BNP Paribas', 'Societe Generale', 'ING Group', 'Other']
-  }
-};
 
 const OFFICIAL_NGN_ACCOUNTS = [
   { bankName: 'ACCESS BANK PLC', accountName: 'SOGUNRO FESTUS OLUSEGUN / EFADO', accountNo: '0081204179', badge: 'Primary Corporate' },
@@ -43,19 +21,12 @@ const OFFICIAL_NGN_ACCOUNTS = [
   { bankName: 'UBA BANK PLC', accountName: 'Daniel F. Okhawere', accountNo: '2120742200', badge: 'UBA Savings' },
 ];
 
-const BANK_DETAILS: Record<string, { bankName: string; accountName: string; accountNo: string; extraLabel?: string; extraValue?: string }> = {
-  NGN: {
-    bankName: 'ACCESS BANK PLC',
-    accountName: 'SOGUNRO FESTUS OLUSEGUN / EFADO',
-    accountNo: '0081204179',
-    extraLabel: 'Account Type',
-    extraValue: 'Verified Bank Escrow'
-  },
+const INTERNATIONAL_ACCOUNTS: Record<string, { bankName: string; accountName: string; accountNo: string; extraLabel?: string; extraValue?: string }> = {
   USD: {
     bankName: 'Chase Bank USA / Wire',
     accountName: 'E-FADO TECH LLC',
     accountNo: '123456789',
-    extraLabel: 'SWIFT Code',
+    extraLabel: 'SWIFT / BIC Code',
     extraValue: 'CHASUS33XXX'
   },
   GBP: {
@@ -80,41 +51,49 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
   onSuccess,
   onClose
 }) => {
+  // Flow state: strictly 2 steps!
+  // Step 1 = Payment Instruction Screen (EFADO details + amount due + copyable reference)
+  // Step 2 = Payment Confirmation Screen (Sender bank verification + transaction ID + proof upload)
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Currency & Amount
   const [currency, setCurrency] = useState<'NGN' | 'USD' | 'GBP' | 'EUR'>('NGN');
-  const [country, setCountry] = useState<string>('Nigeria');
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
-  const [selectedBank, setSelectedBank] = useState<string>('');
+  const [reference, setReference] = useState<string>('');
+
+  // Step 2: Sender Account Verification States
+  const [senderBankCode, setSenderBankCode] = useState<string>('044'); // Access Bank default
+  const [senderBankName, setSenderBankName] = useState<string>('Access Bank PLC');
   const [customBankName, setCustomBankName] = useState<string>('');
   const [senderAccountNumber, setSenderAccountNumber] = useState<string>('');
-  const [senderAccountName, setSenderAccountName] = useState<string>('');
-  const [reference, setReference] = useState<string>('');
-  const [transactionId, setTransactionId] = useState<string>('');
   
-  // Proof upload state
+  // Account Name Enquiry API state
+  const [isResolvingAccount, setIsResolvingAccount] = useState<boolean>(false);
+  const [resolvedAccountName, setResolvedAccountName] = useState<string>('');
+  const [accountResolveError, setAccountResolveError] = useState<string | null>(null);
+
+  // Step 2: Payment Evidence States
+  const [bankTransactionId, setBankTransactionId] = useState<string>('');
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofFileName, setProofFileName] = useState<string>('');
   const [proofBase64, setProofBase64] = useState<string>('');
   const [uploadProgress, setUploadProgress] = useState(false);
 
-  // General state
+  // General States
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [showManualReceipt, setShowManualReceipt] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
 
-  // Re-generate Reference and sync country on Currency Change
+  // Generate unique transaction reference on mount
   useEffect(() => {
-    setCountry(BANK_DATA[currency].country);
-    const defaults = BANK_DATA[currency].banks;
-    setSelectedBank(defaults[0]);
     generateReference();
-  }, [currency]);
+  }, []);
 
   const generateReference = () => {
     const chars = '0123456789';
     let rand = '';
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       rand += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     const today = new Date();
@@ -130,17 +109,47 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  // Automatic Bank Account Name Resolution when 10 digits typed or bank changes
+  useEffect(() => {
+    if (step === 2) {
+      const cleanNo = senderAccountNumber.trim().replace(/\D/g, '');
+      if (cleanNo.length === 10) {
+        triggerAccountResolution(cleanNo, senderBankCode, senderBankName);
+      } else {
+        setResolvedAccountName('');
+        setAccountResolveError(null);
+      }
+    }
+  }, [senderAccountNumber, senderBankCode, senderBankName, step]);
+
+  const triggerAccountResolution = async (accNum: string, bankCode: string, bankNameStr: string) => {
+    setIsResolvingAccount(true);
+    setAccountResolveError(null);
+    setResolvedAccountName('');
+
+    const effectiveBankName = bankCode === '000' ? customBankName || 'Other Bank' : bankNameStr;
+    const result = await resolveBankAccount(accNum, bankCode, effectiveBankName);
+
+    setIsResolvingAccount(false);
+    if (result.success && result.accountName) {
+      setResolvedAccountName(result.accountName);
+      setAccountResolveError(null);
+    } else {
+      setResolvedAccountName('');
+      setAccountResolveError(result.message || 'Unable to resolve account holder name. Please check account number.');
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 2 * 1024 * 1024) {
-        alert('File size exceeds 2MB limit. Please upload a smaller screenshot.');
+      if (file.size > 3 * 1024 * 1024) {
+        alert('File size exceeds 3MB limit. Please upload a smaller screenshot or PDF.');
         return;
       }
       setProofFile(file);
       setProofFileName(file.name);
 
-      // Convert to Base64 so we can save it as an offline proof attachment in Firestore
       setUploadProgress(true);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -155,60 +164,108 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
     }
   };
 
+  const handleBankSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCode = e.target.value;
+    setSenderBankCode(selectedCode);
+    const found = NIGERIAN_BANKS.find(b => b.code === selectedCode);
+    if (found) {
+      setSenderBankName(found.name);
+    }
+  };
+
   const handleSubmitDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     const numericAmount = parseFloat(amount);
+
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Please enter a valid amount.');
+      alert('Please enter a valid deposit amount.');
+      return;
+    }
+
+    if (!senderAccountNumber || senderAccountNumber.trim().length < 8) {
+      alert('Please enter a valid 10-digit sender account number.');
+      return;
+    }
+
+    if (!resolvedAccountName) {
+      alert('Sender Account Name Verification is required! Please verify account number and bank before submitting.');
+      return;
+    }
+
+    if (!bankTransactionId.trim()) {
+      alert('Please enter your Bank Transaction Reference or Session ID.');
       return;
     }
 
     if (!proofBase64) {
-      alert('Please upload a screenshot or image copy as proof of your bank transfer receipt.');
+      alert('Please upload a screenshot or PDF document as proof of payment.');
       return;
     }
 
     setIsSubmitting(true);
     setStatusMessage(null);
 
-    const actualBankName = selectedBank === 'Other' ? customBankName : selectedBank;
-    const destDetails = BANK_DETAILS[currency];
+    const actualBankName = senderBankCode === '000' ? (customBankName || 'Other Bank') : senderBankName;
 
     try {
-      // Save directly to 'deposits' collection in Firestore
-      await addDoc(collection(db, 'deposits'), {
+      const depositPayload = {
         user_id: user.uid,
         user_email: user.email,
         currency,
         amount: numericAmount,
         channel: 'bank_transfer',
         reference,
-        bank_account_id: currency, // use the currency as the account detail ID since it's hardcoded
-        custom_bank_name: selectedBank === 'Other' ? actualBankName : '',
-        transaction_id: transactionId || '',
-        proof_url: proofBase64, // local base64 preview stored securely
+        bank_transaction_id: bankTransactionId.trim(),
+        sender_bank_code: senderBankCode,
+        sender_bank_name: actualBankName,
+        sender_account_number: senderAccountNumber.trim(),
+        sender_verified_account_name: resolvedAccountName,
+        proof_url: proofBase64,
         proof_name: proofFileName,
-        status: 'pending',
+        status: 'pending', // 'Pending Review'
         created_at: serverTimestamp(),
-        // Extra helpful metadata for auditing
-        sender_country: country,
-        sender_bank: actualBankName,
-        destination_bank: destDetails.bankName,
-        destination_account: destDetails.accountNo
+        destination_bank: currency === 'NGN' ? 'ACCESS BANK PLC / GTBANK / OPAY' : INTERNATIONAL_ACCOUNTS[currency]?.bankName || 'Escrow Bank',
+        destination_account: currency === 'NGN' ? '0081204179 / 3001964082' : INTERNATIONAL_ACCOUNTS[currency]?.accountNo || 'N/A'
+      };
+
+      // 1. Save directly to 'deposits' collection
+      const depositDocRef = await addDoc(collection(db, 'deposits'), depositPayload);
+
+      // 2. Also log to 'transactions' collection with unique ID so CEO/Admin panel can view and reconcile
+      const txCustomId = `MAN_DEP_${reference}`;
+      await setDoc(doc(db, 'transactions', txCustomId), {
+        userId: user.uid,
+        type: 'deposit',
+        amount: numericAmount,
+        currency,
+        status: 'pending',
+        reference,
+        timestamp: serverTimestamp(),
+        description: `Manual Bank Transfer (Ref: ${reference}) | Sender: ${resolvedAccountName} (${actualBankName} - ${senderAccountNumber}) | TxID: ${bankTransactionId}`,
+        metadata: {
+          gateway: 'direct_bank_transfer',
+          depositDocId: depositDocRef.id,
+          senderBank: actualBankName,
+          senderAccountNumber: senderAccountNumber.trim(),
+          senderAccountName: resolvedAccountName,
+          bankTransactionId: bankTransactionId.trim(),
+          proofFileName,
+          proofUrl: proofBase64
+        }
       });
 
       setStatusMessage({
         type: 'success',
-        text: 'Sync Complete. Your deposit setup has been routed to CEO Monitory finance queue for verification.'
+        text: 'Deposit Submitted for Admin Verification! Your transfer record and proof of payment have been safely registered on the EFADO ledger.'
       });
-      
-      // Fire success callback (e.g. refresh transactional logs or show alert)
+
+      // Call onSuccess callback
       setTimeout(() => {
         onSuccess();
-      }, 5000);
-      
+      }, 4000);
+
     } catch (err: any) {
-      console.error('Error recording bank deposit draft:', err);
+      console.error('Error submitting direct bank transfer:', err);
       setStatusMessage({
         type: 'error',
         text: `Submission failed: ${err.message || String(err)}`
@@ -218,439 +275,492 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
     }
   };
 
-  const currentDetails = BANK_DETAILS[currency];
-  const symbol = BANK_DATA[currency].symbol;
+  const symbol = currency === 'NGN' ? '₦' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : '€';
 
   return (
-    <div id="direct-bank-deposit-container" className="space-y-6">
-      {/* 3-Step Visual Progress Bar */}
+    <div id="direct-bank-transfer-container" className="space-y-6">
+      {/* Visual Step Indicator (2 Steps Only) */}
       {!statusMessage && (
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-2">
-          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>1</span>
-            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">1. Sender & Amount</span>
+        <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 p-4 rounded-2xl">
+          <div className={`flex items-center gap-2.5 ${step === 1 ? 'text-[#DAA520] font-black' : 'text-slate-400 font-bold'}`}>
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${step === 1 ? 'bg-[#DAA520] text-slate-950 shadow-md shadow-[#DAA520]/20' : 'bg-slate-800 text-slate-300'}`}>1</span>
+            <div>
+              <span className="text-[10px] uppercase tracking-wider block font-black">STEP 1: PAYMENT INSTRUCTIONS</span>
+              <span className="text-[8px] text-slate-400 block hidden sm:block">EFADO Escrow Details & Reference</span>
+            </div>
           </div>
-          <div className="w-8 h-[2px] bg-slate-200" />
-          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 2 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>2</span>
-            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">2. Escrow Details</span>
-          </div>
-          <div className="w-8 h-[2px] bg-slate-200" />
-          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-indigo-600 font-black' : 'text-slate-400 font-bold'}`}>
-            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step >= 3 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>3</span>
-            <span className="text-[10px] uppercase tracking-wider hidden sm:inline">3. Confirm Code & Proof</span>
+
+          <div className="flex-1 mx-4 h-[2px] bg-slate-800" />
+
+          <div className={`flex items-center gap-2.5 ${step === 2 ? 'text-[#DAA520] font-black' : 'text-slate-400 font-bold'}`}>
+            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${step === 2 ? 'bg-[#DAA520] text-slate-950 shadow-md shadow-[#DAA520]/20' : 'bg-slate-800 text-slate-300'}`}>2</span>
+            <div>
+              <span className="text-[10px] uppercase tracking-wider block font-black">STEP 2: PAYMENT CONFIRMATION</span>
+              <span className="text-[8px] text-slate-400 block hidden sm:block">Account Verification & Proof Upload</span>
+            </div>
           </div>
         </div>
       )}
 
-      {statusMessage ? (
-        <div 
-          id="deposit-receipt-screen" 
-          className="p-8 bg-slate-900 border border-[#DAA520]/20 rounded-3xl text-center space-y-6 animate-fade-in"
-        >
-          <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 text-[#DAA520] rounded-full flex items-center justify-center mx-auto shadow-lg animate-pulse">
-            <ShieldCheck className="w-8 h-8" />
+      {/* SUCCESS CONFIRMATION RECEIPT SCREEN */}
+      {statusMessage && statusMessage.type === 'success' ? (
+        <div id="deposit-success-screen" className="p-8 bg-slate-900 border border-[#DAA520]/30 rounded-3xl text-center space-y-6 animate-fade-in shadow-2xl">
+          <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-lg animate-pulse">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
+
           <div className="space-y-2">
-            <h4 className="text-xl font-black text-white uppercase tracking-tight">Transmission Synced</h4>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-relaxed">
-              REFERENCE: <span className="text-[#DAA520]">{reference}</span>
+            <h4 className="text-xl font-black text-white uppercase tracking-tight">Deposit Pending Review</h4>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">
+              NARRATION REF: <span className="text-[#DAA520] font-mono font-black">{reference}</span>
             </p>
           </div>
-          <div className="p-6 bg-slate-950/80 border border-white/5 rounded-2xl text-left space-y-3">
-            <p className="text-xs text-slate-300 font-bold leading-normal">
-              🛡️ {statusMessage.text}
+
+          <div className="p-5 bg-slate-950/90 border border-white/10 rounded-2xl text-left space-y-3">
+            <p className="text-xs text-slate-200 font-bold leading-relaxed">
+              ✅ {statusMessage.text}
             </p>
-            <p className="text-[10px] text-amber-400 font-bold uppercase tracking-widest leading-normal">
-              🔔 Pending Admin Confirmation. You’ll get SMS + Email once confirmed. Usually 5-30 mins during business hours.
-            </p>
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
+              <p className="text-[10px] text-amber-300 font-black uppercase tracking-wider">
+                ⏳ Administrator Review Status: Pending Review
+              </p>
+              <p className="text-[9px] text-amber-200/80 leading-normal">
+                An administrator will verify your bank transfer against your uploaded receipt proof. Funds will be credited directly to your wallet upon reconciliation (usually 5 to 30 mins).
+              </p>
+            </div>
           </div>
+
           <div className="flex flex-col gap-2 pt-2">
             <button
-              id="download-manual-receipt-btn"
               type="button"
-              onClick={() => setShowManualReceipt(true)}
+              onClick={() => setShowReceiptModal(true)}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95"
             >
-              <FileText className="w-4 h-4 text-emerald-300 animate-pulse" /> Download & Print Receipt
+              <FileText className="w-4 h-4 text-emerald-200" /> View & Print Payment Receipt
             </button>
-          </div>
-          <p className="text-[9px] text-slate-500 font-bold leading-none uppercase tracking-widest">
-            Pending verification... You can reference this receipt anytime.
-          </p>
-        </div>
-      ) : step === 1 ? (
-        /* Step 1: Currency selection, Amount, and Sender Account Inputs */
-        <div id="step-1-deposit-form" className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-2 gap-4">
-            {/* Selective Currency Dropdown */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Currency</label>
-              <select
-                id="deposit-currency-select"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value as any)}
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-black focus:outline-none focus:border-indigo-600 cursor-pointer"
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black rounded-2xl text-xs uppercase tracking-widest transition-all"
               >
-                <option value="NGN">NGN (₦) - Naira</option>
-                <option value="USD">USD ($) - Dollar</option>
-                <option value="GBP">GBP (£) - Pound</option>
-                <option value="EUR">EUR (€) - Euro</option>
-              </select>
-            </div>
-
-            {/* Selective Country Dropdown */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Country</label>
-              <select
-                id="deposit-country-select"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-black focus:outline-none focus:border-indigo-600 cursor-pointer"
-              >
-                {currency === 'NGN' && <option value="Nigeria">Nigeria</option>}
-                {currency === 'USD' && <option value="USA">United States</option>}
-                {currency === 'GBP' && <option value="UK">United Kingdom</option>}
-                {currency === 'EUR' && (
-                  <>
-                    <option value="Germany">Germany</option>
-                    <option value="France">France</option>
-                    <option value="Italy">Italy</option>
-                    <option value="Europe">Other Europe</option>
-                  </>
-                )}
-                <option value="Other">Other country / Wire</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Amount input */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Amount to deposit</label>
-            <div className="relative">
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">{symbol}</span>
-              <input
-                id="deposit-amount-input"
-                type="number"
-                placeholder="e.g. 1000"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full pl-10 pr-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 text-black placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* Bank selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Your Sending Bank</label>
-              <select
-                id="sender-bank-select"
-                value={selectedBank}
-                onChange={(e) => setSelectedBank(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-black focus:outline-none focus:border-indigo-600 cursor-pointer"
-              >
-                {BANK_DATA[currency].banks.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-
-            {selectedBank === 'Other' && (
-              <div className="space-y-2 animate-fade-in">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Type your Bank Name</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Nova Pioneer Bank"
-                  value={customBankName}
-                  onChange={(e) => setCustomBankName(e.target.value)}
-                  className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 text-black"
-                />
-              </div>
+                Close Window
+              </button>
             )}
           </div>
-
-          {/* CRITICAL MISSING INPUTS: Sending Account Number & Sender Account Holder Name */}
-          <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase text-indigo-900 tracking-wider">YOUR SENDER ACCOUNT DETAILS</span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest block">
-                  Your 10-Digit Sending Account Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  maxLength={10}
-                  placeholder="Enter 10-digit account number"
-                  value={senderAccountNumber}
-                  onChange={(e) => setSenderAccountNumber(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-mono font-black text-black focus:outline-none focus:border-indigo-600 placeholder:text-slate-400"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest block">
-                  Your Sender Account Holder Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  required
-                  type="text"
-                  placeholder="Enter sender bank account name"
-                  value={senderAccountName}
-                  onChange={(e) => setSenderAccountName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-black uppercase text-black focus:outline-none focus:border-indigo-600 placeholder:text-slate-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <button
-              id="deposit-proceed-button"
-              type="button"
-              onClick={() => {
-                const num = parseFloat(amount);
-                if (isNaN(num) || num <= 0) {
-                  alert('Please enter a valid deposit amount first.');
-                  return;
-                }
-                if (currency === 'NGN' && (!senderAccountNumber || senderAccountNumber.length < 8)) {
-                  alert('Please enter a valid sending account number before proceeding.');
-                  return;
-                }
-                if (!senderAccountName.trim()) {
-                  alert('Please enter your sender account holder name.');
-                  return;
-                }
-                setStep(2);
-              }}
-              className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center gap-2 active:scale-95"
-            >
-              Continue to Destination Bank Escrow Details <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
         </div>
-      ) : step === 2 ? (
-        /* Step 2: Show Official Destination Escrow Details & Instructions */
-        <div id="step-2-deposit-form" className="space-y-5 animate-fade-in">
-          {/* Back reference link */}
+      ) : statusMessage && statusMessage.type === 'error' ? (
+        <div className="p-6 bg-rose-950/40 border border-rose-500/30 rounded-2xl space-y-3 text-center">
+          <AlertCircle className="w-8 h-8 text-rose-500 mx-auto animate-bounce" />
+          <p className="text-xs text-rose-300 font-bold">{statusMessage.text}</p>
           <button
             type="button"
-            onClick={() => setStep(1)}
-            className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors flex items-center gap-1.5"
+            onClick={() => setStatusMessage(null)}
+            className="px-4 py-2 bg-rose-600 text-white font-black rounded-xl text-xs uppercase tracking-wider"
           >
-            ← Back to Sender Details
+            Try Again
           </button>
+        </div>
+      ) : step === 1 ? (
+        /* ================= STEP 1: PAYMENT INSTRUCTION SCREEN ================= */
+        <div id="step-1-payment-instructions" className="space-y-6 animate-fade-in">
+          {/* Header Notice */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 border border-indigo-500/20 rounded-2xl text-white space-y-1">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-[#DAA520]" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-[#DAA520]">
+                EFADO DIRECT BANK TRANSFER & ESCROW DEPOSIT
+              </h3>
+            </div>
+            <p className="text-[10px] text-slate-300 leading-relaxed font-medium">
+              Please review the company bank accounts below and make your transfer using your bank app or USSD code. No personal form input is required in this step.
+            </p>
+          </div>
 
-          {/* Section: Bank details and Account Information */}
-          <div className="p-6 bg-slate-900 border border-slate-800 text-white rounded-3xl space-y-4 shadow-xl">
+          {/* Amount Due & Currency Selection */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 text-white">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <label className="text-[10px] font-black text-[#DAA520] uppercase tracking-widest block">
+                1. Select Currency & Deposit Amount
+              </label>
+              <div className="flex gap-2">
+                {(['NGN', 'USD', 'GBP', 'EUR'] as const).map(curr => (
+                  <button
+                    key={curr}
+                    type="button"
+                    onClick={() => setCurrency(curr)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${
+                      currency === curr ? 'bg-[#DAA520] text-slate-950 font-black shadow-md' : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {curr}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">Amount Due for Transfer</span>
+                <div className="relative mt-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-amber-400">{symbol}</span>
+                  <input
+                    id="deposit-amount-due-input"
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full pl-9 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono font-black text-white focus:outline-none focus:border-[#DAA520]"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-950 border border-emerald-500/20 rounded-xl flex items-center gap-3">
+                <Banknote className="w-8 h-8 text-emerald-400 flex-shrink-0" />
+                <div>
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest block">Calculated Total</span>
+                  <p className="text-base font-black text-white font-mono">
+                    {symbol}{parseFloat(amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Unique Transaction Reference Display */}
+          <div className="p-5 bg-indigo-950/60 border-2 border-indigo-500/40 rounded-2xl text-white space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-[0.2em] block">
-                OFFICIAL VERIFIED ESCROW ACCOUNTS
+              <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">
+                2. Unique Transaction Reference (MUST INCLUDE IN NARRATION)
               </span>
-              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full uppercase font-black">
-                Step 2: Transfer Funds Now
+              <span className="text-[8px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
+                Required Narration Code
               </span>
             </div>
 
-            <p className="text-[10px] text-slate-300 font-bold uppercase leading-relaxed">
-              Open your bank app, transfer exact amount <span className="text-amber-400 font-black">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span> to any of EFADO's official registered bank accounts below, and include the narration code:
-            </p>
+            <div className="flex items-center justify-between p-3.5 bg-slate-950 rounded-xl border border-indigo-500/30">
+              <div>
+                <p className="text-base font-black font-mono text-[#DAA520] tracking-wider">{reference}</p>
+                <p className="text-[9px] text-slate-400 mt-0.5 font-bold uppercase">
+                  ⚠️ Add this exact code in your transfer narration / remark box.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleCopyText(reference, 'narration_ref')}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 shadow-md"
+              >
+                {copiedField === 'narration_ref' ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                <span>{copiedField === 'narration_ref' ? 'Copied!' : 'Copy Ref'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* EFADO Escrow Bank Account List */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                3. EFADO Active Escrow Bank Accounts
+              </span>
+              <span className="text-[9px] text-emerald-600 font-bold uppercase">Verified Corporate Accounts</span>
+            </div>
 
             {currency === 'NGN' ? (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {OFFICIAL_NGN_ACCOUNTS.map((acc, idx) => (
-                  <div key={idx} className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <div key={idx} className="p-4 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-3 text-white transition-all shadow-md">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-black text-[#DAA520] uppercase tracking-wide">
+                        {acc.bankName}
+                      </span>
+                      <span className="text-[8px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-black uppercase">
                         {acc.badge}
                       </span>
-                      <span className="text-[10px] font-extrabold text-amber-400">{acc.bankName}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                       <div>
-                        <p className="text-xs font-mono font-black text-white">{acc.accountNo}</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">{acc.accountName}</p>
+                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest block">Account Number</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-sm font-black font-mono text-white">{acc.accountNo}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(acc.accountNo, `num_${idx}`)}
+                            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-all active:scale-95"
+                            title="Copy Account Number"
+                          >
+                            {copiedField === `num_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText(acc.accountNo, `acc_${idx}`)}
-                        className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center gap-1 active:scale-95"
-                      >
-                        {copiedField === `acc_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span className="text-[9px] font-black uppercase">{copiedField === `acc_${idx}` ? 'Copied' : 'Copy'}</span>
-                      </button>
+
+                      <div>
+                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest block">Account Name</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs font-black text-slate-200 truncate max-w-[180px]">{acc.accountName}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(acc.accountName, `name_${idx}`)}
+                            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-all active:scale-95"
+                            title="Copy Account Name"
+                          >
+                            {copiedField === `name_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <>
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">Settlement Bank</p>
-                    <p className="font-black text-slate-100">{currentDetails.bankName}</p>
-                  </div>
-                  <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">Account Name</p>
-                    <p className="font-black text-slate-100 truncate">{currentDetails.accountName}</p>
-                  </div>
+              <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 text-white">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                  <span className="text-xs font-black text-[#DAA520]">{INTERNATIONAL_ACCOUNTS[currency]?.bankName}</span>
+                  <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full uppercase font-black">
+                    International Wire
+                  </span>
                 </div>
 
-                <div className="p-4 bg-slate-950 rounded-2xl flex items-center justify-between border border-white/5">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">Account Number / IBAN</p>
-                    <p className="text-sm font-black font-mono text-[#DAA520]">{currentDetails.accountNo}</p>
+                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Account Holder</span>
+                    <span className="text-xs font-black text-white">{INTERNATIONAL_ACCOUNTS[currency]?.accountName}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(currentDetails.accountNo, 'acc')}
-                    className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-300 hover:text-white transition-all flex items-center justify-center"
-                  >
-                    {copiedField === 'acc' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
+                  <div>
+                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Account Number / IBAN</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-black text-[#DAA520]">{INTERNATIONAL_ACCOUNTS[currency]?.accountNo}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(INTERNATIONAL_ACCOUNTS[currency]?.accountNo || '', 'intl_acc')}
+                        className="p-1 bg-slate-800 rounded text-slate-300"
+                      >
+                        {copiedField === 'intl_acc' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {currentDetails.extraLabel && (
-                  <div className="p-4 bg-slate-950/60 rounded-xl flex items-center justify-between text-xs border border-white/5">
-                    <span className="text-slate-400 font-bold uppercase text-[9px]">{currentDetails.extraLabel}</span>
-                    <span className="font-black text-slate-200">{currentDetails.extraValue}</span>
+                {INTERNATIONAL_ACCOUNTS[currency]?.extraLabel && (
+                  <div className="p-3 bg-slate-950 rounded-xl flex items-center justify-between text-xs border border-slate-800">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">{INTERNATIONAL_ACCOUNTS[currency]?.extraLabel}</span>
+                    <span className="font-mono font-black text-amber-300">{INTERNATIONAL_ACCOUNTS[currency]?.extraValue}</span>
                   </div>
                 )}
-              </>
-            )}
-
-            {/* Crucial unique transaction reference */}
-            <div className="p-4 bg-indigo-950/40 border border-indigo-900/40 rounded-2xl flex items-center justify-between">
-              <div>
-                <p className="text-[8px] font-black text-indigo-300 uppercase tracking-wider">Narration / Reference ID</p>
-                <p className="text-sm font-black font-mono text-indigo-200 tracking-wider p-0.5">{reference}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCopyText(reference, 'ref')}
-                className="p-3 bg-indigo-900/40 hover:bg-indigo-900/60 rounded-2xl text-indigo-300 hover:text-white transition-all"
-              >
-                {copiedField === 'ref' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            <div className="p-3 bg-slate-950/40 rounded-xl text-xs space-y-1">
-              <span className="text-[9px] font-black text-slate-400 uppercase block">Registered Sender Account:</span>
-              <p className="text-emerald-400 font-bold font-mono text-[11px]">{senderAccountName} ({senderAccountNumber} - {selectedBank === 'Other' ? customBankName : selectedBank})</p>
-            </div>
-
-            <div className="p-4 bg-slate-950/20 text-center border-t border-slate-800">
-              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider block">
-                Required Deposit: <span className="font-black text-white text-lg">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-              </span>
-              <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                “Use Reference exactly as shown in transfer narration”
-              </p>
-            </div>
+            )}
           </div>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          {/* Action Button to Proceed to Step 2 */}
+          <div className="pt-4 border-t border-slate-200 flex justify-end">
             <button
+              id="btn-complete-transfer-step1"
               type="button"
-              onClick={() => setStep(1)}
-              className="px-6 py-4 border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
+              onClick={() => {
+                const num = parseFloat(amount);
+                if (isNaN(num) || num <= 0) {
+                  alert('Please enter a valid deposit amount.');
+                  return;
+                }
+                setStep(2);
+              }}
+              className="w-full sm:w-auto px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 active:scale-95"
             >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 active:scale-95"
-            >
-              I Have Made The Transfer (Proceed to Confirmation) <ArrowRight className="w-4 h-4" />
+              I Have Completed The Transfer <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       ) : (
-        /* Step 3: Confirmation Code & Proof Submission */
-        <form onSubmit={handleSubmitDeposit} id="step-3-deposit-form" className="space-y-5 animate-fade-in">
-          {/* Back link */}
+        /* ================= STEP 2: PAYMENT CONFIRMATION SCREEN ================= */
+        <form onSubmit={handleSubmitDeposit} id="step-2-payment-confirmation" className="space-y-6 animate-fade-in">
+          {/* Back Navigation Button */}
           <button
             type="button"
-            onClick={() => setStep(2)}
+            onClick={() => setStep(1)}
             className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors flex items-center gap-1.5"
           >
-            ← Back to Escrow Details
+            ← Back to Step 1 (Payment Instructions)
           </button>
 
-          <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 border border-slate-800">
-            <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest block">TRANSFER SUMMARY</span>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Amount Paid:</span>
-              <span className="font-black text-white">{symbol}{parseFloat(amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+          {/* Transfer Summary Badge */}
+          <div className="p-4 bg-slate-900 border border-slate-800 text-white rounded-2xl flex items-center justify-between">
+            <div>
+              <span className="text-[8px] font-black text-[#DAA520] uppercase tracking-widest block">Transfer Summary</span>
+              <p className="text-sm font-black font-mono text-white mt-0.5">
+                {symbol}{parseFloat(amount || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
             </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Reference:</span>
-              <span className="font-mono text-indigo-300 font-bold">{reference}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Sender Account:</span>
-              <span className="text-slate-300 font-bold">{senderAccountName} ({senderAccountNumber})</span>
+            <div className="text-right">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Narration Code</span>
+              <p className="text-xs font-mono font-black text-indigo-300">{reference}</p>
             </div>
           </div>
 
-          {/* Form items for Bank Transaction ID & Screenshot upload */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest block">
-                Bank Transaction ID / Ref Code / Session ID <span className="text-red-500">*</span>
+          {/* SECTION 1: SENDER ACCOUNT VERIFICATION */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 text-white">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <ShieldCheck className="w-4 h-4 text-[#DAA520]" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#DAA520]">
+                1. Sender Account Verification
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sender Bank Name Select Dropdown */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest block">
+                  Sender's Bank Name <span className="text-red-400">*</span>
+                </label>
+                <select
+                  id="sender-bank-code-select"
+                  value={senderBankCode}
+                  onChange={handleBankSelectChange}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#DAA520] cursor-pointer"
+                >
+                  {NIGERIAN_BANKS.map(b => (
+                    <option key={b.code} value={b.code}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custom Bank Name Input if Other is selected */}
+              {senderBankCode === '000' && (
+                <div className="space-y-1.5 animate-fade-in">
+                  <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest block">
+                    Type Your Custom Bank Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="e.g. Citibank / International"
+                    value={customBankName}
+                    onChange={(e) => setCustomBankName(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-black text-white focus:outline-none focus:border-[#DAA520]"
+                  />
+                </div>
+              )}
+
+              {/* Sender Account Number Input */}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest block">
+                  Sender's 10-Digit Account Number <span className="text-red-400">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  maxLength={10}
+                  placeholder="e.g. 0123456789"
+                  value={senderAccountNumber}
+                  onChange={(e) => setSenderAccountNumber(e.target.value.replace(/\D/g, ''))}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-black text-white focus:outline-none focus:border-[#DAA520] placeholder:text-slate-600"
+                />
+              </div>
+            </div>
+
+            {/* Account Name Enquiry Output Display */}
+            <div className="pt-2">
+              {isResolvingAccount ? (
+                <div className="p-4 bg-indigo-950/40 border border-indigo-500/30 rounded-xl flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#DAA520]" />
+                  <div>
+                    <p className="text-xs font-black text-indigo-200">Calling Bank Account Name Enquiry API...</p>
+                    <p className="text-[9px] text-indigo-300/70 font-mono">Verifying account holder with CBN / NIBSS interbank switch</p>
+                  </div>
+                </div>
+              ) : resolvedAccountName ? (
+                <div className="p-4 bg-emerald-950/50 border border-emerald-500/40 rounded-xl flex items-center justify-between animate-fade-in">
+                  <div className="space-y-0.5">
+                    <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider border border-emerald-500/30">
+                      ✓ Verified Account Holder Name
+                    </span>
+                    <p className="text-sm font-black font-mono text-emerald-300 mt-1 uppercase tracking-tight">
+                      {resolvedAccountName}
+                    </p>
+                    <p className="text-[9px] text-emerald-400/80 font-bold">
+                      Account Verified with {senderBankCode === '000' ? customBankName || 'Bank' : senderBankName}
+                    </p>
+                  </div>
+                  <CheckCircle2 className="w-7 h-7 text-emerald-400 flex-shrink-0" />
+                </div>
+              ) : accountResolveError ? (
+                <div className="p-3.5 bg-rose-950/40 border border-rose-500/30 rounded-xl flex items-center gap-2.5 text-rose-300">
+                  <ShieldAlert className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-black text-rose-200">Account Name Lookup Warning</p>
+                    <p className="text-[10px] text-rose-300">{accountResolveError}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[9px] text-slate-400 font-medium italic">
+                  💡 Type your 10-digit account number above to automatically trigger account name resolution.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 2: PAYMENT EVIDENCE SECTION */}
+          <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 text-white">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <Upload className="w-4 h-4 text-[#DAA520]" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-[#DAA520]">
+                2. Payment Evidence & Transaction Proof
+              </h4>
+            </div>
+
+            {/* Bank Transaction Reference / ID / Session ID */}
+            <div className="space-y-1.5">
+              <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest block">
+                Sender's Bank Transaction Reference / ID / Session ID <span className="text-red-400">*</span>
               </label>
               <input
                 required
                 type="text"
-                placeholder="Enter transaction code from your bank app e.g. T20261111832049"
-                value={transactionId}
-                onChange={(e) => setTransactionId(e.target.value)}
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-indigo-300 rounded-2xl text-xs font-mono font-black text-black focus:outline-none focus:border-indigo-600 transition-all placeholder:text-slate-400"
+                placeholder="e.g. T20260730123984 / Session ID"
+                value={bankTransactionId}
+                onChange={(e) => setBankTransactionId(e.target.value)}
+                className="w-full px-4 py-3.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono font-black text-white focus:outline-none focus:border-[#DAA520] placeholder:text-slate-600"
               />
-              <p className="text-[9px] text-slate-500">Paste or type the transaction ref / session code provided in your bank transfer receipt.</p>
+              <p className="text-[8px] text-slate-400">
+                Found on your bank app debit alert receipt or USSD confirmation SMS.
+              </p>
             </div>
 
+            {/* File Upload Field for Proof of Payment (Image & PDF) */}
             <div className="space-y-2">
-              <label id="upload-label" className="text-[10px] font-black text-slate-700 uppercase tracking-widest block">
-                Proof of Transfer (Screenshot / Image) <span className="text-red-500">*</span>
+              <label className="text-[9px] font-black text-slate-300 uppercase tracking-widest block">
+                Upload Field for Proof of Payment (Image or PDF) <span className="text-red-400">*</span>
               </label>
-              
-              <div id="file-picker-container" className="relative group">
+
+              <div className="relative group">
                 <input
                   required
                   type="file"
-                  accept="image/png, image/jpeg, application/pdf"
+                  accept="image/png, image/jpeg, image/jpg, image/webp, application/pdf"
                   onChange={handleFileChange}
                   className="hidden"
-                  id="screenshot-file-input"
+                  id="payment-proof-file-input"
                 />
                 <label
-                  htmlFor="screenshot-file-input"
-                  className="w-full h-32 border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50 rounded-2xl cursor-pointer flex flex-col items-center justify-center p-4 text-center transition-all group-hover:bg-slate-100"
+                  htmlFor="payment-proof-file-input"
+                  className="w-full h-32 border-2 border-dashed border-slate-700 hover:border-[#DAA520] bg-slate-950 rounded-2xl cursor-pointer flex flex-col items-center justify-center p-4 text-center transition-all group-hover:bg-slate-900"
                 >
                   {uploadProgress ? (
                     <div className="space-y-2">
-                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Syncing Image Node...</p>
+                      <Loader2 className="w-6 h-6 animate-spin text-[#DAA520] mx-auto" />
+                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider">Processing Document...</p>
                     </div>
                   ) : proofFileName ? (
                     <div className="space-y-1">
-                      <Check className="w-7 h-7 text-emerald-500 mx-auto mb-1" />
-                      <p className="text-xs font-black text-slate-700 truncate max-w-xs">{proofFileName}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Tap to replace file (MAX 2MB)</p>
+                      <Check className="w-7 h-7 text-emerald-400 mx-auto mb-1" />
+                      <p className="text-xs font-black text-white truncate max-w-xs">{proofFileName}</p>
+                      <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider">✓ File Attached (Tap to replace)</p>
                     </div>
                   ) : (
-                    <div className="space-y-1 text-slate-500">
-                      <Upload className="w-7 h-7 mx-auto mb-1 text-slate-400 group-hover:scale-110 transition-transform" />
-                      <p className="text-xs font-black text-slate-700 uppercase tracking-tight">Upload bank screenshot / Alert</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">JPG, PNG, or PDF up to 2MB</p>
+                    <div className="space-y-1 text-slate-400">
+                      <Upload className="w-7 h-7 mx-auto mb-1 text-[#DAA520] group-hover:scale-110 transition-transform" />
+                      <p className="text-xs font-black text-slate-200 uppercase tracking-tight">Upload Proof of Payment</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Accepts Image (JPG, PNG) and PDF up to 3MB</p>
                     </div>
                   )}
                 </label>
@@ -658,50 +768,53 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+          {/* ACTION BUTTON: Submit For Admin Verification */}
+          <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-4">
             <button
               type="button"
-              onClick={() => setStep(2)}
-              className="px-6 py-4 border-2 border-slate-200 hover:border-slate-300 text-slate-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
+              onClick={() => setStep(1)}
+              className="px-6 py-4 border border-slate-300 hover:border-slate-400 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest transition-colors"
             >
               Back
             </button>
+
             <button
-              id="deposit-submit-button"
+              id="btn-submit-admin-verification"
               type="submit"
-              disabled={isSubmitting || uploadProgress}
-              className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-emerald-600/10 flex items-center justify-center gap-2 active:scale-95"
+              disabled={isSubmitting || uploadProgress || !resolvedAccountName}
+              className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 active:scale-95"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Broadcasting Ledger...
+                  Submitting to Ledger...
                 </>
               ) : (
-                'Confirm & Submit Payment for Clearance ✓'
+                'Submit For Admin Verification ✓'
               )}
             </button>
           </div>
         </form>
       )}
 
-      {showManualReceipt && (
-        <StrategicReceipt 
+      {/* STRATEGIC RECEIPT MODAL */}
+      {showReceiptModal && (
+        <StrategicReceipt
           transaction={{
-            id: reference || transactionId || 'REQ_' + Math.floor(1000 + Math.random() * 9000),
+            id: reference || 'REQ_' + Math.floor(1000 + Math.random() * 9000),
             userId: user.uid,
             type: 'deposit',
             amount: parseFloat(amount) || 0,
             currency: currency,
             status: 'pending',
             method: 'Direct Bank Transfer',
-            purpose: `Corporate Account Deposit - Reference: ${reference}`,
+            purpose: `EFADO Bank Deposit - Narration Ref: ${reference}`,
             reference: reference || 'N/A',
             timestamp: { seconds: Math.floor(Date.now() / 1000) },
-            description: `Manual submission awaiting administrator clearance. Sending Bank: ${selectedBank === 'Other' ? customBankName : selectedBank}. Sender Account: ${senderAccountName} (${senderAccountNumber}). Reference generated code: ${reference}.`
+            description: `Manual Bank Transfer awaiting administrator verification. Sender: ${resolvedAccountName} (${senderBankCode === '000' ? customBankName : senderBankName} - ${senderAccountNumber}). Bank TxID: ${bankTransactionId}.`
           }}
           userEmail={user.email}
-          onClose={() => setShowManualReceipt(false)}
+          onClose={() => setShowReceiptModal(false)}
         />
       )}
     </div>

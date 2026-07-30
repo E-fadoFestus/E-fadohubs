@@ -55,6 +55,7 @@ import {
   onSnapshot, 
   doc, 
   updateDoc, 
+  deleteDoc,
   setDoc, 
   addDoc, 
   serverTimestamp, 
@@ -117,6 +118,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [marketOrders, setMarketOrders] = useState<any[]>([]);
   const [adListings, setAdListings] = useState<any[]>([]);
   const [socialPosts, setSocialPosts] = useState<any[]>([]);
+  const [reels, setReels] = useState<any[]>([]);
+  const [ecosystemContentTab, setEcosystemContentTab] = useState<'ads' | 'market' | 'social' | 'reels' | 'vendors'>('ads');
+  const [contentSearchQuery, setContentSearchQuery] = useState('');
   
   // Executive Support & Innovation States
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
@@ -147,7 +151,17 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
 
-  // --- MONETIZATION SITE WALLET EXTENDED STATES ---
+  const [depositsList, setDepositsList] = useState<any[]>([]);
+  
+  // Direct Executive User Messaging State
+  const [showMessageUserModal, setShowMessageUserModal] = useState(false);
+  const [directMsgTargetUser, setDirectMsgTargetUser] = useState<UserProfile | null>(null);
+  const [directMsgSubject, setDirectMsgSubject] = useState('');
+  const [directMsgBody, setDirectMsgBody] = useState('');
+  const [directMsgType, setDirectMsgType] = useState<'info' | 'urgent' | 'success' | 'warning' | 'wallet_grant'>('info');
+  const [directMsgBonus, setDirectMsgBonus] = useState<number>(0);
+  const [directMsgStatus, setDirectMsgStatus] = useState<string | null>(null);
+  const [pendingFilter, setPendingFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
   const [monStats, setMonStats] = useState(monetizationService.getMonetizationStats());
   const [showMonWithdrawalModal, setShowMonWithdrawalModal] = useState(false);
   const [selectedMonBank, setSelectedMonBank] = useState<any>(null);
@@ -557,10 +571,14 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       setAdminLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (e) => handleSnapError(e, 'admin_logs'));
 
-    // Fetch All Transactions
+    // Fetch All Transactions & Deposits
     const unsubTransactions = onSnapshot(query(collection(db, 'transactions'), orderBy('timestamp', 'desc'), limit(100)), (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction)));
     }, (e) => handleSnapError(e, 'transactions'));
+
+    const unsubDeposits = onSnapshot(query(collection(db, 'deposits'), orderBy('created_at', 'desc'), limit(100)), (snapshot) => {
+      setDepositsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (e) => handleSnapError(e, 'deposits'));
 
     // Fetch Hub Content
     const unsubPosts = onSnapshot(query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(50)), (snap) => {
@@ -586,6 +604,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     const unsubSocialPosts = onSnapshot(collection(db, 'social_posts'), (snap) => {
       setSocialPosts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (e) => handleSnapError(e, 'social_posts'));
+    const unsubReels = onSnapshot(collection(db, 'reels'), (snap) => {
+      setReels(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'reels'));
 
     // Fetch Help Requests Support Tickets (CEO support hub)
     const unsubSupport = onSnapshot(collection(db, 'help_requests'), (snap) => {
@@ -613,6 +634,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       unsubWithdrawals();
       unsubAnnouncements();
       unsubTransactions();
+      unsubDeposits();
       unsubProviders();
       unsubSettings();
       unsubRequests();
@@ -632,11 +654,55 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       unsubMarketOrders();
       unsubAdListings();
       unsubSocialPosts();
+      unsubReels();
       unsubSupport();
       unsubIdeas();
       unsubLiveClasses();
     };
   }, []);
+
+  // Master Content & Advertising Management Handlers
+  const handleUpdateContentStatus = async (collectionName: string, docId: string, status: 'active' | 'sold_out' | 'archived') => {
+    setIsProcessing(true);
+    try {
+      await updateDoc(doc(db, collectionName, docId), {
+        status,
+        updatedAt: serverTimestamp(),
+        updatedBy: 'CEO'
+      });
+      await addDoc(collection(db, 'admin_logs'), {
+        action: 'UPDATE_CONTENT_STATUS',
+        targetCollection: collectionName,
+        targetId: docId,
+        newStatus: status,
+        timestamp: serverTimestamp(),
+        admin: 'CEO'
+      });
+    } catch (err) {
+      console.error("Error updating content status:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteContentItem = async (collectionName: string, docId: string) => {
+    if (!window.confirm("Are you sure you want to permanently remove this item from the platform database?")) return;
+    setIsProcessing(true);
+    try {
+      await deleteDoc(doc(db, collectionName, docId));
+      await addDoc(collection(db, 'admin_logs'), {
+        action: 'DELETE_CONTENT_ITEM',
+        targetCollection: collectionName,
+        targetId: docId,
+        timestamp: serverTimestamp(),
+        admin: 'CEO'
+      });
+    } catch (err) {
+      console.error("Error deleting content item:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // Executive Support Hub Operations
   const handleCeoSendReply = async () => {
@@ -772,9 +838,20 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         const userData = userSnap.data() as UserProfile;
 
         // WRITES AFTER
-        transaction.update(withdrawalRef, { status });
+        const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
+        transaction.update(withdrawalRef, { 
+          status, 
+          processedAt: serverTimestamp(),
+          processedDateString: processedDateStr,
+          processedBy: 'CEO' 
+        });
         if (txSnap.exists()) {
-          transaction.update(txRef, { status });
+          transaction.update(txRef, { 
+            status, 
+            processedAt: serverTimestamp(),
+            processedDateString: processedDateStr,
+            processedBy: 'CEO' 
+          });
         }
 
         if (status === 'completed') {
@@ -782,6 +859,15 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             adminWallet: adminData.adminWallet - withdrawal.amount,
             pendingPayouts: Math.max(0, adminData.pendingPayouts - withdrawal.amount),
             lastUpdated: serverTimestamp()
+          });
+          const logRef = doc(collection(db, 'admin_logs'));
+          transaction.set(logRef, {
+            action: 'APPROVE_WITHDRAWAL_PAYOUT',
+            targetUser: userData.email,
+            amount: withdrawal.amount,
+            processedDate: processedDateStr,
+            timestamp: serverTimestamp(),
+            admin: 'CEO'
           });
         } else if (status === 'failed') {
           // Dynamic Refund Logic based on original source wallet details
@@ -799,6 +885,16 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             pendingPayouts: Math.max(0, adminData.pendingPayouts - withdrawal.amount),
             lastUpdated: serverTimestamp()
           });
+
+          const logRef = doc(collection(db, 'admin_logs'));
+          transaction.set(logRef, {
+            action: 'REJECT_WITHDRAWAL_PAYOUT',
+            targetUser: userData.email,
+            amount: withdrawal.amount,
+            processedDate: processedDateStr,
+            timestamp: serverTimestamp(),
+            admin: 'CEO'
+          });
         }
       });
     } catch (e) {
@@ -811,6 +907,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const handleProcessDeposit = async (tx: Transaction, status: 'completed' | 'failed') => {
     setIsProcessing(true);
     try {
+      const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
       await runTransaction(db, async (transaction) => {
         const txRef = doc(db, 'transactions', tx.id!);
         const userRef = doc(db, 'users', tx.userId);
@@ -825,7 +922,10 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         // WRITE STATUS TO TRANSACTION 
         transaction.update(txRef, { 
           status,
-          description: `Manual Deposit processed by CEO`
+          processedAt: serverTimestamp(),
+          processedDateString: processedDateStr,
+          processedBy: 'CEO',
+          description: status === 'completed' ? `Manual Deposit Approved & Credited by CEO` : `Manual Deposit Rejected by CEO`
         });
 
         if (status === 'completed') {
@@ -841,6 +941,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             action: 'APPROVE_MANUAL_DEPOSIT',
             targetUser: userData.email,
             amount: tx.amount,
+            processedDate: processedDateStr,
             timestamp: serverTimestamp(),
             admin: 'CEO'
           });
@@ -848,6 +949,124 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       });
     } catch (e) {
       console.error("Error approving manual deposit:", e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleProcessDepositDoc = async (depositDoc: any, status: 'completed' | 'failed') => {
+    setIsProcessing(true);
+    try {
+      const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', depositDoc.userId);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("Specified user does not exist");
+        }
+        const userData = userSnap.data() as UserProfile;
+
+        // Update deposit doc if it exists in deposits collection
+        if (depositDoc.id && depositsList.some(d => d.id === depositDoc.id)) {
+          const depRef = doc(db, 'deposits', depositDoc.id);
+          transaction.update(depRef, {
+            status,
+            processedAt: serverTimestamp(),
+            processedDateString: processedDateStr,
+            processedBy: 'CEO'
+          });
+        }
+
+        // Find & update matching transaction if any
+        const matchingTx = transactions.find(t => t.id === depositDoc.id || t.reference === depositDoc.reference);
+        if (matchingTx && matchingTx.id) {
+          const txRef = doc(db, 'transactions', matchingTx.id);
+          transaction.update(txRef, {
+            status,
+            processedAt: serverTimestamp(),
+            processedDateString: processedDateStr,
+            processedBy: 'CEO',
+            description: status === 'completed' ? `Direct Bank Transfer Approved by CEO` : `Direct Bank Transfer Declined by CEO`
+          });
+        }
+
+        if (status === 'completed') {
+          transaction.update(userRef, {
+            playerWallet: (userData.playerWallet || 0) + (depositDoc.amount || 0),
+            depositWallet: ((userData as any).depositWallet || 0) + (depositDoc.amount || 0)
+          });
+
+          const logRef = doc(collection(db, 'admin_logs'));
+          transaction.set(logRef, {
+            action: 'APPROVE_MANUAL_DIRECT_DEPOSIT',
+            targetUser: userData.email,
+            targetUid: userData.uid,
+            amount: depositDoc.amount,
+            reference: depositDoc.reference || depositDoc.id,
+            processedDate: processedDateStr,
+            timestamp: serverTimestamp(),
+            admin: 'CEO'
+          });
+        }
+      });
+    } catch (e) {
+      console.error("Error processing deposit document:", e);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSendDirectUserMessage = async () => {
+    if (!directMsgTargetUser || !directMsgBody.trim()) return;
+    setIsProcessing(true);
+    setDirectMsgStatus('Dispatching direct message to user...');
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: directMsgTargetUser.uid,
+        userEmail: directMsgTargetUser.email,
+        title: directMsgSubject.trim() || 'Executive Notice from CEO',
+        message: directMsgBody.trim(),
+        type: directMsgType,
+        sender: 'CEO',
+        read: false,
+        createdAt: serverTimestamp(),
+        ...(directMsgBonus > 0 ? { bonusAmount: directMsgBonus } : {})
+      });
+
+      if (directMsgBonus > 0) {
+        await runTransaction(db, async (transaction) => {
+          const uRef = doc(db, 'users', directMsgTargetUser.uid);
+          const uSnap = await transaction.get(uRef);
+          if (uSnap.exists()) {
+            const uData = uSnap.data() as UserProfile;
+            transaction.update(uRef, {
+              playerWallet: (uData.playerWallet || 0) + directMsgBonus
+            });
+          }
+        });
+      }
+
+      await addDoc(collection(db, 'admin_logs'), {
+        action: 'SEND_DIRECT_MESSAGE',
+        targetUser: directMsgTargetUser.email,
+        targetUid: directMsgTargetUser.uid,
+        subject: directMsgSubject || 'Executive Notice',
+        bonusGranted: directMsgBonus,
+        timestamp: serverTimestamp(),
+        admin: 'CEO'
+      });
+
+      setDirectMsgStatus('Direct message successfully sent!');
+      setTimeout(() => {
+        setShowMessageUserModal(false);
+        setDirectMsgSubject('');
+        setDirectMsgBody('');
+        setDirectMsgBonus(0);
+        setDirectMsgStatus(null);
+      }, 1200);
+    } catch (err: any) {
+      console.error("Error sending direct message:", err);
+      setDirectMsgStatus(`Error: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -1193,6 +1412,226 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                     <p className="text-3xl font-black text-white font-display">{withdrawals.filter(w => w.status === 'pending').length}</p>
                   </div>
                 </div>
+
+                {/* CEO URGENT ACTION CENTER - PENDING DEPOSITS & PAYOUTS COMMAND PANEL */}
+                {(() => {
+                  const pendingDeposits = [
+                    ...depositsList.filter(d => d.status === 'pending'),
+                    ...transactions.filter(t => t.type === 'deposit' && t.status === 'pending' && !depositsList.some(d => d.id === t.id))
+                  ];
+                  const pendingPayouts = withdrawals.filter(w => w.status === 'pending');
+                  const totalPendingCount = pendingDeposits.length + pendingPayouts.length;
+
+                  return (
+                    <div className="bg-gradient-to-r from-amber-950/40 via-slate-900 to-indigo-950/40 border-2 border-amber-500/40 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden space-y-6">
+                      {/* Top Glowing Alert Banner Header */}
+                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                        <div className="space-y-1.5 text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 bg-amber-500/20 border border-amber-500/40 rounded-full text-[9px] font-black uppercase text-amber-400 tracking-widest flex items-center gap-1.5 animate-pulse">
+                              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                              CEO IMMEDIATE ACTION CENTER
+                            </span>
+                            {totalPendingCount > 0 && (
+                              <span className="px-3 py-1 bg-rose-500/20 border border-rose-500/30 rounded-full text-[9px] font-black uppercase text-rose-300 tracking-widest">
+                                {totalPendingCount} ACTION(S) REQUIRED
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-2xl font-black text-white uppercase italic tracking-tight font-display flex items-center gap-3">
+                            <AlertCircle className="w-6 h-6 text-amber-400 shrink-0" />
+                            Pending Financial Deposits & Payout Approvals
+                          </h3>
+                          <p className="text-xs text-slate-300 font-medium max-w-3xl leading-relaxed">
+                            Every pending deposit and player payout request requires direct CEO approval. Below are all active submissions displaying verified sender names, exact dates & times, uploaded transfer proofs, and eye-catching extended controls.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setShowMessageUserModal(true)}
+                            className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+                          >
+                            <Mail className="w-4 h-4" /> Message A User
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Pending List Items */}
+                      <div className="space-y-4">
+                        {totalPendingCount === 0 ? (
+                          <div className="p-8 bg-slate-950/40 rounded-3xl border border-emerald-500/20 text-center space-y-2">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+                            <h4 className="text-base font-black text-white uppercase tracking-wider">All Clear! No Pending Financial Approvals</h4>
+                            <p className="text-xs text-slate-400 font-bold">All direct bank deposits and player cash-outs have been reviewed, verified, and processed.</p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Render Pending Deposits */}
+                            {pendingDeposits.map((dep: any) => {
+                              const userObj = users.find(u => u.uid === dep.userId || u.email === dep.userEmail);
+                              const formattedDate = dep.created_at?.toDate ? dep.created_at.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : (dep.timestamp?.toDate ? dep.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : new Date().toLocaleString());
+                              const proofUrl = dep.proof_url || dep.metadata?.proofUrl;
+
+                              return (
+                                <div key={dep.id} className="bg-slate-950/70 border-2 border-amber-500/30 hover:border-amber-400 rounded-3xl p-6 shadow-2xl transition-all space-y-4 text-left">
+                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-[9px] uppercase tracking-widest rounded-full">
+                                          📥 DIRECT BANK DEPOSIT
+                                        </span>
+                                        <span className="px-2.5 py-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[9px] font-black uppercase tracking-wider rounded-full flex items-center gap-1">
+                                          <Clock className="w-3 h-3 animate-spin" /> PENDING CEO APPROVAL
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-mono font-bold">
+                                          📅 Date/Time: <span className="text-white">{formattedDate}</span>
+                                        </span>
+                                      </div>
+                                      <h4 className="text-xl font-black text-white font-mono tracking-tight mt-1">
+                                        Amount Due: <span className="text-emerald-400 font-display">₦{(dep.amount || 0).toLocaleString()}</span>
+                                      </h4>
+                                    </div>
+
+                                    {/* Proof image trigger if uploaded */}
+                                    {proofUrl && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const w = window.open('', '_blank');
+                                          if (w) {
+                                            w.document.write(`
+                                              <html>
+                                                <head><title>Proof of Transfer - ${dep.reference || dep.id}</title></head>
+                                                <body style="background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-center;padding:20px;font-family:sans-serif;">
+                                                  <h3 style="color:#DAA520;">Uploaded Payment Proof Receipt</h3>
+                                                  <p>Reference: ${dep.reference || dep.id}</p>
+                                                  <p>Sender Name: ${dep.senderAccountName || 'N/A'}</p>
+                                                  <img src="${proofUrl}" style="max-width:90%;max-height:80vh;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.5);"/>
+                                                </body>
+                                              </html>
+                                            `);
+                                          }
+                                        }}
+                                        className="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                                      >
+                                        📷 View Uploaded Receipt Proof
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {/* User & Sender Account Details */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-medium bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Sender Name / Depositor</span>
+                                      <span className="text-white font-black text-sm">{dep.senderAccountName || userObj?.accountName || 'Direct Transfer Depositor'}</span>
+                                      <p className="text-[10px] text-slate-400 font-mono">{dep.userEmail || userObj?.email}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Narration / Transfer Ref</span>
+                                      <span className="text-amber-400 font-mono font-black text-sm">{dep.reference || dep.id}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">User Sovereign Wallet</span>
+                                      <span className="text-emerald-400 font-black">Current: ₦{(userObj?.playerWallet || 0).toLocaleString()}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* EXTENDED EYE-CATCHING ACTION BUTTONS */}
+                                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                                    <button
+                                      onClick={() => handleProcessDepositDoc(dep, 'completed')}
+                                      disabled={isProcessing}
+                                      className="w-full sm:w-auto flex-1 py-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all shadow-xl shadow-emerald-600/30 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30"
+                                    >
+                                      <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                                      ACCEPT DEPOSIT & CREDIT USER (MARK AS DONE ✓)
+                                    </button>
+                                    <button
+                                      onClick={() => handleProcessDepositDoc(dep, 'failed')}
+                                      disabled={isProcessing}
+                                      className="w-full sm:w-auto px-6 py-4 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-2xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                      <XCircle className="w-5 h-5 text-rose-400" />
+                                      REJECT & MARK DECLINED ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {/* Render Pending Withdrawals */}
+                            {pendingPayouts.map((w: any) => {
+                              const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
+                              const formattedDate = w.timestamp?.toDate ? w.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : new Date().toLocaleString();
+
+                              return (
+                                <div key={w.id} className="bg-slate-950/70 border-2 border-rose-500/30 hover:border-rose-400 rounded-3xl p-6 shadow-2xl transition-all space-y-4 text-left">
+                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/5">
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="px-3 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 font-black text-[9px] uppercase tracking-widest rounded-full">
+                                          📤 PLAYER PAYOUT REQUEST
+                                        </span>
+                                        <span className="px-2.5 py-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[9px] font-black uppercase tracking-wider rounded-full flex items-center gap-1">
+                                          <Clock className="w-3 h-3 animate-spin" /> PENDING CEO DISPATCH
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-mono font-bold">
+                                          📅 Requested: <span className="text-white">{formattedDate}</span>
+                                        </span>
+                                      </div>
+                                      <h4 className="text-xl font-black text-white font-mono tracking-tight mt-1">
+                                        Payout Amount: <span className="text-amber-400 font-display">${(w.amount || 0).toLocaleString()}</span>
+                                      </h4>
+                                    </div>
+                                  </div>
+
+                                  {/* Player Bank Account Details */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-medium bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Player Name & Email</span>
+                                      <span className="text-white font-black text-sm">{w.userEmail}</span>
+                                      <p className="text-[10px] text-slate-400 font-mono">UID: {w.userId}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Destination Bank Account</span>
+                                      <span className="text-emerald-400 font-black text-sm">{targetUser?.bankName || 'Specified Bank'}</span>
+                                      <p className="text-[10px] text-slate-200 font-mono">Acc: {targetUser?.accountNumber || 'N/A'} • {targetUser?.accountName || 'No Name'}</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Withdrawal Request ID</span>
+                                      <span className="text-slate-400 font-mono font-black">{w.id}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* EXTENDED EYE-CATCHING ACTION BUTTONS FOR PAYOUT */}
+                                  <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                                    <button
+                                      onClick={() => handleProcessWithdrawal(w, 'completed')}
+                                      disabled={isProcessing}
+                                      className="w-full sm:w-auto flex-1 py-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] transition-all shadow-xl shadow-emerald-600/30 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30"
+                                    >
+                                      <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                                      PAY PLAYER & MARK PAYOUT DONE ✓
+                                    </button>
+                                    <button
+                                      onClick={() => handleProcessWithdrawal(w, 'failed')}
+                                      disabled={isProcessing}
+                                      className="w-full sm:w-auto px-6 py-4 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-2xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    >
+                                      <XCircle className="w-5 h-5 text-rose-400" />
+                                      REJECT PAYOUT & REFUND PLAYER ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Site Standard Monetization Wallet Gateway */}
                 <div className="bg-gradient-to-r from-amber-950/40 via-indigo-950/40 to-slate-900 border-2 border-amber-500/20 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
@@ -1556,6 +1995,32 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                                   {tx.description}
                                 </span>
                               )}
+                              {(tx.metadata?.proofUrl || (tx as any).proof_url) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const proofUrl = tx.metadata?.proofUrl || (tx as any).proof_url;
+                                    if (proofUrl) {
+                                      const w = window.open('', '_blank');
+                                      if (w) {
+                                        w.document.write(`
+                                          <html>
+                                            <head><title>Proof of Deposit - ${tx.reference || tx.id}</title></head>
+                                            <body style="background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-center;padding:20px;font-family:sans-serif;">
+                                              <h3 style="color:#DAA520;">Uploaded Payment Proof Document</h3>
+                                              <p>Reference: ${tx.reference || 'N/A'}</p>
+                                              <img src="${proofUrl}" style="max-width:90%;max-height:80vh;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.5);"/>
+                                            </body>
+                                          </html>
+                                        `);
+                                      }
+                                    }
+                                  }}
+                                  className="text-[9px] font-black text-amber-400 hover:text-amber-300 underline mt-1 flex items-center gap-1"
+                                >
+                                  📷 View Uploaded Payment Proof
+                                </button>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -1635,62 +2100,88 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   {withdrawals.length === 0 ? (
                     <div className="text-center py-20 text-slate-500 italic">No withdrawal requests found.</div>
                   ) : (
-                    withdrawals.map((w) => (
-                      <div key={w.id} className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 flex items-center justify-between shadow-xl">
-                        <div className="flex items-center gap-6">
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
-                            w.status === 'pending' ? 'bg-amber-500/20 text-amber-500' : 
-                            w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-rose-500/20 text-rose-500'
-                          }`}>
-                            {w.status === 'pending' ? <Clock className="w-6 h-6" /> : 
-                             w.status === 'completed' ? <CheckCircle2 className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-black text-white font-display">${w.amount.toLocaleString()}</span>
-                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest ${
-                                w.status === 'pending' ? 'bg-amber-500/20 text-amber-500' : 
-                                w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-rose-500/20 text-rose-500'
-                              }`}>
-                                {w.status}
-                              </span>
-                            </div>
-                            <p className="text-sm text-slate-400 font-bold">{w.userEmail}</p>
-                            {(() => {
-                              const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
-                              return targetUser && (targetUser.bankName || targetUser.accountNumber || targetUser.accountName) ? (
-                                <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-2.5 py-1 rounded-xl w-fit">
-                                  <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>{targetUser.bankName || 'Unknown Bank'}</span> • <span className="font-mono">{targetUser.accountNumber || 'N/A'}</span> • <span className="italic">{targetUser.accountName || 'No Name'}</span>
-                                </div>
-                              ) : null;
-                            })()}
-                            <p className="text-[10px] text-slate-600 font-mono mt-1">ID: {w.id}</p>
-                          </div>
-                        </div>
+                    withdrawals.map((w) => {
+                      const reqDateStr = w.timestamp?.toDate ? w.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : new Date().toLocaleString();
+                      const processedDateStr = (w as any).processedDateString || ((w as any).processedAt?.toDate ? (w as any).processedAt.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : null);
 
-                        <div className="flex items-center gap-3">
-                          {w.status === 'pending' && (
-                            <>
-                              <button 
-                                onClick={() => handleProcessWithdrawal(w, 'completed')}
-                                disabled={isProcessing}
-                                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20"
-                              >
-                                Pay Player
-                              </button>
-                              <button 
-                                onClick={() => handleProcessWithdrawal(w, 'failed')}
-                                disabled={isProcessing}
-                                className="px-6 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-500 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-rose-500/20"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
+                      return (
+                        <div key={w.id} className={`p-6 rounded-3xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl transition-all ${
+                          w.status === 'pending' ? 'bg-slate-900 border-2 border-amber-500/40' :
+                          w.status === 'completed' ? 'bg-slate-900/60 border-emerald-500/30' : 'bg-slate-900/40 border-rose-500/20'
+                        }`}>
+                          <div className="flex items-start gap-5 text-left">
+                            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mt-1 ${
+                              w.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse' : 
+                              w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            }`}>
+                              {w.status === 'pending' ? <Clock className="w-7 h-7" /> : 
+                               w.status === 'completed' ? <CheckCircle2 className="w-7 h-7" /> : <XCircle className="w-7 h-7" />}
+                            </div>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-xl font-black text-white font-display">${w.amount.toLocaleString()}</span>
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                  w.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 
+                                  w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                }`}>
+                                  {w.status === 'completed' ? 'ACCEPTED & MARKED DONE ✓' : w.status === 'failed' ? 'DECLINED ✕' : 'PENDING CEO ACTION'}
+                                </span>
+                              </div>
+                              <p className="text-sm text-slate-300 font-bold">{w.userEmail}</p>
+                              <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-400">
+                                <span>📅 Requested: <span className="text-white font-bold">{reqDateStr}</span></span>
+                                {processedDateStr && (
+                                  <span className="text-emerald-400 font-bold">✓ Done Date: {processedDateStr}</span>
+                                )}
+                              </div>
+                              {(() => {
+                                const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
+                                return targetUser && (targetUser.bankName || targetUser.accountNumber || targetUser.accountName) ? (
+                                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1.5 rounded-xl w-fit">
+                                    <Building2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    <span>Bank: <strong className="text-white">{targetUser.bankName || 'Unknown Bank'}</strong></span> • <span>Acc #: <strong className="text-white font-mono">{targetUser.accountNumber || 'N/A'}</strong></span> • <span>Name: <strong className="text-white italic">{targetUser.accountName || 'No Name'}</strong></span>
+                                  </div>
+                                ) : null;
+                              })()}
+                              <p className="text-[10px] text-slate-600 font-mono">Ref ID: {w.id}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto shrink-0">
+                            {w.status === 'pending' ? (
+                              <>
+                                <button 
+                                  onClick={() => handleProcessWithdrawal(w, 'completed')}
+                                  disabled={isProcessing}
+                                  className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                                  PAY PLAYER & MARK DONE ✓
+                                </button>
+                                <button 
+                                  onClick={() => handleProcessWithdrawal(w, 'failed')}
+                                  disabled={isProcessing}
+                                  className="w-full sm:w-auto px-5 py-3.5 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border border-rose-500/30 active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                  <XCircle className="w-4 h-4 text-rose-400" />
+                                  REJECT ✕
+                                </button>
+                              </>
+                            ) : w.status === 'completed' ? (
+                              <div className="px-5 py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                PAYOUT COMPLETED & MARKED DONE ✓
+                              </div>
+                            ) : (
+                              <div className="px-5 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-rose-400" />
+                                DECLINED & REFUNDED
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </motion.div>
@@ -2397,6 +2888,362 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
+                {/* MASTER ECOSYSTEM ADVERTISING, MARKETPLACE & MEDIA CONTENT COMMAND CENTER */}
+                <div className="bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 p-8 rounded-[2.5rem] border-2 border-indigo-500/40 shadow-2xl space-y-8 text-left">
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-3.5 py-1 bg-indigo-500/20 border border-indigo-500/40 rounded-full text-[9px] font-black uppercase text-indigo-300 tracking-widest flex items-center gap-1.5">
+                          <Zap className="w-3 h-3 text-indigo-400" /> MASTER ECOSYSTEM MEDIA TERMINAL
+                        </span>
+                        <span className="px-3.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-[9px] font-black uppercase text-emerald-300 tracking-widest flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> LIVE DATABASE SYNC
+                        </span>
+                      </div>
+                      <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight font-display flex items-center gap-3">
+                        <Megaphone className="w-7 h-7 text-indigo-400" />
+                        Ecosystem Advertisements, Products, Posts & Reels
+                      </h3>
+                      <p className="text-xs text-slate-300 font-medium max-w-3xl leading-relaxed">
+                        Full CEO oversight of every item advertised, sold, or shared across EFADO Hubs. You can view, search, mark items as <strong>SOLD OUT</strong>, <strong>ACTIVE</strong>, or <strong>ARCHIVED</strong> (so expired or sold products don't cluster the platform), or message users directly.
+                      </p>
+                    </div>
+
+                    {/* Sub-tab Navigation */}
+                    <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-white/10">
+                      <button
+                        onClick={() => setEcosystemContentTab('ads')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                          ecosystemContentTab === 'ads' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Megaphone className="w-4 h-4" /> Ads ({adListings.length + ads.length})
+                      </button>
+                      <button
+                        onClick={() => setEcosystemContentTab('market')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                          ecosystemContentTab === 'market' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <ShoppingBag className="w-4 h-4" /> Market Catalog ({marketProducts.length})
+                      </button>
+                      <button
+                        onClick={() => setEcosystemContentTab('social')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                          ecosystemContentTab === 'social' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4" /> Social Gists ({socialPosts.length + posts.length})
+                      </button>
+                      <button
+                        onClick={() => setEcosystemContentTab('reels')}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+                          ecosystemContentTab === 'reels' ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Sparkles className="w-4 h-4" /> Video Reels ({reels.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder={`Search across ${ecosystemContentTab.toUpperCase()} by title, author, email, category, or status...`}
+                      value={contentSearchQuery}
+                      onChange={(e) => setContentSearchQuery(e.target.value)}
+                      className="w-full pl-11 pr-4 py-3.5 bg-slate-950 border border-white/10 rounded-2xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                    />
+                  </div>
+
+                  {/* SUB-TAB 1: AD LISTINGS */}
+                  {ecosystemContentTab === 'ads' && (
+                    <div className="space-y-4">
+                      {adListings.length === 0 && ads.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500 italic">No ad listings found in the database.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {[...adListings, ...ads]
+                            .filter(ad => {
+                              if (!contentSearchQuery) return true;
+                              const q = contentSearchQuery.toLowerCase();
+                              return (ad.title || '').toLowerCase().includes(q) ||
+                                     (ad.description || '').toLowerCase().includes(q) ||
+                                     (ad.category || '').toLowerCase().includes(q) ||
+                                     (ad.sellerEmail || ad.userEmail || '').toLowerCase().includes(q) ||
+                                     (ad.status || '').toLowerCase().includes(q);
+                            })
+                            .map((ad, idx) => {
+                              const createdDateStr = ad.createdAt?.toDate ? ad.createdAt.toDate().toLocaleString() : 'N/A';
+                              return (
+                                <div key={ad.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all">
+                                  <div className="space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-indigo-500/30">
+                                            {ad.category || 'GENERAL AD'}
+                                          </span>
+                                          <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full border ${
+                                            ad.status === 'sold_out' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                                            ad.status === 'archived' ? 'bg-slate-800 text-slate-400 border-slate-700' :
+                                            'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                          }`}>
+                                            {ad.status === 'sold_out' ? '🏷️ SOLD OUT' : ad.status === 'archived' ? '📁 ARCHIVED' : '🟢 ACTIVE'}
+                                          </span>
+                                        </div>
+                                        <h4 className="text-lg font-black text-white font-display leading-tight">{ad.title || 'Untitled Listing'}</h4>
+                                      </div>
+                                      <span className="text-base font-black text-emerald-400 font-mono shrink-0">
+                                        ${(ad.price || ad.budget || 0).toLocaleString()}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{ad.description || 'No description'}</p>
+                                    <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
+                                      <p>👤 Advertiser: <strong className="text-white">{ad.sellerEmail || ad.userEmail || ad.userId || 'System'}</strong></p>
+                                      <p>📅 Date: {createdDateStr} • ID: {ad.id}</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
+                                    {ad.status !== 'sold_out' ? (
+                                      <button
+                                        onClick={() => handleUpdateContentStatus('ad_listings', ad.id, 'sold_out')}
+                                        disabled={isProcessing}
+                                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                      >
+                                        Mark Sold Out
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleUpdateContentStatus('ad_listings', ad.id, 'active')}
+                                        disabled={isProcessing}
+                                        className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                      >
+                                        Reactivate (Active)
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        const email = ad.sellerEmail || ad.userEmail;
+                                        const found = users.find(u => u.email === email || u.uid === ad.userId);
+                                        setDirectMsgTargetUser(found || { uid: ad.userId || 'unknown', email: email || 'user@efado.net', accountName: ad.sellerName || 'Advertiser' } as any);
+                                        setShowMessageUserModal(true);
+                                      }}
+                                      className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                    >
+                                      Message Seller
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteContentItem('ad_listings', ad.id)}
+                                      disabled={isProcessing}
+                                      className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
+                                    >
+                                      Delete Ad
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SUB-TAB 2: MARKETPLACE PRODUCTS */}
+                  {ecosystemContentTab === 'market' && (
+                    <div className="space-y-4">
+                      {marketProducts.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500 italic">No marketplace catalog products found.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {marketProducts
+                            .filter(prod => {
+                              if (!contentSearchQuery) return true;
+                              const q = contentSearchQuery.toLowerCase();
+                              return (prod.title || prod.name || '').toLowerCase().includes(q) ||
+                                     (prod.category || '').toLowerCase().includes(q) ||
+                                     (prod.vendorEmail || prod.vendorName || '').toLowerCase().includes(q);
+                            })
+                            .map((prod, idx) => (
+                              <div key={prod.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
+                                <div className="space-y-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-emerald-500/30">
+                                        {prod.category || 'CATALOG ITEM'}
+                                      </span>
+                                      <h4 className="text-lg font-black text-white font-display mt-1">{prod.title || prod.name || 'Market Item'}</h4>
+                                    </div>
+                                    <span className="text-base font-black text-emerald-400 font-mono">
+                                      ${(prod.price || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-300 line-clamp-2">{prod.description || 'No product details'}</p>
+                                  <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
+                                    <p>🏬 Store/Vendor: <strong className="text-white">{prod.vendorName || prod.vendorEmail || 'Verified Vendor'}</strong></p>
+                                    <p>📦 Stock: {prod.stockQuantity ?? prod.stock ?? 'In Stock'} • Status: <span className="text-emerald-400 font-bold">{prod.status || 'Active'}</span></p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
+                                  {prod.status !== 'sold_out' ? (
+                                    <button
+                                      onClick={() => handleUpdateContentStatus('marketProducts', prod.id, 'sold_out')}
+                                      disabled={isProcessing}
+                                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                    >
+                                      Mark Sold Out
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleUpdateContentStatus('marketProducts', prod.id, 'active')}
+                                      disabled={isProcessing}
+                                      className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                    >
+                                      Mark Active
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      const email = prod.vendorEmail;
+                                      const found = users.find(u => u.email === email || u.uid === prod.userId);
+                                      setDirectMsgTargetUser(found || { uid: prod.userId || 'unknown', email: email || 'vendor@efado.net', accountName: prod.vendorName || 'Vendor' } as any);
+                                      setShowMessageUserModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                  >
+                                    Message Vendor
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteContentItem('marketProducts', prod.id)}
+                                    disabled={isProcessing}
+                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
+                                  >
+                                    Delete Product
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SUB-TAB 3: SOCIAL GIST POSTS */}
+                  {ecosystemContentTab === 'social' && (
+                    <div className="space-y-4">
+                      {[...socialPosts, ...posts].length === 0 ? (
+                        <div className="text-center py-12 text-slate-500 italic">No social posts found in the database.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {[...socialPosts, ...posts]
+                            .filter(post => {
+                              if (!contentSearchQuery) return true;
+                              const q = contentSearchQuery.toLowerCase();
+                              return (post.content || '').toLowerCase().includes(q) ||
+                                     (post.authorName || '').toLowerCase().includes(q) ||
+                                     (post.category || '').toLowerCase().includes(q);
+                            })
+                            .map((post, idx) => (
+                              <div key={post.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-purple-500/30 transition-all">
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <span className="px-2.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-purple-500/30">
+                                      {post.category || 'GIST HUB'}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-slate-400">ID: {post.id}</span>
+                                  </div>
+                                  <p className="text-xs text-slate-200 leading-relaxed font-medium">{post.content || 'No text content'}</p>
+                                  <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
+                                    <p>👤 Author: <strong className="text-white">{post.authorName || 'Anonymous Gister'}</strong> ({post.authorId || 'ID'})</p>
+                                    <p>👍 Likes: {post.likes?.length || 0} • 💬 Comments: {post.comments?.length || 0}</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-3 border-t border-white/10">
+                                  <button
+                                    onClick={() => {
+                                      const found = users.find(u => u.uid === post.authorId || u.email === post.authorEmail);
+                                      setDirectMsgTargetUser(found || { uid: post.authorId || 'unknown', email: post.authorEmail || 'user@efado.net', accountName: post.authorName || 'Gister' } as any);
+                                      setShowMessageUserModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                  >
+                                    Message Author
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteContentItem('social_posts', post.id)}
+                                    disabled={isProcessing}
+                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
+                                  >
+                                    Delete Post
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SUB-TAB 4: VIDEO REELS */}
+                  {ecosystemContentTab === 'reels' && (
+                    <div className="space-y-4">
+                      {reels.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500 italic">No video reels uploaded yet.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {reels
+                            .filter(reel => {
+                              if (!contentSearchQuery) return true;
+                              const q = contentSearchQuery.toLowerCase();
+                              return (reel.caption || '').toLowerCase().includes(q) ||
+                                     (reel.authorName || '').toLowerCase().includes(q);
+                            })
+                            .map((reel, idx) => (
+                              <div key={reel.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-5 space-y-3 flex flex-col justify-between hover:border-rose-500/30 transition-all">
+                                <div className="space-y-2">
+                                  <div className="aspect-[9/12] bg-slate-900 rounded-2xl overflow-hidden relative border border-white/10">
+                                    <video src={reel.videoUrl} className="w-full h-full object-cover" controls preload="metadata" />
+                                    <span className="absolute top-3 left-3 px-2.5 py-0.5 bg-rose-500 text-white text-[8px] font-black uppercase tracking-wider rounded-full shadow-lg">
+                                      VIDEO REEL
+                                    </span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-white line-clamp-2">{reel.caption || 'No caption'}</h4>
+                                  <p className="text-[10px] font-mono text-slate-400">👤 Creator: <strong className="text-white">{reel.authorName || 'Creator'}</strong></p>
+                                  <p className="text-[10px] font-mono text-slate-400">❤️ Likes: {reel.likes?.length || 0} • 💸 Tips: {reel.tipsCount || 0}</p>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+                                  <button
+                                    onClick={() => {
+                                      const found = users.find(u => u.uid === reel.authorId);
+                                      setDirectMsgTargetUser(found || { uid: reel.authorId || 'unknown', email: 'creator@efado.net', accountName: reel.authorName || 'Creator' } as any);
+                                      setShowMessageUserModal(true);
+                                    }}
+                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                                  >
+                                    Message Creator
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteContentItem('reels', reel.id)}
+                                    disabled={isProcessing}
+                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
+                                  >
+                                    Delete Reel
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Service Corps Monitor */}
                 <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
                   <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
@@ -3756,6 +4603,137 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           </motion.div>
         )}
       </AnimatePresence>
+
+        {/* DIRECT EXECUTIVE USER MESSAGING MODAL */}
+        <AnimatePresence>
+          {showMessageUserModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[300] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-slate-900 border-2 border-indigo-500/30 rounded-[2.5rem] p-8 max-w-2xl w-full shadow-2xl relative space-y-6 text-left"
+              >
+                <button
+                  onClick={() => setShowMessageUserModal(false)}
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="space-y-2">
+                  <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[9px] font-black uppercase tracking-widest rounded-full inline-block">
+                    EXECUTIVE DISPATCH TERMINAL
+                  </span>
+                  <h3 className="text-2xl font-black text-white uppercase italic tracking-tight font-display flex items-center gap-2">
+                    <Mail className="w-6 h-6 text-indigo-400" />
+                    Send Direct Message to User
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                    Dispatch an executive notice directly to a specific user's notification inbox. You may optionally attach a bonus wallet grant.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Select target user */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Select Target User</label>
+                    <select
+                      value={directMsgTargetUser?.uid || ''}
+                      onChange={(e) => {
+                        const found = users.find(u => u.uid === e.target.value);
+                        setDirectMsgTargetUser(found || null);
+                      }}
+                      className="w-full px-4 py-3.5 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                    >
+                      <option value="">-- Choose User from Database --</option>
+                      {users.map(u => (
+                        <option key={u.uid} value={u.uid}>
+                          {u.email} ({u.accountName || u.uid})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Subject */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Message Title / Subject</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Executive Notice regarding your wallet"
+                      value={directMsgSubject}
+                      onChange={(e) => setDirectMsgSubject(e.target.value)}
+                      className="w-full px-4 py-3.5 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                    />
+                  </div>
+
+                  {/* Priority & Bonus */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Priority Tier</label>
+                      <select
+                        value={directMsgType}
+                        onChange={(e) => setDirectMsgType(e.target.value as any)}
+                        className="w-full px-4 py-3.5 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <option value="info">Info / Standard Notice</option>
+                        <option value="success">Success / Congratulations</option>
+                        <option value="warning">Warning / Security Notice</option>
+                        <option value="urgent">Urgent Action Required</option>
+                        <option value="wallet_grant">Wallet Bonus Grant</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Optional Bonus Wallet Grant (₦)</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={directMsgBonus || ''}
+                        onChange={(e) => setDirectMsgBonus(Number(e.target.value))}
+                        className="w-full px-4 py-3.5 bg-slate-950 border border-white/10 rounded-xl text-xs font-black text-emerald-400 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Message Body */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Message Content</label>
+                    <textarea
+                      placeholder="Type your official message here..."
+                      value={directMsgBody}
+                      onChange={(e) => setDirectMsgBody(e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-3.5 bg-slate-950 border border-white/10 rounded-2xl text-xs font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
+                    />
+                  </div>
+
+                  {directMsgStatus && (
+                    <div className={`p-3 rounded-xl text-center text-xs font-black uppercase tracking-wider ${
+                      directMsgStatus.startsWith('Error') ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}>
+                      {directMsgStatus}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleSendDirectUserMessage}
+                    disabled={isProcessing || !directMsgTargetUser || !directMsgBody.trim()}
+                    className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs transition-all shadow-xl shadow-indigo-600/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Dispatch Direct Message
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         </motion.div>
       )}

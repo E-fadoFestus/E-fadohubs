@@ -784,8 +784,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
   useEffect(() => {
     // Index-free queries for maximum database resilience
-    const postsQuery = query(collection(db, 'social_posts'), limit(50));
-    const reelsQuery = query(collection(db, 'reels'), limit(30));
+    const postsQuery = query(collection(db, 'social_posts'), limit(250));
+    const reelsQuery = query(collection(db, 'reels'), limit(250));
     const adsQuery = query(collection(db, 'ads'), where('status', '==', 'active'));
 
     const DEFAULT_MOCK_POSTS: SocialPost[] = [

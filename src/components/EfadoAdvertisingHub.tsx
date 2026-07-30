@@ -384,7 +384,7 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
   };
 
   useEffect(() => {
-    const q = query(collection(db, 'ad_listings'), where('status', '==', 'active'));
+    const q = query(collection(db, 'ad_listings'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AdListing));
       setListings(docs);
@@ -771,11 +771,16 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                           alt={ad.title} 
                           className="w-full h-full object-cover rounded-t-[3.5rem]" 
                         />
-                        <div className="absolute top-6 left-6 flex gap-2">
+                        <div className="absolute top-6 left-6 flex gap-2 flex-wrap">
                            <span className="px-3 py-1 bg-white/90 backdrop-blur text-[9px] font-black uppercase tracking-widest rounded-full">{ad.category}</span>
                            <span className={`px-3 py-1 text-white text-[9px] font-black uppercase tracking-widest rounded-full ${ad.type === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'}`}>
                              {ad.type}
                            </span>
+                           {ad.status === 'sold_out' && (
+                             <span className="px-3 py-1 bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-widest rounded-full shadow-lg">
+                               SOLD OUT
+                             </span>
+                           )}
                         </div>
                         <button className="absolute bottom-6 right-6 p-4 bg-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 duration-500">
                            <Heart className="w-5 h-5 text-rose-500" />
@@ -802,17 +807,26 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                               <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-1">Starting At</p>
                               <p className="text-lg font-black text-gray-950 italic tracking-tighter">{formatPrice(ad.price)}</p>
                            </div>
-                           <button 
-                             onClick={() => {
-                                setSelectedAdForEngagement(ad);
-                                setEngagementMessage(`Hi! I am interested in your listed asset: "${ad.title}". Please advise on physical alignment or transaction options.`);
-                                setEngagementSuccess(false);
-                                setEngagementSending(false);
-                             }}
-                             className="px-8 py-4 bg-gray-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-gray-200"
-                           >
-                             Engage Now
-                           </button>
+                           {ad.status === 'sold_out' ? (
+                             <button 
+                               disabled
+                               className="px-8 py-4 bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed"
+                             >
+                               SOLD OUT
+                             </button>
+                           ) : (
+                             <button 
+                               onClick={() => {
+                                  setSelectedAdForEngagement(ad);
+                                  setEngagementMessage(`Hi! I am interested in your listed asset: "${ad.title}". Please advise on physical alignment or transaction options.`);
+                                  setEngagementSuccess(false);
+                                  setEngagementSending(false);
+                               }}
+                               className="px-8 py-4 bg-gray-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-gray-200"
+                             >
+                               Engage Now
+                             </button>
+                           )}
                         </div>
                      </div>
                    </motion.div>
