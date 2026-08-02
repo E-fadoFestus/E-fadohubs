@@ -927,6 +927,40 @@ function AppContent() {
     };
   }, []);
 
+  // Paystack Automated Callback Redirect Listener
+  useEffect(() => {
+    const handlePaystackCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const reference = urlParams.get('reference') || urlParams.get('trxref');
+        const simUserId = urlParams.get('userId');
+        const simAmount = urlParams.get('amount');
+
+        if (reference) {
+          console.log('💳 Paystack Return Reference detected in URL:', reference);
+          const currentUserId = user?.uid || simUserId || '';
+          
+          const verifyUrl = `/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`;
+          const res = await fetch(verifyUrl);
+          const data = await res.json();
+
+          if (data.status && (data.data?.status === 'success' || data.already_processed)) {
+            alert(`✅ PAYSTACK DEPOSIT VERIFIED!\n\nReference: ${reference}\nYour deposit wallet has been successfully credited.`);
+          } else {
+            console.warn('Paystack return verification status:', data);
+          }
+
+          const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (err) {
+        console.error('Error handling Paystack URL callback:', err);
+      }
+    };
+
+    handlePaystackCallback();
+  }, [user]);
+
   // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
   useEffect(() => {
     const handleHashRoute = () => {
