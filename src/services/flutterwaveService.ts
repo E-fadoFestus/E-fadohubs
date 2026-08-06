@@ -56,38 +56,32 @@ export const flutterwaveService = {
    * POST https://api.flutterwave.com/v3/subaccounts
    */
   async createSubaccount(payload: CreateSubaccountRequest): Promise<SubaccountResponse> {
-    const secretKey = import.meta.env.VITE_FLW_SECRET_KEY || '';
-    const endpoint = 'https://api.flutterwave.com/v3/subaccounts';
-
     try {
-      if (secretKey) {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${secretKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            account_bank: payload.account_bank,
-            account_number: payload.account_number,
-            business_name: payload.business_name,
-            business_email: payload.business_email,
-            business_contact: payload.business_contact || '',
-            country: payload.country,
-            split_type: payload.split_type || 'percentage',
-            split_value: payload.split_value ?? 95,
-          }),
-        });
+      const response = await fetch('/api/flutterwave/subaccount', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          account_bank: payload.account_bank,
+          account_number: payload.account_number,
+          business_name: payload.business_name,
+          business_email: payload.business_email,
+          business_contact: payload.business_contact || '',
+          country: payload.country,
+          split_type: payload.split_type || 'percentage',
+          split_value: payload.split_value ?? 95,
+        }),
+      });
 
-        if (response.ok) {
-          const resJson = await response.json();
-          if (resJson.status === 'success' && resJson.data) {
-            return resJson;
-          }
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.status === 'success' && resJson.data) {
+          return resJson;
         }
       }
     } catch (err) {
-      console.warn('Flutterwave API live reach failed or blocked by browser CORS, switching to secure automated settlement simulator:', err);
+      console.warn('Flutterwave server subaccount route error, switching to simulation:', err);
     }
 
     // Graceful automated settlement fallback if no live server proxy or in client preview

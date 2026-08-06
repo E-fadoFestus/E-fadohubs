@@ -137,13 +137,35 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           }
         });
       } else {
-        setIsPaying(false);
-        alert('Could not launch Flutterwave checkout.');
+        throw new Error('FlutterwaveCheckout script function unavailable');
       }
     } catch (err) {
-      console.error('Error invoking Flutterwave Client:', err);
-      setIsPaying(false);
-      alert('Could not start Flutterwave checkout process. Ensure your internet connection is active.');
+      console.warn('Inline Flutterwave modal unavailable, calling server initialization API:', err);
+      // Fallback to server payment link creation
+      fetch('/api/flutterwave/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email || 'customer@efado.com',
+          amount: numericAmount,
+          userId: user.uid,
+          purpose: 'EFADO Wallet Topup'
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        setIsPaying(false);
+        if (data.status && data.link) {
+          window.location.href = data.link;
+        } else {
+          alert(`Payment Initialization Failure: ${data.message || 'Please check API keys configuration.'}`);
+        }
+      })
+      .catch(fetchErr => {
+        setIsPaying(false);
+        console.error('Server init failed:', fetchErr);
+        alert('Could not start Flutterwave checkout process. Ensure your internet connection is active.');
+      });
     }
   };
 

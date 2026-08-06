@@ -322,10 +322,31 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
   const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
 
   // 1. Paystack Live Account Resolution API
-  if (paystackSecret && bankCode && bankCode !== '000') {
+  let codeToTry = bankCode;
+  if (!codeToTry || codeToTry === '000') {
+    // Attempt auto-matching bank code from name
+    const bNameLower = bankName.toLowerCase();
+    if (bNameLower.includes('gtb') || bNameLower.includes('guaranty')) codeToTry = '058';
+    else if (bNameLower.includes('access')) codeToTry = '044';
+    else if (bNameLower.includes('zenith')) codeToTry = '057';
+    else if (bNameLower.includes('first bank')) codeToTry = '011';
+    else if (bNameLower.includes('kuda')) codeToTry = '50211';
+    else if (bNameLower.includes('moniepoint')) codeToTry = '50515';
+    else if (bNameLower.includes('opay')) codeToTry = '999992';
+    else if (bNameLower.includes('palmpay')) codeToTry = '999991';
+    else if (bNameLower.includes('uba') || bNameLower.includes('united bank')) codeToTry = '033';
+    else if (bNameLower.includes('fcmb')) codeToTry = '214';
+    else if (bNameLower.includes('stanbic')) codeToTry = '221';
+    else if (bNameLower.includes('sterling')) codeToTry = '232';
+    else if (bNameLower.includes('wema') || bNameLower.includes('alat')) codeToTry = '035';
+    else if (bNameLower.includes('fidelity')) codeToTry = '070';
+    else if (bNameLower.includes('providus')) codeToTry = '101';
+  }
+
+  if (paystackSecret && codeToTry && codeToTry !== '000') {
     try {
-      console.info(`[Bank Resolve API] Attempting Paystack live account resolution for Acc: ${accountNumber}, BankCode: ${bankCode}`);
-      const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`, {
+      console.info(`[Bank Resolve API] Attempting Paystack live account resolution for Acc: ${accountNumber}, BankCode: ${codeToTry}`);
+      const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(codeToTry)}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${paystackSecret}`,
@@ -349,9 +370,14 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
   }
 
   // 2. Flutterwave Live Account Resolution API
-  if (flwSecret && bankCode && bankCode !== '000') {
+  // Flutterwave FLW bank code mappings for OPay / PalmPay
+  let flwBankCode = codeToTry;
+  if (codeToTry === '999992') flwBankCode = '100004'; // OPay in Flutterwave
+  if (codeToTry === '999991') flwBankCode = '100033'; // PalmPay in Flutterwave
+
+  if (flwSecret && flwBankCode && flwBankCode !== '000') {
     try {
-      console.info(`[Bank Resolve API] Attempting Flutterwave live account resolution for Acc: ${accountNumber}, BankCode: ${bankCode}`);
+      console.info(`[Bank Resolve API] Attempting Flutterwave live account resolution for Acc: ${accountNumber}, BankCode: ${flwBankCode}`);
       const response = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
         method: 'POST',
         headers: {
@@ -360,7 +386,7 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
         },
         body: JSON.stringify({
           account_number: accountNumber,
-          account_bank: bankCode
+          account_bank: flwBankCode
         })
       });
       const data = await response.json();
@@ -397,6 +423,177 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     bank_name: bankName || 'Verified Bank',
     note: 'Resolved via Interbank Switch (Sandbox Mode)'
   });
+});
+
+// Route D: Flutterwave Initialize Checkout Session
+app.post('/api/flutterwave/initialize', async (req: express.Request, res: express.Response) => {
+  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations } = req.body;
+  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const callbackUrl = callback_url || `${appUrl}/payment/flutterwave-callback`;
+  const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+
+  if (!flwSecret) {
+    console.warn('[Flutterwave Init API] FLW Secret key is missing on backend. Generating sandbox checkout URL.');
+    return res.json({
+      status: true,
+      message: 'Sandbox Flutterwave session initialized',
+      link: `${callbackUrl}?tx_ref=${reference}&status=successful&amount=${amount}&userId=${encodeURIComponent(userId || '')}`,
+      tx_ref: reference
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.flutterwave.com/v3/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${flwSecret}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tx_ref: reference,
+        amount: Number(amount),
+        currency,
+        redirect_url: callbackUrl,
+        customer: {
+          email: email || 'customer@efado.com',
+          name: email || 'EFADO Valued Member'
+        },
+        meta: {
+          userId: userId || '',
+          purpose: purpose || 'EFADO Wallet Topup'
+        },
+        customizations: customizations || {
+          title: 'EFADO Sovereign Payment Gateway',
+          description: purpose || 'Instant EFADO Wallet Topup'
+        }
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success' && data.data?.link) {
+      return res.json({
+        status: true,
+        link: data.data.link,
+        tx_ref: reference
+      });
+    } else {
+      console.error('[Flutterwave Init API] Error response from Flutterwave API:', data);
+      return res.status(400).json({ status: false, message: data.message || 'Could not initialize Flutterwave payment session' });
+    }
+  } catch (err: any) {
+    console.error('[Flutterwave Init API] Exception:', err);
+    return res.status(500).json({ status: false, message: err.message || 'Failed to connect to Flutterwave payment gateway' });
+  }
+});
+
+// Route E: Flutterwave Real Live Bank Transfer / Payout API
+app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Response) => {
+  const { account_bank, account_number, amount, narration, beneficiary_name, userId } = req.body;
+  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+
+  if (!account_number || !amount) {
+    return res.status(400).json({ status: false, message: 'Account number and amount are required for payout.' });
+  }
+
+  const reference = `EFD_TRF_${Math.floor(100000 + Math.random() * 900000)}_${Date.now()}`;
+
+  if (!flwSecret) {
+    console.warn('[Flutterwave Payout API] FLW Secret key is missing on backend. Simulating live transfer.');
+    return res.json({
+      status: true,
+      message: 'Payout queued successfully (Sandbox Simulation)',
+      reference,
+      data: {
+        id: Math.floor(10000 + Math.random() * 90000),
+        account_number,
+        bank_code: account_bank,
+        full_name: beneficiary_name || 'Beneficiary',
+        amount: Number(amount),
+        status: 'SUCCESSFUL',
+        complete_message: 'Transfer processed in sandbox mode'
+      }
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.flutterwave.com/v3/transfers', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${flwSecret}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        account_bank: account_bank || '044',
+        account_number,
+        amount: Number(amount),
+        narration: narration || 'EFADO Sovereign Cashout Transfer',
+        currency: 'NGN',
+        reference,
+        callback_url: `${process.env.APP_URL || ''}/api/flutterwave/transfer-callback`
+      })
+    });
+
+    const data = await response.json();
+    if (data.status === 'success') {
+      console.info(`[Flutterwave Payout API] Payout successfully dispatched for Acc: ${account_number}, Amount: NGN ${amount}, Ref: ${reference}`);
+      return res.json({
+        status: true,
+        message: 'Payout transfer dispatched successfully via Flutterwave Live Gateway',
+        reference,
+        data: data.data
+      });
+    } else {
+      console.error('[Flutterwave Payout API] Flutterwave Transfer failed:', data);
+      return res.status(400).json({ status: false, message: data.message || 'Flutterwave Transfer execution failed' });
+    }
+  } catch (err: any) {
+    console.error('[Flutterwave Payout API] Exception:', err);
+    return res.status(500).json({ status: false, message: err.message || 'Failed to dispatch transfer via Flutterwave API' });
+  }
+});
+
+// Route F: Flutterwave Subaccount Creation Proxy
+app.post('/api/flutterwave/subaccount', async (req: express.Request, res: express.Response) => {
+  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+
+  if (!flwSecret) {
+    const simId = `FLW_SUB_SIM_${Math.floor(100000 + Math.random() * 900000)}`;
+    return res.json({
+      status: 'success',
+      data: {
+        id: simId,
+        account_number: req.body.account_number,
+        business_name: req.body.business_name,
+        split_value: req.body.split_value || 95
+      }
+    });
+  }
+
+  try {
+    const response = await fetch('https://api.flutterwave.com/v3/subaccounts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${flwSecret}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        account_bank: req.body.account_bank,
+        account_number: req.body.account_number,
+        business_name: req.body.business_name,
+        business_email: req.body.business_email,
+        business_contact: req.body.business_contact || '',
+        country: req.body.country || 'NG',
+        split_type: req.body.split_type || 'percentage',
+        split_value: req.body.split_value ?? 95
+      })
+    });
+
+    const data = await response.json();
+    return res.status(response.status).json(data);
+  } catch (err: any) {
+    return res.status(500).json({ status: false, message: err.message || 'Subaccount creation request failed' });
+  }
 });
 
 // Start server with Vite middleware support

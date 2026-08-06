@@ -46,6 +46,7 @@ import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
 import { db, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
+import { resolveBankAccount } from '../utils/bankVerification';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
@@ -163,31 +164,36 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
     if (accNo && accNo.length === 10 && bName) {
       setIsResolvingName(true);
-      setResolvedStatusMessage('Verifying account with NIBSS Gateway...');
+      setResolvedStatusMessage('Verifying account with NIBSS & Payment Gateway...');
       
-      const timer = setTimeout(() => {
-        let resolvedName = accountDetails.accountName || user.fullName || user.displayName || '';
-        
-        if (accNo === '3001964082' || accNo === '8072456836' || accNo === '3001964109' || accNo === '3001964123' || accNo === '3001964147') {
-          resolvedName = 'EFADO Technology Computer Engineering Training & Services';
-        } else if (accNo === '0001304979' || accNo === '2120742200' || accNo === '0424168460' || accNo === '0424168587') {
-          resolvedName = 'Okhawere Festus Daniel';
-        }
-        
-        setAccountDetails(prev => ({
-          ...prev,
-          accountName: resolvedName || prev.accountName
-        }));
-        setIsResolvingName(false);
-        setResolvedStatusMessage('NIBSS Account Match Verified ✓');
-      }, 800);
+      let isMounted = true;
+      resolveBankAccount(accNo, accountDetails.routingNumber || '', bName)
+        .then(res => {
+          if (!isMounted) return;
+          if (res.success && res.accountName) {
+            setAccountDetails(prev => ({
+              ...prev,
+              accountName: res.accountName || prev.accountName
+            }));
+            setResolvedStatusMessage(`Account Match Verified: ${res.accountName} ✓`);
+          } else {
+            setResolvedStatusMessage(res.message || 'Verification complete');
+          }
+          setIsResolvingName(false);
+        })
+        .catch(err => {
+          if (!isMounted) return;
+          console.warn('Bank lookup error:', err);
+          setIsResolvingName(false);
+          setResolvedStatusMessage('NIBSS Account Name Verification Pending');
+        });
 
-      return () => clearTimeout(timer);
+      return () => { isMounted = false; };
     } else {
       setIsResolvingName(false);
       setResolvedStatusMessage(null);
     }
-  }, [accountDetails.accountNumber, accountDetails.bankName, user.fullName, user.displayName]);
+  }, [accountDetails.accountNumber, accountDetails.bankName, accountDetails.routingNumber]);
 
   useEffect(() => {
     setProfileDisplayName(user.displayName || '');

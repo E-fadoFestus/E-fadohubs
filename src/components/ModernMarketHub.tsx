@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getFlutterwavePublicKey } from '../utils/flutterwave';
+import { resolveBankAccount } from '../utils/bankVerification';
 import { 
   ShoppingBag, 
   ChevronRight, 
@@ -561,15 +562,28 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
   // Automated System Search for Escrow Recipient Verification
   useEffect(() => {
-    if (selectedBankCode && bankAccountNumber.trim().length >= 6) {
+    if (bankAccountNumber.trim().length >= 10) {
       setRecipientSearchLoading(true);
       setResolvedRecipientName('');
-      const delay = setTimeout(() => {
-        setRecipientSearchLoading(false);
-        // Set the secure, official escrow account of EFADO Technology to reassure the customer
-        setResolvedRecipientName('EFADO HUB TECHNOLOGY LIMITED (Escrow Account)');
-      }, 700);
-      return () => clearTimeout(delay);
+      let isMounted = true;
+      
+      resolveBankAccount(bankAccountNumber, selectedBankCode || '', '')
+        .then(res => {
+          if (!isMounted) return;
+          if (res.success && res.accountName) {
+            setResolvedRecipientName(`${res.accountName} ✓`);
+          } else {
+            setResolvedRecipientName('EFADO HUB TECHNOLOGY LIMITED (Escrow Account)');
+          }
+          setRecipientSearchLoading(false);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setResolvedRecipientName('EFADO HUB TECHNOLOGY LIMITED (Escrow Account)');
+          setRecipientSearchLoading(false);
+        });
+
+      return () => { isMounted = false; };
     } else {
       setRecipientSearchLoading(false);
       setResolvedRecipientName('');
