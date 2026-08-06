@@ -43,8 +43,8 @@ export function getFlutterwavePublicKey(): string {
     if (sanitized) return sanitized;
   }
   
-  // 3. Live Mode default public key formatted from user's live public key: c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873
-  return 'FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X';
+  // 3. Live Mode default public key formatted from user's live public key: c9b9eca1-6bc8-44ea-bef6-e5a721fbf873
+  return 'FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a721fbf873-X';
 }
 
 export function saveFlutterwavePublicKey(key: string): void {
