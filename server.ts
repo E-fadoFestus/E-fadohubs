@@ -318,37 +318,71 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     return res.status(400).json({ status: false, message: 'Account number must be at least 10 digits.' });
   }
 
-  const secretKey = process.env.PAYSTACK_SECRET_KEY || '';
+  const paystackSecret = process.env.PAYSTACK_SECRET_KEY || process.env.VITE_PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || '';
+  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
 
-  if (secretKey && bankCode && bankCode !== '000') {
+  // 1. Paystack Live Account Resolution API
+  if (paystackSecret && bankCode && bankCode !== '000') {
     try {
+      console.info(`[Bank Resolve API] Attempting Paystack live account resolution for Acc: ${accountNumber}, BankCode: ${bankCode}`);
       const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${secretKey}`,
+          'Authorization': `Bearer ${paystackSecret}`,
           'Content-Type': 'application/json'
         }
       });
       const data = await response.json();
       if (data.status && data.data?.account_name) {
+        console.info(`[Bank Resolve API] Paystack live account resolved successfully: ${data.data.account_name}`);
         return res.json({
           status: true,
           account_name: data.data.account_name,
           account_number: accountNumber,
-          bank_name: bankName || 'Verified Bank'
+          bank_name: bankName || 'Verified Bank',
+          resolved_via: 'Paystack Live Gateway'
         });
       }
     } catch (err) {
-      console.warn('[Bank Resolve API] Live API call failed, falling back to NIBSS resolver:', err);
+      console.warn('[Bank Resolve API] Paystack live API query failed:', err);
     }
   }
 
-  // NIBSS / CBN Interbank Simulation fallback for testing & sandbox mode
-  // Generate a realistic Nigerian account name based on account number pattern
-  const sampleFirstNames = ['CHINEDU', 'BOLA', 'TUNDE', 'EMeka', 'Olamide', 'Amina', 'DANIEL', 'FESTUS', 'IBRAHIM', 'NKECHI'];
+  // 2. Flutterwave Live Account Resolution API
+  if (flwSecret && bankCode && bankCode !== '000') {
+    try {
+      console.info(`[Bank Resolve API] Attempting Flutterwave live account resolution for Acc: ${accountNumber}, BankCode: ${bankCode}`);
+      const response = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${flwSecret}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          account_number: accountNumber,
+          account_bank: bankCode
+        })
+      });
+      const data = await response.json();
+      if (data.status === 'success' && data.data?.account_name) {
+        console.info(`[Bank Resolve API] Flutterwave live account resolved successfully: ${data.data.account_name}`);
+        return res.json({
+          status: true,
+          account_name: data.data.account_name,
+          account_number: accountNumber,
+          bank_name: bankName || 'Verified Bank',
+          resolved_via: 'Flutterwave Live Gateway'
+        });
+      }
+    } catch (err) {
+      console.warn('[Bank Resolve API] Flutterwave live API query failed:', err);
+    }
+  }
+
+  // 3. Fallback NIBSS Interbank Lookup for test/sandbox mode
+  const sampleFirstNames = ['CHINEDU', 'BOLA', 'TUNDE', 'EMEKA', 'OLAMIDE', 'AMINA', 'DANIEL', 'FESTUS', 'IBRAHIM', 'NKECHI'];
   const sampleLastNames = ['OKONKWO', 'ADEBAYO', 'SOGUNRO', 'DANJUMA', 'OKHAWERE', 'EZE', 'BALOGUN', 'BELLO', 'IBRAHIM'];
   
-  // Deterministic seed based on account number digits
   const seed = accountNumber.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const firstName = sampleFirstNames[seed % sampleFirstNames.length].toUpperCase();
   const lastName = sampleLastNames[(seed * 3) % sampleLastNames.length].toUpperCase();
@@ -360,8 +394,8 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     status: true,
     account_name: resolvedName,
     account_number: accountNumber,
-    bank_name: bankName || 'Verified Bank (NIBSS Verified)',
-    note: 'Resolved via NIBSS CBN Interbank Verification Switch'
+    bank_name: bankName || 'Verified Bank',
+    note: 'Resolved via Interbank Switch (Sandbox Mode)'
   });
 });
 
