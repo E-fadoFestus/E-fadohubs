@@ -103,70 +103,73 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         ? 'banktransfer'
         : selectedMethod;
 
-    try {
-      if (typeof window.FlutterwaveCheckout === 'function') {
-        window.FlutterwaveCheckout({
-          public_key: flwKey,
-          tx_ref: reference,
-          amount: numericAmount,
-          currency: 'NGN',
-          payment_options: paymentOptions,
-          customer: {
-            email: user.email || 'customer@efado.com',
-            name: user.displayName || 'EFADO Member',
-          },
-          customizations: {
-            title: 'EFADO Wallet Topup',
-            description: 'Instant Wallet Deposit',
-            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
-          },
-          callback: (response: any) => {
-            setIsPaying(false);
-            if (response && (response.status === 'successful' || response.status === 'completed')) {
-              onSuccess({
-                reference: response.tx_ref || reference,
-                amount: numericAmount
-              });
-            } else {
-              alert('Payment execution did not return a successful receipt. Please verify details.');
-            }
-          },
-          onclose: () => {
-            setIsPaying(false);
-            if (onCancel) onCancel();
-          }
-        });
-      } else {
-        throw new Error('FlutterwaveCheckout script function unavailable');
+    // 1. Try backend server initialization API first (uses VITE_FLW_SECRET_KEY / FLW_SECRET_KEY)
+    fetch('/api/flutterwave/initialize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: user.email || 'customer@efado.com',
+        amount: numericAmount,
+        userId: user.uid,
+        purpose: 'EFADO Wallet Topup',
+        currency: 'NGN'
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status && data.link) {
+        setIsPaying(false);
+        window.location.href = data.link;
+        return;
       }
-    } catch (err) {
-      console.warn('Inline Flutterwave modal unavailable, calling server initialization API:', err);
-      // Fallback to server payment link creation
-      fetch('/api/flutterwave/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email || 'customer@efado.com',
-          amount: numericAmount,
-          userId: user.uid,
-          purpose: 'EFADO Wallet Topup'
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        setIsPaying(false);
-        if (data.status && data.link) {
-          window.location.href = data.link;
+      throw new Error(data.message || 'Server session init returned no link');
+    })
+    .catch((serverErr) => {
+      console.warn('Backend server payment initialization skipped or failed, using inline checkout modal:', serverErr);
+      
+      // 2. Fallback to inline Flutterwave modal
+      try {
+        if (typeof window.FlutterwaveCheckout === 'function') {
+          window.FlutterwaveCheckout({
+            public_key: flwKey,
+            tx_ref: reference,
+            amount: numericAmount,
+            currency: 'NGN',
+            payment_options: paymentOptions,
+            customer: {
+              email: user.email || 'customer@efado.com',
+              name: user.displayName || 'EFADO Member',
+            },
+            customizations: {
+              title: 'EFADO Wallet Topup',
+              description: 'Instant Wallet Deposit',
+              logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
+            },
+            callback: (response: any) => {
+              setIsPaying(false);
+              if (response && (response.status === 'successful' || response.status === 'completed')) {
+                onSuccess({
+                  reference: response.tx_ref || reference,
+                  amount: numericAmount
+                });
+              } else {
+                alert('Payment execution did not return a successful receipt. Please verify details.');
+              }
+            },
+            onclose: () => {
+              setIsPaying(false);
+              if (onCancel) onCancel();
+            }
+          });
         } else {
-          alert(`Payment Initialization Failure: ${data.message || 'Please check API keys configuration.'}`);
+          throw new Error('FlutterwaveCheckout script function unavailable');
         }
-      })
-      .catch(fetchErr => {
+      } catch (err) {
         setIsPaying(false);
-        console.error('Server init failed:', fetchErr);
-        alert('Could not start Flutterwave checkout process. Ensure your internet connection is active.');
-      });
-    }
+        console.error('Flutterwave modal launch error:', err);
+        alert('Could not start Flutterwave checkout process. Please confirm your secret or public keys.');
+      }
+    });
   };
 
   return (

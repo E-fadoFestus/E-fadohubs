@@ -1,49 +1,53 @@
 function sanitizeKey(rawKey: string): string {
+  if (!rawKey) return '';
   let cleaned = rawKey.trim();
+
+  // If format is VITE_FLW_PUBLIC_KEY=FLWPUBK...
   if (cleaned.includes('=')) {
-    cleaned = cleaned.split('=').pop() || '';
+    const parts = cleaned.split('=');
+    cleaned = parts[parts.length - 1].trim();
   }
+
+  // Remove surrounding quotes, double quotes or trailing semicolons
   cleaned = cleaned.replace(/['";]/g, '').trim();
 
   if (!cleaned) return '';
 
-  // If user passed a raw key without FLWPUBK prefix (e.g. c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873)
-  if (!cleaned.toUpperCase().startsWith('FLWPUBK')) {
-    cleaned = `FLWPUBK-${cleaned}`;
+  // If already starts with valid Flutterwave Public Key prefix (FLWPUBK or FLWPUBK_TEST)
+  if (cleaned.toUpperCase().startsWith('FLWPUBK')) {
+    return cleaned;
   }
 
-  // Ensure trailing -X
-  if (!cleaned.endsWith('-X') && !cleaned.endsWith('-x')) {
-    cleaned = `${cleaned}-X`;
+  // If user passed a raw 32-hex character string without FLWPUBK prefix
+  let prefixed = `FLWPUBK-${cleaned}`;
+  if (!prefixed.endsWith('-X') && !prefixed.endsWith('-x')) {
+    prefixed = `${prefixed}-X`;
   }
-
-  return cleaned;
+  return prefixed;
 }
 
 export function getFlutterwavePublicKey(): string {
-  // 1. Check browser localStorage override set by user in UI
-  const localKey = localStorage.getItem('efado_flw_public_key');
-  if (localKey && localKey.trim()) {
-    const sanitizedLocal = sanitizeKey(localKey);
-    // Ignore legacy test key if user wants live production payments
-    if (sanitizedLocal && !sanitizedLocal.startsWith('FLWPUBK_TEST')) {
-      return sanitizedLocal;
-    }
-  }
-  
-  // 2. Check environment variables (supporting both VITE_FLW_PUBLIC_KEY and variations)
+  // 1. Priority 1: Check environment variable from Google AI Studio Secrets / .env
   const rawEnvKey = (
     import.meta.env.VITE_FLW_PUBLIC_KEY || 
     import.meta.env.VITE_FLW_PUBLIC_KE || 
+    import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
     ''
   ).trim();
 
   if (rawEnvKey) {
-    const sanitized = sanitizeKey(rawEnvKey);
-    if (sanitized) return sanitized;
+    const sanitizedEnv = sanitizeKey(rawEnvKey);
+    if (sanitizedEnv) return sanitizedEnv;
+  }
+
+  // 2. Priority 2: Check browser localStorage override if manually saved by user
+  const localKey = localStorage.getItem('efado_flw_public_key');
+  if (localKey && localKey.trim()) {
+    const sanitizedLocal = sanitizeKey(localKey);
+    if (sanitizedLocal) return sanitizedLocal;
   }
   
-  // 3. Live Mode default public key formatted from user's live public key: c9b9eca1-6bc8-44ea-bef6-e5a721fbf873
+  // 3. Fallback Key
   return 'FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a721fbf873-X';
 }
 

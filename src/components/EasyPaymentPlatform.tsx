@@ -247,8 +247,36 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
     setIsProcessing(true);
     setStep('processing');
-    setProcessingProgress(30);
+    setProcessingProgress(25);
 
+    // 1. First Attempt: Backend API session initialization via Server Secret Key (/api/flutterwave/initialize)
+    try {
+      const apiRes = await fetch('/api/flutterwave/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email || 'customer@efado.com',
+          amount: parsedAmt,
+          userId: user.uid,
+          purpose: intentPurpose || 'Wallet Funding',
+          currency: 'NGN'
+        })
+      });
+
+      if (apiRes.ok) {
+        const apiData = await apiRes.json();
+        if (apiData.status && apiData.link) {
+          setProcessingProgress(100);
+          // Directly open or redirect to official Flutterwave Hosted Payment URL
+          window.location.href = apiData.link;
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Backend API initialize route unavailable, attempting client inline modal:', apiErr);
+    }
+
+    // 2. Second Attempt: Client Inline Checkout Modal
     try {
       await loadFlutterwaveScript();
       setProcessingProgress(60);
@@ -326,7 +354,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         throw new Error('Flutterwave library missing');
       }
     } catch (err: any) {
-      console.warn('Flutterwave script error, using fallback:', err);
+      console.warn('Flutterwave inline modal error, executing fallback record:', err);
       executeFallbackSuccess('Flutterwave Gateway');
     }
   };
