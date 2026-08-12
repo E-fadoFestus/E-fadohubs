@@ -64,6 +64,7 @@ import { CurrencySelector } from './CurrencySelector';
 import { ExamCategory } from '../data/examData';
 import { UserProfile } from '../types';
 import { AiStudyPlatform } from './education/AiStudyPlatform';
+import { WaecScratchCardPortal } from './education/WaecScratchCardPortal';
 import { 
   CgpaCalculator, 
   SiwesLogbook, 
@@ -82,7 +83,7 @@ interface SubCategory {
   description: string;
   tags?: ('Most Visited' | 'Recently Updated')[];
   examType?: ExamCategory;
-  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE' | 'PAYMENT' | 'THESIS_PLANNER' | 'VIVA_SIMULATOR' | 'POLY_PATHWAY' | 'SCREENING_CHECKER' | 'SIWES' | 'CGPA';
+  serviceType?: 'CBT' | 'SEMINAR' | 'PORTAL' | 'GUIDE' | 'PAYMENT' | 'WAEC_CARD' | 'THESIS_PLANNER' | 'VIVA_SIMULATOR' | 'POLY_PATHWAY' | 'SCREENING_CHECKER' | 'SIWES' | 'CGPA';
 }
 
 interface EducationSection {
@@ -138,6 +139,13 @@ const educationData: EducationSection[] = [
     icon: BookOpen,
     description: "Syllabi, past questions, and portals for WAEC, NECO, and GCE.",
     subCategories: [
+      {
+        title: "Buy WAEC Scratch Card",
+        icon: CreditCard,
+        description: "Official WAEC result checking serial PIN (₦3,500 flat fee). Access serial-pin.waec.org portal.",
+        tags: ["Most Visited", "Recently Updated"],
+        serviceType: "WAEC_CARD"
+      },
       {
         title: "WAEC Core Prep & Syllabus",
         icon: FileText,
@@ -324,6 +332,7 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
 
   // New AI-powered study states & dynamic modals
   const [showAiStudyPortal, setShowAiStudyPortal] = useState(false);
+  const [showWaecCardPortal, setShowWaecCardPortal] = useState(false);
   const [activeHubDetails, setActiveHubDetails] = useState<any | null>(null);
   const [activeInteractiveTool, setActiveInteractiveTool] = useState<{ type: string; title: string } | null>(null);
 
@@ -522,6 +531,45 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
            <EfadoIntelligenceFeed />
         </motion.div>
 
+        {/* Prominent WAEC Scratch Card Purchase Banner & Button */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-gradient-to-r from-[#0A0E3F] via-indigo-950 to-slate-900 border-2 border-amber-400/40 rounded-[3rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden group"
+        >
+          <div className="absolute right-0 top-0 w-64 h-64 bg-amber-400/10 rounded-full blur-[90px] pointer-events-none -mr-32 -mt-32" />
+          <div className="flex items-center gap-6 relative z-10">
+            <div className="w-16 h-16 bg-amber-400/20 border-2 border-amber-400/40 rounded-[2rem] flex items-center justify-center text-amber-300 shadow-xl shrink-0">
+              <CreditCard className="w-8 h-8" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-wider">
+                  Official WAEC Result PIN
+                </span>
+                <span className="text-emerald-400 font-mono text-xs font-black bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                  ₦3,500 Flat Fee
+                </span>
+              </div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight">
+                WAEC Scratch Card & Serial PIN Portal
+              </h3>
+              <p className="text-xs text-slate-300 font-medium leading-relaxed max-w-2xl mt-1">
+                Instant Flutterwave integrated payment for checking WASSCE & GCE candidate results. Unlocks access form for <span className="text-amber-300 font-mono font-bold">https://serial-pin.waec.org/</span>
+              </p>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={() => setShowWaecCardPortal(true)}
+            className="w-full md:w-auto px-10 py-5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-xs transition-all shadow-[0_15px_30px_rgba(251,191,36,0.3)] hover:scale-[1.05] active:scale-95 flex items-center justify-center gap-3 shrink-0 relative z-10"
+          >
+            Buy WAEC Scratch Card <ArrowRight className="w-4 h-4" />
+          </button>
+        </motion.div>
+
         {/* Prominent Active Launching Button / CTA Card for the Extended AI Study Platform */}
         <motion.div
           initial={{ opacity: 0, y: 25 }}
@@ -673,6 +721,13 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           />
         )}
 
+        {showWaecCardPortal && (
+          <WaecScratchCardPortal 
+            user={user}
+            onClose={() => setShowWaecCardPortal(false)}
+          />
+        )}
+
         {/* Academic Hub Detail Overlay */}
         {activeHubDetails && (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 backdrop-blur-md p-4 md:p-8 flex items-center justify-center">
@@ -717,6 +772,10 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                       }
                       if (sub.serviceType === 'PAYMENT') {
                         setShowJambPaymentModal(true);
+                        return;
+                      }
+                      if (sub.serviceType === 'WAEC_CARD' || sub.title.toLowerCase().includes('waec scratch card') || sub.title.toLowerCase().includes('buy waec')) {
+                        setShowWaecCardPortal(true);
                         return;
                       }
                       if (sub.serviceType === 'THESIS_PLANNER') {
