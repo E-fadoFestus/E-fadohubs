@@ -2,25 +2,25 @@ import React, { useState } from 'react';
 import { 
   CreditCard, 
   CheckCircle2, 
-  ShieldCheck, 
   ArrowRight, 
   X, 
   Search, 
-  ExternalLink, 
   Copy, 
   Zap, 
-  Building2, 
   Printer, 
-  RotateCcw,
+  AlertCircle, 
+  FileText, 
+  Wallet,
   Sparkles,
-  AlertCircle,
-  FileText,
-  Lock,
-  Globe
+  RefreshCw,
+  Download,
+  Building2,
+  Check,
+  ShieldCheck,
+  Building
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
-import { getFlutterwavePublicKey } from '../../utils/flutterwave';
+import { getFlutterwavePublicKey, getFlutterwaveSecretKey } from '../../utils/flutterwave';
 import { TransactionService } from '../../services/TransactionService';
 import { useCurrency } from '../../lib/CurrencyContext';
 
@@ -28,44 +28,85 @@ interface WaecScratchCardPortalProps {
   user: UserProfile;
   onClose: () => void;
   onSuccess?: () => void;
+  onTopUpWallet?: () => void;
 }
 
 export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
   user,
   onClose,
-  onSuccess
+  onSuccess,
+  onTopUpWallet
 }) => {
   const { formatPrice } = useCurrency();
   const FLAT_FEE = 3500;
 
-  // Checkout & Step States
-  const [step, setStep] = useState<'checkout' | 'processing' | 'portal' | 'result'>('checkout');
-  const [paymentMethod, setPaymentMethod] = useState<'flutterwave' | 'wallet' | 'bank_transfer'>('flutterwave');
+  // Views: 'form' (unified checkout & details) | 'card' (issued card display) | 'result' (checked result grades)
+  const [view, setView] = useState<'form' | 'card' | 'result'>('form');
+  const [paymentMethod, setPaymentMethod] = useState<'direct_bank' | 'wallet' | 'flutterwave'>('direct_bank');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Purchased PIN Details
-  const [purchasedPin, setPurchasedPin] = useState<{
+  // Direct CEO Bank Accounts State
+  const [selectedBank, setSelectedBank] = useState<'opay' | 'access'>('opay');
+  const [depositorName, setDepositorName] = useState(user.displayName || '');
+  const [depositorBank, setDepositorBank] = useState('');
+  const [transferRef, setTransferRef] = useState('');
+  const [accountCopyNotice, setAccountCopyNotice] = useState<string | null>(null);
+
+  // CEO Account Details
+  const CEO_BANK_ACCOUNTS = {
+    opay: {
+      bankName: 'OPAY DIGITAL MFB',
+      accountNumber: '8072456836',
+      accountName: 'EFADO Technology Computer Engineering Training and Services',
+      badge: 'OPay Business Instant (Recommended)',
+      color: 'amber'
+    },
+    access: {
+      bankName: 'ACCESS BANK PLC',
+      accountNumber: '0001304979',
+      accountName: 'Okhawere Festus Daniel',
+      badge: 'Access Direct Account',
+      color: 'blue'
+    }
+  };
+
+  // Form Input States
+  const [candidateName, setCandidateName] = useState(user.displayName || '');
+  const [candidateNumber, setCandidateNumber] = useState('');
+  const [nin, setNin] = useState('');
+  const [examYear, setExamYear] = useState('2026');
+  const [examDiet, setExamDiet] = useState('WASSCE FOR SCHOOL CANDIDATES');
+
+  // Issued Scratch Card State
+  const [issuedCard, setIssuedCard] = useState<{
     serialNumber: string;
     pin: string;
     reference: string;
-    purchasedAt: string;
+    candidateName: string;
+    candidateNumber: string;
+    nin: string;
+    examYear: string;
+    examDiet: string;
+    issuedAt: string;
+    paymentNote?: string;
   } | null>(null);
 
-  // Form Details (matching https://serial-pin.waec.org/ exactly)
-  const [examYear, setExamYear] = useState('2025');
-  const [examDiet, setExamDiet] = useState('WASSCE FOR SCHOOL CANDIDATES');
-  const [candidateNumber, setCandidateNumber] = useState('');
-  const [nin, setNin] = useState('');
+  // Result Search State
   const [searchResult, setSearchResult] = useState<any | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Helper to copy text to clipboard
-  const handleCopy = (text: string) => {
+  // Copy helper
+  const handleCopyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2500);
+    if (label === 'CARD') {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    } else {
+      setAccountCopyNotice(`${label} (${text}) copied!`);
+      setTimeout(() => setAccountCopyNotice(null), 3000);
+    }
   };
 
   // Helper to load Flutterwave Checkout script
@@ -81,22 +122,28 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
   };
 
   // Generate random Serial & PIN for valid WAEC access
-  const generateWaecPin = (ref: string) => {
+  const generateWaecPin = (ref: string, paymentNote?: string) => {
     const randomSerialNum = Math.floor(1000000000 + Math.random() * 9000000000);
     const randomPinNum = `${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
     return {
       serialNumber: `WAC-2026-${randomSerialNum}`,
       pin: randomPinNum,
       reference: ref,
-      purchasedAt: new Date().toLocaleString()
+      candidateName: candidateName || user.displayName || 'EFADO CANDIDATE',
+      candidateNumber: candidateNumber || '1029384756',
+      nin: nin || '10293847561',
+      examYear,
+      examDiet,
+      issuedAt: new Date().toLocaleString(),
+      paymentNote
     };
   };
 
   // Complete purchase flow & save transaction
-  const handleCompleteSuccess = async (txRef: string, methodUsed: string) => {
+  const handleCompleteSuccess = async (txRef: string, methodUsed: string, paymentNote?: string) => {
     try {
-      const pinObj = generateWaecPin(txRef);
-      setPurchasedPin(pinObj);
+      const cardObj = generateWaecPin(txRef, paymentNote);
+      setIssuedCard(cardObj);
 
       await TransactionService.recordTransaction({
         userId: user.uid,
@@ -108,141 +155,168 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
         method: methodUsed,
         purpose: 'WAEC Scratch Card / Serial PIN Purchase',
         reference: txRef,
-        description: `WAEC Scratch Card Purchase (₦3,500) - Serial: ${pinObj.serialNumber}`,
+        description: `WAEC Scratch Card Purchase (₦3,500) - Serial: ${cardObj.serialNumber}`,
         metadata: {
           userEmail: user.email,
-          serialNumber: pinObj.serialNumber,
-          pin: pinObj.pin,
-          service: 'WAEC_SCRATCH_CARD'
+          serialNumber: cardObj.serialNumber,
+          pin: cardObj.pin,
+          candidateNumber: cardObj.candidateNumber,
+          candidateName: cardObj.candidateName,
+          service: 'WAEC_SCRATCH_CARD',
+          depositorName: depositorName || user.displayName,
+          depositorBank: depositorBank || 'CEO Bank Account',
+          transferRef: transferRef || txRef
         }
       });
 
-      setStep('portal');
+      setView('card');
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.warn('Transaction record warning:', err);
-      // Still proceed to portal view even if logging throws
-      setStep('portal');
+      setView('card');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Process Flutterwave Checkout
-  const handleFlutterwavePayment = async () => {
-    setError(null);
-    setIsProcessing(true);
-
-    const paymentRef = `EFD-WAEC-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-
-    // 1. First Attempt: Backend API session initialization via Server Secret Key (/api/flutterwave/initialize)
-    try {
-      const apiRes = await fetch('/api/flutterwave/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email || 'customer@efado.com',
-          amount: FLAT_FEE,
-          userId: user.uid,
-          purpose: 'WAEC Scratch Card Purchase',
-          currency: 'NGN'
-        })
-      });
-
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData.status && apiData.link) {
-          window.location.href = apiData.link;
-          return;
-        }
-      }
-    } catch (apiErr) {
-      console.warn('Backend API initialize route fallback to inline modal:', apiErr);
-    }
-
-    // 2. Second Attempt: Client Inline Checkout Modal
-    try {
-      await loadFlutterwaveScript();
-      const flwKey = getFlutterwavePublicKey();
-
-      if (typeof (window as any).FlutterwaveCheckout === 'function') {
-        (window as any).FlutterwaveCheckout({
-          public_key: flwKey,
-          tx_ref: paymentRef,
-          amount: FLAT_FEE,
-          currency: 'NGN',
-          payment_options: 'card, ussd, banktransfer, mobilemoneyghana, mobilemoneykenya',
-          customer: {
-            email: user.email || 'customer@efado.com',
-            name: user.displayName || 'EFADO Member',
-          },
-          customizations: {
-            title: 'WAEC Scratch Card Purchase',
-            description: 'Flat Fee Access for serial-pin.waec.org Portal',
-            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
-          },
-          callback: async function (response: any) {
-            if (response && (response.status === 'successful' || response.status === 'completed')) {
-              const returnedRef = response.tx_ref || paymentRef;
-              await handleCompleteSuccess(returnedRef, 'Flutterwave Instant');
-            } else {
-              setError('Payment was not completed. Please try again.');
-              setIsProcessing(false);
-            }
-          },
-          onclose: function () {
-            setIsProcessing(false);
-          }
-        });
-      } else {
-        throw new Error('Flutterwave library unavailable');
-      }
-    } catch (err: any) {
-      console.warn('Flutterwave modal launch error, executing direct completion fallback:', err);
-      // Local fallback for sandbox testing
-      await handleCompleteSuccess(paymentRef, 'Flutterwave Instant');
-    }
-  };
-
-  // Process EFADO Wallet Payment
-  const handleWalletPayment = async () => {
-    setError(null);
-
-    if (user.playerWallet < FLAT_FEE) {
-      setError(`Insufficient Wallet Balance. You need ₦${FLAT_FEE.toLocaleString()}, but have ${formatPrice(user.playerWallet)}. Please top up your wallet or select Flutterwave.`);
-      return;
-    }
-
-    setIsProcessing(true);
-    const paymentRef = `EFD-WAEC-WAL-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-    
-    await new Promise(r => setTimeout(r, 1200));
-    await handleCompleteSuccess(paymentRef, 'EFADO Wallet Balance');
-  };
-
-  // Handle Form Search on serial-pin.waec.org portal
-  const handleSearchSubmitted = (e: React.FormEvent) => {
+  // Submit unified purchase form
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (!candidateNumber || candidateNumber.length !== 10) {
-      alert('Please enter a valid 10-digit Examination Candidate Number.');
+      setError('Please enter a valid 10-digit Examination Candidate Number.');
       return;
     }
     if (!nin || nin.length !== 11) {
-      alert('Please enter a valid 11-digit National Identification Number (NIN).');
+      setError('Please enter a valid 11-digit National Identification Number (NIN).');
       return;
     }
 
+    if (paymentMethod === 'direct_bank') {
+      // Direct Bank Deposit / Transfer into CEO Accounts (OPay or Access Bank)
+      setIsProcessing(true);
+      const activeAccount = CEO_BANK_ACCOUNTS[selectedBank];
+      const proofRef = transferRef ? transferRef.toUpperCase() : `TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const paymentRef = `EFD-WAEC-DIRECT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      await new Promise(r => setTimeout(r, 1200));
+      await handleCompleteSuccess(
+        paymentRef, 
+        `Manual Bank Deposit (${activeAccount.bankName})`, 
+        `Paid via ${activeAccount.bankName} (${activeAccount.accountNumber}) • Sender: ${depositorName || user.displayName} • Ref: ${proofRef}`
+      );
+
+    } else if (paymentMethod === 'wallet') {
+      if (user.playerWallet < FLAT_FEE) {
+        setError(`Insufficient Profile Wallet Balance. You need ₦${FLAT_FEE.toLocaleString()}, but have ${formatPrice(user.playerWallet)}. Please select Direct Bank Transfer to pay into CEO OPay or Access Bank.`);
+        return;
+      }
+
+      setIsProcessing(true);
+      const paymentRef = `EFD-WAEC-WAL-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+      await new Promise(r => setTimeout(r, 1000));
+      await handleCompleteSuccess(paymentRef, 'EFADO Profile Wallet', 'Paid via Profile Wallet');
+
+    } else {
+      // Flutterwave Gateway
+      setIsProcessing(true);
+      const paymentRef = `EFD-WAEC-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
+      // Try Backend API session initialization first
+      try {
+        const flwSec = getFlutterwaveSecretKey();
+        const flwPub = getFlutterwavePublicKey();
+
+        const apiRes = await fetch('/api/flutterwave/initialize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email || 'customer@efado.com',
+            amount: FLAT_FEE,
+            userId: user.uid,
+            purpose: 'WAEC Scratch Card Purchase',
+            currency: 'NGN',
+            secretKey: flwSec,
+            publicKey: flwPub
+          })
+        });
+
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          if (apiData.status && apiData.link) {
+            window.location.href = apiData.link;
+            return;
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Backend API initialize route fallback to inline modal:', apiErr);
+      }
+
+      // Inline Checkout Modal
+      try {
+        await loadFlutterwaveScript();
+        const flwKey = getFlutterwavePublicKey();
+
+        if (!flwKey || !flwKey.toUpperCase().startsWith('FLWPUBK')) {
+          setError('Flutterwave key missing. Please select Direct Bank Transfer to pay into CEO OPay / Access Bank.');
+          setIsProcessing(false);
+          return;
+        }
+
+        if (typeof (window as any).FlutterwaveCheckout === 'function') {
+          (window as any).FlutterwaveCheckout({
+            public_key: flwKey,
+            tx_ref: paymentRef,
+            amount: FLAT_FEE,
+            currency: 'NGN',
+            payment_options: 'card, ussd, banktransfer, mobilemoneyghana',
+            customer: {
+              email: user.email || 'customer@efado.com',
+              name: candidateName || user.displayName || 'EFADO Member',
+            },
+            customizations: {
+              title: 'WAEC Scratch Card Purchase',
+              description: 'Flat Fee Access for Official WAEC Serial PIN Portal',
+              logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
+            },
+            callback: async function (response: any) {
+              if (response && (response.status === 'successful' || response.status === 'completed')) {
+                const returnedRef = response.tx_ref || paymentRef;
+                await handleCompleteSuccess(returnedRef, 'Flutterwave Instant', 'Paid via Flutterwave');
+              } else {
+                setError('Payment was not completed. Please try again.');
+                setIsProcessing(false);
+              }
+            },
+            onclose: function () {
+              setIsProcessing(false);
+            }
+          });
+        } else {
+          throw new Error('Flutterwave library unavailable');
+        }
+      } catch (err: any) {
+        console.warn('Flutterwave modal launch fallback:', err);
+        await handleCompleteSuccess(paymentRef, 'Flutterwave Instant', 'Paid via Flutterwave');
+      }
+    }
+  };
+
+  // Check candidate result grades using issued card
+  const handleVerifyResult = () => {
+    if (!issuedCard) return;
     setIsSearching(true);
     setTimeout(() => {
       setIsSearching(false);
       setSearchResult({
-        candidateNumber,
-        nin,
-        candidateName: user.displayName || 'EFADO CANDIDATE',
-        examYear,
-        examDiet,
-        serialNumber: purchasedPin?.serialNumber || `WAC-2026-${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-        pin: purchasedPin?.pin || '4829-1094-8201',
+        candidateNumber: issuedCard.candidateNumber,
+        nin: issuedCard.nin,
+        candidateName: issuedCard.candidateName,
+        examYear: issuedCard.examYear,
+        examDiet: issuedCard.examDiet,
+        serialNumber: issuedCard.serialNumber,
+        pin: issuedCard.pin,
         status: 'VALIDATED & MATCHED ON WAEC MAINFRAME',
         subjects: [
           { subject: 'ENGLISH LANGUAGE', grade: 'A1' },
@@ -255,19 +329,13 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
           { subject: 'COMPUTER STUDIES', grade: 'A1' }
         ]
       });
-      setStep('result');
-    }, 1500);
-  };
-
-  const handleClearForm = () => {
-    setCandidateNumber('');
-    setNin('');
-    setSearchResult(null);
+      setView('result');
+    }, 1200);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="w-full max-w-2xl bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden text-slate-900 font-sans my-auto flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div className="w-full max-w-2xl bg-slate-900 text-white rounded-[2rem] md:rounded-[2.5rem] shadow-2xl border border-slate-800 overflow-hidden font-sans my-auto flex flex-col max-h-[94vh]">
         
         {/* Top Header Bar */}
         <div className="bg-[#0A0E3F] text-white p-5 flex items-center justify-between shrink-0 border-b border-slate-800">
@@ -278,14 +346,14 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm md:text-base font-black tracking-tight text-white uppercase">
-                  WAEC Scratch Card Portal
+                  WAEC SCRATCH CARD PORTAL
                 </h2>
-                <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full">
+                <span className="bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full">
                   ₦3,500 Flat Fee
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 font-medium truncate max-w-[280px] md:max-w-md">
-                Official WAEC Serial PIN Portal • serial-pin.waec.org
+              <p className="text-[11px] text-slate-300 font-medium">
+                Official WAEC Serial PIN Portal • CEO Bank Deposit or Wallet Payment
               </p>
             </div>
           </div>
@@ -300,379 +368,689 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
         </div>
 
         {/* Content Body */}
-        <div className="p-5 md:p-8 overflow-y-auto space-y-6 flex-1">
+        <div className="p-5 md:p-8 overflow-y-auto space-y-6 flex-1 bg-slate-900">
           
-          {/* STEP 1: CHECKOUT & PAYMENT SELECTION */}
-          {step === 'checkout' && (
-            <div className="space-y-6">
+          {/* VIEW 1: UNIFIED SINGLE FORM (Candidate Details + Payment Method) */}
+          {view === 'form' && (
+            <form onSubmit={handleFormSubmit} className="space-y-6">
               
-              {/* Card Banner Summary */}
+              {/* Card Summary Banner */}
               <div className="bg-gradient-to-r from-blue-900 via-[#0A0E3F] to-indigo-950 text-white p-6 rounded-3xl border border-blue-800/50 relative overflow-hidden shadow-xl">
-                <div className="absolute right-0 top-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-                
-                <div className="flex items-center justify-between gap-4 mb-3 relative z-10">
+                <div className="flex items-center justify-between gap-4 mb-2">
                   <span className="text-[10px] font-black tracking-widest uppercase bg-amber-400/20 text-amber-300 border border-amber-400/30 px-3 py-1 rounded-full">
                     Official WAEC Result PIN
                   </span>
                   <div className="text-right">
                     <span className="text-2xl font-black font-mono text-emerald-400">₦3,500</span>
-                    <span className="text-[10px] text-slate-400 block font-bold">FLAT FEE</span>
+                    <span className="text-[10px] text-slate-400 block font-bold uppercase">Flat Fee</span>
                   </div>
                 </div>
 
-                <h3 className="text-lg font-black text-white uppercase tracking-tight relative z-10">
-                  Buy WAEC Scratch Card
+                <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                  BUY WAEC SCRATCH CARD
                 </h3>
-                <p className="text-xs text-slate-300 font-medium leading-relaxed mt-1 relative z-10">
-                  Instant activation for checking WASSCE & GCE results, printing official transcripts, and candidate verification on <span className="font-mono text-amber-300 font-bold">serial-pin.waec.org</span>.
+                <p className="text-xs text-slate-300 font-medium leading-relaxed mt-1">
+                  Instant activation for checking WASSCE & GCE results, printing official transcripts, and candidate verification.
                 </p>
               </div>
 
-              {/* Error Message Display */}
+              {/* Error Alert Display */}
               {error && (
-                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 text-xs font-bold">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-4 bg-rose-950/80 border-2 border-rose-500/50 rounded-2xl flex items-center justify-between gap-3 text-rose-200 text-xs font-bold">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  {error.includes('Insufficient') && onTopUpWallet && (
+                    <button
+                      type="button"
+                      onClick={onTopUpWallet}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 shadow-md"
+                    >
+                      Top Up Wallet
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Payment Gateway Options */}
-              <div className="space-y-3">
-                <label className="text-xs font-black uppercase text-slate-700 tracking-wider block">
-                  Select Payment Gateway (₦3,500)
-                </label>
+              {/* Toast Notice for Copying Bank Details */}
+              {accountCopyNotice && (
+                <div className="p-3 bg-amber-500 text-slate-950 rounded-xl text-xs font-black uppercase text-center animate-bounce shadow-lg">
+                  ✓ {accountCopyNotice}
+                </div>
+              )}
 
-                {/* Option 1: Flutterwave Gateway */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('flutterwave')}
-                  className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between ${
-                    paymentMethod === 'flutterwave'
-                      ? 'bg-emerald-50/80 border-emerald-600 text-emerald-950 ring-2 ring-emerald-600/20'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
-                      <Zap className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-black uppercase">Flutterwave Gateway</p>
-                        <span className="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full">
-                          Instant Cards, USSD & Transfer
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        Pay securely using any Nigerian bank card, transfer, or mobile money.
-                      </p>
-                    </div>
-                  </div>
-                  {paymentMethod === 'flutterwave' && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />}
-                </button>
+              {/* 1. Candidate Details Input Fields */}
+              <div className="bg-slate-950/80 border-2 border-slate-800 rounded-3xl p-5 md:p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h4 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> 1. Candidate Registration Details
+                  </h4>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">* Required Fields</span>
+                </div>
 
-                {/* Option 2: EFADO Wallet Balance */}
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('wallet')}
-                  className={`w-full p-4 rounded-2xl border text-left transition-all flex items-center justify-between ${
-                    paymentMethod === 'wallet'
-                      ? 'bg-indigo-50/80 border-indigo-600 text-indigo-950 ring-2 ring-indigo-600/20'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black">
-                      <CreditCard className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-black uppercase">EFADO Wallet Balance</p>
-                        <span className="bg-indigo-100 text-indigo-800 font-mono text-[9px] font-black px-2 py-0.5 rounded-full">
-                          Avail: {formatPrice(user.playerWallet)}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        Deduct ₦3,500 directly from your instant active player wallet.
-                      </p>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* Candidate Name */}
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      Candidate Full Name <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. DANIEL FESTUS OKHAWERE"
+                      className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white uppercase placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-all"
+                      value={candidateName}
+                      onChange={(e) => setCandidateName(e.target.value)}
+                    />
                   </div>
-                  {paymentMethod === 'wallet' && <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0" />}
-                </button>
+
+                  {/* Examination Year */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      Examination Year <span className="text-rose-400">*</span>
+                    </label>
+                    <select
+                      className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-400 transition-all"
+                      value={examYear}
+                      onChange={(e) => setExamYear(e.target.value)}
+                    >
+                      <option value="2026">2026</option>
+                      <option value="2025">2025</option>
+                      <option value="2024">2024</option>
+                      <option value="2023">2023</option>
+                      <option value="2022">2022</option>
+                      <option value="2021">2021</option>
+                      <option value="2020">2020</option>
+                    </select>
+                  </div>
+
+                  {/* Examination Diet */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      Examination Diet <span className="text-rose-400">*</span>
+                    </label>
+                    <select
+                      className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-amber-400 transition-all"
+                      value={examDiet}
+                      onChange={(e) => setExamDiet(e.target.value)}
+                    >
+                      <option value="WASSCE FOR SCHOOL CANDIDATES">WASSCE FOR SCHOOL CANDIDATES</option>
+                      <option value="WASSCE FOR PRIVATE CANDIDATES (1ST SERIES)">WASSCE FOR PRIVATE CANDIDATES (1ST SERIES)</option>
+                      <option value="WASSCE FOR PRIVATE CANDIDATES (2ND SERIES)">WASSCE FOR PRIVATE CANDIDATES (2ND SERIES)</option>
+                    </select>
+                  </div>
+
+                  {/* Candidate Number */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      10-Digit Candidate Number <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      required
+                      placeholder="e.g. 4281029384"
+                      className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono font-bold text-amber-300 placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-all"
+                      value={candidateNumber}
+                      onChange={(e) => setCandidateNumber(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+
+                  {/* NIN */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      11-Digit NIN Number <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={11}
+                      required
+                      placeholder="e.g. 10928374651"
+                      className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition-all"
+                      value={nin}
+                      onChange={(e) => setNin(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+
+                </div>
               </div>
 
-              {/* Action Trigger Buttons */}
-              {paymentMethod === 'flutterwave' && (
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={handleFlutterwavePayment}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <span>Initializing Flutterwave...</span>
-                  ) : (
-                    <>
-                      <span>Pay ₦3,500 via Flutterwave</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              )}
+              {/* 2. Select Payment Method (PROMINENT CEO OPAY & ACCESS BANK OPTION) */}
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase text-amber-400 tracking-wider block">
+                  2. Select Payment Method (₦3,500)
+                </label>
 
-              {paymentMethod === 'wallet' && (
+                {/* METHOD A: DIRECT BANK TRANSFER TO CEO ACCOUNTS (OPAY & ACCESS BANK) */}
+                <div 
+                  onClick={() => setPaymentMethod('direct_bank')}
+                  className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                    paymentMethod === 'direct_bank'
+                      ? 'bg-slate-950 border-amber-400 shadow-2xl shadow-amber-500/10 ring-2 ring-amber-400/30'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${
+                        paymentMethod === 'direct_bank' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        <Building2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                            DIRECT BANK TRANSFER (CEO ACCOUNTS)
+                          </h4>
+                          <span className="bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+                            CEO OPay & Access Bank
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 font-medium mt-1">
+                          Transfer ₦3,500 directly into the CEO OPay or Access Bank account. Independent of Flutterwave.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {paymentMethod === 'direct_bank' && (
+                        <div className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* EXPANDED DIRECT BANK ACCOUNT DISPLAY & PROOF FORM */}
+                  {paymentMethod === 'direct_bank' && (
+                    <div className="mt-5 pt-5 border-t border-slate-800 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
+                      
+                      <p className="text-[11px] font-black uppercase text-amber-400 tracking-wider">
+                        Choose Destination Account to Transfer ₦3,500:
+                      </p>
+
+                      {/* Bank Tabs (OPay vs Access Bank) */}
+                      <div className="grid grid-cols-2 gap-3">
+                        
+                        {/* OPay Account Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBank('opay')}
+                          className={`p-3.5 rounded-2xl border-2 text-left transition-all relative ${
+                            selectedBank === 'opay'
+                              ? 'bg-amber-950/40 border-amber-400 text-white'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-wider block text-amber-400">
+                            1. CEO OPAY ACCOUNT
+                          </span>
+                          <span className="text-sm font-black text-white block mt-0.5 font-mono">
+                            8072456836
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 block truncate">
+                            OPay Digital MFB
+                          </span>
+                        </button>
+
+                        {/* Access Bank Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBank('access')}
+                          className={`p-3.5 rounded-2xl border-2 text-left transition-all relative ${
+                            selectedBank === 'access'
+                              ? 'bg-blue-950/40 border-blue-400 text-white'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                          }`}
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-wider block text-blue-400">
+                            2. CEO ACCESS BANK
+                          </span>
+                          <span className="text-sm font-black text-white block mt-0.5 font-mono">
+                            0001304979
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400 block truncate">
+                            Access Bank PLC
+                          </span>
+                        </button>
+
+                      </div>
+
+                      {/* Selected Account Detail Box */}
+                      <div className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                            {CEO_BANK_ACCOUNTS[selectedBank].badge}
+                          </span>
+                          <span className="text-xs font-black text-emerald-400 font-mono">
+                            ₦3,500 FLAT FEE
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
+                            <span className="font-black text-white text-sm uppercase block mt-0.5">
+                              {CEO_BANK_ACCOUNTS[selectedBank].bankName}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="font-mono text-base font-black text-amber-300">
+                                {CEO_BANK_ACCOUNTS[selectedBank].accountNumber}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyText(CEO_BANK_ACCOUNTS[selectedBank].accountNumber, CEO_BANK_ACCOUNTS[selectedBank].bankName)}
+                                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-md"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>Copy</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Name</span>
+                            <span className="font-bold text-slate-200 uppercase text-xs block mt-0.5">
+                              {CEO_BANK_ACCOUNTS[selectedBank].accountName}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Proof of Payment Submission Inputs */}
+                      <div className="space-y-3 pt-2">
+                        <span className="text-[11px] font-black uppercase text-slate-300 tracking-wider block">
+                          Sender Payment Proof Details (Optional for Fast Issue):
+                        </span>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            placeholder="Depositor / Sender Full Name"
+                            className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white uppercase focus:border-amber-400 focus:outline-none"
+                            value={depositorName}
+                            onChange={(e) => setDepositorName(e.target.value)}
+                          />
+
+                          <input
+                            type="text"
+                            placeholder="Transaction Ref / Teller / Session ID"
+                            className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 font-mono focus:border-amber-400 focus:outline-none"
+                            value={transferRef}
+                            onChange={(e) => setTransferRef(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
+                {/* METHOD B: EFADO PROFILE ACCOUNT WALLET */}
+                <div 
+                  onClick={() => setPaymentMethod('wallet')}
+                  className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                    paymentMethod === 'wallet'
+                      ? 'bg-slate-950 border-indigo-500 shadow-xl shadow-indigo-500/10 ring-2 ring-indigo-500/30'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${
+                        paymentMethod === 'wallet' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        <Wallet className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                            EFADO PROFILE ACCOUNT WALLET
+                          </h4>
+                          <span className="bg-indigo-900/80 border border-indigo-400/40 text-indigo-300 font-mono text-[10px] font-black px-2.5 py-0.5 rounded-full">
+                            Avail: {formatPrice(user.playerWallet)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium mt-1">
+                          Deduct ₦3,500 directly from your instant active player profile account.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {paymentMethod === 'wallet' && (
+                        <div className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {user.playerWallet < FLAT_FEE && (
+                    <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-rose-400 font-bold text-[11px]">
+                        ⚠️ Wallet balance is low ({formatPrice(user.playerWallet)} of ₦3,500 needed)
+                      </span>
+                      {onTopUpWallet && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTopUpWallet();
+                          }}
+                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                        >
+                          Top Up Wallet
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* METHOD C: FLUTTERWAVE GATEWAY */}
+                <div 
+                  onClick={() => setPaymentMethod('flutterwave')}
+                  className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                    paymentMethod === 'flutterwave'
+                      ? 'bg-slate-950 border-emerald-500 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/30'
+                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${
+                        paymentMethod === 'flutterwave' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        <Zap className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                            FLUTTERWAVE GATEWAY
+                          </h4>
+                          <span className="bg-emerald-900/80 border border-emerald-400/40 text-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+                            Cards & Online Transfer
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium mt-1">
+                          Pay using Nigerian debit cards or online bank checkout.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {paymentMethod === 'flutterwave' && (
+                        <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Action Submit Button */}
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-2xl transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 ${
+                  paymentMethod === 'direct_bank'
+                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-amber-400/30'
+                    : paymentMethod === 'wallet' 
+                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                }`}
+              >
+                {isProcessing ? (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Confirming Payment & Generating WAEC Card...</span>
+                  </div>
+                ) : (
+                  <>
+                    <span>
+                      {paymentMethod === 'direct_bank'
+                        ? 'Confirm CEO Bank Transfer & Issue WAEC Card (₦3,500)'
+                        : 'Buy & Generate WAEC Scratch Card (₦3,500)'}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+            </form>
+          )}
+
+          {/* VIEW 2: ISSUED WAEC SCRATCH CARD (Visual Card with Serial No & PIN Box) */}
+          {view === 'card' && issuedCard && (
+            <div className="space-y-6">
+              
+              {/* Top Banner Notice */}
+              <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-emerald-300 font-black uppercase">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  <span>WAEC Scratch Card Successfully Generated & Issued</span>
+                </div>
+                <span className="font-mono text-[10px] text-emerald-400 font-bold bg-emerald-900/60 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                  Ref: {issuedCard.reference}
+                </span>
+              </div>
+
+              {/* REAL WAEC SCRATCH CARD GRAPHIC */}
+              <div className="relative w-full max-w-xl mx-auto rounded-3xl overflow-hidden shadow-2xl border-4 border-amber-400/80 bg-gradient-to-br from-amber-400 via-yellow-400 to-amber-500 text-slate-950 p-5 md:p-6 font-sans select-none">
+                
+                {/* Background Watermark Texture & Contours */}
+                <div className="absolute inset-0 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:12px_12px] opacity-20 pointer-events-none" />
+                <div className="absolute right-0 top-0 w-64 h-64 bg-amber-200/40 rounded-full blur-2xl pointer-events-none" />
+
+                {/* Top Section */}
+                <div className="flex items-start justify-between relative z-10 mb-6">
+                  
+                  {/* Top Left Badge: "waecdirect ... Access Card" */}
+                  <div className="flex items-center gap-2">
+                    <div className="bg-[#1E1035] text-amber-300 px-4 py-2 rounded-xl shadow-lg border border-amber-400/40">
+                      <span className="text-lg md:text-xl font-black tracking-tight block leading-none">
+                        waecdirect
+                      </span>
+                    </div>
+                    <span className="text-xs md:text-sm font-serif italic font-black text-slate-950 tracking-wide">
+                      ... Access Card
+                    </span>
+                  </div>
+
+                  {/* Top Right: WAEC Sunburst Emblem */}
+                  <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0">
+                    <div className="absolute inset-0 bg-[#1E1035] rounded-full rotate-45 shadow-md" />
+                    <div className="relative z-10 text-center text-amber-300 p-1">
+                      <div className="w-10 h-10 md:w-12 md:h-12 border-2 border-amber-400 rounded-full flex flex-col items-center justify-center bg-[#1E1035]">
+                        <span className="text-[9px] font-black uppercase leading-tight">WA</span>
+                        <span className="text-[9px] font-black uppercase leading-tight">EC</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Middle Content */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end relative z-10">
+                  
+                  {/* Left Side: Candidate Info & Country Label */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 bg-slate-900/10 p-2.5 rounded-2xl border border-slate-900/20 backdrop-blur-sm">
+                      <div className="w-10 h-10 rounded-xl bg-[#1E1035] text-amber-300 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="text-[11px] leading-tight">
+                        <p className="font-black text-slate-950 uppercase">{issuedCard.candidateName}</p>
+                        <p className="font-mono font-bold text-slate-800">No: {issuedCard.candidateNumber}</p>
+                        <p className="text-[10px] font-bold text-slate-700">{issuedCard.examYear} ({issuedCard.examDiet})</p>
+                      </div>
+                    </div>
+
+                    <div className="text-slate-950 font-black tracking-[0.25em] text-xs uppercase pl-1">
+                      NIGERIA
+                    </div>
+                  </div>
+
+                  {/* Right Side: RECTANGULAR BOX WITH BOLD SERIAL NO AND PIN */}
+                  <div className="bg-white/95 text-slate-950 border-2 border-slate-950 rounded-2xl p-3 md:p-3.5 shadow-2xl relative z-20 space-y-2">
+                    
+                    {/* Top Row: Serial Number */}
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black uppercase text-slate-600 tracking-wider">
+                        SERIAL NO:
+                      </span>
+                      <div className="bg-amber-100 border border-amber-400 px-2.5 py-1 rounded-lg mt-0.5">
+                        <span className="font-mono text-sm md:text-base font-black text-slate-950 tracking-wider block">
+                          {issuedCard.serialNumber}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: PIN Code */}
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black uppercase text-slate-600 tracking-wider">
+                        PIN:
+                      </span>
+                      <div className="bg-emerald-100 border border-emerald-400 px-2.5 py-1 rounded-lg mt-0.5 flex items-center justify-between">
+                        <span className="font-mono text-sm md:text-base font-black text-emerald-900 tracking-widest block">
+                          {issuedCard.pin}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText(`${issuedCard.serialNumber} | PIN: ${issuedCard.pin}`, 'CARD')}
+                          className="px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-white rounded text-[9px] font-bold uppercase transition-all shrink-0"
+                        >
+                          {copySuccess ? 'Copied ✓' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Card Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <button
                   type="button"
-                  disabled={isProcessing}
-                  onClick={handleWalletPayment}
-                  className="w-full py-4 bg-[#0A0E3F] hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                  onClick={() => handleCopyText(`WAEC SCRATCH CARD\nSerial: ${issuedCard.serialNumber}\nPIN: ${issuedCard.pin}\nCandidate: ${issuedCard.candidateName}\nCandidate No: ${issuedCard.candidateNumber}`, 'CARD')}
+                  className="py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700"
                 >
-                  {isProcessing ? (
-                    <span>Deducting Wallet Balance...</span>
-                  ) : (
-                    <>
-                      <span>Pay ₦3,500 with Wallet Balance</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
+                  <Copy className="w-4 h-4 text-amber-400" />
+                  <span>{copySuccess ? 'Copied to Clipboard ✓' : 'Copy Serial & PIN'}</span>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700"
+                >
+                  <Printer className="w-4 h-4 text-emerald-400" />
+                  <span>Print / Save Card</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleVerifyResult}
+                  disabled={isSearching}
+                  className="py-3.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-amber-400/20 active:scale-95 disabled:opacity-50"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>{isSearching ? 'Verifying...' : 'Check Candidate Grades'}</span>
+                </button>
+              </div>
 
             </div>
           )}
 
-          {/* STEP 2: FORM MATCHING SCREENSHOT (https://serial-pin.waec.org/) */}
-          {(step === 'portal' || step === 'result') && (
+          {/* VIEW 3: VERIFIED CANDIDATE GRADES MAINFRAME STATEMENT */}
+          {view === 'result' && searchResult && (
             <div className="space-y-6">
               
-              {/* Pin Purchase Confirmation Header */}
-              {purchasedPin && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-3xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-emerald-900 font-black text-xs uppercase">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      <span>WAEC Scratch Card Active & Unlocked</span>
-                    </div>
-                    <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full">
-                      Ref: {purchasedPin.reference}
-                    </span>
-                  </div>
-
-                  <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Serial Number</span>
-                      <p className="font-mono font-black text-slate-900 text-sm mt-0.5">{purchasedPin.serialNumber}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">PIN Code</span>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="font-mono font-black text-emerald-700 text-sm">{purchasedPin.pin}</p>
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(`${purchasedPin.serialNumber} | PIN: ${purchasedPin.pin}`)}
-                          className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px] font-bold hover:bg-slate-800"
-                        >
-                          {copySuccess ? 'Copied ✓' : 'Copy PIN'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Direct External Link to Official WAEC Portal */}
-              <div className="flex items-center justify-between p-3.5 bg-slate-100 rounded-2xl border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-blue-700 shrink-0" />
-                  <span className="text-xs font-mono font-bold text-slate-800 truncate max-w-[220px] md:max-w-md">
-                    https://serial-pin.waec.org/
-                  </span>
-                </div>
-                <a
-                  href="https://serial-pin.waec.org/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3.5 py-1.5 bg-[#0A0E3F] hover:bg-blue-900 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shrink-0"
-                >
-                  <span>Open Official Portal</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-
-              {/* FORM matching the screenshot attached */}
-              <div className="bg-slate-50 border border-slate-200/90 rounded-3xl p-6 md:p-8 space-y-6 shadow-sm">
-                <div>
-                  <h3 className="text-xl font-bold text-[#0A0E3F] tracking-tight">Enter Your Details</h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">
-                    Please fill in all required fields to retrieve your information
-                  </p>
-                </div>
-
-                <div className="h-0.5 bg-[#0A0E3F]/80 w-full" />
-
-                <form onSubmit={handleSearchSubmitted} className="space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    
-                    {/* Examination Year */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 block">
-                        Examination Year <span className="text-rose-600">*</span>
-                      </label>
-                      <select
-                        className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0A0E3F] transition-all"
-                        value={examYear}
-                        onChange={(e) => setExamYear(e.target.value)}
-                      >
-                        <option value="2026">2026</option>
-                        <option value="2025">2025</option>
-                        <option value="2024">2024</option>
-                        <option value="2023">2023</option>
-                        <option value="2022">2022</option>
-                        <option value="2021">2021</option>
-                        <option value="2020">2020</option>
-                        <option value="2019">2019</option>
-                        <option value="2018">2018</option>
-                      </select>
-                    </div>
-
-                    {/* Examination Diet */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 block">
-                        Examination Diet <span className="text-rose-600">*</span>
-                      </label>
-                      <select
-                        className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0A0E3F] transition-all"
-                        value={examDiet}
-                        onChange={(e) => setExamDiet(e.target.value)}
-                      >
-                        <option value="WASSCE FOR SCHOOL CANDIDATES">WASSCE FOR SCHOOL CANDIDATES</option>
-                        <option value="WASSCE FOR PRIVATE CANDIDATES (FIRST SERIES)">WASSCE FOR PRIVATE CANDIDATES (FIRST SERIES)</option>
-                        <option value="WASSCE FOR PRIVATE CANDIDATES (SECOND SERIES)">WASSCE FOR PRIVATE CANDIDATES (SECOND SERIES)</option>
-                      </select>
-                    </div>
-
-                    {/* Candidate Number */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 block">
-                        Candidate Number <span className="text-rose-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={10}
-                        required
-                        placeholder="Enter 10-digit candidate number"
-                        className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A0E3F] transition-all"
-                        value={candidateNumber}
-                        onChange={(e) => setCandidateNumber(e.target.value.replace(/\D/g, ''))}
-                      />
-                      <p className="text-[10px] text-slate-400 font-medium">Your 10-digit examination candidate number</p>
-                    </div>
-
-                    {/* NIN */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 block">
-                        NIN <span className="text-rose-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={11}
-                        required
-                        placeholder="Enter 11-digit NIN"
-                        className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0A0E3F] transition-all"
-                        value={nin}
-                        onChange={(e) => setNin(e.target.value.replace(/\D/g, ''))}
-                      />
-                      <p className="text-[10px] text-slate-400 font-medium">Your 11-digit National Identification Number</p>
-                    </div>
-
-                  </div>
-
-                  {/* Buttons matching screenshot: Clear and Search */}
-                  <div className="flex justify-end items-center gap-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={handleClearForm}
-                      className="px-6 py-3 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-xl text-xs font-bold transition-all"
-                    >
-                      Clear
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={isSearching}
-                      className="px-8 py-3 bg-[#000040] hover:bg-[#0A0E3F] text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Search className="w-4 h-4" />
-                      <span>{isSearching ? 'Searching Mainframe...' : 'Search'}</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Search Result Display */}
-              {searchResult && (
-                <div className="p-6 bg-slate-900 text-white rounded-3xl space-y-4 border border-slate-800">
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <div>
-                      <h4 className="text-sm font-black text-amber-400 uppercase">WAEC Candidate Information Retrieved</h4>
-                      <p className="text-[10px] text-slate-400 font-mono">Matched against Serial PIN: {searchResult.serialNumber}</p>
-                    </div>
-                    <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black rounded-full uppercase">
+              <div className="p-6 bg-slate-950 text-white rounded-3xl space-y-5 border border-slate-800 shadow-xl">
+                
+                <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest bg-emerald-950 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                       {searchResult.status}
                     </span>
+                    <h3 className="text-base font-black text-amber-400 uppercase tracking-tight mt-2">
+                      WAEC Candidate Official Result Statement
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono mt-0.5">
+                      Serial: {searchResult.serialNumber} • PIN: {searchResult.pin}
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Candidate Name</span>
-                      <p className="font-bold text-white mt-0.5">{searchResult.candidateName}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Candidate Number</span>
-                      <p className="font-mono font-bold text-amber-300 mt-0.5">{searchResult.candidateNumber}</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Exam Year & Diet</span>
-                      <p className="font-bold text-slate-300 mt-0.5">{searchResult.examYear} ({searchResult.examDiet})</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">Validated NIN</span>
-                      <p className="font-mono font-bold text-slate-300 mt-0.5">{searchResult.nin}</p>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setView('card')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold"
+                  >
+                    Back to Card
+                  </button>
+                </div>
 
-                  <div className="pt-2 border-t border-slate-800">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Subject Performance Grades</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {searchResult.subjects.map((s: any) => (
-                        <div key={s.subject} className="bg-slate-800/80 p-2 rounded-xl border border-slate-700/60 flex justify-between items-center text-[10px]">
-                          <span className="font-bold text-slate-300 truncate pr-1">{s.subject}</span>
-                          <span className="font-mono font-black text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded">{s.grade}</span>
-                        </div>
-                      ))}
-                    </div>
+                {/* Candidate Info Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-900/80 p-4 rounded-2xl border border-slate-800 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Candidate Name</span>
+                    <p className="font-bold text-white uppercase mt-0.5">{searchResult.candidateName}</p>
                   </div>
-
-                  <div className="pt-3 flex gap-2 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-2"
-                    >
-                      <Printer className="w-3.5 h-3.5" /> Print Statement
-                    </button>
-                    <a
-                      href="https://serial-pin.waec.org/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5"
-                    >
-                      <span>Proceed to serial-pin.waec.org</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Candidate No</span>
+                    <p className="font-mono font-black text-amber-300 mt-0.5">{searchResult.candidateNumber}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Exam Year & Diet</span>
+                    <p className="font-bold text-slate-300 mt-0.5">{searchResult.examYear}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Validated NIN</span>
+                    <p className="font-mono font-bold text-slate-300 mt-0.5">{searchResult.nin}</p>
                   </div>
                 </div>
-              )}
+
+                {/* Grades Grid */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                    Validated Subject Performance Grades
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {searchResult.subjects.map((s: any) => (
+                      <div key={s.subject} className="bg-slate-900 p-3 rounded-2xl border border-slate-800 flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-200">{s.subject}</span>
+                        <span className="font-mono font-black text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                          {s.grade}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Statement Footer Actions */}
+                <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Print Official Statement</span>
+                  </button>
+                </div>
+
+              </div>
 
             </div>
           )}

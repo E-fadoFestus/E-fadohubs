@@ -179,6 +179,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
   const [selectedL3, setSelectedL3] = useState<string | null>(null);
   const [selectedL4, setSelectedL4] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [adListings, setAdListings] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<MarketProduct[]>(SAMPLE_PRODUCTS);
   const [showRegModal, setShowRegModal] = useState(false);
   
@@ -345,12 +346,51 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     const unsub = onSnapshot(q, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketOrder)));
     });
-    return unsub;
+
+    const unsubAds = onSnapshot(collection(db, 'ad_listings'), (snap) => {
+      setAdListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => console.error("Error loading ad_listings in FairlyUsedMarket:", e));
+
+    return () => {
+      unsub();
+      unsubAds();
+    };
   }, [user.uid]);
 
   useEffect(() => {
-    let filtered = SAMPLE_PRODUCTS;
-    // ... (Your filter logic is correct, just adding search)
+    const userProducts: MarketProduct[] = adListings.map((ad: any) => ({
+      id: ad.id,
+      title: ad.title || 'Pre-Owned Asset',
+      price: Number(ad.price) || 0,
+      currency: 'NGN',
+      images: (ad.photos && ad.photos.length > 0) ? ad.photos : [`https://picsum.photos/seed/${ad.id}/600/400`],
+      rating: 5.0,
+      reviewsCount: 12,
+      vendor: {
+        id: ad.vendorId || 'user',
+        name: ad.contact?.email ? ad.contact.email.split('@')[0] : 'Community Seller',
+        verified: true,
+        rating: 5.0
+      },
+      delivery: {
+        methods: ['Direct Pickup', 'Verified Delivery'],
+        estimatedDays: '1-2 Days'
+      },
+      stock: ad.status === 'sold_out' ? 0 : 1,
+      description: ad.description || '',
+      categoryPath: {
+        level1: ad.category || 'Pre-Owned Gadgets',
+        level2: 'User Pre-Owned',
+        level3: 'Certified Used'
+      },
+      attributes: {
+        condition: 'Pre-Owned / Certified',
+        location: ad.location ? `${ad.location.city || ''}, ${ad.location.state || ''}` : 'Nigeria',
+        phone: ad.contact?.phone || ad.contact?.whatsapp || ''
+      }
+    }));
+
+    let filtered = [...userProducts, ...SAMPLE_PRODUCTS];
     if (selectedL1) filtered = filtered.filter(p => p.categoryPath.level1 === selectedL1);
     if (selectedL2) filtered = filtered.filter(p => p.categoryPath.level2 === selectedL2);
     if (selectedL3) filtered = filtered.filter(p => p.categoryPath.level3 === selectedL3);
@@ -362,7 +402,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       );
     }
     setFilteredProducts(filtered);
-  }, [selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
+  }, [adListings, selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
 
   const addToCart = (product: MarketProduct) => {
     setCart(prev => {

@@ -308,28 +308,36 @@ app.get('/api/paystack/verify/:reference', async (req: express.Request, res: exp
   }
 });
 
-// Route C: Bank Account Name Enquiry API (/api/bank/resolve)
+// Route C: Real Bank Account Name Enquiry API (/api/bank/resolve)
 app.get('/api/bank/resolve', async (req: express.Request, res: express.Response) => {
   const accountNumber = String(req.query.account_number || '').trim();
   const bankCode = String(req.query.bank_code || '').trim();
   const bankName = String(req.query.bank_name || '').trim();
+  const clientSecretKey = String(req.query.secret_key || req.headers['x-secret-key'] || '').trim();
 
   if (!accountNumber || accountNumber.length < 10) {
     return res.status(400).json({ status: false, message: 'Account number must be at least 10 digits.' });
   }
 
-  const paystackSecret = process.env.PAYSTACK_SECRET_KEY || process.env.VITE_PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || '';
-  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  // Determine active keys (Server env or client provided secret key)
+  let paystackSecret = process.env.PAYSTACK_SECRET_KEY || process.env.VITE_PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET || '';
+  if (clientSecretKey && clientSecretKey.startsWith('sk_')) {
+    paystackSecret = clientSecretKey;
+  }
 
-  // 1. Paystack Live Account Resolution API
+  let flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  if (clientSecretKey && (clientSecretKey.startsWith('FLWSECK') || clientSecretKey.length > 20)) {
+    flwSecret = clientSecretKey;
+  }
+
+  // Normalize Bank Code for Paystack & Flutterwave
   let codeToTry = bankCode;
   if (!codeToTry || codeToTry === '000') {
-    // Attempt auto-matching bank code from name
     const bNameLower = bankName.toLowerCase();
     if (bNameLower.includes('gtb') || bNameLower.includes('guaranty')) codeToTry = '058';
     else if (bNameLower.includes('access')) codeToTry = '044';
     else if (bNameLower.includes('zenith')) codeToTry = '057';
-    else if (bNameLower.includes('first bank')) codeToTry = '011';
+    else if (bNameLower.includes('first bank') || bNameLower.includes('firstbank')) codeToTry = '011';
     else if (bNameLower.includes('kuda')) codeToTry = '50211';
     else if (bNameLower.includes('moniepoint')) codeToTry = '50515';
     else if (bNameLower.includes('opay')) codeToTry = '999992';
@@ -343,9 +351,10 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     else if (bNameLower.includes('providus')) codeToTry = '101';
   }
 
+  // 1. Attempt Paystack Live Account Resolution
   if (paystackSecret && codeToTry && codeToTry !== '000') {
     try {
-      console.info(`[Bank Resolve API] Attempting Paystack live account resolution for Acc: ${accountNumber}, BankCode: ${codeToTry}`);
+      console.info(`[Bank Resolve API] Querying Paystack NIBSS for Acc: ${accountNumber}, BankCode: ${codeToTry}`);
       const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(codeToTry)}`, {
         method: 'GET',
         headers: {
@@ -355,7 +364,7 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
       });
       const data = await response.json();
       if (data.status && data.data?.account_name) {
-        console.info(`[Bank Resolve API] Paystack live account resolved successfully: ${data.data.account_name}`);
+        console.info(`[Bank Resolve API] Paystack resolved real name: ${data.data.account_name}`);
         return res.json({
           status: true,
           account_name: data.data.account_name,
@@ -369,15 +378,15 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     }
   }
 
-  // 2. Flutterwave Live Account Resolution API
-  // Flutterwave FLW bank code mappings for OPay / PalmPay
+  // 2. Attempt Flutterwave Live Account Resolution
   let flwBankCode = codeToTry;
   if (codeToTry === '999992') flwBankCode = '100004'; // OPay in Flutterwave
   if (codeToTry === '999991') flwBankCode = '100033'; // PalmPay in Flutterwave
+  if (codeToTry === '50211') flwBankCode = '090267'; // Kuda in Flutterwave
 
   if (flwSecret && flwBankCode && flwBankCode !== '000') {
     try {
-      console.info(`[Bank Resolve API] Attempting Flutterwave live account resolution for Acc: ${accountNumber}, BankCode: ${flwBankCode}`);
+      console.info(`[Bank Resolve API] Querying Flutterwave NIBSS for Acc: ${accountNumber}, BankCode: ${flwBankCode}`);
       const response = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
         method: 'POST',
         headers: {
@@ -391,7 +400,7 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
       });
       const data = await response.json();
       if (data.status === 'success' && data.data?.account_name) {
-        console.info(`[Bank Resolve API] Flutterwave live account resolved successfully: ${data.data.account_name}`);
+        console.info(`[Bank Resolve API] Flutterwave resolved real name: ${data.data.account_name}`);
         return res.json({
           status: true,
           account_name: data.data.account_name,
@@ -405,45 +414,56 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     }
   }
 
-  // 3. Fallback NIBSS Interbank Lookup for test/sandbox mode
-  const sampleFirstNames = ['CHINEDU', 'BOLA', 'TUNDE', 'EMEKA', 'OLAMIDE', 'AMINA', 'DANIEL', 'FESTUS', 'IBRAHIM', 'NKECHI'];
-  const sampleLastNames = ['OKONKWO', 'ADEBAYO', 'SOGUNRO', 'DANJUMA', 'OKHAWERE', 'EZE', 'BALOGUN', 'BELLO', 'IBRAHIM'];
-  
-  const seed = accountNumber.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const firstName = sampleFirstNames[seed % sampleFirstNames.length].toUpperCase();
-  const lastName = sampleLastNames[(seed * 3) % sampleLastNames.length].toUpperCase();
-  const middleInitial = String.fromCharCode(65 + (seed % 26));
-
-  const resolvedName = `${lastName} ${firstName} ${middleInitial}.`;
-
-  return res.json({
-    status: true,
-    account_name: resolvedName,
-    account_number: accountNumber,
-    bank_name: bankName || 'Verified Bank',
-    note: 'Resolved via Interbank Switch (Sandbox Mode)'
+  // If live bank resolution could not verify account, report account verification failure
+  return res.status(422).json({
+    status: false,
+    message: `Account verification failed: Destination bank could not verify account number ${accountNumber}. Please confirm your 10-digit account number and destination bank selection.`
   });
 });
 
 // Route D: Flutterwave Initialize Checkout Session
 app.post('/api/flutterwave/initialize', async (req: express.Request, res: express.Response) => {
-  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations } = req.body;
-  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations, secretKey: clientSecretKey, publicKey: clientPublicKey } = req.body;
+  
+  // Resolve active secret key from request body or backend environment
+  let flwSecret = (
+    clientSecretKey ||
+    process.env.VITE_FLW_SECRET_KEY || 
+    process.env.FLW_SECRET_KEY || 
+    process.env.FLUTTERWAVE_SECRET_KEY || 
+    process.env.FLWSECK || 
+    ''
+  ).trim();
+
+  // If secret key wasn't explicitly set, but client passed a secret key in public key field (starts with FLWSECK)
+  const clientPub = (clientPublicKey || process.env.VITE_FLW_PUBLIC_KEY || '').trim();
+  if (!flwSecret && clientPub.toUpperCase().startsWith('FLWSECK')) {
+    flwSecret = clientPub;
+  }
+
+  // Clean raw key strings (strip quotes/equals if user pasted whole env line)
+  if (flwSecret.includes('=')) {
+    flwSecret = flwSecret.split('=').pop()?.trim() || '';
+  }
+  flwSecret = flwSecret.replace(/['";]/g, '').trim();
+
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   const callbackUrl = callback_url || `${appUrl}/payment/flutterwave-callback`;
   const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
   if (!flwSecret) {
-    console.warn('[Flutterwave Init API] FLW Secret key is missing on backend. Generating sandbox checkout URL.');
+    console.warn('[Flutterwave Init API] FLW Secret key is not configured on backend or client. Generating sandbox simulation URL.');
     return res.json({
       status: true,
       message: 'Sandbox Flutterwave session initialized',
       link: `${callbackUrl}?tx_ref=${reference}&status=successful&amount=${amount}&userId=${encodeURIComponent(userId || '')}`,
-      tx_ref: reference
+      tx_ref: reference,
+      isSandbox: true
     });
   }
 
   try {
+    console.info(`[Flutterwave Init API] Initializing live transaction via Flutterwave API using Secret Key (${flwSecret.substring(0, 10)}...)...`);
     const response = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: {
@@ -478,8 +498,12 @@ app.post('/api/flutterwave/initialize', async (req: express.Request, res: expres
         tx_ref: reference
       });
     } else {
-      console.error('[Flutterwave Init API] Error response from Flutterwave API:', data);
-      return res.status(400).json({ status: false, message: data.message || 'Could not initialize Flutterwave payment session' });
+      console.error('[Flutterwave Init API] Flutterwave rejected request:', data);
+      return res.status(400).json({ 
+        status: false, 
+        message: data.message || 'Could not initialize Flutterwave payment session with current secret key.',
+        details: data
+      });
     }
   } catch (err: any) {
     console.error('[Flutterwave Init API] Exception:', err);

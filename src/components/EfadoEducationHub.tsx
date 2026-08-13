@@ -142,7 +142,7 @@ const educationData: EducationSection[] = [
       {
         title: "Buy WAEC Scratch Card",
         icon: CreditCard,
-        description: "Official WAEC result checking serial PIN (₦3,500 flat fee). Access serial-pin.waec.org portal.",
+        description: "Official WAEC result checking serial PIN (₦3,500 flat fee). Instant PIN and Serial Number delivery.",
         tags: ["Most Visited", "Recently Updated"],
         serviceType: "WAEC_CARD"
       },
@@ -556,7 +556,7 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                 WAEC Scratch Card & Serial PIN Portal
               </h3>
               <p className="text-xs text-slate-300 font-medium leading-relaxed max-w-2xl mt-1">
-                Instant Flutterwave integrated payment for checking WASSCE & GCE candidate results. Unlocks access form for <span className="text-amber-300 font-mono font-bold">https://serial-pin.waec.org/</span>
+                Direct CEO Bank Deposit (OPay & Access Bank), Wallet & Flutterwave payment for checking WASSCE & GCE candidate results and printing official transcripts.
               </p>
             </div>
           </div>

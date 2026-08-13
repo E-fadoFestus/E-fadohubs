@@ -23,7 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { getFlutterwavePublicKey } from '../utils/flutterwave';
+import { getFlutterwavePublicKey, getFlutterwaveSecretKey } from '../utils/flutterwave';
 import { TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
@@ -251,6 +251,9 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
     // 1. First Attempt: Backend API session initialization via Server Secret Key (/api/flutterwave/initialize)
     try {
+      const flwSec = getFlutterwaveSecretKey();
+      const flwPub = getFlutterwavePublicKey();
+
       const apiRes = await fetch('/api/flutterwave/initialize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,7 +262,9 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
           amount: parsedAmt,
           userId: user.uid,
           purpose: intentPurpose || 'Wallet Funding',
-          currency: 'NGN'
+          currency: 'NGN',
+          secretKey: flwSec,
+          publicKey: flwPub
         })
       });
 
@@ -283,6 +288,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
       const flwKey = getFlutterwavePublicKey();
       const paymentRef = `EFD-FLW-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
+      if (!flwKey || !flwKey.toUpperCase().startsWith('FLWPUBK')) {
+        setError('Flutterwave Public Key is missing or invalid. Please configure your Flutterwave keys (FLWPUBK- and FLWSECK-) in the Flutterwave Deposit settings tab.');
+        setIsProcessing(false);
+        setStep('form');
+        return;
+      }
 
       if (typeof (window as any).FlutterwaveCheckout === 'function') {
         (window as any).FlutterwaveCheckout({

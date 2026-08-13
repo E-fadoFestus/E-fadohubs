@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CreditCard, Shield, AlertTriangle } from 'lucide-react';
+import { Loader2, CreditCard, Shield, AlertTriangle, Key } from 'lucide-react';
 import { UserProfile } from '../types';
-import { getFlutterwavePublicKey, saveFlutterwavePublicKey, isDefaultOrInvalidKey } from '../utils/flutterwave';
+import { 
+  getFlutterwavePublicKey, 
+  saveFlutterwavePublicKey, 
+  getFlutterwaveSecretKey, 
+  saveFlutterwaveSecretKey,
+  isDefaultOrInvalidKey 
+} from '../utils/flutterwave';
 
 interface FlutterwaveDepositProps {
   user: UserProfile;
@@ -28,23 +34,30 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const [isPaying, setIsPaying] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'all' | 'card' | 'ussd' | 'transfer'>('all');
   
-  // Custom Public Key override state (stored in localStorage)
-  const [customKey, setCustomKey] = useState<string>(() => {
-    return localStorage.getItem('efado_flw_public_key') || '';
-  });
+  // Custom Public Key & Secret Key override states
+  const [customPubKey, setCustomPubKey] = useState<string>(() => getFlutterwavePublicKey());
+  const [customSecKey, setCustomSecKey] = useState<string>(() => getFlutterwaveSecretKey());
   const [showKeyConfig, setShowKeyConfig] = useState(false);
+  const [initErrorMessage, setInitErrorMessage] = useState<string | null>(null);
 
-  // Compute active key
-  const activeKey = getFlutterwavePublicKey();
+  // Compute active keys
+  const activePubKey = getFlutterwavePublicKey();
+  const activeSecKey = getFlutterwaveSecretKey();
 
-  // Validate if active key matches expected Flutterwave Public Key format (FLWPUBK...)
-  const isValidPublicKeyFormat = activeKey.toUpperCase().startsWith('FLWPUBK');
+  const isValidPublicKeyFormat = activePubKey.toUpperCase().startsWith('FLWPUBK');
 
-  // Save custom key
-  const handleSaveCustomKey = (key: string) => {
+  const handleSavePubKey = (key: string) => {
     const trimmed = key.trim();
-    setCustomKey(trimmed);
+    setCustomPubKey(trimmed);
     saveFlutterwavePublicKey(trimmed);
+    setInitErrorMessage(null);
+  };
+
+  const handleSaveSecKey = (key: string) => {
+    const trimmed = key.trim();
+    setCustomSecKey(trimmed);
+    saveFlutterwaveSecretKey(trimmed);
+    setInitErrorMessage(null);
   };
 
   // Dynamically load Flutterwave Inline JS script
@@ -75,26 +88,15 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const quickAmounts = [500, 1000, 5000, 10000];
 
   const handleFlutterwavePayment = () => {
+    setInitErrorMessage(null);
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
       alert('Please enter a valid deposit amount greater than zero.');
       return;
     }
 
-    if (!scriptLoaded) {
-      alert('Flutterwave secure gateway is initializing. Please wait a moment.');
-      return;
-    }
-
-    if (!isValidPublicKeyFormat) {
-      setShowKeyConfig(true);
-      alert('Your configured key is not a valid Flutterwave Public Key. Flutterwave Public Keys start with "FLWPUBK...". Please check the key input box below.');
-      return;
-    }
-
     setIsPaying(true);
 
-    const flwKey = activeKey;
     const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
     const paymentOptions = selectedMethod === 'all'
@@ -103,7 +105,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         ? 'banktransfer'
         : selectedMethod;
 
-    // 1. Try backend server initialization API first (uses VITE_FLW_SECRET_KEY / FLW_SECRET_KEY)
+    // 1. Try backend server initialization API first (passes Secret Key & Public Key)
     fetch('/api/flutterwave/initialize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -112,26 +114,42 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         amount: numericAmount,
         userId: user.uid,
         purpose: 'EFADO Wallet Topup',
-        currency: 'NGN'
+        currency: 'NGN',
+        secretKey: activeSecKey,
+        publicKey: activePubKey
       })
     })
     .then(res => res.json())
     .then(data => {
       if (data.status && data.link) {
         setIsPaying(false);
+        // Redirect to hosted Flutterwave checkout page
         window.location.href = data.link;
         return;
       }
-      throw new Error(data.message || 'Server session init returned no link');
-    })
-    .catch((serverErr) => {
-      console.warn('Backend server payment initialization skipped or failed, using inline checkout modal:', serverErr);
       
+      // If server returned a clear key rejection error from Flutterwave
+      if (data.message) {
+        throw new Error(data.message);
+      }
+      throw new Error('Could not initialize Flutterwave session.');
+    })
+    .catch((serverErr: any) => {
+      console.warn('Backend server payment initialization skipped or failed:', serverErr);
+      
+      // If active public key is missing or doesn't start with FLWPUBK, show key config drawer
+      if (!isValidPublicKeyFormat) {
+        setIsPaying(false);
+        setShowKeyConfig(true);
+        setInitErrorMessage('Please enter your valid Flutterwave Public Key (starting with FLWPUBK-) and Secret Key (starting with FLWSECK-) below.');
+        return;
+      }
+
       // 2. Fallback to inline Flutterwave modal
       try {
         if (typeof window.FlutterwaveCheckout === 'function') {
           window.FlutterwaveCheckout({
-            public_key: flwKey,
+            public_key: activePubKey,
             tx_ref: reference,
             amount: numericAmount,
             currency: 'NGN',
@@ -164,10 +182,11 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         } else {
           throw new Error('FlutterwaveCheckout script function unavailable');
         }
-      } catch (err) {
+      } catch (err: any) {
         setIsPaying(false);
         console.error('Flutterwave modal launch error:', err);
-        alert('Could not start Flutterwave checkout process. Please confirm your secret or public keys.');
+        setShowKeyConfig(true);
+        setInitErrorMessage(`Flutterwave Key Error: ${serverErr.message || 'Invalid parameter (PBFPubKey)'}. Please confirm your Flutterwave Public Key and Secret Key in the key settings box below.`);
       }
     });
   };
@@ -274,21 +293,38 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         </div>
       )}
 
+      {/* Error Message Alert */}
+      {initErrorMessage && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-2">
+          <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>Flutterwave Payment Session Issue</span>
+          </div>
+          <p className="text-[11px] text-rose-800 leading-relaxed font-medium">
+            {initErrorMessage}
+          </p>
+        </div>
+      )}
+
       {/* Key Validation Alert & Config drawer */}
       <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
-              Active Flutterwave Key Status:
+              Flutterwave Key Status:
             </span>
             <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded-full uppercase ${
-              activeKey.startsWith('FLWPUBK_TEST')
+              activePubKey.startsWith('FLWPUBK_TEST') || activeSecKey.startsWith('FLWSECK_TEST')
                 ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                : activeKey.startsWith('FLWPUBK')
+                : activePubKey.startsWith('FLWPUBK') || activeSecKey.startsWith('FLWSECK')
                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'bg-red-100 text-red-800 border border-red-300'
+                  : 'bg-rose-100 text-rose-800 border border-rose-300'
             }`}>
-              {activeKey.startsWith('FLWPUBK_TEST') ? '⚠️ TEST MODE KEY' : activeKey.startsWith('FLWPUBK') ? '🟢 LIVE PRODUCTION KEY' : 'INVALID KEY'}
+              {activePubKey.startsWith('FLWPUBK_TEST') || activeSecKey.startsWith('FLWSECK_TEST') 
+                ? '⚠️ TEST KEYS ACTIVE' 
+                : (activePubKey.startsWith('FLWPUBK') || activeSecKey.startsWith('FLWSECK')) 
+                  ? '🟢 LIVE KEYS ACTIVE' 
+                  : '⚠️ KEY SETUP REQUIRED'}
             </span>
           </div>
 
@@ -297,66 +333,75 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
             onClick={() => setShowKeyConfig(!showKeyConfig)}
             className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
           >
-            ⚙️ {showKeyConfig ? 'Hide Key Settings' : 'Configure / Switch Key'}
+            ⚙️ {showKeyConfig ? 'Hide Key Config' : 'Configure Flutterwave Keys'}
           </button>
         </div>
 
         {showKeyConfig && (
-          <div className="space-y-3 pt-3 border-t border-slate-200">
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl space-y-1 text-xs text-emerald-900">
+          <div className="space-y-4 pt-3 border-t border-slate-200">
+            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl space-y-1 text-xs text-indigo-900">
               <p className="font-bold flex items-center gap-1.5 text-[11px]">
-                <Shield className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                Live Production Mode Active:
+                <Shield className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                Configure Merchant Keys (Flutterwave Dashboard):
               </p>
-              <p className="text-[10px] leading-relaxed text-emerald-800">
-                To collect real money from customers, Flutterwave uses your live public key (<code className="font-mono font-bold">FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X</code>).
+              <p className="text-[10px] leading-relaxed text-indigo-800">
+                To accept real live payments from your users, paste your <strong>Public Key</strong> (starts with <code className="font-mono font-bold">FLWPUBK-</code>) and <strong>Secret Key</strong> (starts with <code className="font-mono font-bold">FLWSECK-</code>) from your <a href="https://dashboard.flutterwave.com/" target="_blank" rel="noreferrer" className="underline font-bold">Flutterwave Dashboard</a>.
               </p>
             </div>
 
-            <div className="space-y-2">
+            {/* Public Key Input */}
+            <div className="space-y-1.5">
               <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
-                Enter Custom Flutterwave Public Key:
+                1. Flutterwave Public Key (FLWPUBK-...):
               </label>
-              <div className="flex flex-wrap sm:flex-nowrap gap-2">
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  value={customKey}
-                  onChange={(e) => handleSaveCustomKey(e.target.value)}
-                  placeholder="c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873"
+                  value={customPubKey}
+                  onChange={(e) => handleSavePubKey(e.target.value)}
+                  placeholder="e.g. FLWPUBK-xxxxxxxxxxxxxxxxxxxxxxxx-X"
                   className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSaveCustomKey('FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a72f1bf873-X');
-                  }}
-                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
-                >
-                  🟢 Use Live Key
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSaveCustomKey('FLWPUBK_TEST-a3e7403487053e164c9f139d2c2ad3c1-X');
-                  }}
-                  className="px-3.5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm flex-shrink-0"
-                >
-                  ⚠️ Test Key
-                </button>
-                {customKey && (
+                {customPubKey && (
                   <button
                     type="button"
-                    onClick={() => handleSaveCustomKey('')}
+                    onClick={() => handleSavePubKey('')}
                     className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10px] uppercase rounded-xl transition-all flex-shrink-0"
                   >
-                    Clear Override
+                    Clear
                   </button>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">
-                Active Key in use: <code className="font-mono font-bold text-indigo-700">{activeKey}</code>
-              </p>
             </div>
+
+            {/* Secret Key Input */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
+                2. Flutterwave Secret Key (FLWSECK-...):
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={customSecKey}
+                  onChange={(e) => handleSaveSecKey(e.target.value)}
+                  placeholder="e.g. FLWSECK-xxxxxxxxxxxxxxxxxxxxxxxx-X"
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
+                />
+                {customSecKey && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveSecKey('')}
+                    className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10px] uppercase rounded-xl transition-all flex-shrink-0"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 font-medium">
+              Saved keys are retained securely in your local browser session for processing checkouts.
+            </p>
           </div>
         )}
       </div>

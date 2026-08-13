@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { db, collection, onSnapshot } from '../firebase';
 import { 
   Store, 
   X, 
@@ -50,8 +51,29 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<{item: MarketplaceItem, qty: number}[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [adListings, setAdListings] = useState<any[]>([]);
 
-  const filteredItems = MARKETPLACE_ITEMS.filter(item => {
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'ad_listings'), (snap) => {
+      setAdListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => console.error("VendorMarketplace ad_listings snapshot error:", e));
+    return unsub;
+  }, []);
+
+  const userVendorItems: MarketplaceItem[] = adListings.map(ad => ({
+    id: ad.id,
+    name: ad.title || 'User Vendor Product',
+    category: 'OTHER',
+    price: Number(ad.price) || 0,
+    description: ad.description || 'User Listed Vendor Product / Advertised Asset',
+    stock: ad.status === 'sold_out' ? 0 : 50,
+    color: 'indigo',
+    icon: Package
+  }));
+
+  const allMarketplaceItems = [...userVendorItems, ...MARKETPLACE_ITEMS];
+
+  const filteredItems = allMarketplaceItems.filter(item => {
     const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          item.description.toLowerCase().includes(searchQuery.toLowerCase());

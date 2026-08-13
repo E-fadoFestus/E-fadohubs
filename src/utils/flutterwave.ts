@@ -1,33 +1,45 @@
-function sanitizeKey(rawKey: string): string {
+export function sanitizeKey(rawKey: string, isSecret = false): string {
   if (!rawKey) return '';
   let cleaned = rawKey.trim();
 
-  // If format is VITE_FLW_PUBLIC_KEY=FLWPUBK...
+  // Handle KEY_NAME=VAL format if user pasted entire env line
   if (cleaned.includes('=')) {
     const parts = cleaned.split('=');
     cleaned = parts[parts.length - 1].trim();
   }
 
-  // Remove surrounding quotes, double quotes or trailing semicolons
+  // Remove surrounding quotes, double quotes, whitespace, or trailing semicolons
   cleaned = cleaned.replace(/['";]/g, '').trim();
 
   if (!cleaned) return '';
 
-  // If already starts with valid Flutterwave Public Key prefix (FLWPUBK or FLWPUBK_TEST)
-  if (cleaned.toUpperCase().startsWith('FLWPUBK')) {
+  const upper = cleaned.toUpperCase();
+
+  // If secret key is requested or string starts with FLWSECK
+  if (isSecret || upper.startsWith('FLWSECK')) {
+    if (upper.startsWith('FLWSECK')) {
+      return cleaned;
+    }
+    // If raw string without prefix
+    return `FLWSECK-${cleaned}`;
+  }
+
+  // If public key is requested or starts with FLWPUBK
+  if (upper.startsWith('FLWPUBK')) {
     return cleaned;
   }
 
-  // If user passed a raw 32-hex character string without FLWPUBK prefix
-  let prefixed = `FLWPUBK-${cleaned}`;
-  if (!prefixed.endsWith('-X') && !prefixed.endsWith('-x')) {
-    prefixed = `${prefixed}-X`;
+  // If user pasted a Secret Key in Public Key field, do not prefix with FLWPUBK
+  if (upper.startsWith('FLWSECK')) {
+    return cleaned;
   }
-  return prefixed;
+
+  // Only prefix if it looks like a 32-char hex token
+  return `FLWPUBK-${cleaned}`;
 }
 
 export function getFlutterwavePublicKey(): string {
-  // 1. Priority 1: Check environment variable from Google AI Studio Secrets / .env
+  // 1. Priority 1: Check environment variables
   const rawEnvKey = (
     import.meta.env.VITE_FLW_PUBLIC_KEY || 
     import.meta.env.VITE_FLW_PUBLIC_KE || 
@@ -36,19 +48,51 @@ export function getFlutterwavePublicKey(): string {
   ).trim();
 
   if (rawEnvKey) {
-    const sanitizedEnv = sanitizeKey(rawEnvKey);
-    if (sanitizedEnv) return sanitizedEnv;
+    const sanitizedEnv = sanitizeKey(rawEnvKey, false);
+    if (sanitizedEnv && sanitizedEnv.toUpperCase().startsWith('FLWPUBK')) {
+      return sanitizedEnv;
+    }
   }
 
-  // 2. Priority 2: Check browser localStorage override if manually saved by user
+  // 2. Priority 2: Check browser localStorage override
   const localKey = localStorage.getItem('efado_flw_public_key');
   if (localKey && localKey.trim()) {
-    const sanitizedLocal = sanitizeKey(localKey);
-    if (sanitizedLocal) return sanitizedLocal;
+    const sanitizedLocal = sanitizeKey(localKey, false);
+    if (sanitizedLocal && sanitizedLocal.toUpperCase().startsWith('FLWPUBK')) {
+      return sanitizedLocal;
+    }
   }
   
-  // 3. Fallback Key
-  return 'FLWPUBK-c9b9eca1-6bc8-44ea-bef6-e5a721fbf873-X';
+  return '';
+}
+
+export function getFlutterwaveSecretKey(): string {
+  // 1. Check environment variables
+  const rawEnvKey = (
+    import.meta.env.VITE_FLW_SECRET_KEY || 
+    import.meta.env.FLW_SECRET_KEY || 
+    import.meta.env.FLUTTERWAVE_SECRET_KEY ||
+    import.meta.env.FLWSECK ||
+    ''
+  ).trim();
+
+  if (rawEnvKey) {
+    const sanitized = sanitizeKey(rawEnvKey, true);
+    if (sanitized && sanitized.toUpperCase().startsWith('FLWSECK')) {
+      return sanitized;
+    }
+  }
+
+  // 2. Check localStorage override
+  const localKey = localStorage.getItem('efado_flw_secret_key');
+  if (localKey && localKey.trim()) {
+    const sanitizedLocal = sanitizeKey(localKey, true);
+    if (sanitizedLocal && sanitizedLocal.toUpperCase().startsWith('FLWSECK')) {
+      return sanitizedLocal;
+    }
+  }
+
+  return '';
 }
 
 export function saveFlutterwavePublicKey(key: string): void {
@@ -60,13 +104,23 @@ export function saveFlutterwavePublicKey(key: string): void {
   }
 }
 
-export function clearFlutterwavePublicKey(): void {
+export function saveFlutterwaveSecretKey(key: string): void {
+  const trimmed = key.trim();
+  if (trimmed) {
+    localStorage.setItem('efado_flw_secret_key', trimmed);
+  } else {
+    localStorage.removeItem('efado_flw_secret_key');
+  }
+}
+
+export function clearFlutterwaveKeys(): void {
   localStorage.removeItem('efado_flw_public_key');
+  localStorage.removeItem('efado_flw_secret_key');
 }
 
 export function isTestKey(key?: string): boolean {
   const activeKey = key || getFlutterwavePublicKey();
-  return activeKey.toUpperCase().includes('FLWPUBK_TEST');
+  return activeKey.toUpperCase().includes('TEST');
 }
 
 export function isDefaultOrInvalidKey(key?: string): boolean {
@@ -74,9 +128,7 @@ export function isDefaultOrInvalidKey(key?: string): boolean {
   if (!activeKey || !activeKey.toUpperCase().startsWith('FLWPUBK')) {
     return true;
   }
-  if (activeKey.includes('a3e7403487053e164c9f139d2c2ad3c1-X')) {
-    return true;
-  }
   return false;
 }
+
 

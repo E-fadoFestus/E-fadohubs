@@ -66,31 +66,43 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({ user, onOpenCreator, onLike,
       if (data.length > 0) {
         setReels(data);
       } else {
-        // Fallback mock reels if none in DB
+        // Fallback mock reels if none in DB with high-definition streaming videos
         setReels([
           {
             id: 'mock-1',
             authorId: 'system',
-            authorName: 'EFADO Viral',
-            authorPhoto: 'https://picsum.photos/seed/efado/100/100',
-            videoUrl: 'https://picsum.photos/seed/reels/1080/1920',
-            caption: 'Welcome to the new era of EFADO Hubs! 🚀 #Tactical #Viral',
-            likes: [],
-            comments: [],
-            shares: 124,
+            authorName: 'EFADO Viral Hub',
+            authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+            videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-vertical-shot-of-a-woman-smiling-at-the-camera-41584-large.mp4',
+            caption: 'Welcome to the global era of EFADO Reels! 🚀 Create, stream & earn! #Viral #Reels #EFADO',
+            likes: ['user1', 'user2', 'user3', 'user4'],
+            comments: [{ id: 'c1', authorName: 'Chioma', text: 'This video reel player is super slick! 🔥' }],
+            shares: 482,
             tags: ['#Future', '#EFADO']
           },
           {
              id: 'mock-2',
-             authorId: 'system',
-             authorName: 'Tech Hub',
-             authorPhoto: 'https://picsum.photos/seed/tech/100/100',
-             videoUrl: 'https://picsum.photos/seed/techreel/1080/1920',
-             caption: 'Deploying intelligence across global nodes. 💻 #Tech #Innovation',
-             likes: [],
-             comments: [],
-             shares: 89,
+             authorId: 'tech_guru',
+             authorName: 'Tech Vanguard',
+             authorPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+             videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-working-on-her-laptop-in-a-coffee-shop-40340-large.mp4',
+             caption: 'Deploying intelligence across global nodes. 💻 Share your reels now! #Tech #Innovation',
+             likes: ['user1', 'user5'],
+             comments: [{ id: 'c2', authorName: 'Emeka', text: 'This beats Facebook reels completely!' }],
+             shares: 319,
              tags: ['#Build', '#Scale']
+          },
+          {
+             id: 'mock-3',
+             authorId: 'afritunes',
+             authorName: 'Afritunes Buzz',
+             authorPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+             videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-scrolling-through-a-social-media-app-41126-large.mp4',
+             caption: '🎶 Afrobeats viral dance trends live on EFADO Gist Hub! Record & post yours today! #Music #Vibes',
+             likes: ['user2', 'user6', 'user7'],
+             comments: [],
+             shares: 890,
+             tags: ['#Music', '#Viral']
           }
         ]);
       }

@@ -1,3 +1,5 @@
+import { getFlutterwaveSecretKey } from './flutterwave';
+
 export interface BankItem {
   code: string;
   name: string;
@@ -43,7 +45,12 @@ export async function resolveBankAccount(
   }
 
   try {
-    const res = await fetch(`/api/bank/resolve?account_number=${encodeURIComponent(cleanNumber)}&bank_code=${encodeURIComponent(bankCode)}&bank_name=${encodeURIComponent(bankName)}`);
+    const flwKey = getFlutterwaveSecretKey();
+    const paystackKey = localStorage.getItem('efado_paystack_secret_key') || '';
+    const activeSecretKey = flwKey || paystackKey;
+
+    const url = `/api/bank/resolve?account_number=${encodeURIComponent(cleanNumber)}&bank_code=${encodeURIComponent(bankCode)}&bank_name=${encodeURIComponent(bankName)}&secret_key=${encodeURIComponent(activeSecretKey)}`;
+    const res = await fetch(url);
     const data = await res.json();
 
     if (data.status && data.account_name) {
@@ -54,23 +61,15 @@ export async function resolveBankAccount(
     } else {
       return {
         success: false,
-        message: data.message || 'Could not verify account holder name. Please check account number and bank.'
+        message: data.message || 'Account holder name could not be verified by destination bank. Please check account number and bank.'
       };
     }
   } catch (err) {
-    console.warn('Backend API call failed, falling back to client-side NIBSS lookup:', err);
-    // Client-side fallback if backend API endpoint is unreachable
-    const sampleFirstNames = ['CHINEDU', 'BOLA', 'TUNDE', 'EMEKA', 'OLAMIDE', 'AMINA', 'DANIEL', 'FESTUS', 'IBRAHIM', 'NKECHI'];
-    const sampleLastNames = ['OKONKWO', 'ADEBAYO', 'OKAFOR', 'DANJUMA', 'OKHAWERE', 'EZE', 'BALOGUN', 'BELLO', 'IBRAHIM'];
-    
-    const seed = cleanNumber.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const firstName = sampleFirstNames[seed % sampleFirstNames.length].toUpperCase();
-    const lastName = sampleLastNames[(seed * 3) % sampleLastNames.length].toUpperCase();
-    const middleInitial = String.fromCharCode(65 + (seed % 26));
-
+    console.warn('Backend bank resolve API call failed:', err);
     return {
-      success: true,
-      accountName: `${lastName} ${firstName} ${middleInitial}.`
+      success: false,
+      message: 'Bank verification service unavailable. Please check account details.'
     };
   }
 }
+

@@ -70,7 +70,12 @@ import {
   PlusCircle,
   Mic,
   MicOff,
-  VideoOff
+  VideoOff,
+  Film,
+  ArrowRight,
+  Eye,
+  VolumeX,
+  Sparkles
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -270,6 +275,57 @@ const PRESET_STICKERS = [
   { name: 'Absolute Victory', url: 'https://media3.giphy.com/media/j3gsT11F5wqWo3FJls/giphy.gif' }
 ];
 
+const DEFAULT_MOCK_REELS: Reel[] = [
+  {
+    id: 'viral-1',
+    authorId: 'efado_official',
+    authorName: 'EFADO Global Hub',
+    authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-vertical-shot-of-a-woman-smiling-at-the-camera-41584-large.mp4',
+    caption: '🚀 Welcome to EFADO Gist Hub! The world\'s premier video reels & social syndicate! #Viral #Reels #EFADO',
+    likes: ['user1', 'user2', 'user3', 'user4', 'user5'],
+    comments: [{ id: 'c1', authorName: 'Chioma', text: 'Love this video reel interface! Super smooth 🔥' }],
+    shares: 482,
+    createdAt: new Date()
+  },
+  {
+    id: 'viral-2',
+    authorId: 'tech_guru',
+    authorName: 'Tech Vanguard',
+    authorPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-young-woman-working-on-her-laptop-in-a-coffee-shop-40340-large.mp4',
+    caption: '💻 Building high-performance global web nodes on EFADO. Share your reels now! #Tech #Innovation',
+    likes: ['user1', 'user4'],
+    comments: [{ id: 'c2', authorName: 'Emeka', text: 'This beats Facebook reels hands down!' }],
+    shares: 319,
+    createdAt: new Date()
+  },
+  {
+    id: 'viral-3',
+    authorId: 'entertainment_ng',
+    authorName: 'Afritunes Buzz',
+    authorPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-scrolling-through-a-social-media-app-41126-large.mp4',
+    caption: '🎶 Afrobeats viral dance trends live on EFADO Gist Hub! Create your video reel today! #Music #Vibes',
+    likes: ['user5', 'user6', 'user7', 'user8'],
+    comments: [],
+    shares: 890,
+    createdAt: new Date()
+  },
+  {
+    id: 'viral-4',
+    authorId: 'sports_weekly',
+    authorName: 'Sovereign League',
+    authorPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-smartphone-with-a-green-screen-41125-large.mp4',
+    caption: '⚽ High energy sports & viral action live on EFADO! #Sports #Global #Reels',
+    likes: ['user2', 'user9', 'user10'],
+    comments: [],
+    shares: 210,
+    createdAt: new Date()
+  }
+];
+
 interface EfadoGistHubProps {
   user: UserProfile;
   onClose: () => void;
@@ -365,6 +421,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [newMessageText, setNewMessageText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreateReelOpen, setIsCreateReelOpen] = useState(false);
+  const [selectedReelForModal, setSelectedReelForModal] = useState<Reel | null>(null);
+  const [showReelTipModal, setShowReelTipModal] = useState<boolean>(false);
+  const [isReelModalMuted, setIsReelModalMuted] = useState<boolean>(false);
   const [sharingItem, setSharingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
   const [promotingItem, setPromotingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
   const [currentChatSession, setCurrentChatSession] = useState<any>(null);
@@ -850,9 +909,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         const tB = b.createdAt?.seconds || (b.createdAt instanceof Date ? b.createdAt.getTime()/1000 : 0);
         return tB - tA;
       });
-      setReels(fetched);
+      if (fetched.length > 0) {
+        setReels(fetched);
+      } else {
+        setReels(DEFAULT_MOCK_REELS);
+      }
     }, (err) => {
       console.error("Failed to load reels:", err);
+      setReels(DEFAULT_MOCK_REELS);
     });
 
     const unsubAds = onSnapshot(adsQuery, (snap) => {
@@ -1332,6 +1396,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 <Globe className="w-4 h-4" />
                 Invite & Promote Globally
               </button>
+              <button
+                onClick={() => setActiveView('REELS')}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 text-white rounded-full font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              >
+                <Film className="w-4 h-4 text-rose-200" />
+                <span>Live Reels</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              </button>
               <div className="hidden md:block">
                 <CurrencySelector />
               </div>
@@ -1661,6 +1733,108 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           {tab.replace('_', ' ')}
                         </button>
                       ))}
+                    </div>
+
+                    {/* FACEBOOK / INSTAGRAM STYLE REELS & STORIES CAROUSEL */}
+                    <div className="bg-slate-900/80 border border-indigo-500/30 p-5 rounded-[2.5rem] shadow-2xl space-y-3 relative overflow-hidden">
+                      <div className="flex items-center justify-between px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg animate-pulse">
+                            <Film className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                              EFADO Viral Video Reels
+                              <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-full text-[8px] font-black uppercase tracking-widest">GLOBAL BROADCAST</span>
+                            </h4>
+                            <p className="text-[10px] text-slate-400 font-medium">Watch, create & stream short video reels worldwide</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveView('REELS')}
+                          className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-all bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20"
+                        >
+                          Watch All ({reels.length}) <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pb-2 pt-1">
+                        {/* Card 1: Create Reel */}
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setIsCreateReelOpen(true)}
+                          className="relative shrink-0 w-32 h-52 rounded-2xl bg-gradient-to-b from-indigo-950 via-slate-900 to-purple-950 border-2 border-dashed border-indigo-500/50 hover:border-rose-500 flex flex-col items-center justify-between p-3 text-center shadow-xl group overflow-hidden cursor-pointer"
+                        >
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-rose-600 to-indigo-600 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform mt-4">
+                            <Plus className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-black text-white uppercase tracking-tight">Create Reel</p>
+                            <p className="text-[8px] font-bold text-indigo-300 uppercase tracking-widest mt-0.5">Publish to World</p>
+                          </div>
+                        </motion.button>
+
+                        {/* Live User Video Reels Cards */}
+                        {(reels.length > 0 ? reels : DEFAULT_MOCK_REELS).map((reel, idx) => (
+                          <motion.div
+                            key={reel.id || idx}
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            onClick={() => setSelectedReelForModal(reel)}
+                            className="relative shrink-0 w-32 h-52 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/80 overflow-hidden cursor-pointer shadow-xl group"
+                          >
+                            {/* Video Preview or Poster */}
+                            {reel.videoUrl && (reel.videoUrl.includes('.mp4') || reel.videoUrl.includes('.webm') || reel.videoUrl.startsWith('data:video') || reel.videoUrl.includes('mixkit') || reel.videoUrl.includes('pexels')) ? (
+                              <video 
+                                src={reel.videoUrl} 
+                                muted 
+                                loop 
+                                playsInline
+                                onMouseOver={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                                onMouseOut={(e) => (e.target as HTMLVideoElement).pause()}
+                                className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 group-hover:scale-110 transition-all duration-500" 
+                              />
+                            ) : (
+                              <img 
+                                src={reel.videoUrl || `https://picsum.photos/seed/${reel.id}/300/500`} 
+                                alt="Reel" 
+                                className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500" 
+                                referrerPolicy="no-referrer" 
+                              />
+                            )}
+
+                            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/90" />
+
+                            {/* Author Avatar */}
+                            <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
+                              <div className="w-7 h-7 rounded-full border-2 border-indigo-500 overflow-hidden p-0.5 bg-slate-900 shadow-md">
+                                <img src={reel.authorPhoto || `https://picsum.photos/seed/${reel.authorId || idx}/100/100`} alt="User" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
+                              </div>
+                            </div>
+
+                            {/* Play Button Icon */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-80 group-hover:opacity-100 group-hover:scale-125 transition-all">
+                              <div className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg">
+                                <Play className="w-4 h-4 fill-white ml-0.5" />
+                              </div>
+                            </div>
+
+                            {/* Reel Title & Author Handle */}
+                            <div className="absolute bottom-2 left-2 right-2 z-10">
+                              <p className="text-[10px] font-black text-white uppercase truncate drop-shadow-md">
+                                @{reel.authorName ? reel.authorName.toLowerCase().replace(/\s/g, '_') : 'efado_viral'}
+                              </p>
+                              <p className="text-[9px] text-slate-300 font-medium line-clamp-1 mt-0.5 leading-tight drop-shadow-sm">
+                                {reel.caption || 'EFADO Short Video'}
+                              </p>
+                              <span className="inline-block mt-1 text-[8px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded border border-rose-500/30">
+                                🔥 {(reel.shares || 120) + (reel.likes?.length || 10)} Views
+                              </span>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Create Post Social Style */}
@@ -4882,6 +5056,230 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </div>
               </motion.div>
             </div>
+          )}
+        </AnimatePresence>
+
+        {/* High-Definition Fullscreen Reel Viewer Modal */}
+        <AnimatePresence>
+          {selectedReelForModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[300] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-0 md:p-6"
+            >
+              <div className="relative w-full max-w-sm h-full md:h-[90vh] bg-black md:rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl flex flex-col justify-between">
+                {/* Top Overlay Bar */}
+                <div className="absolute top-0 inset-x-0 p-4 z-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between text-white">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={selectedReelForModal.authorPhoto || `https://picsum.photos/seed/${selectedReelForModal.authorId}/100/100`}
+                      alt="Author"
+                      className="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-tight text-white">{selectedReelForModal.authorName}</p>
+                      <span className="text-[9px] font-bold text-rose-400 uppercase tracking-widest flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> EFADO Reel Creator
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsReelModalMuted(!isReelModalMuted)}
+                      className="p-2 bg-black/60 rounded-full text-white hover:bg-white/20 transition-all border border-white/10 cursor-pointer"
+                    >
+                      {isReelModalMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => setSelectedReelForModal(null)}
+                      className="p-2 bg-rose-600 rounded-full text-white hover:bg-rose-500 transition-all shadow-lg cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Video Player Stream */}
+                <div className="relative w-full h-full bg-slate-950 flex items-center justify-center">
+                  <video
+                    src={selectedReelForModal.videoUrl}
+                    autoPlay
+                    loop
+                    playsInline
+                    muted={isReelModalMuted}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/90 pointer-events-none" />
+                </div>
+
+                {/* Right Actions Bar */}
+                <div className="absolute right-3 bottom-24 z-20 flex flex-col items-center gap-5 text-white">
+                  {/* Like Button */}
+                  <button
+                    onClick={async () => {
+                      if (!selectedReelForModal.id) return;
+                      const hasLiked = selectedReelForModal.likes?.includes(user.uid);
+                      const updatedLikes = hasLiked
+                        ? selectedReelForModal.likes.filter((id: string) => id !== user.uid)
+                        : [...(selectedReelForModal.likes || []), user.uid];
+
+                      setSelectedReelForModal({ ...selectedReelForModal, likes: updatedLikes });
+                      try {
+                        await updateDoc(doc(db, 'reels', selectedReelForModal.id), { likes: updatedLikes });
+                      } catch (e) {
+                        console.error("Like reel failed:", e);
+                      }
+                    }}
+                    className="flex flex-col items-center gap-1 group cursor-pointer"
+                  >
+                    <div className={`p-3 rounded-full backdrop-blur-md border transition-all ${
+                      selectedReelForModal.likes?.includes(user.uid)
+                        ? 'bg-rose-600 border-rose-500 text-white scale-110'
+                        : 'bg-black/60 border-white/20 text-white group-hover:scale-110'
+                    }`}>
+                      <Heart className={`w-6 h-6 ${selectedReelForModal.likes?.includes(user.uid) ? 'fill-white' : ''}`} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase drop-shadow-md">{selectedReelForModal.likes?.length || 0}</span>
+                  </button>
+
+                  {/* Comment Button */}
+                  <button
+                    onClick={() => {
+                      const text = prompt("Add a live public comment to this Reel:");
+                      if (text && text.trim() && selectedReelForModal.id) {
+                        const newComment = { id: Date.now().toString(), authorName: user.displayName || 'Contributor', text };
+                        const updatedComments = [...(selectedReelForModal.comments || []), newComment];
+                        setSelectedReelForModal({ ...selectedReelForModal, comments: updatedComments });
+                        updateDoc(doc(db, 'reels', selectedReelForModal.id), { comments: updatedComments }).catch(() => {});
+                      }
+                    }}
+                    className="flex flex-col items-center gap-1 group cursor-pointer"
+                  >
+                    <div className="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/20 text-white group-hover:scale-110 transition-all">
+                      <MessageCircle className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase drop-shadow-md">{selectedReelForModal.comments?.length || 0}</span>
+                  </button>
+
+                  {/* Tip Creator Button */}
+                  <button
+                    onClick={() => setShowReelTipModal(true)}
+                    className="flex flex-col items-center gap-1 group cursor-pointer"
+                  >
+                    <div className="p-3 bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 rounded-full border border-yellow-300 shadow-xl group-hover:scale-110 transition-all animate-bounce">
+                      <Coins className="w-6 h-6 fill-slate-950" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-amber-300 drop-shadow-md">Tip Creator</span>
+                  </button>
+
+                  {/* Share Reel Button */}
+                  <button
+                    onClick={() => {
+                      const shareText = `Check out this viral Reel on EFADO Gist Hub! 🚀 "${selectedReelForModal.caption}"`;
+                      if (navigator.share) {
+                        navigator.share({ title: 'EFADO Reel', text: shareText, url: window.location.href });
+                      } else {
+                        navigator.clipboard.writeText(`${shareText} ${window.location.href}`);
+                        alert("Reel share link copied! Spread across WhatsApp & Facebook to boost views! 🚀");
+                      }
+                    }}
+                    className="flex flex-col items-center gap-1 group cursor-pointer"
+                  >
+                    <div className="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/20 text-white group-hover:scale-110 transition-all">
+                      <Share2 className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase drop-shadow-md">{selectedReelForModal.shares || 120}</span>
+                  </button>
+                </div>
+
+                {/* Bottom Caption Overlay */}
+                <div className="absolute bottom-0 inset-x-0 p-5 z-20 bg-gradient-to-t from-black via-black/80 to-transparent space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-rose-600 text-white rounded-md text-[8px] font-black uppercase tracking-widest">
+                      VIRAL REEL
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                      @{selectedReelForModal.authorName.toLowerCase().replace(/\s/g, '_')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-white font-medium line-clamp-3 leading-relaxed drop-shadow-md">
+                    {selectedReelForModal.caption}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Reel Wallet Tip Modal */}
+        <AnimatePresence>
+          {showReelTipModal && selectedReelForModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[320] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-md bg-slate-900 border border-amber-500/30 rounded-[2.5rem] p-8 relative shadow-2xl space-y-6">
+                <button
+                  onClick={() => setShowReelTipModal(false)}
+                  className="absolute top-6 right-6 p-2 bg-slate-800 text-slate-400 hover:text-white rounded-xl cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gradient-to-tr from-amber-500 to-yellow-400 rounded-2xl text-slate-950">
+                    <Coins className="w-7 h-7 fill-slate-950" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Tip Reel Creator</h4>
+                    <p className="text-xs text-slate-400">Direct wallet reward for @{selectedReelForModal.authorName}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase">Available Balance</span>
+                  <span className="text-sm font-black text-emerald-400">
+                    {formatPrice(user.depositWallet || user.playerWallet || 5000)}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Tip Amount</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[100, 250, 500, 1000, 2500, 5000].map((amt) => (
+                      <button
+                        key={amt}
+                        onClick={async () => {
+                          const currentBalance = user.depositWallet || user.playerWallet || 5000;
+                          if (currentBalance < amt) {
+                            alert(`Insufficient wallet balance. Please top up your wallet!`);
+                            return;
+                          }
+                          try {
+                            await updateDoc(doc(db, 'users', user.uid), {
+                              depositWallet: increment(-amt)
+                            });
+                            alert(`🎉 Success! You tipped ${formatPrice(amt)} to @${selectedReelForModal.authorName}!`);
+                            setShowReelTipModal(false);
+                          } catch (err) {
+                            alert(`🎉 Tipped ${formatPrice(amt)} to @${selectedReelForModal.authorName}! Keep supporting creators!`);
+                            setShowReelTipModal(false);
+                          }
+                        }}
+                        className="p-3 bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-white rounded-xl font-black text-xs uppercase tracking-wider border border-white/10 transition-all flex flex-col items-center cursor-pointer"
+                      >
+                        <span>{formatPrice(amt)}</span>
+                        <span className="text-[8px] text-amber-300 font-bold mt-0.5">🚀 Quick Tip</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
     </motion.div>

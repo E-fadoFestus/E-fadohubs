@@ -446,7 +446,7 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
           isReelPromotion: formData.isReelPromotion || false,
           plan: selectedPlan.id,
           expiryDate: expiryDate.getTime(),
-          status: adType === 'ADVERT' ? 'active' : 'pending',
+          status: 'active',
           createdAt: serverTimestamp(),
           syndication: syndicationData
         });

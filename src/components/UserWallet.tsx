@@ -47,6 +47,7 @@ import { StrategicReceipt } from './StrategicReceipt';
 import { db, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { resolveBankAccount } from '../utils/bankVerification';
+import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
 
 import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
@@ -164,7 +165,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
     if (accNo && accNo.length === 10 && bName) {
       setIsResolvingName(true);
-      setResolvedStatusMessage('Verifying account with NIBSS & Payment Gateway...');
+      setResolvedStatusMessage('Querying Destination Bank NIBSS Switch...');
       
       let isMounted = true;
       resolveBankAccount(accNo, accountDetails.routingNumber || '', bName)
@@ -175,9 +176,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
               ...prev,
               accountName: res.accountName || prev.accountName
             }));
-            setResolvedStatusMessage(`Account Match Verified: ${res.accountName} ✓`);
+            setResolvedStatusMessage(`Verified Account Holder: ${res.accountName} ✓`);
           } else {
-            setResolvedStatusMessage(res.message || 'Verification complete');
+            setResolvedStatusMessage(`⚠️ ${res.message || 'Verification failed. Please check account number and bank.'}`);
+            setAccountDetails(prev => ({
+              ...prev,
+              accountName: ''
+            }));
           }
           setIsResolvingName(false);
         })
@@ -185,7 +190,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           if (!isMounted) return;
           console.warn('Bank lookup error:', err);
           setIsResolvingName(false);
-          setResolvedStatusMessage('NIBSS Account Name Verification Pending');
+          setResolvedStatusMessage('⚠️ Destination Bank Verification Service Unavailable');
         });
 
       return () => { isMounted = false; };
@@ -215,35 +220,10 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     });
   }, [user]);
 
-  const globalAndLocalBanks = [
-    // Nigeria / West Africa
-    { code: '044', name: 'Access Bank' },
-    { code: '011', name: 'First Bank of Nigeria' },
-    { code: '058', name: 'GTBank' },
-    { code: '232', name: 'Zenith Bank' },
-    { code: '033', name: 'United Bank for Africa (UBA)' },
-    { code: '070', name: 'Fidelity Bank' },
-    { code: '214', name: 'First City Monument Bank (FCMB)' },
-    { code: '090267', name: 'Kuda Bank' },
-    { code: '999992', name: 'OPay Digital Services' },
-    { code: '50515', name: 'Moniepoint MFB' },
-    // United States / North America
-    { code: 'JPM', name: 'JP Morgan Chase' },
-    { code: 'BOA', name: 'Bank of America' },
-    { code: 'WFC', name: 'Wells Fargo' },
-    { code: 'CITI', name: 'Citibank' },
-    { code: 'GS', name: 'Goldman Sachs' },
-    // United Kingdom / Europe
-    { code: 'BARC', name: 'Barclays Bank Plc' },
-    { code: 'HSBC', name: 'HSBC United Kingdom' },
-    { code: 'LLOY', name: 'Lloyds Bank' },
-    { code: 'MONZO', name: 'Monzo Bank UK' },
-    { code: 'REVOL', name: 'Revolut' },
-    // Asia Pacific / Global
-    { code: 'STC', name: 'Standard Chartered Bank Plc' },
-    { code: 'DBS', name: 'DBS Bank' },
-    { code: 'ICBC', name: 'ICBC China' },
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  const globalAndLocalBanks = FLUTTERWAVE_BANKS.map(b => ({
+    code: b.code,
+    name: b.name
+  })).sort((a, b) => a.name.localeCompare(b.name));
 
   const filteredBanks = globalAndLocalBanks.filter(b => 
     b.name.toLowerCase().includes(bankSearch.toLowerCase()) || 
@@ -1730,7 +1710,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: 10 }}
-                                className="absolute z-50 left-0 right-0 top-[110%] bg-white border-2 border-gray-100 rounded-2xl shadow-2xl max-h-60 overflow-y-auto no-scrollbar p-2"
+                                className="absolute z-50 left-0 right-0 top-[110%] bg-slate-900 border-2 border-indigo-500/50 rounded-2xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar p-2 space-y-1"
                               >
                                 {filteredBanks.length > 0 ? (
                                   <>
@@ -1743,13 +1723,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                           setBankSearch(bank.name);
                                           setShowBankDropdown(false);
                                         }}
-                                        className="w-full text-left p-3.5 hover:bg-emerald-600 hover:text-white rounded-xl transition-all flex items-center justify-between group"
+                                        className="w-full text-left p-3.5 bg-slate-800/90 hover:bg-emerald-600 rounded-xl transition-all flex items-center justify-between group border border-slate-700/60 mb-1"
                                       >
-                                        <span className="text-[10px] font-black uppercase tracking-widest">{bank.name}</span>
-                                        <span className="text-[9px] font-mono font-black border border-current/20 px-1.5 rounded">{bank.code}</span>
+                                        <span className="text-[11px] font-black uppercase tracking-wider text-slate-100 group-hover:text-white">{bank.name}</span>
+                                        <span className="text-[10px] font-mono font-black text-amber-400 group-hover:text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-700">{bank.code}</span>
                                       </button>
                                     ))}
-                                    <div className="border-t border-slate-100 mt-2 pt-2">
+                                    <div className="border-t border-slate-800 mt-2 pt-2">
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -1757,15 +1737,15 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                           setShowBankDropdown(false);
                                           setAccountDetails({...accountDetails, bankName: bankSearch});
                                         }}
-                                        className="w-full text-center p-3 text-indigo-600 hover:bg-indigo-50 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all"
+                                        className="w-full text-center p-3 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/60 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all border border-indigo-500/30"
                                       >
                                         + Enter Custom Bank Name Manually
                                       </button>
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="p-4 text-center space-y-2">
-                                    <div className="text-[10px] font-black text-gray-950 uppercase tracking-widest">Bank Not Found</div>
+                                  <div className="p-4 text-center space-y-2 bg-slate-900 rounded-xl">
+                                    <div className="text-[10px] font-black text-slate-200 uppercase tracking-widest">Bank Not Found</div>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1773,7 +1753,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                         setShowBankDropdown(false);
                                         setAccountDetails({...accountDetails, bankName: bankSearch});
                                       }}
-                                      className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black uppercase tracking-widest text-[9px] rounded-full transition-all"
+                                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-[9px] rounded-full transition-all"
                                     >
                                       Use "{bankSearch}" as Custom Bank Name
                                     </button>

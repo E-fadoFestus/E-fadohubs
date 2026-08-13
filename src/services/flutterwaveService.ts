@@ -126,6 +126,11 @@ export const flutterwaveService = {
    */
   async initiateSplitCheckout(request: CheckoutPaymentRequest, onSuccess: (res: any) => void, onClose?: () => void) {
     const publicKey = getFlutterwavePublicKey();
+    if (!publicKey || !publicKey.toUpperCase().startsWith('FLWPUBK')) {
+      alert('Flutterwave Public Key is missing or invalid. Please configure your Flutterwave keys (FLWPUBK- and FLWSECK-) in the Flutterwave Deposit settings tab.');
+      if (onClose) onClose();
+      return;
+    }
     
     // Check if Flutterwave script is loaded
     if (typeof (window as any).FlutterwaveCheckout === 'function') {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { db, doc, updateDoc } from '../firebase';
 import { 
   Pickaxe, 
   Trophy, 
@@ -42,9 +43,38 @@ const STAGES: MiningStage[] = [
 ];
 
 export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onUpdateBalance?: (amount: number) => void }> = ({ user, onClose, onUpdateBalance }) => {
-  const [currentStageIdx, setCurrentStageIdx] = useState(0);
-  const [isFinalSovereign, setIsFinalSovereign] = useState(false);
-  const [sessionCoins, setSessionCoins] = useState(0);
+  // Determine initial stage and EFADO stage status from user profile or local storage
+  const getInitialMiningState = () => {
+    const uid = user?.uid || 'guest';
+    const savedSovereign = localStorage.getItem(`efado_mining_sovereign_${uid}`) === 'true' ||
+      user?.miningProgress?.stage === 'EFADO' ||
+      user?.miningProgress?.stage === 'COMPLETED';
+
+    const savedStageStr = localStorage.getItem(`efado_mining_stage_${uid}`) || user?.miningProgress?.stage || 'E';
+    const savedCoins = Number(localStorage.getItem(`efado_mining_coins_${uid}`)) || user?.miningProgress?.collectedInStage || 0;
+
+    if (savedSovereign) {
+      return {
+        stageIdx: STAGES.length - 1, // Lord Node / EFADO stage (index 4)
+        isFinalSovereign: true,
+        sessionCoins: savedCoins
+      };
+    }
+
+    const stageMap: Record<string, number> = { 'E': 0, 'F': 1, 'A': 2, 'D': 3, 'O': 4 };
+    const stageIdx = stageMap[savedStageStr] !== undefined ? stageMap[savedStageStr] : 0;
+
+    return {
+      stageIdx,
+      isFinalSovereign: false,
+      sessionCoins: savedCoins
+    };
+  };
+
+  const initialState = getInitialMiningState();
+  const [currentStageIdx, setCurrentStageIdx] = useState(initialState.stageIdx);
+  const [isFinalSovereign, setIsFinalSovereign] = useState(initialState.isFinalSovereign);
+  const [sessionCoins, setSessionCoins] = useState(initialState.sessionCoins);
   const [isCelebrating, setIsCelebrating] = useState(false);
   const [isMining, setIsMining] = useState(false);
   const [floatingCoins, setFloatingCoins] = useState<{ id: number; x: number; y: number; isCredit?: boolean }[]>([]);
@@ -68,6 +98,39 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   const stage = STAGES[currentStageIdx];
   const progress = (sessionCoins / stage.requirement) * 100;
   const isFinalStage = currentStageIdx === STAGES.length - 1 && sessionCoins >= stage.requirement;
+
+  // Persist mining progress to LocalStorage & Firestore
+  const saveMiningProgress = async (stageStr: string, coins: number, sovereign: boolean) => {
+    try {
+      const finalStageName = sovereign ? 'EFADO' : stageStr;
+      const uid = user?.uid || 'guest';
+      
+      localStorage.setItem(`efado_mining_stage_${uid}`, finalStageName);
+      localStorage.setItem(`efado_mining_coins_${uid}`, coins.toString());
+      if (sovereign) {
+        localStorage.setItem(`efado_mining_sovereign_${uid}`, 'true');
+      }
+
+      if (user) {
+        user.miningProgress = {
+          stage: finalStageName as any,
+          collectedInStage: coins
+        };
+      }
+
+      if (user?.uid) {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          miningProgress: {
+            stage: finalStageName,
+            collectedInStage: coins
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Syncing mining progress failed:', err);
+    }
+  };
 
   const triggerInterstitialAd = (onDone: () => void) => {
     // Show premium full-screen interstitial ad
@@ -112,12 +175,20 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
     const newCoin = { id: Date.now(), x, y };
     setFloatingCoins(prev => [...prev, newCoin]);
     
-    setSessionCoins(prev => prev + 1);
+    const nextSessionCoins = sessionCoins + 1;
+    setSessionCoins(nextSessionCoins);
     setTotalMined(prev => prev + 1);
+
+    // Persist progress on mining
+    saveMiningProgress(
+      isFinalSovereign ? 'EFADO' : stage.id,
+      nextSessionCoins,
+      isFinalSovereign
+    );
     
     // Monetary credit logic: 100 mining = 1.00 Naira
     if (isFinalSovereign) {
-       if ((sessionCoins + 1) % 100 === 0) {
+       if (nextSessionCoins % 100 === 0) {
           // Epic zoom out credit animation
           setFloatingCoins(prev => [...prev, { id: Date.now() + 1, x: window.innerWidth / 2, y: window.innerHeight / 2, isCredit: true }]);
           
@@ -159,14 +230,17 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
   const handleNextStage = () => {
     triggerInterstitialAd(() => {
       if (currentStageIdx < STAGES.length - 1) {
-        setCurrentStageIdx(prev => prev + 1);
+        const nextIdx = currentStageIdx + 1;
+        setCurrentStageIdx(nextIdx);
         setSessionCoins(0);
         setIsCelebrating(false);
+        saveMiningProgress(STAGES[nextIdx].id, 0, false);
       } else {
         setIsFinalSovereign(true);
         setIsCelebrating(false);
         setShowEfadoButton(false);
         setSessionCoins(0);
+        saveMiningProgress('EFADO', 0, true);
       }
     });
   };

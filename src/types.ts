@@ -17,7 +17,7 @@ export interface UserProfile {
   phoneNumber?: string;
   miningWallet?: number;
   miningProgress?: {
-    stage: 'E' | 'F' | 'A' | 'D' | 'O' | 'COMPLETED';
+    stage: 'E' | 'F' | 'A' | 'D' | 'O' | 'EFADO' | 'COMPLETED';
     collectedInStage: number;
   };
   creatorEarnings?: {

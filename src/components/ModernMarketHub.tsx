@@ -239,6 +239,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const [selectedL3, setSelectedL3] = useState<string | null>(null);
   const [selectedL4, setSelectedL4] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [adListings, setAdListings] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<MarketProduct[]>(SAMPLE_PRODUCTS);
   const [showRegModal, setShowRegModal] = useState(false);
   const [cart, setCart] = useState<{product: MarketProduct, quantity: number}[]>([]);
@@ -416,7 +417,15 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     const unsub = onSnapshot(q, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketOrder)));
     });
-    return unsub;
+
+    const unsubAds = onSnapshot(collection(db, 'ad_listings'), (snap) => {
+      setAdListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => console.error("Error loading ad_listings in ModernMarketHub:", e));
+
+    return () => {
+      unsub();
+      unsubAds();
+    };
   }, [user.uid]);
 
   const handleSubmitMarketTestimony = async () => {
@@ -471,7 +480,39 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   };
 
   useEffect(() => {
-    let filtered = SAMPLE_PRODUCTS;
+    const userProducts: MarketProduct[] = adListings.map((ad: any) => ({
+      id: ad.id,
+      title: ad.title || 'Advertised Product',
+      price: Number(ad.price) || 0,
+      currency: 'NGN',
+      images: (ad.photos && ad.photos.length > 0) ? ad.photos : [`https://picsum.photos/seed/${ad.id}/600/400`],
+      rating: 5.0,
+      reviewsCount: 24,
+      vendor: {
+        id: ad.vendorId || 'user',
+        name: ad.contact?.email ? ad.contact.email.split('@')[0] : 'EFADO Verified Vendor',
+        verified: true,
+        rating: 5.0
+      },
+      delivery: {
+        methods: ['Dispatch', 'Pickup', 'Express Nationwide'],
+        estimatedDays: '1-2 Days'
+      },
+      stock: ad.status === 'sold_out' ? 0 : 10,
+      description: ad.description || '',
+      categoryPath: {
+        level1: ad.category || 'General',
+        level2: ad.type === 'SELL' ? 'User Products' : 'User Adverts',
+        level3: ad.type || 'SELL'
+      },
+      attributes: {
+        condition: 'Verified Asset',
+        location: ad.location ? `${ad.location.city || ''}, ${ad.location.state || ''}` : 'Nigeria',
+        phone: ad.contact?.phone || ad.contact?.whatsapp || ''
+      }
+    }));
+
+    let filtered = [...userProducts, ...SAMPLE_PRODUCTS];
     if (selectedL1) {
       filtered = filtered.filter(p => p.categoryPath.level1 === selectedL1);
     }
@@ -491,7 +532,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       );
     }
     setFilteredProducts(filtered);
-  }, [selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
+  }, [adListings, selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
 
   const handleL1Select = (cat: string) => {
     setSelectedL1(cat);
