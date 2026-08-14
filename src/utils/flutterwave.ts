@@ -1,4 +1,32 @@
-export function sanitizeKey(rawKey: string, isSecret = false): string {
+import { functions, httpsCallable } from '../firebase';
+
+export interface FlutterwavePaymentParams {
+  amount: number;
+  currency?: string;
+  email: string;
+  name?: string;
+  phone?: string;
+  tx_ref?: string;
+  purpose?: string;
+  redirectBase?: string;
+  redirect_url?: string;
+  meta?: Record<string, any>;
+  customizations?: {
+    title?: string;
+    description?: string;
+    logo?: string;
+  };
+}
+
+export interface FlutterwavePaymentResult {
+  status: boolean;
+  link?: string;
+  tx_ref?: string;
+  message?: string;
+  isSandbox?: boolean;
+}
+
+export function sanitizeKey(rawKey: string): string {
   if (!rawKey) return '';
   let cleaned = rawKey.trim();
 
@@ -15,41 +43,26 @@ export function sanitizeKey(rawKey: string, isSecret = false): string {
 
   const upper = cleaned.toUpperCase();
 
-  // If secret key is requested or string starts with FLWSECK
-  if (isSecret || upper.startsWith('FLWSECK')) {
-    if (upper.startsWith('FLWSECK')) {
-      return cleaned;
-    }
-    // If raw string without prefix
-    return `FLWSECK-${cleaned}`;
-  }
-
-  // If public key is requested or starts with FLWPUBK
+  // If public key is provided or starts with FLWPUBK
   if (upper.startsWith('FLWPUBK')) {
     return cleaned;
   }
 
-  // If user pasted a Secret Key in Public Key field, do not prefix with FLWPUBK
-  if (upper.startsWith('FLWSECK')) {
-    return cleaned;
-  }
-
-  // Only prefix if it looks like a 32-char hex token
-  return `FLWPUBK-${cleaned}`;
+  return cleaned;
 }
 
 export function getFlutterwavePublicKey(): string {
-  // 1. Priority 1: Check environment variables
+  // 1. Priority 1: Check environment variables (Vite public key / Client ID)
   const rawEnvKey = (
     import.meta.env.VITE_FLW_PUBLIC_KEY || 
-    import.meta.env.VITE_FLW_PUBLIC_KE || 
+    import.meta.env.VITE_FLW_CLIENT_ID ||
     import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
     ''
   ).trim();
 
   if (rawEnvKey) {
-    const sanitizedEnv = sanitizeKey(rawEnvKey, false);
-    if (sanitizedEnv && sanitizedEnv.toUpperCase().startsWith('FLWPUBK')) {
+    const sanitizedEnv = sanitizeKey(rawEnvKey);
+    if (sanitizedEnv) {
       return sanitizedEnv;
     }
   }
@@ -57,41 +70,12 @@ export function getFlutterwavePublicKey(): string {
   // 2. Priority 2: Check browser localStorage override
   const localKey = localStorage.getItem('efado_flw_public_key');
   if (localKey && localKey.trim()) {
-    const sanitizedLocal = sanitizeKey(localKey, false);
-    if (sanitizedLocal && sanitizedLocal.toUpperCase().startsWith('FLWPUBK')) {
+    const sanitizedLocal = sanitizeKey(localKey);
+    if (sanitizedLocal) {
       return sanitizedLocal;
     }
   }
   
-  return '';
-}
-
-export function getFlutterwaveSecretKey(): string {
-  // 1. Check environment variables
-  const rawEnvKey = (
-    import.meta.env.VITE_FLW_SECRET_KEY || 
-    import.meta.env.FLW_SECRET_KEY || 
-    import.meta.env.FLUTTERWAVE_SECRET_KEY ||
-    import.meta.env.FLWSECK ||
-    ''
-  ).trim();
-
-  if (rawEnvKey) {
-    const sanitized = sanitizeKey(rawEnvKey, true);
-    if (sanitized && sanitized.toUpperCase().startsWith('FLWSECK')) {
-      return sanitized;
-    }
-  }
-
-  // 2. Check localStorage override
-  const localKey = localStorage.getItem('efado_flw_secret_key');
-  if (localKey && localKey.trim()) {
-    const sanitizedLocal = sanitizeKey(localKey, true);
-    if (sanitizedLocal && sanitizedLocal.toUpperCase().startsWith('FLWSECK')) {
-      return sanitizedLocal;
-    }
-  }
-
   return '';
 }
 
@@ -104,18 +88,8 @@ export function saveFlutterwavePublicKey(key: string): void {
   }
 }
 
-export function saveFlutterwaveSecretKey(key: string): void {
-  const trimmed = key.trim();
-  if (trimmed) {
-    localStorage.setItem('efado_flw_secret_key', trimmed);
-  } else {
-    localStorage.removeItem('efado_flw_secret_key');
-  }
-}
-
 export function clearFlutterwaveKeys(): void {
   localStorage.removeItem('efado_flw_public_key');
-  localStorage.removeItem('efado_flw_secret_key');
 }
 
 export function isTestKey(key?: string): boolean {
@@ -125,10 +99,80 @@ export function isTestKey(key?: string): boolean {
 
 export function isDefaultOrInvalidKey(key?: string): boolean {
   const activeKey = key || getFlutterwavePublicKey();
-  if (!activeKey || !activeKey.toUpperCase().startsWith('FLWPUBK')) {
-    return true;
-  }
-  return false;
+  return !activeKey;
 }
 
+/**
+ * Creates a Flutterwave V4 Checkout session via Firebase Cloud Functions or Backend API.
+ * The Flutterwave Client Secret and Encryption Key remain strictly secured on the backend.
+ */
+export async function createFlutterwavePaymentLink(params: FlutterwavePaymentParams): Promise<FlutterwavePaymentResult> {
+  const publicKey = getFlutterwavePublicKey();
+  const payload = {
+    ...params,
+    publicKey,
+    redirectBase: params.redirectBase || window.location.origin
+  };
 
+  // 1. Attempt Firebase Callable Function first (Step 1 requirement)
+  try {
+    if (functions) {
+      const createPaymentFn = httpsCallable<any, any>(functions, 'createFlutterwavePayment');
+      const response = await createPaymentFn(payload);
+      const data = response.data;
+      if (data && (data.link || data.status)) {
+        return {
+          status: true,
+          link: data.link,
+          tx_ref: data.tx_ref
+        };
+      }
+    }
+  } catch (fnErr: any) {
+    console.warn('[Flutterwave] Firebase function unavailable or error, falling back to server API endpoint:', fnErr?.message || fnErr);
+  }
+
+  // 2. Fallback to Express backend server endpoint
+  try {
+    const response = await fetch('/api/flutterwave/initialize', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (data.status && data.link) {
+      return {
+        status: true,
+        link: data.link,
+        tx_ref: data.tx_ref,
+        isSandbox: data.isSandbox
+      };
+    }
+
+    return {
+      status: false,
+      message: data.message || 'Payment initialization was rejected by Flutterwave gateway.'
+    };
+  } catch (err: any) {
+    return {
+      status: false,
+      message: err.message || 'Unable to connect to Flutterwave payment gateway.'
+    };
+  }
+}
+
+/**
+ * High-level checkout helper that initiates the session and redirects the browser
+ * directly to the Flutterwave hosted checkout screen.
+ */
+export async function startFlutterwaveCheckout(params: FlutterwavePaymentParams): Promise<void> {
+  const result = await createFlutterwavePaymentLink(params);
+  if (result.status && result.link) {
+    window.location.href = result.link;
+  } else {
+    throw new Error(result.message || 'Could not initiate Flutterwave payment link.');
+  }
+}

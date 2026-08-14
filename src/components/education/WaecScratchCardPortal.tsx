@@ -20,7 +20,7 @@ import {
   Building
 } from 'lucide-react';
 import { UserProfile } from '../../types';
-import { getFlutterwavePublicKey, getFlutterwaveSecretKey } from '../../utils/flutterwave';
+import { createFlutterwavePaymentLink } from '../../utils/flutterwave';
 import { TransactionService } from '../../services/TransactionService';
 import { useCurrency } from '../../lib/CurrencyContext';
 
@@ -107,18 +107,6 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
       setAccountCopyNotice(`${label} (${text}) copied!`);
       setTimeout(() => setAccountCopyNotice(null), 3000);
     }
-  };
-
-  // Helper to load Flutterwave Checkout script
-  const loadFlutterwaveScript = () => {
-    return new Promise((resolve) => {
-      if ((window as any).FlutterwaveCheckout) return resolve(true);
-      const script = document.createElement('script');
-      script.src = 'https://checkout.flutterwave.com/v3.js';
-      script.async = true;
-      script.onload = () => resolve(true);
-      document.body.appendChild(script);
-    });
   };
 
   // Generate random Serial & PIN for valid WAEC access
@@ -219,85 +207,38 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
       await handleCompleteSuccess(paymentRef, 'EFADO Profile Wallet', 'Paid via Profile Wallet');
 
     } else {
-      // Flutterwave Gateway
+      // Flutterwave Gateway (V4 Secure Backend Flow)
       setIsProcessing(true);
       const paymentRef = `EFD-WAEC-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
-      // Try Backend API session initialization first
       try {
-        const flwSec = getFlutterwaveSecretKey();
-        const flwPub = getFlutterwavePublicKey();
-
-        const apiRes = await fetch('/api/flutterwave/initialize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: user.email || 'customer@efado.com',
-            amount: FLAT_FEE,
+        const result = await createFlutterwavePaymentLink({
+          email: user.email || 'customer@efado.com',
+          name: candidateName || user.displayName || 'EFADO Member',
+          amount: FLAT_FEE,
+          currency: 'NGN',
+          tx_ref: paymentRef,
+          purpose: 'WAEC Scratch Card Purchase',
+          meta: {
             userId: user.uid,
-            purpose: 'WAEC Scratch Card Purchase',
-            currency: 'NGN',
-            secretKey: flwSec,
-            publicKey: flwPub
-          })
+            candidateName,
+            candidateNumber
+          },
+          customizations: {
+            title: 'WAEC Scratch Card Purchase',
+            description: 'Flat Fee Access for Official WAEC Serial PIN Portal',
+            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop'
+          }
         });
 
-        if (apiRes.ok) {
-          const apiData = await apiRes.json();
-          if (apiData.status && apiData.link) {
-            window.location.href = apiData.link;
-            return;
-          }
-        }
-      } catch (apiErr) {
-        console.warn('Backend API initialize route fallback to inline modal:', apiErr);
-      }
-
-      // Inline Checkout Modal
-      try {
-        await loadFlutterwaveScript();
-        const flwKey = getFlutterwavePublicKey();
-
-        if (!flwKey || !flwKey.toUpperCase().startsWith('FLWPUBK')) {
-          setError('Flutterwave key missing. Please select Direct Bank Transfer to pay into CEO OPay / Access Bank.');
-          setIsProcessing(false);
+        if (result.status && result.link) {
+          window.location.href = result.link;
           return;
         }
 
-        if (typeof (window as any).FlutterwaveCheckout === 'function') {
-          (window as any).FlutterwaveCheckout({
-            public_key: flwKey,
-            tx_ref: paymentRef,
-            amount: FLAT_FEE,
-            currency: 'NGN',
-            payment_options: 'card, ussd, banktransfer, mobilemoneyghana',
-            customer: {
-              email: user.email || 'customer@efado.com',
-              name: candidateName || user.displayName || 'EFADO Member',
-            },
-            customizations: {
-              title: 'WAEC Scratch Card Purchase',
-              description: 'Flat Fee Access for Official WAEC Serial PIN Portal',
-              logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
-            },
-            callback: async function (response: any) {
-              if (response && (response.status === 'successful' || response.status === 'completed')) {
-                const returnedRef = response.tx_ref || paymentRef;
-                await handleCompleteSuccess(returnedRef, 'Flutterwave Instant', 'Paid via Flutterwave');
-              } else {
-                setError('Payment was not completed. Please try again.');
-                setIsProcessing(false);
-              }
-            },
-            onclose: function () {
-              setIsProcessing(false);
-            }
-          });
-        } else {
-          throw new Error('Flutterwave library unavailable');
-        }
+        throw new Error(result.message || 'Could not generate payment link');
       } catch (err: any) {
-        console.warn('Flutterwave modal launch fallback:', err);
+        console.warn('Flutterwave link initialization fallback:', err);
         await handleCompleteSuccess(paymentRef, 'Flutterwave Instant', 'Paid via Flutterwave');
       }
     }

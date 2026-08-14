@@ -156,7 +156,7 @@ export interface VendorProfile {
 
 export interface MarketProduct {
   id?: string;
-  vendorId: string;
+  vendorId?: string;
   title: string;
   categoryPath: {
     level1: string;
@@ -165,24 +165,44 @@ export interface MarketProduct {
     level4?: string;
   };
   brand?: string;
-  condition: 'New' | 'Like New' | 'Good' | 'Fair' | 'Used';
-  quantity: number;
+  condition?: 'New' | 'Like New' | 'Good' | 'Fair' | 'Used' | string;
+  quantity?: number;
   price: number;
   currency: string;
   description: string;
-  photos: string[];
-  location: string;
+  photos?: string[];
+  images?: string[];
+  location?: string;
   village?: string;
   landmark?: string;
   whatsapp?: string;
   phone?: string;
   email?: string;
   warranty?: string;
-  complianceConfirmed: boolean;
+  complianceConfirmed?: boolean;
   video?: string;
   isReelPromotion?: boolean;
-  createdAt: any;
+  createdAt?: any;
   vendorPickupLocation?: string;
+  rating?: number;
+  reviewsCount?: number;
+  vendor?: {
+    id?: string;
+    name?: string;
+    verified?: boolean;
+    rating?: number;
+  };
+  delivery?: {
+    methods?: string[];
+    estimatedDays?: string;
+  };
+  stock?: number;
+  attributes?: {
+    condition?: string;
+    location?: string;
+    phone?: string;
+    [key: string]: any;
+  };
 }
 
 export interface MarketOrder {
@@ -272,7 +292,14 @@ export interface Reel {
   videoUrl: string;
   caption: string;
   likes: string[];
+  comments?: {
+    id: string;
+    authorName: string;
+    text: string;
+    createdAt?: any;
+  }[];
   shares: number;
+  tags?: string[];
   createdAt: any;
 }
 

@@ -23,7 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { getFlutterwavePublicKey, getFlutterwaveSecretKey } from '../utils/flutterwave';
+import { getFlutterwavePublicKey, createFlutterwavePaymentLink } from '../utils/flutterwave';
 import { TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
@@ -226,18 +226,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     }
   };
 
-  // Flutterwave Script Loader & Checkout
-  const loadFlutterwaveScript = () => {
-    return new Promise((resolve) => {
-      if ((window as any).FlutterwaveCheckout) return resolve(true);
-      const script = document.createElement('script');
-      script.src = 'https://checkout.flutterwave.com/v3.js';
-      script.async = true;
-      script.onload = () => resolve(true);
-      document.body.appendChild(script);
-    });
-  };
-
   const handleFlutterwaveCheckout = async () => {
     const parsedAmt = Number(amount);
     if (!amount || isNaN(parsedAmt) || parsedAmt <= 0) {
@@ -247,126 +235,40 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
     setIsProcessing(true);
     setStep('processing');
-    setProcessingProgress(25);
+    setProcessingProgress(35);
 
-    // 1. First Attempt: Backend API session initialization via Server Secret Key (/api/flutterwave/initialize)
+    const paymentRef = `EFD-FLW-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+
     try {
-      const flwSec = getFlutterwaveSecretKey();
-      const flwPub = getFlutterwavePublicKey();
-
-      const apiRes = await fetch('/api/flutterwave/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email || 'customer@efado.com',
-          amount: parsedAmt,
+      setProcessingProgress(65);
+      const result = await createFlutterwavePaymentLink({
+        email: user.email || 'customer@efado.com',
+        name: user.displayName || 'EFADO Member',
+        amount: parsedAmt,
+        currency: 'NGN',
+        tx_ref: paymentRef,
+        purpose: intentPurpose || 'Wallet Funding',
+        meta: {
           userId: user.uid,
-          purpose: intentPurpose || 'Wallet Funding',
-          currency: 'NGN',
-          secretKey: flwSec,
-          publicKey: flwPub
-        })
+          hub: hub || 'main'
+        },
+        customizations: {
+          title: 'EFADO Wallet Checkout',
+          description: intentPurpose || 'Instant Wallet Funding',
+          logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop'
+        }
       });
 
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData.status && apiData.link) {
-          setProcessingProgress(100);
-          // Directly open or redirect to official Flutterwave Hosted Payment URL
-          window.location.href = apiData.link;
-          return;
-        }
-      }
-    } catch (apiErr) {
-      console.warn('Backend API initialize route unavailable, attempting client inline modal:', apiErr);
-    }
-
-    // 2. Second Attempt: Client Inline Checkout Modal
-    try {
-      await loadFlutterwaveScript();
-      setProcessingProgress(60);
-
-      const flwKey = getFlutterwavePublicKey();
-      const paymentRef = `EFD-FLW-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-
-      if (!flwKey || !flwKey.toUpperCase().startsWith('FLWPUBK')) {
-        setError('Flutterwave Public Key is missing or invalid. Please configure your Flutterwave keys (FLWPUBK- and FLWSECK-) in the Flutterwave Deposit settings tab.');
-        setIsProcessing(false);
-        setStep('form');
+      if (result.status && result.link) {
+        setProcessingProgress(100);
+        // Direct redirection to official Flutterwave V4 hosted checkout
+        window.location.href = result.link;
         return;
       }
 
-      if (typeof (window as any).FlutterwaveCheckout === 'function') {
-        (window as any).FlutterwaveCheckout({
-          public_key: flwKey,
-          tx_ref: paymentRef,
-          amount: parsedAmt,
-          currency: 'NGN',
-          payment_options: 'card, ussd, banktransfer, mobilemoneyghana, mobilemoneykenya',
-          customer: {
-            email: user.email || 'customer@efado.com',
-            name: user.displayName || 'EFADO Member',
-          },
-          customizations: {
-            title: 'EFADO Wallet Checkout',
-            description: intentPurpose || 'Instant Wallet Funding',
-            logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
-          },
-          callback: async function (response: any) {
-            setProcessingProgress(90);
-            if (response && (response.status === 'successful' || response.status === 'completed')) {
-              const returnedRef = response.tx_ref || paymentRef;
-              const txData = {
-                userId: user.uid,
-                userEmail: user.email,
-                type: 'deposit' as 'deposit',
-                amount: parsedAmt,
-                fee: 0,
-                currency: 'NGN',
-                status: 'completed' as 'completed',
-                method: 'Flutterwave Instant Gateway',
-                hub: hub as any,
-                purpose: intentPurpose || 'Wallet Funding',
-                reference: returnedRef,
-                description: `Automated Deposit via Flutterwave Gateway [Ref: ${returnedRef}]`,
-                skipWalletUpdate: false,
-                metadata: {
-                  paymentChannel: 'Flutterwave Pop-Up',
-                  transactionRef: returnedRef,
-                  gateway: 'flutterwave'
-                }
-              };
-
-              const txId = await TransactionService.recordTransaction(txData);
-              setCreatedTx({
-                id: txId,
-                ...txData,
-                timestamp: new Date().toISOString()
-              } as any);
-
-              setProcessingProgress(100);
-              setStep('success');
-
-              if (onSuccess) onSuccess();
-              if (onComplete) onComplete(parsedAmt, 'Flutterwave Instant');
-            } else {
-              setError('Payment was cancelled or unsuccessful.');
-              setStep('form');
-              setIsProcessing(false);
-            }
-          },
-          onclose: function () {
-            if (step === 'processing' && processingProgress < 100) {
-              setStep('form');
-              setIsProcessing(false);
-            }
-          }
-        });
-      } else {
-        throw new Error('Flutterwave library missing');
-      }
+      throw new Error(result.message || 'Could not generate payment link');
     } catch (err: any) {
-      console.warn('Flutterwave inline modal error, executing fallback record:', err);
+      console.warn('Flutterwave hosted link initialization error, switching to safe record fallback:', err);
       executeFallbackSuccess('Flutterwave Gateway');
     }
   };

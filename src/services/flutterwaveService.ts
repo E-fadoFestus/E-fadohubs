@@ -1,5 +1,5 @@
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
-import { getFlutterwavePublicKey } from '../utils/flutterwave';
+import { createFlutterwavePaymentLink } from '../utils/flutterwave';
 
 export interface CreateSubaccountRequest {
   account_bank: string;      // Bank code e.g., '044'
@@ -24,14 +24,15 @@ export interface SubaccountResponse {
 }
 
 export interface CheckoutPaymentRequest {
-  tx_ref: string;
+  tx_ref?: string;
   amount: number;
-  currency: string;
+  currency?: string;
   redirect_url?: string;
+  redirectBase?: string;
   customer: {
     email: string;
-    phonenumber: string;
-    name: string;
+    phonenumber?: string;
+    name?: string;
   };
   subaccounts?: {
     id: string | number;
@@ -44,8 +45,8 @@ export interface CheckoutPaymentRequest {
     [key: string]: any;
   };
   customizations?: {
-    title: string;
-    description: string;
+    title?: string;
+    description?: string;
     logo?: string;
   };
 }
@@ -53,7 +54,7 @@ export interface CheckoutPaymentRequest {
 export const flutterwaveService = {
   /**
    * Step A: Create a Subaccount on Flutterwave
-   * POST https://api.flutterwave.com/v3/subaccounts
+   * Uses backend server proxy to keep secret key safe
    */
   async createSubaccount(payload: CreateSubaccountRequest): Promise<SubaccountResponse> {
     try {
@@ -121,71 +122,43 @@ export const flutterwaveService = {
   },
 
   /**
-   * Step 3: Payment Flow — When a Buyer Checks Out
-   * Initiates payment with transaction split ratio (95% to vendor, 5% platform)
+   * Step 3: V4 Payment Flow — Checkout Link Pattern
+   * Creates a hosted payment session securely via backend and redirects buyer
    */
-  async initiateSplitCheckout(request: CheckoutPaymentRequest, onSuccess: (res: any) => void, onClose?: () => void) {
-    const publicKey = getFlutterwavePublicKey();
-    if (!publicKey || !publicKey.toUpperCase().startsWith('FLWPUBK')) {
-      alert('Flutterwave Public Key is missing or invalid. Please configure your Flutterwave keys (FLWPUBK- and FLWSECK-) in the Flutterwave Deposit settings tab.');
-      if (onClose) onClose();
-      return;
-    }
-    
-    // Check if Flutterwave script is loaded
-    if (typeof (window as any).FlutterwaveCheckout === 'function') {
-      (window as any).FlutterwaveCheckout({
-        public_key: publicKey,
-        tx_ref: request.tx_ref || `EFD-FLW-${Date.now()}`,
+  async initiateSplitCheckout(request: CheckoutPaymentRequest, onSuccess?: (res: any) => void, onClose?: () => void) {
+    try {
+      const result = await createFlutterwavePaymentLink({
         amount: request.amount,
         currency: request.currency || 'NGN',
-        payment_options: 'card, ussd, banktransfer, mobilemoneyghana, mobilemoneykenya',
-        customer: {
-          email: request.customer.email,
-          phone_number: request.customer.phonenumber,
-          name: request.customer.name,
+        email: request.customer.email,
+        name: request.customer.name,
+        phone: request.customer.phonenumber,
+        tx_ref: request.tx_ref || `EFD-FLW-${Date.now()}`,
+        purpose: request.customizations?.description || 'EFADO Order Settlement',
+        redirectBase: request.redirectBase || window.location.origin,
+        redirect_url: request.redirect_url,
+        meta: {
+          ...request.meta,
+          subaccounts: request.subaccounts || []
         },
-        subaccounts: request.subaccounts || [],
-        meta: request.meta || {},
         customizations: {
           title: request.customizations?.title || 'EFADO Marketplace',
           description: request.customizations?.description || 'Payment for item',
           logo: request.customizations?.logo || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop',
-        },
-        callback: function (data: any) {
-          console.log('Flutterwave payment callback:', data);
-          if (data && (data.status === 'successful' || data.status === 'completed')) {
-            onSuccess(data);
-          } else {
-            alert('Payment was not completed.');
-          }
-        },
-        onclose: function () {
-          if (onClose) onClose();
-        },
+        }
       });
-    } else {
-      // Fallback checkout dialog if SDK script not loaded yet
-      const vendorShare = Math.round(request.amount * 0.95);
-      const platformShare = Math.round(request.amount * 0.05);
-      const confirmMsg = `⚡ FLUTTERWAVE AUTOMATED SUBACCOUNT SPLIT SETTLEMENT\n\n` +
-        `Total Amount: ${request.currency} ${request.amount.toLocaleString()}\n` +
-        `Vendor Share (95% Direct): ${request.currency} ${vendorShare.toLocaleString()}\n` +
-        `EFADO Platform Fee (5%): ${request.currency} ${platformShare.toLocaleString()}\n\n` +
-        `Subaccount ID: ${request.subaccounts?.[0]?.id || 'FLW_SUB_DIRECT'}\n\n` +
-        `Click OK to execute automated Flutterwave Gateway transfer.`;
-      
-      if (window.confirm(confirmMsg)) {
-        onSuccess({
-          status: 'successful',
-          tx_ref: request.tx_ref,
-          transaction_id: `FLW_TX_${Math.floor(1000000 + Math.random() * 9000000)}`,
-          amount: request.amount,
-          currency: request.currency,
-        });
-      } else if (onClose) {
-        onClose();
+
+      if (result.status && result.link) {
+        // Direct redirection to Flutterwave V4 Hosted Checkout
+        window.location.href = result.link;
+        return;
       }
+
+      throw new Error(result.message || 'Could not generate payment link');
+    } catch (err: any) {
+      console.error('Flutterwave payment initialization error:', err);
+      alert(`Flutterwave Checkout: ${err.message || 'Unable to connect to gateway'}`);
+      if (onClose) onClose();
     }
   },
 

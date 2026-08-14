@@ -57,6 +57,7 @@ import {
   collection, 
   onSnapshot, 
   doc, 
+  getDoc,
   updateDoc, 
   deleteDoc,
   setDoc, 
@@ -65,7 +66,8 @@ import {
   query, 
   orderBy, 
   limit,
-  runTransaction
+  runTransaction,
+  increment
 } from '../firebase';
 import { UserProfile, AdminStats, Announcement, WithdrawalRequest, Transaction, ServiceProvider, ServiceRequest, CSCCGroup, Loan, LoanApplication, LoanVendor, DomainSeller, DomainOrder, QuizSession, EmailAccount } from '../types';
 

@@ -325,7 +325,7 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     paystackSecret = clientSecretKey;
   }
 
-  let flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  let flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLWSECK || '').trim();
   if (clientSecretKey && (clientSecretKey.startsWith('FLWSECK') || clientSecretKey.length > 20)) {
     flwSecret = clientSecretKey;
   }
@@ -421,25 +421,18 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
   });
 });
 
-// Route D: Flutterwave Initialize Checkout Session
-app.post('/api/flutterwave/initialize', async (req: express.Request, res: express.Response) => {
-  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations, secretKey: clientSecretKey, publicKey: clientPublicKey } = req.body;
+// Route D: Flutterwave Initialize Checkout Session (V4 Secure Pattern)
+app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], async (req: express.Request, res: express.Response) => {
+  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations, redirectBase, publicKey: clientPublicKey, phone, phonenumber, name } = req.body;
   
-  // Resolve active secret key from request body or backend environment
+  // Resolve active secret key strictly from backend environment
   let flwSecret = (
-    clientSecretKey ||
-    process.env.VITE_FLW_SECRET_KEY || 
-    process.env.FLW_SECRET_KEY || 
+    process.env.FLUTTERWAVE_CLIENT_SECRET || 
     process.env.FLUTTERWAVE_SECRET_KEY || 
+    process.env.FLW_SECRET_KEY || 
     process.env.FLWSECK || 
     ''
   ).trim();
-
-  // If secret key wasn't explicitly set, but client passed a secret key in public key field (starts with FLWSECK)
-  const clientPub = (clientPublicKey || process.env.VITE_FLW_PUBLIC_KEY || '').trim();
-  if (!flwSecret && clientPub.toUpperCase().startsWith('FLWSECK')) {
-    flwSecret = clientPub;
-  }
 
   // Clean raw key strings (strip quotes/equals if user pasted whole env line)
   if (flwSecret.includes('=')) {
@@ -447,12 +440,14 @@ app.post('/api/flutterwave/initialize', async (req: express.Request, res: expres
   }
   flwSecret = flwSecret.replace(/['";]/g, '').trim();
 
+  const clientId = (process.env.FLUTTERWAVE_CLIENT_ID || clientPublicKey || process.env.VITE_FLW_PUBLIC_KEY || '').trim();
+
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  const callbackUrl = callback_url || `${appUrl}/payment/flutterwave-callback`;
-  const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+  const callbackUrl = callback_url || (redirectBase ? (redirectBase.includes('http') ? redirectBase : `${appUrl}/payment-success`) : `${appUrl}/payment/flutterwave-callback`);
+  const reference = req.body.tx_ref || `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
   if (!flwSecret) {
-    console.warn('[Flutterwave Init API] FLW Secret key is not configured on backend or client. Generating sandbox simulation URL.');
+    console.warn('[Flutterwave Init API] FLW Secret key is not configured in backend environment. Generating sandbox simulation URL.');
     return res.json({
       status: true,
       message: 'Sandbox Flutterwave session initialized',
@@ -462,12 +457,35 @@ app.post('/api/flutterwave/initialize', async (req: express.Request, res: expres
     });
   }
 
+  // Attempt V4 Token Exchange if clientId is present
+  let accessToken: string | null = null;
+  if (clientId && flwSecret) {
+    try {
+      const tokenRes = await fetch('https://api.flutterwave.com/v3/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: flwSecret
+        })
+      });
+      const tokenData = await tokenRes.json();
+      if (tokenData.access_token) {
+        accessToken = tokenData.access_token;
+      }
+    } catch (tokenErr) {
+      console.warn('[Flutterwave Init API] V4 token exchange fallback to direct secret:', tokenErr);
+    }
+  }
+
+  const authHeader = accessToken ? `Bearer ${accessToken}` : `Bearer ${flwSecret}`;
+
   try {
-    console.info(`[Flutterwave Init API] Initializing live transaction via Flutterwave API using Secret Key (${flwSecret.substring(0, 10)}...)...`);
+    console.info(`[Flutterwave Init API] Initializing live transaction via Flutterwave API using Bearer Token...`);
     const response = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${flwSecret}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -477,15 +495,16 @@ app.post('/api/flutterwave/initialize', async (req: express.Request, res: expres
         redirect_url: callbackUrl,
         customer: {
           email: email || 'customer@efado.com',
-          name: email || 'EFADO Valued Member'
+          name: name || email || 'EFADO Valued Member',
+          phonenumber: phone || phonenumber || ''
         },
         meta: {
           userId: userId || '',
-          purpose: purpose || 'EFADO Wallet Topup'
+          purpose: purpose || 'EFADO Ecosystem Payment'
         },
         customizations: customizations || {
           title: 'EFADO Sovereign Payment Gateway',
-          description: purpose || 'Instant EFADO Wallet Topup'
+          description: purpose || 'Instant EFADO Payment'
         }
       })
     });
@@ -514,7 +533,7 @@ app.post('/api/flutterwave/initialize', async (req: express.Request, res: expres
 // Route E: Flutterwave Real Live Bank Transfer / Payout API
 app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Response) => {
   const { account_bank, account_number, amount, narration, beneficiary_name, userId } = req.body;
-  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  const flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLWSECK || '').trim();
 
   if (!account_number || !amount) {
     return res.status(400).json({ status: false, message: 'Account number and amount are required for payout.' });
@@ -579,7 +598,7 @@ app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Re
 
 // Route F: Flutterwave Subaccount Creation Proxy
 app.post('/api/flutterwave/subaccount', async (req: express.Request, res: express.Response) => {
-  const flwSecret = process.env.VITE_FLW_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLWSECK || '';
+  const flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLWSECK || '').trim();
 
   if (!flwSecret) {
     const simId = `FLW_SUB_SIM_${Math.floor(100000 + Math.random() * 900000)}`;

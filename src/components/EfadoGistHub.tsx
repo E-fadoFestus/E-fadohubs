@@ -99,7 +99,8 @@ import {
   setDoc,
   doc,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  increment
 } from '../firebase';
 import { updatePassword } from 'firebase/auth';
 import { MiningMiniCard, EfadoMining, AdvertisingMiniCard } from './EfadoMining';
