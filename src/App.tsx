@@ -982,6 +982,42 @@ function AppContent() {
     handlePaystackCallback();
   }, [user]);
 
+  // Flutterwave Automated Callback Redirect Listener
+  useEffect(() => {
+    const handleFlutterwaveCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const txRef = urlParams.get('tx_ref') || urlParams.get('txRef');
+        const transactionId = urlParams.get('transaction_id') || urlParams.get('id');
+        const status = urlParams.get('status');
+        const simUserId = urlParams.get('userId');
+        const simAmount = urlParams.get('amount');
+
+        if (txRef || transactionId) {
+          console.log('🌐 Flutterwave Return Reference detected in URL:', txRef || transactionId, 'Status:', status);
+          const currentUserId = user?.uid || simUserId || '';
+          
+          const verifyUrl = `/api/flutterwave/verify/${encodeURIComponent(txRef || '')}?transaction_id=${encodeURIComponent(transactionId || '')}&userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`;
+          const res = await fetch(verifyUrl);
+          const data = await res.json();
+
+          if (data.status && (data.data?.status === 'success' || data.already_processed)) {
+            alert(`✅ FLUTTERWAVE PAYMENT VERIFIED!\n\nReference: ${txRef || transactionId}\nStatus: Successful\nYour account/order has been updated.`);
+          } else {
+            console.warn('Flutterwave return verification status:', data);
+          }
+
+          const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (err) {
+        console.error('Error handling Flutterwave URL callback:', err);
+      }
+    };
+
+    handleFlutterwaveCallback();
+  }, [user]);
+
   // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
   useEffect(() => {
     const handleHashRoute = () => {

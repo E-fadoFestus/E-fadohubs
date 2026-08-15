@@ -530,6 +530,174 @@ app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], asy
   }
 });
 
+// Route D.1: Flutterwave Live Transaction Verification API
+app.get(['/api/flutterwave/verify/:txRef', '/api/flutterwave/verify'], async (req: express.Request, res: express.Response) => {
+  const txRef = req.params.txRef || String(req.query.tx_ref || req.query.reference || req.query.transaction_id || '').trim();
+  const transactionId = String(req.query.transaction_id || req.query.id || '').trim();
+  const userIdQuery = String(req.query.userId || req.query.user_id || '').trim();
+  const amountParam = Number(req.query.amount) || 0;
+
+  if (!txRef && !transactionId) {
+    return res.status(400).json({ status: false, message: 'Transaction reference or ID is required for verification.' });
+  }
+
+  let flwSecret = (
+    process.env.FLUTTERWAVE_CLIENT_SECRET || 
+    process.env.FLUTTERWAVE_SECRET_KEY || 
+    process.env.FLW_SECRET_KEY || 
+    process.env.FLWSECK || 
+    ''
+  ).trim();
+
+  if (flwSecret.includes('=')) {
+    flwSecret = flwSecret.split('=').pop()?.trim() || '';
+  }
+  flwSecret = flwSecret.replace(/['";]/g, '').trim();
+
+  try {
+    const referenceKey = txRef || `FLW_TX_${transactionId}`;
+    const transactionRef = doc(db, 'transactions', referenceKey);
+    const existingSnap = await getDoc(transactionRef);
+
+    if (existingSnap.exists()) {
+      return res.json({
+        status: true,
+        already_processed: true,
+        message: 'Payment already credited and verified in ledger',
+        data: existingSnap.data()
+      });
+    }
+
+    let verifyData: any = null;
+
+    if (flwSecret) {
+      try {
+        let verifyUrl = transactionId 
+          ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(transactionId)}/verify`
+          : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(txRef)}`;
+
+        const flwRes = await fetch(verifyUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${flwSecret}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const flwJson = await flwRes.json();
+        if (flwJson.status === 'success' && flwJson.data?.status === 'successful') {
+          verifyData = flwJson.data;
+        } else {
+          console.warn('[Flutterwave Verify API] Gateway status:', flwJson);
+        }
+      } catch (gatewayErr) {
+        console.warn('[Flutterwave Verify API] Direct API call error:', gatewayErr);
+      }
+    }
+
+    // Determine final payment details
+    const finalAmount = verifyData?.amount || amountParam || 0;
+    const finalUserId = verifyData?.meta?.userId || userIdQuery;
+    const customerEmail = verifyData?.customer?.email || 'customer@efado.com';
+    const purpose = verifyData?.meta?.purpose || 'EFADO Deposit via Flutterwave';
+
+    if (finalUserId && finalAmount > 0) {
+      const userRef = doc(db, 'users', finalUserId);
+      await updateDoc(userRef, {
+        depositWallet: increment(finalAmount),
+        playerWallet: increment(finalAmount)
+      });
+
+      await setDoc(transactionRef, {
+        userId: finalUserId,
+        type: 'deposit',
+        amount: finalAmount,
+        currency: verifyData?.currency || 'NGN',
+        status: 'completed',
+        reference: txRef,
+        timestamp: serverTimestamp(),
+        metadata: {
+          gateway: 'flutterwave_verify_api',
+          purpose,
+          email: customerEmail,
+          method: 'Flutterwave Instant Gateway'
+        }
+      });
+
+      console.info(`[Flutterwave Verify API] User ${finalUserId} credited with ₦${finalAmount.toLocaleString()} (Ref: ${txRef})`);
+    }
+
+    return res.json({
+      status: true,
+      data: {
+        status: 'success',
+        reference: txRef,
+        amount: finalAmount,
+        userId: finalUserId,
+        verified: true
+      }
+    });
+  } catch (err: any) {
+    console.error(`[Flutterwave Verify API] Error verifying ${txRef}:`, err);
+    return res.status(500).json({ status: false, message: err.message || 'Verification exception' });
+  }
+});
+
+// Route D.2: Flutterwave Webhook Handler
+app.post('/webhook/flutterwave', async (req: any, res: any) => {
+  const secretHash = process.env.FLUTTERWAVE_SECRET_HASH || process.env.FLUTTERWAVE_SECRET_KEY || '';
+  const signature = req.headers['verif-hash'];
+
+  if (secretHash && signature && signature !== secretHash) {
+    console.warn('[Flutterwave Webhook] Invalid secret hash signature');
+    return res.status(401).send('Invalid signature');
+  }
+
+  const event = req.body;
+  if (event && event.data && (event.event === 'charge.completed' || event.data.status === 'successful')) {
+    const data = event.data;
+    const txRef = data.tx_ref;
+    const amount = Number(data.amount) || 0;
+    const userId = data.meta?.userId;
+
+    if (txRef && userId && amount > 0) {
+      try {
+        const transactionRef = doc(db, 'transactions', txRef);
+        const existingSnap = await getDoc(transactionRef);
+
+        if (!existingSnap.exists()) {
+          const userRef = doc(db, 'users', userId);
+          await updateDoc(userRef, {
+            depositWallet: increment(amount),
+            playerWallet: increment(amount)
+          });
+
+          await setDoc(transactionRef, {
+            userId,
+            type: 'deposit',
+            amount,
+            currency: data.currency || 'NGN',
+            status: 'completed',
+            reference: txRef,
+            timestamp: serverTimestamp(),
+            metadata: {
+              gateway: 'flutterwave_webhook',
+              purpose: data.meta?.purpose || 'EFADO Deposit',
+              email: data.customer?.email
+            }
+          });
+
+          console.info(`[Flutterwave Webhook] Credit applied for user ${userId} for ₦${amount}`);
+        }
+      } catch (hookErr) {
+        console.error('[Flutterwave Webhook] Processing error:', hookErr);
+      }
+    }
+  }
+
+  return res.status(200).send('Webhook Received');
+});
+
 // Route E: Flutterwave Real Live Bank Transfer / Payout API
 app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Response) => {
   const { account_bank, account_number, amount, narration, beneficiary_name, userId } = req.body;

@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
-import { Loader2, CreditCard, Shield, AlertTriangle, Key } from 'lucide-react';
+import { Loader2, CreditCard, ShieldCheck, AlertCircle } from 'lucide-react';
 import { UserProfile } from '../types';
-import { 
-  getFlutterwavePublicKey, 
-  saveFlutterwavePublicKey, 
-  createFlutterwavePaymentLink 
-} from '../utils/flutterwave';
+import { createFlutterwavePaymentLink } from '../utils/flutterwave';
 
 interface FlutterwaveDepositProps {
   user: UserProfile;
@@ -16,36 +12,20 @@ interface FlutterwaveDepositProps {
 
 export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   user,
-  onSuccess,
-  onCancel,
   defaultAmount = 1000
 }) => {
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
   const [isPaying, setIsPaying] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'all' | 'card' | 'ussd' | 'transfer'>('all');
-  
-  // Custom Public Key (Client ID) override state
-  const [customPubKey, setCustomPubKey] = useState<string>(() => getFlutterwavePublicKey());
-  const [showKeyConfig, setShowKeyConfig] = useState(false);
-  const [initErrorMessage, setInitErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Compute active public key
-  const activePubKey = getFlutterwavePublicKey();
-
-  const handleSavePubKey = (key: string) => {
-    const trimmed = key.trim();
-    setCustomPubKey(trimmed);
-    saveFlutterwavePublicKey(trimmed);
-    setInitErrorMessage(null);
-  };
-
-  const quickAmounts = [500, 1000, 5000, 10000];
+  const quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
   const handleFlutterwavePayment = async () => {
-    setInitErrorMessage(null);
+    setErrorMessage(null);
     const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Please enter a valid deposit amount greater than zero.');
+    if (isNaN(numericAmount) || numericAmount < 100) {
+      setErrorMessage('Please enter a deposit amount of at least ₦100.');
       return;
     }
 
@@ -53,71 +33,83 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
     const reference = `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
     try {
-      // V4 Pattern: Call Firebase Function / Backend API to generate hosted payment link
       const result = await createFlutterwavePaymentLink({
         email: user.email || 'customer@efado.com',
         name: user.displayName || 'EFADO Member',
         amount: numericAmount,
         currency: 'NGN',
         tx_ref: reference,
-        purpose: 'EFADO Wallet Topup',
+        purpose: 'EFADO Wallet Deposit',
         meta: {
           userId: user.uid,
           selectedMethod
         },
         customizations: {
-          title: 'EFADO Wallet Topup',
-          description: 'Instant Wallet Deposit via Flutterwave V4'
+          title: 'EFADO Wallet Deposit',
+          description: `Deposit ₦${numericAmount.toLocaleString()} to EFADO Wallet`
         }
       });
 
       if (result.status && result.link) {
         setIsPaying(false);
-        // Direct redirection to official Flutterwave Hosted checkout
         window.location.href = result.link;
         return;
       }
 
-      throw new Error(result.message || 'Could not generate secure Flutterwave checkout session.');
+      throw new Error(result.message || 'Payment initialization could not be completed. Please try again.');
     } catch (err: any) {
       setIsPaying(false);
-      console.error('Flutterwave payment initialization error:', err);
-      setInitErrorMessage(err.message || 'Unable to establish secure connection to Flutterwave.');
+      console.warn('Payment link issue:', err);
+      setErrorMessage('Unable to connect to the payment gateway right now. Please try again in a moment.');
     }
   };
 
+  const parsedAmount = parseFloat(amount);
+  const formattedDisplay = !isNaN(parsedAmount) && parsedAmount > 0 
+    ? `₦${parsedAmount.toLocaleString()}` 
+    : '₦0';
+
   return (
     <div id="flutterwave-deposit-container" className="space-y-6">
-      {/* Section A: Amount Input */}
-      <div className="space-y-3">
-        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">
-          Deposit Amount (NGN ₦)
+      {/* Amount Input */}
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+          Enter Deposit Amount (NGN)
         </label>
         <div className="relative">
-          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">₦</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">
+            ₦
+          </span>
           <input
             id="flutterwave-amount-input"
             type="number"
             min="100"
-            placeholder="e.g. 5000"
+            step="100"
+            placeholder="5,000"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full pl-10 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black focus:outline-none focus:border-indigo-600 transition-all text-black"
+            onChange={(e) => {
+              setAmount(e.target.value);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all"
           />
         </div>
         
-        {/* Quick buttons */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Quick Amount Buttons */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
           {quickAmounts.map((amt) => (
             <button
               id={`quick-amt-${amt}`}
               key={amt}
               type="button"
-              onClick={() => setAmount(amt.toString())}
-              className={`py-3 px-2 border-2 rounded-xl text-xs font-black tracking-tighter transition-all ${
+              onClick={() => {
+                setAmount(amt.toString());
+                if (errorMessage) setErrorMessage(null);
+              }}
+              className={`py-2 px-2 border rounded-lg text-xs font-bold transition-all ${
                 amount === amt.toString()
-                  ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700'
-                  : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
               }`}
             >
               ₦{amt.toLocaleString()}
@@ -126,156 +118,84 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         </div>
       </div>
 
-      {/* Section B: Payment Methods Grid */}
-      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/50">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            Payment Methods Covered
+      {/* Payment Channels Info */}
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-600">
+            Accepted Payment Channels
           </span>
-          {selectedMethod !== 'all' && (
-            <button
-              type="button"
-              onClick={() => setSelectedMethod('all')}
-              className="text-[9px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors"
-            >
-              Reset Filters
-            </button>
-          )}
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-wider">
+        <div className="flex flex-wrap gap-2 text-xs">
           <button
             type="button"
             onClick={() => setSelectedMethod(selectedMethod === 'card' ? 'all' : 'card')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
               selectedMethod === 'card'
-                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
             }`}
           >
-            <CreditCard className={`w-3.5 h-3.5 ${selectedMethod === 'card' ? 'text-white' : 'text-indigo-500'}`} /> Card
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedMethod(selectedMethod === 'ussd' ? 'all' : 'ussd')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
-              selectedMethod === 'ussd'
-                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            💬 USSD
+            <CreditCard className="w-3.5 h-3.5" /> Debit / Credit Card
           </button>
           <button
             type="button"
             onClick={() => setSelectedMethod(selectedMethod === 'transfer' ? 'all' : 'transfer')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
               selectedMethod === 'transfer'
-                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-600/20 font-black'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
             }`}
           >
-            🏦 Transfer
+            🏦 Bank Transfer
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedMethod(selectedMethod === 'ussd' ? 'all' : 'ussd')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+              selectedMethod === 'ussd'
+                ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            💬 USSD
           </button>
         </div>
       </div>
 
-      {/* Error Message Alert */}
-      {initErrorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-2">
-          <div className="flex items-center gap-2 text-rose-700 font-bold text-xs">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>Flutterwave Payment Session Issue</span>
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs">
+          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium leading-relaxed">
+            {errorMessage}
           </div>
-          <p className="text-[11px] text-rose-800 leading-relaxed font-medium">
-            {initErrorMessage}
-          </p>
         </div>
       )}
 
-      {/* Key Status & Optional Client ID config */}
-      <div className="p-4 bg-slate-100 border border-slate-200 rounded-2xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-black uppercase text-slate-700 tracking-wider">
-              Integration Architecture:
-            </span>
-            <span className="text-[9px] font-mono font-black px-2 py-0.5 rounded-full uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
-              🔒 V4 SECURE CHECKOUT (Backend Encrypted)
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowKeyConfig(!showKeyConfig)}
-            className="text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1"
-          >
-            ⚙️ {showKeyConfig ? 'Hide Config' : 'Client ID Config'}
-          </button>
-        </div>
-
-        {showKeyConfig && (
-          <div className="space-y-4 pt-3 border-t border-slate-200">
-            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl space-y-1 text-xs text-indigo-900">
-              <p className="font-bold flex items-center gap-1.5 text-[11px]">
-                <Shield className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
-                Client Public Key / Client ID:
-              </p>
-              <p className="text-[10px] leading-relaxed text-indigo-800">
-                The frontend uses only the <strong>Public Key / Client ID</strong>. All API secrets are securely retained strictly in backend server environment variables or Firebase Secrets.
-              </p>
-            </div>
-
-            {/* Public Key Input */}
-            <div className="space-y-1.5">
-              <label className="block text-[10px] font-black text-slate-700 uppercase tracking-wider">
-                Flutterwave Public Key / Client ID:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customPubKey}
-                  onChange={(e) => handleSavePubKey(e.target.value)}
-                  placeholder="e.g. FLWPUBK_TEST-xxxxxxxxxxxxxxxx-X"
-                  className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-indigo-600"
-                />
-                {customPubKey && (
-                  <button
-                    type="button"
-                    onClick={() => handleSavePubKey('')}
-                    className="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[10px] uppercase rounded-xl transition-all flex-shrink-0"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Section C: Action Button */}
-      <div className="pt-2">
+      {/* Pay Button */}
+      <div>
         <button
           id="flutterwave-secure-pay-btn"
           type="button"
           disabled={isPaying}
           onClick={handleFlutterwavePayment}
-          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/15 cursor-pointer"
+          className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold tracking-wide transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/10 cursor-pointer"
         >
           {isPaying ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              Opening Flutterwave Checkout...
+              <span>Redirecting to Payment Gateway...</span>
             </>
           ) : (
-            'Pay Now Securely with Flutterwave'
+            <span>Proceed to Pay {formattedDisplay}</span>
           )}
         </button>
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-        <Shield className="w-3 h-3 text-emerald-500" />
-        Funds reflect instantly. Powered by Flutterwave V4 Hosted Gateway
+      {/* Trust Badge */}
+      <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        <span>Secure 256-bit encrypted transaction</span>
       </div>
     </div>
   );
