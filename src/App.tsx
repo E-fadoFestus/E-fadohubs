@@ -116,6 +116,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
 import { CurrencySelector } from './components/CurrencySelector';
+import { TextSizeSelector } from './components/TextSizeSelector';
 
 enum OperationType {
   CREATE = 'create',
@@ -2457,6 +2458,7 @@ function AppContent() {
             </div>
 
             <CurrencySelector />
+            <TextSizeSelector />
             
             <div className="hidden sm:flex flex-col items-end px-3 border-r border-white/5">
               <div className="flex items-center gap-1.5">

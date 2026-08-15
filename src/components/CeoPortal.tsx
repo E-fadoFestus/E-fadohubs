@@ -77,7 +77,7 @@ import { PatronageTracker } from './PatronageTracker';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { monetizationService } from '../services/monetizationService';
 import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
-import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff } from 'lucide-react';
+import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff, Copy, ExternalLink, Filter, Layers, Send, Check, BookOpen, Cpu } from 'lucide-react';
 
 interface CeoPortalProps {
   onClose: () => void;
@@ -130,6 +130,21 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [reels, setReels] = useState<any[]>([]);
   const [ecosystemContentTab, setEcosystemContentTab] = useState<'ads' | 'market' | 'social' | 'reels' | 'vendors'>('ads');
   const [contentSearchQuery, setContentSearchQuery] = useState('');
+
+  // Extended Interactive Hub Tab Navigator
+  const [selectedHubTab, setSelectedHubTab] = useState<'stream' | 'corps' | 'cscc' | 'loans' | 'market' | 'ads' | 'gist' | 'domain' | 'quiz' | 'education' | 'email' | 'mining' | 'tech' | 'support'>('stream');
+  const [hubActionFeedback, setHubActionFeedback] = useState<string | null>(null);
+
+  // Dedicated Cash Out & Withdrawal Filtering
+  const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('pending');
+  const [withdrawalSearchQuery, setWithdrawalSearchQuery] = useState('');
+  const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBankId(id);
+    setTimeout(() => setCopiedBankId(null), 2500);
+  };
   
   // Executive Support & Innovation States
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
@@ -1343,6 +1358,218 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     }
   };
 
+  const handleToggleVerifyProvider = async (provider: ServiceProvider) => {
+    try {
+      setIsProcessing(true);
+      await updateDoc(doc(db, 'service_providers', provider.id), {
+        verified: !provider.verified,
+        verifiedAt: serverTimestamp(),
+        verifiedBy: 'CEO'
+      });
+      setHubActionFeedback(`Provider ${provider.businessName || provider.id} verification set to ${!provider.verified ? 'VERIFIED' : 'UNVERIFIED'}`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error updating provider:", err);
+      setHubActionFeedback(`Error updating provider: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleUpdateServiceRequestStatus = async (req: ServiceRequest, status: string) => {
+    try {
+      setIsProcessing(true);
+      await updateDoc(doc(db, 'service_requests', req.id), {
+        status,
+        updatedAt: serverTimestamp(),
+        reviewedBy: 'CEO'
+      });
+      setHubActionFeedback(`Service request updated to ${status.toUpperCase()}`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error updating service request:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleApproveLoanApplication = async (app: LoanApplication) => {
+    try {
+      setIsProcessing(true);
+      await runTransaction(db, async (transaction) => {
+        const appRef = doc(db, 'loan_applications', app.id!);
+        const appSnap = await transaction.get(appRef);
+        if (!appSnap.exists()) throw new Error("Application not found");
+
+        transaction.update(appRef, {
+          status: 'approved',
+          approvedAt: serverTimestamp(),
+          approvedBy: 'CEO'
+        });
+
+        // Also create or activate the active loan
+        const loanRef = doc(collection(db, 'loans'));
+        transaction.set(loanRef, {
+          userId: app.userId,
+          amount: app.amount,
+          principal: app.amount,
+          interest: app.interest || 0,
+          fees: 0,
+          totalRepayment: app.totalRepayment || app.amount,
+          remainingAmount: app.amount,
+          tenor: app.tenor || '3 months',
+          status: 'active',
+          repaymentSchedule: [],
+          createdAt: serverTimestamp()
+        });
+
+        // Credit user's wallet
+        const userRef = doc(db, 'users', app.userId);
+        const userSnap = await transaction.get(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data() as UserProfile;
+          transaction.update(userRef, {
+            playerWallet: (userData.playerWallet || 0) + app.amount
+          });
+        }
+      });
+      setHubActionFeedback(`Loan application for ${app.userName || app.userId} of $${app.amount} APPROVED & DISBURSED!`);
+      setTimeout(() => setHubActionFeedback(null), 5000);
+    } catch (err: any) {
+      console.error("Error approving loan:", err);
+      setHubActionFeedback(`Error approving loan: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRejectLoanApplication = async (app: LoanApplication) => {
+    try {
+      setIsProcessing(true);
+      await updateDoc(doc(db, 'loan_applications', app.id!), {
+        status: 'rejected',
+        rejectedAt: serverTimestamp(),
+        rejectedBy: 'CEO'
+      });
+      setHubActionFeedback(`Loan application for ${app.userName || app.userId} REJECTED`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error rejecting loan:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleToggleProductStatus = async (product: any, newStatus: string) => {
+    try {
+      setIsProcessing(true);
+      const collectionName = product.collectionName || 'marketProducts';
+      await updateDoc(doc(db, collectionName, product.id), {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      setHubActionFeedback(`Product "${product.title || product.name}" status updated to ${newStatus.toUpperCase()}`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error updating product:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product: any) => {
+    if (!confirm(`Are you sure you want to remove product "${product.title || product.name}" from the store catalog?`)) return;
+    try {
+      setIsProcessing(true);
+      const collectionName = product.collectionName || 'marketProducts';
+      await deleteDoc(doc(db, collectionName, product.id));
+      setHubActionFeedback(`Product removed from catalog.`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error deleting product:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleToggleAdStatus = async (ad: any, newStatus: string) => {
+    try {
+      setIsProcessing(true);
+      const coll = adListings.some(a => a.id === ad.id) ? 'ad_listings' : 'ads';
+      await updateDoc(doc(db, coll, ad.id), {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      setHubActionFeedback(`Ad "${ad.title}" marked as ${newStatus.toUpperCase()}`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error updating ad status:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeletePost = async (post: any) => {
+    if (!confirm("Are you sure you want to moderate and delete this post?")) return;
+    try {
+      setIsProcessing(true);
+      const coll = socialPosts.some(p => p.id === post.id) ? 'social_posts' : 'posts';
+      await deleteDoc(doc(db, coll, post.id));
+      setHubActionFeedback(`Post removed.`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error deleting post:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleToggleDomainSeller = async (seller: DomainSeller) => {
+    try {
+      setIsProcessing(true);
+      const newStatus = seller.status === 'active' ? 'inactive' : 'active';
+      await updateDoc(doc(db, 'domain_sellers', seller.id!), {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      });
+      setHubActionFeedback(`Domain seller ${seller.name || seller.id} set to ${newStatus.toUpperCase()}`);
+      setTimeout(() => setHubActionFeedback(null), 4000);
+    } catch (err: any) {
+      console.error("Error updating domain seller:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAnswerSupportTicket = async (ticket: any, replyText: string) => {
+    if (!replyText.trim()) return;
+    try {
+      setIsProcessing(true);
+      await updateDoc(doc(db, 'help_requests', ticket.id), {
+        status: 'resolved',
+        ceoReply: replyText.trim(),
+        repliedAt: serverTimestamp(),
+        repliedBy: 'CEO Festus Daniel'
+      });
+      setCeoReplyText('');
+      setSelectedSupportTicket(null);
+      setHubActionFeedback(`Support ticket #${ticket.id.slice(0, 6)} resolved and reply sent to user.`);
+      setTimeout(() => setHubActionFeedback(null), 5000);
+    } catch (err: any) {
+      console.error("Error replying to ticket:", err);
+      setHubActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) || 
     u.uid.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1494,38 +1721,56 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             </div>
 
         {/* Navigation Tabs */}
-        <div className="flex px-8 border-b border-white/5 bg-slate-900/30 overflow-x-auto no-scrollbar">
-          {[
-            { id: 'dashboard', icon: TrendingUp, label: 'Dashboard' },
-            { id: 'analytics', icon: FileText, label: 'Analytics' },
-            { id: 'players', icon: Users, label: 'Players' },
-            { id: 'transactions', icon: CreditCard, label: 'Transactions' },
-            { id: 'withdrawals', icon: ArrowUpRight, label: 'Withdrawals' },
-            { id: 'hubs', icon: Zap, label: 'Hubs' },
+        {(() => {
+          const pendingPayoutsCount = withdrawals.filter(w => w.status === 'pending').length;
+          const pendingDepositsCount = [
+            ...depositsList.filter(d => d.status === 'pending'),
+            ...transactions.filter(t => t.type === 'deposit' && t.status === 'pending' && !depositsList.some(d => d.id === t.id))
+          ].length;
+          const totalHubEventsCount = serviceRequests.length + loans.length + marketOrders.length + csccGroups.length + domainOrders.length;
+
+          const tabs = [
+            { id: 'dashboard', icon: TrendingUp, label: 'Dashboard', badge: (pendingPayoutsCount + pendingDepositsCount) > 0 ? `${pendingPayoutsCount + pendingDepositsCount} Action` : null, badgeColor: 'bg-amber-500/20 border-amber-500/40 text-amber-300' },
+            { id: 'withdrawals', icon: ArrowUpRight, label: '💸 Cash Out Approvals', badge: pendingPayoutsCount > 0 ? `${pendingPayoutsCount} Pending` : null, badgeColor: 'bg-pink-500/30 border-pink-500/50 text-pink-300 animate-pulse' },
+            { id: 'transactions', icon: CreditCard, label: 'Transactions', badge: pendingDepositsCount > 0 ? `${pendingDepositsCount} Dep` : null, badgeColor: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
+            { id: 'hubs', icon: Zap, label: '🌐 All Digital Hubs', badge: totalHubEventsCount > 0 ? `${totalHubEventsCount} Live` : null, badgeColor: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' },
             { id: 'monetization', icon: Coins, label: 'Monetization' },
-            { id: 'announcements', icon: Megaphone, label: 'Announcement Platform' },
+            { id: 'players', icon: Users, label: 'Players' },
+            { id: 'analytics', icon: FileText, label: 'Analytics' },
+            { id: 'announcements', icon: Megaphone, label: 'Announcements' },
             { id: 'settings', icon: ShieldCheck, label: 'System' },
             { id: 'detective', icon: ShieldAlert, label: 'Detective Engine' },
-            { id: 'support', icon: MessageSquare, label: 'Support Hub' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-bold uppercase tracking-widest transition-all relative ${
-                activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {activeTab === tab.id && (
-                <motion.div 
-                  layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full"
-                />
-              )}
-            </button>
-          ))}
-        </div>
+            { id: 'support', icon: MessageSquare, label: 'Support Hub', badge: supportTickets.filter(s => s.status !== 'resolved').length > 0 ? `${supportTickets.filter(s => s.status !== 'resolved').length}` : null, badgeColor: 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300' }
+          ];
+
+          return (
+            <div className="flex px-8 border-b border-white/5 bg-slate-900/30 overflow-x-auto no-scrollbar">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-5 py-4 text-xs font-black uppercase tracking-wider transition-all relative shrink-0 ${
+                    activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
+                  {tab.badge && (
+                    <span className={`px-2 py-0.5 rounded-full text-[8.5px] font-black border ${tab.badgeColor}`}>
+                      {tab.badge}
+                    </span>
+                  )}
+                  {activeTab === tab.id && (
+                    <motion.div 
+                      layoutId="activeTab"
+                      className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-full"
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Content Area */}
         <div className="flex-grow overflow-y-auto p-8 bg-slate-950/20">
@@ -2364,22 +2609,157 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
+                className="space-y-6 text-left"
               >
+                {/* Cash Out Center Header & Summary */}
+                <div className="bg-gradient-to-r from-pink-950/40 via-slate-900 to-indigo-950/40 border-2 border-pink-500/40 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden space-y-6">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-3.5 py-1 bg-pink-500/20 border border-pink-500/40 rounded-full text-[9px] font-black uppercase text-pink-300 tracking-widest flex items-center gap-1.5 animate-pulse">
+                          <span className="w-2 h-2 rounded-full bg-pink-400 animate-ping" />
+                          💸 PLAYER CASH OUT & WITHDRAWAL COMMAND STATION
+                        </span>
+                        <span className="px-3.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-[9px] font-black uppercase text-emerald-300 tracking-widest">
+                          ⚡ INSTANT CEO DISPATCH
+                        </span>
+                      </div>
+                      <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight font-display flex items-center gap-3">
+                        <ArrowUpRight className="w-7 h-7 text-pink-400 shrink-0" />
+                        Player Cash Out Requests & Bank Approvals
+                      </h3>
+                      <p className="text-xs text-slate-300 font-medium max-w-3xl leading-relaxed">
+                        Here you can click to <strong>ACCEPT & PAY</strong> or <strong>REJECT & REFUND</strong> any cash-out request submitted by players across Nigeria, USA, and global hubs. Clicking Accept marks the payout as completed in real-time, while clicking Reject automatically returns the funds to the user&apos;s wallet.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={() => setShowMessageUserModal(true)}
+                        className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
+                      >
+                        <Mail className="w-4 h-4" /> Message Player
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Counters */}
+                  {(() => {
+                    const pendingList = withdrawals.filter(w => w.status === 'pending');
+                    const completedList = withdrawals.filter(w => w.status === 'completed');
+                    const failedList = withdrawals.filter(w => w.status === 'failed');
+                    const totalPendingAmount = pendingList.reduce((acc, w) => acc + (w.amount || 0), 0);
+                    const totalPaidOutAmount = completedList.reduce((acc, w) => acc + (w.amount || 0), 0);
+
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-slate-950/60 border border-pink-500/30 p-4 rounded-2xl">
+                          <span className="text-[8.5px] font-black text-pink-300 uppercase tracking-widest block mb-1">Pending Approval</span>
+                          <span className="text-2xl font-black text-white font-mono">{pendingList.length}</span>
+                          <p className="text-[10px] text-pink-400 font-bold mt-1">${totalPendingAmount.toLocaleString()} USD</p>
+                        </div>
+                        <div className="bg-slate-950/60 border border-emerald-500/30 p-4 rounded-2xl">
+                          <span className="text-[8.5px] font-black text-emerald-300 uppercase tracking-widest block mb-1">Approved & Paid</span>
+                          <span className="text-2xl font-black text-white font-mono">{completedList.length}</span>
+                          <p className="text-[10px] text-emerald-400 font-bold mt-1">${totalPaidOutAmount.toLocaleString()} USD</p>
+                        </div>
+                        <div className="bg-slate-950/60 border border-rose-500/30 p-4 rounded-2xl">
+                          <span className="text-[8.5px] font-black text-rose-300 uppercase tracking-widest block mb-1">Declined & Refunded</span>
+                          <span className="text-2xl font-black text-white font-mono">{failedList.length}</span>
+                          <p className="text-[10px] text-slate-400 font-bold mt-1">Returned to wallets</p>
+                        </div>
+                        <div className="bg-slate-950/60 border border-indigo-500/30 p-4 rounded-2xl">
+                          <span className="text-[8.5px] font-black text-indigo-300 uppercase tracking-widest block mb-1">All Cash Outs Logged</span>
+                          <span className="text-2xl font-black text-white font-mono">{withdrawals.length}</span>
+                          <p className="text-[10px] text-slate-400 font-bold mt-1">100% Real-Time Ledger</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                  {/* Status Filters */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar bg-slate-900/80 p-1.5 rounded-2xl border border-white/10">
+                    {[
+                      { id: 'pending', label: `Pending Approvals (${withdrawals.filter(w => w.status === 'pending').length})`, color: 'bg-pink-600 text-white' },
+                      { id: 'all', label: `All Requests (${withdrawals.length})`, color: 'bg-indigo-600 text-white' },
+                      { id: 'completed', label: `Completed & Paid (${withdrawals.filter(w => w.status === 'completed').length})`, color: 'bg-emerald-600 text-white' },
+                      { id: 'failed', label: `Declined / Refunded (${withdrawals.filter(w => w.status === 'failed').length})`, color: 'bg-rose-600 text-white' }
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setWithdrawalFilter(f.id as any)}
+                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${
+                          withdrawalFilter === f.id ? `${f.color} shadow-lg` : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Search input */}
+                  <div className="relative flex-1 md:max-w-xs">
+                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search email, bank, account #..."
+                      value={withdrawalSearchQuery}
+                      onChange={(e) => setWithdrawalSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+
+                {/* List of Withdrawals */}
                 <div className="grid grid-cols-1 gap-4">
-                  {withdrawals.length === 0 ? (
-                    <div className="text-center py-20 text-slate-500 italic">No withdrawal requests found.</div>
-                  ) : (
-                    withdrawals.map((w) => {
+                  {(() => {
+                    const filteredList = withdrawals
+                      .filter(w => {
+                        if (withdrawalFilter !== 'all' && w.status !== withdrawalFilter) return false;
+                        if (!withdrawalSearchQuery.trim()) return true;
+                        const q = withdrawalSearchQuery.toLowerCase();
+                        const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
+                        return (
+                          (w.userEmail && w.userEmail.toLowerCase().includes(q)) ||
+                          (w.id && w.id.toLowerCase().includes(q)) ||
+                          (targetUser?.bankName && targetUser.bankName.toLowerCase().includes(q)) ||
+                          (targetUser?.accountNumber && targetUser.accountNumber.includes(q)) ||
+                          (targetUser?.accountName && targetUser.accountName.toLowerCase().includes(q)) ||
+                          (w.accountDetails?.bankName && w.accountDetails.bankName.toLowerCase().includes(q)) ||
+                          (w.accountDetails?.accountNumber && w.accountDetails.accountNumber.includes(q))
+                        );
+                      });
+
+                    if (filteredList.length === 0) {
+                      return (
+                        <div className="p-12 bg-slate-900/40 rounded-3xl border border-white/5 text-center space-y-2">
+                          <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+                          <h4 className="text-base font-black text-white uppercase tracking-wider">No Cash Out Requests in this Filter</h4>
+                          <p className="text-xs text-slate-500 font-bold">Try selecting &apos;All Requests&apos; or clearing your search term.</p>
+                        </div>
+                      );
+                    }
+
+                    return filteredList.map((w) => {
                       const reqDateStr = w.timestamp?.toDate ? w.timestamp.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : new Date().toLocaleString();
                       const processedDateStr = (w as any).processedDateString || ((w as any).processedAt?.toDate ? (w as any).processedAt.toDate().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' }) : null);
+                      const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
+
+                      const bankName = (w.accountDetails as any)?.bankName || targetUser?.bankName || 'Nominated Bank';
+                      const accountNumber = (w.accountDetails as any)?.accountNumber || targetUser?.accountNumber || 'N/A';
+                      const accountName = (w.accountDetails as any)?.accountName || targetUser?.accountName || targetUser?.displayName || 'User Account';
+                      const originalAmount = (w as any).originalAmount || w.amount;
+                      const fee = (w as any).fee || 0;
 
                       return (
-                        <div key={w.id} className={`p-6 rounded-3xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl transition-all ${
+                        <div key={w.id} className={`p-6 rounded-3xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-2xl transition-all ${
                           w.status === 'pending' ? 'bg-slate-900 border-2 border-pink-500/60 shadow-pink-500/20' :
                           w.status === 'completed' ? 'bg-slate-900/60 border-emerald-500/30' : 'bg-slate-900/40 border-rose-500/20'
                         }`}>
-                          <div className="flex items-start gap-5 text-left">
+                          <div className="flex items-start gap-5 text-left flex-1">
                             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mt-1 ${
                               w.status === 'pending' ? 'bg-pink-500/20 text-pink-300 border border-pink-500/40 animate-pulse' : 
                               w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
@@ -2387,72 +2767,101 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                               {w.status === 'pending' ? <Clock className="w-7 h-7 text-pink-300" /> : 
                                w.status === 'completed' ? <CheckCircle2 className="w-7 h-7 text-emerald-400" /> : <XCircle className="w-7 h-7 text-rose-400" />}
                             </div>
-                            <div className="space-y-1.5">
+                            <div className="space-y-2 flex-1">
                               <div className="flex items-center gap-3 flex-wrap">
-                                <span className="text-xl font-black text-white font-display">${w.amount.toLocaleString()}</span>
+                                <span className="text-2xl font-black text-white font-mono tracking-tight">
+                                  Payout: <span className="text-amber-400 font-display">${w.amount.toLocaleString()}</span>
+                                </span>
                                 <span className={`px-3.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                                   w.status === 'pending' ? 'bg-pink-500/20 text-pink-300 border-pink-500/40 animate-pulse' : 
                                   w.status === 'completed' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                                 }`}>
-                                  {w.status === 'completed' ? 'ACCEPTED & MARKED DONE ✓ (GREEN)' : w.status === 'failed' ? 'DECLINED ✕ (RED)' : '💖 PENDING CEO APPROVAL (PINK)'}
+                                  {w.status === 'completed' ? '✓ ACCEPTED & MARKED DONE (GREEN)' : w.status === 'failed' ? '✕ DECLINED & REFUNDED (RED)' : '💖 PENDING CEO APPROVAL (PINK)'}
                                 </span>
-                              </div>
-                              <p className="text-sm text-slate-300 font-bold">{w.userEmail}</p>
-                              <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-400">
-                                <span>📅 Requested: <span className="text-white font-bold">{reqDateStr}</span></span>
-                                {processedDateStr && (
-                                  <span className="text-emerald-400 font-bold">✓ Done Date: {processedDateStr}</span>
+                                {fee > 0 && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Gross: ${originalAmount.toLocaleString()} • 3% Fee: ${fee.toFixed(2)}
+                                  </span>
                                 )}
                               </div>
-                              {(() => {
-                                const targetUser = users.find(u => u.uid === w.userId || u.email === w.userEmail);
-                                return targetUser && (targetUser.bankName || targetUser.accountNumber || targetUser.accountName) ? (
-                                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1.5 rounded-xl w-fit">
-                                    <Building2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                                    <span>Bank: <strong className="text-white">{targetUser.bankName || 'Unknown Bank'}</strong></span> • <span>Acc #: <strong className="text-white font-mono">{targetUser.accountNumber || 'N/A'}</strong></span> • <span>Name: <strong className="text-white italic">{targetUser.accountName || 'No Name'}</strong></span>
+
+                              <p className="text-sm text-slate-200 font-bold">{w.userEmail}</p>
+
+                              {/* Bank Account Details Card with Quick Copy */}
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-950/70 p-3.5 rounded-2xl border border-white/5">
+                                <div>
+                                  <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest block">Bank Name</span>
+                                  <span className="text-white font-black">{bankName}</span>
+                                </div>
+                                <div>
+                                  <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest block">Account Number</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-emerald-400 font-mono font-black text-sm">{accountNumber}</span>
+                                    {accountNumber !== 'N/A' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => copyToClipboard(accountNumber, w.id!)}
+                                        className="px-2 py-0.5 bg-white/10 hover:bg-white/20 text-[8.5px] font-black text-slate-300 rounded uppercase tracking-wider flex items-center gap-1 transition-all"
+                                      >
+                                        {copiedBankId === w.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                        {copiedBankId === w.id ? 'Copied!' : 'Copy'}
+                                      </button>
+                                    )}
                                   </div>
-                                ) : null;
-                              })()}
-                              <p className="text-[10px] text-slate-600 font-mono">Ref ID: {w.id}</p>
+                                </div>
+                                <div>
+                                  <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest block">Account Name</span>
+                                  <span className="text-slate-300 italic font-bold">{accountName}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-4 text-[10px] font-mono text-slate-400 pt-1">
+                                <span>📅 Requested: <strong className="text-white">{reqDateStr}</strong></span>
+                                {processedDateStr && (
+                                  <span className="text-emerald-400 font-bold">✓ Action Date: {processedDateStr}</span>
+                                )}
+                                <span className="text-slate-600">ID: {w.id}</span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto shrink-0">
+                          {/* ACTION BUTTONS */}
+                          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto shrink-0 pt-2 lg:pt-0">
                             {w.status === 'pending' ? (
                               <>
                                 <button 
                                   onClick={() => handleProcessWithdrawal(w, 'completed')}
                                   disabled={isProcessing}
-                                  className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30"
+                                  className="w-full sm:w-auto px-6 py-4 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs font-black uppercase tracking-[0.15em] transition-all shadow-xl shadow-emerald-600/30 active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30 hover:scale-105"
                                 >
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                                  PAY PLAYER & MARK DONE ✓
+                                  <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                                  ACCEPT CASHOUT & MARK AS PAID ✓
                                 </button>
                                 <button 
                                   onClick={() => handleProcessWithdrawal(w, 'failed')}
                                   disabled={isProcessing}
-                                  className="w-full sm:w-auto px-5 py-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-xl border border-rose-500/30 active:scale-95 flex items-center justify-center gap-2"
+                                  className="w-full sm:w-auto px-5 py-4 bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
                                 >
-                                  <XCircle className="w-4 h-4 text-rose-200" />
-                                  REJECT ✕
+                                  <XCircle className="w-5 h-5 text-rose-400" />
+                                  REJECT & REFUND ✕
                                 </button>
                               </>
                             ) : w.status === 'completed' ? (
-                              <div className="px-5 py-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                              <div className="px-5 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs font-black uppercase tracking-wider flex items-center gap-2">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                                 PAYOUT COMPLETED & MARKED DONE ✓
                               </div>
                             ) : (
-                              <div className="px-5 py-2.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                              <div className="px-5 py-3 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-400 text-xs font-black uppercase tracking-wider flex items-center gap-2">
                                 <XCircle className="w-4 h-4 text-rose-400" />
-                                DECLINED & REFUNDED
+                                DECLINED & FUNDS REFUNDED TO WALLET
                               </div>
                             )}
                           </div>
                         </div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                 </div>
               </motion.div>
             )}
@@ -2464,6 +2873,30 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 animate={{ opacity: 1, scale: 1 }}
                 className="space-y-8 text-left"
               >
+                {/* Direct Link to Player Cash Outs for CEO ease of access */}
+                {withdrawals.filter(w => w.status === 'pending').length > 0 && (
+                  <div className="bg-gradient-to-r from-pink-950/60 via-slate-900 to-amber-950/60 border-2 border-pink-500/40 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-pink-500/20 rounded-xl text-pink-400">
+                        <Clock className="w-5 h-5 animate-spin" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                          🚨 {withdrawals.filter(w => w.status === 'pending').length} Player Cash Out Request(s) Awaiting CEO Approval
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          Players have submitted withdrawal requests to their nominated bank accounts.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('withdrawals')}
+                      className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white font-black rounded-xl text-[10px] uppercase tracking-widest shrink-0 transition-all hover:scale-105 active:scale-95 shadow-md shadow-pink-600/30"
+                    >
+                      Approve / Reject Cash Outs →
+                    </button>
+                  </div>
+                )}
                 {/* 1. Header Information */}
                 <div className="bg-gradient-to-r from-amber-900 to-indigo-950 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-48 -mt-48" />

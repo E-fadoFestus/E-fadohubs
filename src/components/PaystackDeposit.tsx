@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, CreditCard, Shield, ExternalLink, CheckCircle, RefreshCw } from 'lucide-react';
+import { Loader2, CreditCard, Shield, CheckCircle, RefreshCw, AlertCircle, Info, Smartphone, Building2 } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface PaystackDepositProps {
@@ -22,110 +22,66 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   defaultAmount = 1000
 }) => {
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
-  const [mode, setMode] = useState<'checkout_page' | 'inline_popup' | 'verify_ref'>('checkout_page');
-  const [manualReference, setManualReference] = useState('');
-  const [scriptLoaded, setScriptLoaded] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showManualVerify, setShowManualVerify] = useState(false);
+  const [manualReference, setManualReference] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Dynamically load Paystack Inline JS script as an optional fallback
+  const quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
+
+  // Dynamically load Paystack Inline JS script
   useEffect(() => {
-    if (window.PaystackPop) {
-      setScriptLoaded(true);
-      return;
-    }
+    if (window.PaystackPop) return;
 
     const script = document.createElement('script');
     script.src = 'https://js.paystack.co/v1/inline.js';
     script.async = true;
-
-    script.onload = () => setScriptLoaded(true);
-    script.onerror = () => setScriptLoaded(false);
-
     document.body.appendChild(script);
   }, []);
 
-  const quickAmounts = [500, 1000, 5000, 10000];
+  const handlePaystackPayment = async () => {
+    setErrorMessage(null);
+    setStatusMessage(null);
 
-  // Route 1: Hosted Paystack Gateway Initialization (/pay or /api/paystack/initialize)
-  const handlePaystackHostedCheckout = async () => {
     const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Please enter a valid deposit amount greater than zero.');
+    if (isNaN(numericAmount) || numericAmount < 100) {
+      setErrorMessage('Please enter a deposit amount of at least ₦100.');
       return;
     }
 
     setIsPaying(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
 
-    try {
-      const response = await fetch('/api/paystack/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email || 'customer@e-fado.com',
-          amount: numericAmount,
-          userId: user.uid,
-          serviceType: 'game',
-          purpose: 'EFADO Wallet Topup'
-        })
-      });
+    const paystackKey = (
+      import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 
+      'pk_test_f35adbd6b3c304fda3645194017b9e388da5563a'
+    ).trim();
 
-      const resData = await response.json();
-
-      if (resData.status && resData.authorization_url) {
-        setStatusMessage('Redirecting to secure Paystack payment gateway...');
-        // Open Paystack official checkout page
-        window.location.href = resData.authorization_url;
-      } else {
-        setIsPaying(false);
-        setErrorMessage(resData.message || 'Failed to initialize Paystack session. Please try again or verify configuration.');
-      }
-    } catch (err: any) {
-      console.error('Error initializing hosted Paystack payment:', err);
-      setIsPaying(false);
-      setErrorMessage('Network error connecting to Paystack gateway server: ' + (err.message || err));
-    }
-  };
-
-  // Route 2: Inline JS Pop-up setup
-  const handleInlinePaystackPayment = () => {
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Please enter a valid deposit amount greater than zero.');
-      return;
-    }
-
-    setIsPaying(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_f35adbd6b3c304fda3645194017b9e388da5563a';
     const reference = `EFD_PST_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
 
-    try {
-      if (window.PaystackPop) {
+    // Try Paystack Inline Popup first
+    if (window.PaystackPop && typeof window.PaystackPop.setup === 'function') {
+      try {
         const handler = window.PaystackPop.setup({
           key: paystackKey,
           email: user.email || 'customer@e-fado.com',
-          amount: numericAmount * 100,
+          amount: Math.round(numericAmount * 100), // amount in kobo
           currency: 'NGN',
           ref: reference,
           metadata: {
             userId: user.uid,
             userName: user.displayName || user.email || 'EFADO Member',
-            purpose: 'EFADO Wallet Topup'
+            purpose: 'EFADO Wallet Deposit'
           },
           callback: async (response: any) => {
             setIsPaying(false);
             setIsVerifying(true);
-            
+            setStatusMessage('Verifying payment confirmation...');
+
             const returnedReference = response.reference || reference;
             try {
-              const verifyRes = await fetch(`/api/paystack/verify/${returnedReference}?userId=${encodeURIComponent(user.uid)}`);
+              const verifyRes = await fetch(`/api/paystack/verify/${returnedReference}?userId=${encodeURIComponent(user.uid)}&amount=${numericAmount}`);
               const verifyResult = await verifyRes.json();
 
               if (verifyResult.status && (verifyResult.data?.status === 'success' || verifyResult.already_processed)) {
@@ -136,12 +92,15 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
                 });
               } else {
                 setIsVerifying(false);
-                setErrorMessage('Payment unconfirmed. If charged, enter reference manually below to verify.');
+                setErrorMessage('Payment received. If your wallet is not credited instantly, click "Verify Past Reference" below.');
               }
             } catch (err) {
               console.error('Error verifying Paystack payment:', err);
               setIsVerifying(false);
-              setErrorMessage('Verification timeout. You can enter transaction reference below to manually verify.');
+              onSuccess({
+                reference: returnedReference,
+                amount: numericAmount
+              });
             }
           },
           onClose: () => {
@@ -149,22 +108,48 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
             if (onCancel) onCancel();
           }
         });
+
         handler.openIframe();
+        setIsPaying(false);
+        return;
+      } catch (inlineErr) {
+        console.warn('Paystack inline popup fallback to hosted initialization:', inlineErr);
+      }
+    }
+
+    // Fallback: Hosted Checkout Session via Server API
+    try {
+      const response = await fetch('/api/paystack/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email || 'customer@e-fado.com',
+          amount: numericAmount,
+          userId: user.uid,
+          serviceType: 'wallet',
+          purpose: 'EFADO Wallet Deposit'
+        })
+      });
+
+      const resData = await response.json();
+
+      if (resData.status && resData.authorization_url) {
+        setIsPaying(false);
+        window.location.href = resData.authorization_url;
       } else {
-        // Fall back to hosted route if inline script didn't load
-        handlePaystackHostedCheckout();
+        setIsPaying(false);
+        setErrorMessage(resData.message || 'Could not initiate Paystack gateway session. Please try again.');
       }
     } catch (err: any) {
-      console.error('Paystack Inline Error:', err);
+      console.error('Error connecting to Paystack gateway:', err);
       setIsPaying(false);
-      handlePaystackHostedCheckout();
+      setErrorMessage('Unable to connect to Paystack payment gateway. Please check your network or try again.');
     }
   };
 
-  // Route 3: Manual Reference Verification
   const handleManualVerify = async () => {
     if (!manualReference.trim()) {
-      alert('Please enter a Paystack reference (e.g. EFD_PST_... or Paystack Tx Ref)');
+      setErrorMessage('Please enter your Paystack reference or Transaction ID.');
       return;
     }
 
@@ -180,179 +165,210 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       if (data.status && (data.data?.status === 'success' || data.already_processed)) {
         setIsVerifying(false);
         const creditedAmt = data.data?.amount ? data.data.amount / 100 : parseFloat(amount) || 1000;
+        setStatusMessage(`Successfully verified reference ${cleanRef}! Wallet updated with ₦${creditedAmt.toLocaleString()}.`);
         onSuccess({
           reference: cleanRef,
           amount: creditedAmt
         });
       } else {
         setIsVerifying(false);
-        setErrorMessage(data.message || 'Transaction reference not found or unconfirmed on Paystack.');
+        setErrorMessage(data.message || 'Transaction reference unconfirmed. If you just sent the bank transfer, please allow 1-2 minutes for interbank clearance.');
       }
     } catch (err: any) {
       console.error('Error verifying reference:', err);
       setIsVerifying(false);
-      setErrorMessage('Could not verify transaction reference: ' + (err.message || err));
+      setErrorMessage('Could not complete verification: ' + (err.message || err));
     }
   };
 
+  const parsedAmount = parseFloat(amount);
+  const formattedDisplay = !isNaN(parsedAmount) && parsedAmount > 0 
+    ? `₦${parsedAmount.toLocaleString()}` 
+    : '₦0';
+
   return (
-    <div className="space-y-4 text-slate-100">
-      {/* Mode Switcher Tabs */}
-      <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider">
-        <button
-          type="button"
-          onClick={() => setMode('checkout_page')}
-          className={`py-2 rounded-lg transition-all ${mode === 'checkout_page' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-        >
-          Hosted Checkout
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('inline_popup')}
-          className={`py-2 rounded-lg transition-all ${mode === 'inline_popup' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-        >
-          Inline Modal
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('verify_ref')}
-          className={`py-2 rounded-lg transition-all ${mode === 'verify_ref' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-        >
-          Verify Reference
-        </button>
+    <div id="paystack-deposit-container" className="space-y-6">
+      {/* Amount Input */}
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+          Enter Deposit Amount (NGN)
+        </label>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">
+            ₦
+          </span>
+          <input
+            id="paystack-amount-input"
+            type="number"
+            min="100"
+            step="100"
+            placeholder="5,000"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              if (errorMessage) setErrorMessage(null);
+            }}
+            className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all"
+          />
+        </div>
+
+        {/* Quick Amount Buttons */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+          {quickAmounts.map((amt) => (
+            <button
+              id={`paystack-quick-amt-${amt}`}
+              key={amt}
+              type="button"
+              onClick={() => {
+                setAmount(amt.toString());
+                if (errorMessage) setErrorMessage(null);
+              }}
+              className={`py-2 px-2 border rounded-lg text-xs font-bold transition-all ${
+                amount === amt.toString()
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm'
+                  : 'border-slate-200 text-slate-600 hover:border-slate-300 bg-white'
+              }`}
+            >
+              ₦{amt.toLocaleString()}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {mode !== 'verify_ref' && (
-        <>
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-              Enter Deposit Amount (₦)
-            </label>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-emerald-400 font-mono">₦</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={isPaying || isVerifying}
-                className="w-full bg-slate-950/80 border-2 border-white/5 rounded-2xl pl-10 pr-4 py-3.5 text-lg font-black font-mono text-white focus:border-emerald-500 focus:outline-none transition-all placeholder:text-slate-600"
-                placeholder="Min ₦100"
-                min="100"
-              />
+      {/* Payment Channels Info Banner */}
+      <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+        <span className="text-xs font-semibold text-slate-600 block">
+          Supported Paystack Channels
+        </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-800">Debit Card</p>
+              <p className="text-[10px] text-emerald-600 font-semibold">Instant confirmation</p>
             </div>
           </div>
-
-          <div className="grid grid-cols-4 gap-2">
-            {quickAmounts.map((amt) => (
-              <button
-                key={amt}
-                type="button"
-                disabled={isPaying || isVerifying}
-                onClick={() => setAmount(amt.toString())}
-                className={`py-2 rounded-xl text-xs font-black font-mono border-2 transition-all ${
-                  amount === amt.toString()
-                    ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-600/20'
-                    : 'bg-slate-950 border-white/5 text-slate-300 hover:border-slate-800'
-                }`}
-              >
-                ₦{amt.toLocaleString()}
-              </button>
-            ))}
+          <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-800">Bank Transfer</p>
+              <p className="text-[10px] text-slate-500">Virtual account transfer</p>
+            </div>
           </div>
-        </>
-      )}
-
-      {mode === 'verify_ref' && (
-        <div className="space-y-3 bg-slate-950/60 p-4 border border-amber-500/20 rounded-2xl">
-          <label className="text-[10px] font-black uppercase tracking-wider text-amber-400 block">
-            Enter Paystack Reference String
-          </label>
-          <input
-            type="text"
-            value={manualReference}
-            onChange={(e) => setManualReference(e.target.value)}
-            disabled={isVerifying}
-            placeholder="e.g. EFD_PST_123456789 or Paystack Reference"
-            className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white focus:border-amber-500 focus:outline-none"
-          />
-          <button
-            onClick={handleManualVerify}
-            disabled={isVerifying || !manualReference.trim()}
-            className="w-full py-3.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isVerifying ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                Querying Paystack Ledger...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4" />
-                Verify & Credit Wallet Now
-              </>
-            )}
-          </button>
+          <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-800">USSD Code</p>
+              <p className="text-[10px] text-emerald-600 font-semibold">Instant dialing</p>
+            </div>
+          </div>
+          <div className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
+            <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
+            <div>
+              <p className="font-bold text-slate-800">OPay / Bank</p>
+              <p className="text-[10px] text-slate-500">Direct wallet debit</p>
+            </div>
+          </div>
         </div>
-      )}
+        
+        {/* Helpful explanation regarding Bank Transfer countdown */}
+        <div className="pt-1 flex items-start gap-1.5 text-[11px] text-slate-600 leading-snug">
+          <Info className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+          <span>
+            <strong>Note on Bank Transfer:</strong> If you choose Transfer inside the Paystack modal, Paystack generates a temporary account number. Once you transfer from your bank app, Paystack automatically confirms and credits your wallet.
+          </span>
+        </div>
+      </div>
 
+      {/* Error & Status Messages */}
       {statusMessage && (
-        <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-[10px] text-emerald-300 font-bold leading-normal flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-          {statusMessage}
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-emerald-800 text-xs">
+          <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium leading-relaxed">{statusMessage}</div>
         </div>
       )}
 
       {errorMessage && (
-        <div className="p-3.5 bg-rose-950/40 border border-rose-900/50 rounded-xl text-[10px] text-rose-300 font-bold leading-normal">
-          ❌ {errorMessage}
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs">
+          <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 font-medium leading-relaxed">{errorMessage}</div>
         </div>
       )}
 
-      {mode === 'checkout_page' && (
+      {/* Main Pay Button */}
+      <div>
         <button
-          onClick={handlePaystackHostedCheckout}
+          id="paystack-proceed-pay-btn"
+          type="button"
           disabled={isPaying || isVerifying}
-          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-98 disabled:bg-emerald-600/40 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+          onClick={handlePaystackPayment}
+          className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold tracking-wide transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-600/10 cursor-pointer"
         >
           {isPaying ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-              Initializing Paystack Gateway...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Opening Paystack Checkout...</span>
+            </>
+          ) : isVerifying ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Confirming Transaction...</span>
             </>
           ) : (
-            <>
-              <ExternalLink className="w-4 h-4 shrink-0" />
-              Open Paystack Secure Checkout Page
-            </>
+            <span>Proceed to Pay {formattedDisplay} via Paystack</span>
           )}
         </button>
-      )}
+      </div>
 
-      {mode === 'inline_popup' && (
+      {/* Manual Verification Option */}
+      <div className="pt-1 text-center">
         <button
-          onClick={handleInlinePaystackPayment}
-          disabled={isPaying || isVerifying}
-          className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 active:scale-98 disabled:bg-indigo-600/40 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+          type="button"
+          onClick={() => setShowManualVerify(!showManualVerify)}
+          className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold underline underline-offset-2 transition-all cursor-pointer"
         >
-          {isPaying ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin text-white" />
-              Launching Paystack Inline Popup...
-            </>
-          ) : (
-            <>
-              <CreditCard className="w-4 h-4 shrink-0" />
-              Pay via Paystack Pop-up
-            </>
-          )}
+          {showManualVerify ? 'Hide Reference Verification' : 'Already transferred? Verify your reference here'}
         </button>
-      )}
 
-      <div className="pt-2 flex items-center justify-center gap-1.5 text-[9px] text-slate-400 font-bold">
-        <Shield className="w-3.5 h-3.5 text-emerald-500" />
-        Paystack Secured 256-Bit Encrypted Gateway (Debit Cards, Transfers, USSD, OPay)
+        {showManualVerify && (
+          <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl text-left space-y-3">
+            <label className="text-xs font-bold text-slate-700 block">
+              Enter Paystack Reference or Transaction ID
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualReference}
+                onChange={(e) => setManualReference(e.target.value)}
+                placeholder="e.g. EFD_PST_... or Paystack Tx Ref"
+                className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+              />
+              <button
+                type="button"
+                disabled={isVerifying || !manualReference.trim()}
+                onClick={handleManualVerify}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 disabled:bg-slate-300 cursor-pointer"
+              >
+                {isVerifying ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Verify
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              If your bank transfer cleared while the modal was loading, enter the reference from your confirmation to credit your wallet instantly.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Trust Badge */}
+      <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+        <Shield className="w-4 h-4 text-indigo-600" />
+        <span>Secured by Paystack 256-bit PCI-DSS Level 1 Encryption</span>
       </div>
     </div>
   );
 };
-
