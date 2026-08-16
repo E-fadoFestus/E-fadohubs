@@ -421,16 +421,17 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
   });
 });
 
-// Route D: Flutterwave Initialize Checkout Session (V4 Secure Pattern)
-app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], async (req: express.Request, res: express.Response) => {
-  const { email, amount, userId, purpose, callback_url, currency = 'NGN', customizations, redirectBase, publicKey: clientPublicKey, phone, phonenumber, name } = req.body;
+// Route D: Flutterwave Initialize Checkout Session (Production Hosted Checkout Pattern)
+app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment', '/api/flutterwave/init-deposit', '/initFlutterwaveDeposit'], async (req: express.Request, res: express.Response) => {
+  const { email, amount, userId, purpose, callback_url, redirect_url, currency = 'NGN', customizations, redirectBase, publicKey: clientPublicKey, phone, phonenumber, name } = req.body;
   
-  // Resolve active secret key strictly from backend environment
+  // Resolve active live secret key strictly from backend environment
   let flwSecret = (
     process.env.FLUTTERWAVE_CLIENT_SECRET || 
     process.env.FLUTTERWAVE_SECRET_KEY || 
     process.env.FLW_SECRET_KEY || 
     process.env.FLWSECK || 
+    process.env.FLW_SECRET ||
     ''
   ).trim();
 
@@ -440,26 +441,54 @@ app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], asy
   }
   flwSecret = flwSecret.replace(/['";]/g, '').trim();
 
-  const clientId = (process.env.FLUTTERWAVE_CLIENT_ID || clientPublicKey || process.env.VITE_FLW_PUBLIC_KEY || '').trim();
+  const clientId = (
+    process.env.VITE_FLUTTERWAVE_CLIENT_ID ||
+    process.env.FLUTTERWAVE_CLIENT_ID || 
+    clientPublicKey || 
+    process.env.VITE_FLW_PUBLIC_KEY || 
+    process.env.VITE_FLW_CLIENT_ID ||
+    ''
+  ).trim();
 
   const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  const callbackUrl = callback_url || (redirectBase ? (redirectBase.includes('http') ? redirectBase : `${appUrl}/payment-success`) : `${appUrl}/payment/flutterwave-callback`);
-  const reference = req.body.tx_ref || `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
+  const effectiveRedirectUrl = redirect_url || callback_url || (redirectBase ? (redirectBase.includes('http') ? redirectBase : `${appUrl}/payment-success`) : `${appUrl}/payment/flutterwave-callback`);
+  const tx_ref = req.body.tx_ref || `depo-${Date.now()}`;
+  const parsedAmount = Number(amount) || 5000;
+  const customerEmail = (email || 'customer@efado.com').trim();
+  const customerName = name || email || 'EFADO Valued Member';
+  const customerPhone = phone || phonenumber || '';
+
+  // 1. Store pending deposit in Firestore deposits collection
+  try {
+    const depositRef = doc(db, 'deposits', tx_ref);
+    await setDoc(depositRef, {
+      tx_ref,
+      amount: parsedAmount,
+      email: customerEmail,
+      userId: userId || customerEmail,
+      currency,
+      purpose: purpose || 'Game Deposit',
+      status: 'pending',
+      createdAt: serverTimestamp()
+    }, { merge: true });
+  } catch (storeErr) {
+    console.warn('[Flutterwave Init API] Deposit pre-record warning:', storeErr);
+  }
 
   if (!flwSecret) {
-    console.warn('[Flutterwave Init API] FLW Secret key is not configured in backend environment. Generating sandbox simulation URL.');
+    console.warn('[Flutterwave Init API] FLW Secret key is not configured in backend environment. Generating sandbox checkout URL.');
     return res.json({
-      status: true,
+      status: 'success',
       message: 'Sandbox Flutterwave session initialized',
-      link: `${callbackUrl}?tx_ref=${reference}&status=successful&amount=${amount}&userId=${encodeURIComponent(userId || '')}`,
-      tx_ref: reference,
+      link: `${effectiveRedirectUrl}?tx_ref=${tx_ref}&status=successful&amount=${parsedAmount}&userId=${encodeURIComponent(userId || '')}`,
+      tx_ref,
       isSandbox: true
     });
   }
 
   // Attempt V4 Token Exchange if clientId is present
   let accessToken: string | null = null;
-  if (clientId && flwSecret) {
+  if (clientId && flwSecret && !flwSecret.startsWith('FLWSECK-')) {
     try {
       const tokenRes = await fetch('https://api.flutterwave.com/v3/token', {
         method: 'POST',
@@ -474,14 +503,14 @@ app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], asy
         accessToken = tokenData.access_token;
       }
     } catch (tokenErr) {
-      console.warn('[Flutterwave Init API] V4 token exchange fallback to direct secret:', tokenErr);
+      console.warn('[Flutterwave Init API] Token exchange fallback to direct secret:', tokenErr);
     }
   }
 
   const authHeader = accessToken ? `Bearer ${accessToken}` : `Bearer ${flwSecret}`;
 
   try {
-    console.info(`[Flutterwave Init API] Initializing live transaction via Flutterwave API using Bearer Token...`);
+    console.info(`[Flutterwave Init API] Initializing live transaction via Flutterwave API (Amount: NGN ${parsedAmount}, TxRef: ${tx_ref})...`);
     const response = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: {
@@ -489,22 +518,25 @@ app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], asy
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        tx_ref: reference,
-        amount: Number(amount),
+        tx_ref,
+        amount: String(parsedAmount),
         currency,
-        redirect_url: callbackUrl,
+        redirect_url: effectiveRedirectUrl,
         customer: {
-          email: email || 'customer@efado.com',
-          name: name || email || 'EFADO Valued Member',
-          phonenumber: phone || phonenumber || ''
-        },
-        meta: {
-          userId: userId || '',
-          purpose: purpose || 'EFADO Ecosystem Payment'
+          email: customerEmail,
+          name: customerName,
+          phonenumber: customerPhone
         },
         customizations: customizations || {
-          title: 'EFADO Sovereign Payment Gateway',
-          description: purpose || 'Instant EFADO Payment'
+          title: 'EFADO Hubs Connect',
+          description: purpose || 'Game Deposit',
+          logo: `${appUrl}/logo.png`
+        },
+        payment_options: 'card,banktransfer,ussd',
+        meta: {
+          userId: userId || customerEmail,
+          email: customerEmail,
+          purpose: purpose || 'Game Deposit'
         }
       })
     });
@@ -512,12 +544,12 @@ app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment'], asy
     const data = await response.json();
     if (data.status === 'success' && data.data?.link) {
       return res.json({
-        status: true,
+        status: 'success',
         link: data.data.link,
-        tx_ref: reference
+        tx_ref
       });
     } else {
-      console.error('[Flutterwave Init API] Flutterwave rejected request:', data);
+      console.error('[Flutterwave Init API] Flutterwave rejected payment initialization:', data);
       return res.status(400).json({ 
         status: false, 
         message: data.message || 'Could not initialize Flutterwave payment session with current secret key.',
@@ -546,6 +578,7 @@ app.get(['/api/flutterwave/verify/:txRef', '/api/flutterwave/verify'], async (re
     process.env.FLUTTERWAVE_SECRET_KEY || 
     process.env.FLW_SECRET_KEY || 
     process.env.FLWSECK || 
+    process.env.FLW_SECRET ||
     ''
   ).trim();
 
@@ -588,7 +621,7 @@ app.get(['/api/flutterwave/verify/:txRef', '/api/flutterwave/verify'], async (re
         if (flwJson.status === 'success' && flwJson.data?.status === 'successful') {
           verifyData = flwJson.data;
         } else {
-          console.warn('[Flutterwave Verify API] Gateway status:', flwJson);
+          console.warn('[Flutterwave Verify API] Gateway verification response:', flwJson);
         }
       } catch (gatewayErr) {
         console.warn('[Flutterwave Verify API] Direct API call error:', gatewayErr);
@@ -602,19 +635,44 @@ app.get(['/api/flutterwave/verify/:txRef', '/api/flutterwave/verify'], async (re
     const purpose = verifyData?.meta?.purpose || 'EFADO Deposit via Flutterwave';
 
     if (finalUserId && finalAmount > 0) {
+      // 1. Credit User Balance in Firestore
       const userRef = doc(db, 'users', finalUserId);
       await updateDoc(userRef, {
         depositWallet: increment(finalAmount),
-        playerWallet: increment(finalAmount)
+        playerWallet: increment(finalAmount),
+        balance: increment(finalAmount)
+      }).catch(async () => {
+        // Fallback setDoc if user doc is keyed by email
+        if (customerEmail) {
+          const emailUserRef = doc(db, 'users', customerEmail);
+          await setDoc(emailUserRef, {
+            depositWallet: increment(finalAmount),
+            playerWallet: increment(finalAmount),
+            balance: increment(finalAmount)
+          }, { merge: true });
+        }
       });
 
+      // 2. Mark deposit as completed
+      if (txRef) {
+        const depositRef = doc(db, 'deposits', txRef);
+        await setDoc(depositRef, {
+          status: 'completed',
+          verifiedAt: serverTimestamp(),
+          amount: finalAmount,
+          customerEmail
+        }, { merge: true });
+      }
+
+      // 3. Record in Transactions collection
       await setDoc(transactionRef, {
         userId: finalUserId,
+        userEmail: customerEmail,
         type: 'deposit',
         amount: finalAmount,
         currency: verifyData?.currency || 'NGN',
         status: 'completed',
-        reference: txRef,
+        reference: txRef || referenceKey,
         timestamp: serverTimestamp(),
         metadata: {
           gateway: 'flutterwave_verify_api',
@@ -643,37 +701,78 @@ app.get(['/api/flutterwave/verify/:txRef', '/api/flutterwave/verify'], async (re
   }
 });
 
-// Route D.2: Flutterwave Webhook Handler
-app.post('/webhook/flutterwave', async (req: any, res: any) => {
-  const secretHash = process.env.FLUTTERWAVE_SECRET_HASH || process.env.FLUTTERWAVE_SECRET_KEY || '';
+// Route D.2: Flutterwave Production Webhook Handler
+app.get(['/webhook/flutterwave', '/api/flutterwave/webhook', '/flutterwaveWebhook'], (req: express.Request, res: express.Response) => {
+  return res.status(200).json({
+    status: 'active',
+    endpoint: 'EFADO Production Flutterwave Webhook Gateway',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post(['/webhook/flutterwave', '/api/flutterwave/webhook', '/flutterwaveWebhook'], async (req: any, res: any) => {
+  const secretHash = (
+    process.env.FLW_VERIFY_HASH || 
+    process.env.FLUTTERWAVE_SECRET_HASH || 
+    process.env.FLUTTERWAVE_CLIENT_SECRET || 
+    process.env.FLUTTERWAVE_SECRET_KEY || 
+    ''
+  ).trim();
   const signature = req.headers['verif-hash'];
 
   if (secretHash && signature && signature !== secretHash) {
-    console.warn('[Flutterwave Webhook] Invalid secret hash signature');
-    return res.status(401).send('Invalid signature');
+    console.warn('[Flutterwave Webhook] Invalid secret hash signature rejected');
+    return res.status(401).send('Unauthorized');
   }
 
-  const event = req.body;
-  if (event && event.data && (event.event === 'charge.completed' || event.data.status === 'successful')) {
-    const data = event.data;
-    const txRef = data.tx_ref;
-    const amount = Number(data.amount) || 0;
-    const userId = data.meta?.userId;
+  const payload = req.body;
+  if (payload && (payload.status === 'successful' || payload.event === 'charge.completed' || payload.event === 'transfer.completed' || payload['event.type'] === 'CARD-TRANSACTION')) {
+    const data = payload.data || payload;
+    const txRef = data.tx_ref || payload.tx_ref;
+    const amount = Number(data.amount || payload.amount) || 0;
+    const customerEmail = data.customer?.email || payload.customer?.email || '';
+    const userId = data.meta?.userId || payload.meta?.userId || customerEmail;
 
-    if (txRef && userId && amount > 0) {
+    if (txRef && amount > 0) {
       try {
+        const depositRef = doc(db, 'deposits', txRef);
+        const depositSnap = await getDoc(depositRef);
+
         const transactionRef = doc(db, 'transactions', txRef);
-        const existingSnap = await getDoc(transactionRef);
+        const existingTxSnap = await getDoc(transactionRef);
 
-        if (!existingSnap.exists()) {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, {
-            depositWallet: increment(amount),
-            playerWallet: increment(amount)
-          });
+        if (!existingTxSnap.exists()) {
+          // Credit user's wallet
+          const targetUserId = userId || (depositSnap.exists() ? depositSnap.data()?.userId : customerEmail);
+          if (targetUserId) {
+            const userRef = doc(db, 'users', targetUserId);
+            await updateDoc(userRef, {
+              depositWallet: increment(amount),
+              playerWallet: increment(amount),
+              balance: increment(amount)
+            }).catch(async () => {
+              if (customerEmail) {
+                const emailRef = doc(db, 'users', customerEmail);
+                await setDoc(emailRef, {
+                  depositWallet: increment(amount),
+                  playerWallet: increment(amount),
+                  balance: increment(amount)
+                }, { merge: true });
+              }
+            });
+          }
 
+          // Update deposit status to completed
+          await setDoc(depositRef, {
+            status: 'completed',
+            updatedAt: serverTimestamp(),
+            amount
+          }, { merge: true });
+
+          // Record transaction in ledger
           await setDoc(transactionRef, {
-            userId,
+            userId: targetUserId || 'anonymous',
+            userEmail: customerEmail,
             type: 'deposit',
             amount,
             currency: data.currency || 'NGN',
@@ -683,11 +782,11 @@ app.post('/webhook/flutterwave', async (req: any, res: any) => {
             metadata: {
               gateway: 'flutterwave_webhook',
               purpose: data.meta?.purpose || 'EFADO Deposit',
-              email: data.customer?.email
+              email: customerEmail
             }
           });
 
-          console.info(`[Flutterwave Webhook] Credit applied for user ${userId} for ₦${amount}`);
+          console.info(`[Flutterwave Webhook] Successfully credited user ${targetUserId} for ₦${amount} (Ref: ${txRef})`);
         }
       } catch (hookErr) {
         console.error('[Flutterwave Webhook] Processing error:', hookErr);
@@ -695,18 +794,78 @@ app.post('/webhook/flutterwave', async (req: any, res: any) => {
     }
   }
 
-  return res.status(200).send('Webhook Received');
+  // Always acknowledge HTTP 200 OK so Flutterwave stops retrying
+  return res.sendStatus(200);
+});
+
+// Route D.3: Flutterwave Banks Directory Provider (/api/flutterwave/banks)
+app.get(['/api/flutterwave/banks', '/api/banks'], async (req: express.Request, res: express.Response) => {
+  const country = String(req.query.country || 'NG').toUpperCase();
+  const flwSecret = (
+    process.env.FLUTTERWAVE_CLIENT_SECRET || 
+    process.env.FLUTTERWAVE_SECRET_KEY || 
+    process.env.FLW_SECRET_KEY || 
+    process.env.FLWSECK || 
+    process.env.FLW_SECRET ||
+    ''
+  ).trim();
+
+  if (flwSecret) {
+    try {
+      const response = await fetch(`https://api.flutterwave.com/v3/banks/${country}`, {
+        headers: {
+          'Authorization': `Bearer ${flwSecret}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (data.status === 'success' && Array.isArray(data.data)) {
+        return res.json({ status: true, data: data.data });
+      }
+    } catch (e) {
+      console.warn('[Flutterwave Banks API] Fallback to standard list:', e);
+    }
+  }
+
+  // Return standard Nigerian banks
+  return res.json({
+    status: true,
+    data: [
+      { code: '044', name: 'Access Bank PLC' },
+      { code: '058', name: 'Guaranty Trust Bank (GTBank)' },
+      { code: '057', name: 'Zenith Bank PLC' },
+      { code: '011', name: 'First Bank of Nigeria' },
+      { code: '090267', name: 'Kuda Microfinance Bank' },
+      { code: '100004', name: 'OPay Digital Services' },
+      { code: '100033', name: 'PalmPay Limited' },
+      { code: '033', name: 'United Bank for Africa (UBA)' },
+      { code: '214', name: 'First City Monument Bank (FCMB)' },
+      { code: '221', name: 'Stanbic IBTC Bank' },
+      { code: '232', name: 'Sterling Bank PLC' },
+      { code: '035', name: 'Wema Bank / ALAT' },
+      { code: '070', name: 'Fidelity Bank PLC' },
+      { code: '101', name: 'Providus Bank' }
+    ]
+  });
 });
 
 // Route E: Flutterwave Real Live Bank Transfer / Payout API
-app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Response) => {
-  const { account_bank, account_number, amount, narration, beneficiary_name, userId } = req.body;
-  const flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY || process.env.FLWSECK || '').trim();
+app.post(['/api/flutterwave/payout', '/api/flutterwave/transfer', '/api/flutterwave/withdraw'], async (req: express.Request, res: express.Response) => {
+  const { account_bank, account_number, amount, narration, beneficiary_name, userId, userEmail } = req.body;
+  const flwSecret = (
+    process.env.FLUTTERWAVE_CLIENT_SECRET || 
+    process.env.FLUTTERWAVE_SECRET_KEY || 
+    process.env.FLW_SECRET_KEY || 
+    process.env.FLWSECK || 
+    process.env.FLW_SECRET ||
+    ''
+  ).trim();
 
   if (!account_number || !amount) {
     return res.status(400).json({ status: false, message: 'Account number and amount are required for payout.' });
   }
 
+  const parsedAmount = Number(amount);
   const reference = `EFD_TRF_${Math.floor(100000 + Math.random() * 900000)}_${Date.now()}`;
 
   if (!flwSecret) {
@@ -720,7 +879,7 @@ app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Re
         account_number,
         bank_code: account_bank,
         full_name: beneficiary_name || 'Beneficiary',
-        amount: Number(amount),
+        amount: parsedAmount,
         status: 'SUCCESSFUL',
         complete_message: 'Transfer processed in sandbox mode'
       }
@@ -737,7 +896,7 @@ app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Re
       body: JSON.stringify({
         account_bank: account_bank || '044',
         account_number,
-        amount: Number(amount),
+        amount: parsedAmount,
         narration: narration || 'EFADO Sovereign Cashout Transfer',
         currency: 'NGN',
         reference,
@@ -747,7 +906,28 @@ app.post('/api/flutterwave/payout', async (req: express.Request, res: express.Re
 
     const data = await response.json();
     if (data.status === 'success') {
-      console.info(`[Flutterwave Payout API] Payout successfully dispatched for Acc: ${account_number}, Amount: NGN ${amount}, Ref: ${reference}`);
+      console.info(`[Flutterwave Payout API] Payout successfully dispatched for Acc: ${account_number}, Amount: NGN ${parsedAmount}, Ref: ${reference}`);
+      
+      // Store in withdrawals collection in Firestore
+      try {
+        const withdrawalRef = doc(db, 'withdrawals', reference);
+        await setDoc(withdrawalRef, {
+          userId: userId || 'user',
+          userEmail: userEmail || '',
+          amount: parsedAmount,
+          status: 'completed',
+          accountDetails: {
+            accountNumber: account_number,
+            bankCode: account_bank,
+            accountName: beneficiary_name
+          },
+          reference,
+          timestamp: serverTimestamp()
+        }, { merge: true });
+      } catch (dbErr) {
+        console.warn('[Flutterwave Payout API] Withdrawal record warning:', dbErr);
+      }
+
       return res.json({
         status: true,
         message: 'Payout transfer dispatched successfully via Flutterwave Live Gateway',

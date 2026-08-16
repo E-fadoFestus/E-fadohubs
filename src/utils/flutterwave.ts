@@ -41,6 +41,7 @@ export function sanitizeKey(rawKey: string): string {
 
 export function getFlutterwavePublicKey(): string {
   const rawEnvKey = (
+    import.meta.env.VITE_FLUTTERWAVE_CLIENT_ID ||
     import.meta.env.VITE_FLW_PUBLIC_KEY || 
     import.meta.env.VITE_FLW_CLIENT_ID ||
     import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
