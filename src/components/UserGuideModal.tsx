@@ -143,7 +143,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[
-                      { icon: Coins, title: "Sovereign Wealth", desc: "Access high-stakes games and mining cores to build capital." },
+                      { icon: Coins, title: "Sovereign Wealth", desc: "Access interactive skill arenas and mining cores to build capital." },
                       { icon: Globe, title: "Global Marketplace", desc: "List products or services to reach international patrons." },
                       { icon: Cpu, title: "Tech Integration", desc: "Deploy tactical tech solutions and digital assets effortlessly." }
                     ].map((item, i) => (

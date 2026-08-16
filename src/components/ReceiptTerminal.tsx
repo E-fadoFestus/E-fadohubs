@@ -147,7 +147,9 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
                 <div className="text-center mb-12">
                   <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.3em] mb-2">Total Transaction Amount</p>
                   <h2 className="text-5xl font-black text-gray-900 tracking-tighter">
-                    {typeof receipt.amount === 'number' ? `${receipt.currency} ${receipt.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : receipt.amount}
+                    {typeof receipt.amount === 'number' 
+                      ? `${(receipt.currency === 'USD' ? '$' : receipt.currency === 'GBP' ? '£' : receipt.currency === 'EUR' ? '€' : '₦')}${receipt.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` 
+                      : receipt.amount}
                   </h2>
                 </div>
 

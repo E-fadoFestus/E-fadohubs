@@ -170,7 +170,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [newAnnouncementActionText, setNewAnnouncementActionText] = useState('');
   const [newAnnouncementActionUrl, setNewAnnouncementActionUrl] = useState('');
   const [creditAmount, setCreditAmount] = useState<number>(0);
-  const [creditType, setCreditType] = useState<'playerWallet' | 'depositWallet' | 'cashOutWallet' | 'miningWallet'>('playerWallet');
+  const [creditType, setCreditType] = useState<'playerWallet' | 'depositWallet' | 'cashOutWallet' | 'miningWallet' | 'usd_balance' | 'eur_balance' | 'gbp_balance'>('playerWallet');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
@@ -439,6 +439,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   ]);
 
   const [showAdminWithdrawModal, setShowAdminWithdrawModal] = useState(false);
+  const [adminWithdrawCurrency, setAdminWithdrawCurrency] = useState<'NGN' | 'USD' | 'EUR' | 'GBP'>('NGN');
   const [withdrawAdminAmount, setWithdrawAdminAmount] = useState<number>(0);
   const [adminWithdrawDetails, setAdminWithdrawDetails] = useState({
     bankName: 'Access Bank Plc',
@@ -459,32 +460,45 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       const accName = adminWithdrawDetails.accountName.trim() || 'CEO Festus Daniel';
       const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
 
+      const currencySymbol = adminWithdrawCurrency === 'USD' ? '$' : adminWithdrawCurrency === 'EUR' ? '€' : adminWithdrawCurrency === 'GBP' ? '£' : '₦';
+      const targetWalletField = adminWithdrawCurrency === 'USD' ? 'adminWalletUSD' : adminWithdrawCurrency === 'EUR' ? 'adminWalletEUR' : adminWithdrawCurrency === 'GBP' ? 'adminWalletGBP' : 'adminWallet';
+
       await runTransaction(db, async (transaction) => {
         const adminRef = doc(db, 'adminStats', 'global');
         const txRef = doc(collection(db, 'transactions'));
         const withdrawalRef = doc(collection(db, 'withdrawals'));
 
         const adminSnap = await transaction.get(adminRef);
-        let currentWallet = 100000;
-        let currentGain = 250000;
+        let currentWallet = 0;
+        let currentGain = 0;
 
         if (adminSnap.exists()) {
           const adminData = adminSnap.data() as AdminStats;
-          currentWallet = adminData.adminWallet || 100000;
-          currentGain = adminData.totalHouseGain || 250000;
+          currentWallet = (adminData as any)[targetWalletField] || (adminWithdrawCurrency === 'NGN' ? 100000 : 0);
+          currentGain = adminWithdrawCurrency === 'USD' ? (adminData.totalHouseGainUSD || 0) :
+                        adminWithdrawCurrency === 'EUR' ? (adminData.totalHouseGainEUR || 0) :
+                        adminWithdrawCurrency === 'GBP' ? (adminData.totalHouseGainGBP || 0) :
+                        (adminData.totalHouseGain || 250000);
+        }
+
+        if (withdrawAdminAmount > currentWallet) {
+          throw new Error(`Insufficient funds in ${adminWithdrawCurrency} vault. Available: ${currencySymbol}${currentWallet.toLocaleString()}`);
         }
 
         const newBalance = Math.max(0, currentWallet - withdrawAdminAmount);
 
         if (adminSnap.exists()) {
           transaction.update(adminRef, {
-            adminWallet: newBalance,
+            [targetWalletField]: newBalance,
             lastUpdated: serverTimestamp()
           });
         } else {
           transaction.set(adminRef, {
-            adminWallet: newBalance,
-            totalHouseGain: currentGain,
+            adminWallet: adminWithdrawCurrency === 'NGN' ? newBalance : 100000,
+            adminWalletUSD: adminWithdrawCurrency === 'USD' ? newBalance : 0,
+            adminWalletEUR: adminWithdrawCurrency === 'EUR' ? newBalance : 0,
+            adminWalletGBP: adminWithdrawCurrency === 'GBP' ? newBalance : 0,
+            totalHouseGain: adminWithdrawCurrency === 'NGN' ? currentGain : 250000,
             totalPlayers: users.length || 1,
             pendingPayouts: 0,
             lastUpdated: serverTimestamp()
@@ -496,14 +510,15 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           userEmail: 'efadofestus@gmail.com',
           type: 'withdrawal',
           amount: withdrawAdminAmount,
-          currency: 'NGN',
+          currency: adminWithdrawCurrency,
           status: 'completed',
           timestamp: serverTimestamp(),
-          description: `CEO Benefit Withdrawal to ${bankDestination} (${accNumber})`,
+          description: `CEO Benefit Withdrawal (${adminWithdrawCurrency}) to ${bankDestination} (${accNumber})`,
           metadata: {
             bankName: bankDestination,
             accountNumber: accNumber,
             accountName: accName,
+            currency: adminWithdrawCurrency,
             processedBy: 'CEO'
           }
         });
@@ -512,6 +527,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           userId: 'ADMIN_CEO',
           userEmail: 'efadofestus@gmail.com',
           amount: withdrawAdminAmount,
+          currency: adminWithdrawCurrency,
           status: 'completed',
           timestamp: serverTimestamp(),
           processedAt: serverTimestamp(),
@@ -520,7 +536,8 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           accountDetails: {
             bankName: bankDestination,
             accountNumber: accNumber,
-            accountName: accName
+            accountName: accName,
+            currency: adminWithdrawCurrency
           }
         });
 
@@ -528,22 +545,25 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         transaction.set(logRef, {
           action: 'CEO_WITHDRAWAL',
           amount: withdrawAdminAmount,
+          currency: adminWithdrawCurrency,
           timestamp: serverTimestamp(),
           details: {
             bankName: bankDestination,
             accountNumber: accNumber,
-            accountName: accName
+            accountName: accName,
+            currency: adminWithdrawCurrency
           },
           admin: 'CEO'
         });
       });
 
+      const withdrawnAmt = withdrawAdminAmount;
       setWithdrawAdminAmount(0);
       setShowAdminWithdrawModal(false);
-      alert(`✅ CEO Benefit Withdrawal of $${withdrawAdminAmount.toLocaleString()} to ${bankDestination} (${accNumber}) completed successfully and recorded!`);
+      alert(`✅ CEO Benefit Withdrawal of ${currencySymbol}${withdrawnAmt.toLocaleString()} (${adminWithdrawCurrency}) to ${bankDestination} (${accNumber}) completed successfully and recorded!`);
     } catch (e: any) {
       console.error("Error withdrawing from admin wallet:", e);
-      alert(`Error processing withdrawal: ${e.message || 'Check network connection'}`);
+      alert(e.message || "Failed to process withdrawal");
     } finally {
       setIsProcessing(false);
     }
@@ -968,26 +988,54 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         const adminRef = doc(db, 'adminStats', 'global');
         
         const adminSnap = await transaction.get(adminRef);
-        const adminData = adminSnap.data() as AdminStats;
+        const adminData = (adminSnap.exists() ? adminSnap.data() : {}) as AdminStats;
 
+        // Determine currency and respective admin vault
+        let currencyCode = 'NGN';
+        let adminVaultKey: 'adminWallet' | 'adminWalletUSD' | 'adminWalletEUR' | 'adminWalletGBP' = 'adminWallet';
+        let desc = 'Sovereign wallet credited manually by CEO';
+
+        if (creditType === 'usd_balance') {
+          currencyCode = 'USD';
+          adminVaultKey = 'adminWalletUSD';
+          desc = 'Sovereign USD Dollar Vault credited manually by CEO';
+        } else if (creditType === 'eur_balance') {
+          currencyCode = 'EUR';
+          adminVaultKey = 'adminWalletEUR';
+          desc = 'Sovereign EUR Euro Vault credited manually by CEO';
+        } else if (creditType === 'gbp_balance') {
+          currencyCode = 'GBP';
+          adminVaultKey = 'adminWalletGBP';
+          desc = 'Sovereign GBP Pound Vault credited manually by CEO';
+        } else if (creditType === 'miningWallet') {
+          currencyCode = 'EC';
+          desc = 'EFADO Mining Credits (EC) granted manually by CEO';
+        }
+
+        // Update target user's specific segregated balance
         transaction.update(userRef, {
           [creditType]: ((user as any)[creditType] || 0) + creditAmount
         });
 
-        transaction.update(adminRef, {
-          adminWallet: adminData.adminWallet - creditAmount,
-          lastUpdated: serverTimestamp()
-        });
+        // Deduct from the matching segregated admin vault if applicable
+        if (creditType !== 'miningWallet') {
+          const currentAdminBal = (adminData as any)[adminVaultKey] || 0;
+          transaction.update(adminRef, {
+            [adminVaultKey]: Math.max(0, currentAdminBal - creditAmount),
+            lastUpdated: serverTimestamp()
+          });
+        }
 
         transaction.set(txRef, {
           userId: user.uid,
           userEmail: user.email || '',
-          type: creditType === 'playerWallet' ? 'deposit' : 'game_win',
+          type: creditType === 'playerWallet' || creditType === 'depositWallet' || creditType === 'usd_balance' || creditType === 'eur_balance' || creditType === 'gbp_balance' ? 'deposit' : 'game_win',
           amount: creditAmount,
+          currency: currencyCode,
           status: 'completed',
           timestamp: serverTimestamp(),
-          description: 'Sovereign wallet credited manually by CEO',
-          purpose: 'CEO Manual Credit Adjustment'
+          description: desc,
+          purpose: `CEO Manual Credit Adjustment (${currencyCode})`
         });
 
         // Audit Log
@@ -996,15 +1044,18 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           action: 'CREDIT_USER',
           targetUser: user.email,
           amount: creditAmount,
+          currency: currencyCode,
           walletType: creditType,
           timestamp: serverTimestamp(),
-          admin: 'CEO' // In a multi-admin system, this would be request.auth.email
+          admin: 'CEO'
         });
       });
       setCreditAmount(0);
       setSelectedUser(null);
+      alert(`✅ Successfully credited ${user.email} with ${creditAmount} to ${creditType.toUpperCase()}!`);
     } catch (e) {
       console.error("Error crediting user:", e);
+      alert("Failed to credit user: " + (e as any)?.message);
     } finally {
       setIsProcessing(false);
     }
@@ -1024,11 +1075,13 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         const userSnap = await transaction.get(userRef);
         const txSnap = await transaction.get(txRef);
         
-        const adminData = adminSnap.data() as AdminStats;
+        const adminData = (adminSnap.exists() ? adminSnap.data() : {}) as AdminStats;
         const userData = userSnap.data() as UserProfile;
 
-        // WRITES AFTER
+        const cur = (withdrawal as any).currency || withdrawal.accountDetails?.currency || 'NGN';
         const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
+
+        // WRITES AFTER
         transaction.update(withdrawalRef, { 
           status, 
           processedAt: serverTimestamp(),
@@ -1045,42 +1098,91 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
         }
 
         if (status === 'completed') {
-          transaction.update(adminRef, {
-            adminWallet: adminData.adminWallet - withdrawal.amount,
-            pendingPayouts: Math.max(0, adminData.pendingPayouts - withdrawal.amount),
-            lastUpdated: serverTimestamp()
-          });
+          // Segregated Payout deduction
+          if (cur === 'USD' || withdrawal.accountDetails?.walletSource === 'usd_balance') {
+            transaction.update(adminRef, {
+              adminWalletUSD: Math.max(0, (adminData.adminWalletUSD || 0) - withdrawal.amount),
+              pendingPayoutsUSD: Math.max(0, (adminData.pendingPayoutsUSD || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'EUR' || withdrawal.accountDetails?.walletSource === 'eur_balance') {
+            transaction.update(adminRef, {
+              adminWalletEUR: Math.max(0, (adminData.adminWalletEUR || 0) - withdrawal.amount),
+              pendingPayoutsEUR: Math.max(0, (adminData.pendingPayoutsEUR || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'GBP' || withdrawal.accountDetails?.walletSource === 'gbp_balance') {
+            transaction.update(adminRef, {
+              adminWalletGBP: Math.max(0, (adminData.adminWalletGBP || 0) - withdrawal.amount),
+              pendingPayoutsGBP: Math.max(0, (adminData.pendingPayoutsGBP || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else {
+            // NGN
+            transaction.update(adminRef, {
+              adminWallet: Math.max(0, (adminData.adminWallet || 0) - withdrawal.amount),
+              pendingPayouts: Math.max(0, (adminData.pendingPayouts || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          }
+
           const logRef = doc(collection(db, 'admin_logs'));
           transaction.set(logRef, {
             action: 'APPROVE_WITHDRAWAL_PAYOUT',
             targetUser: userData.email,
             amount: withdrawal.amount,
+            currency: cur,
             processedDate: processedDateStr,
             timestamp: serverTimestamp(),
             admin: 'CEO'
           });
         } else if (status === 'failed') {
-          // Dynamic Refund Logic based on original source wallet details
-          const walletToRefund = (withdrawal.accountDetails?.sourceWallet === 'playerWallet' || withdrawal.accountDetails?.walletSource === 'playerWallet')
-            ? 'playerWallet'
-            : 'cashOutWallet';
-          
+          // Dynamic Refund Logic restoring exact currency vault
           const refundValue = (withdrawal as any).originalAmount || withdrawal.amount;
           
-          transaction.update(userRef, {
-            [walletToRefund]: userData[walletToRefund] + refundValue
-          });
-          
-          transaction.update(adminRef, {
-            pendingPayouts: Math.max(0, adminData.pendingPayouts - withdrawal.amount),
-            lastUpdated: serverTimestamp()
-          });
+          if (cur === 'USD' || withdrawal.accountDetails?.walletSource === 'usd_balance') {
+            transaction.update(userRef, {
+              usd_balance: (userData.usd_balance || 0) + refundValue
+            });
+            transaction.update(adminRef, {
+              pendingPayoutsUSD: Math.max(0, (adminData.pendingPayoutsUSD || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'EUR' || withdrawal.accountDetails?.walletSource === 'eur_balance') {
+            transaction.update(userRef, {
+              eur_balance: (userData.eur_balance || 0) + refundValue
+            });
+            transaction.update(adminRef, {
+              pendingPayoutsEUR: Math.max(0, (adminData.pendingPayoutsEUR || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'GBP' || withdrawal.accountDetails?.walletSource === 'gbp_balance') {
+            transaction.update(userRef, {
+              gbp_balance: (userData.gbp_balance || 0) + refundValue
+            });
+            transaction.update(adminRef, {
+              pendingPayoutsGBP: Math.max(0, (adminData.pendingPayoutsGBP || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          } else {
+            const walletToRefund = (withdrawal.accountDetails?.sourceWallet === 'playerWallet' || withdrawal.accountDetails?.walletSource === 'playerWallet')
+              ? 'playerWallet'
+              : 'cashOutWallet';
+            transaction.update(userRef, {
+              [walletToRefund]: (userData as any)[walletToRefund] + refundValue
+            });
+            transaction.update(adminRef, {
+              pendingPayouts: Math.max(0, (adminData.pendingPayouts || 0) - withdrawal.amount),
+              lastUpdated: serverTimestamp()
+            });
+          }
 
           const logRef = doc(collection(db, 'admin_logs'));
           transaction.set(logRef, {
             action: 'REJECT_WITHDRAWAL_PAYOUT',
             targetUser: userData.email,
             amount: withdrawal.amount,
+            currency: cur,
             processedDate: processedDateStr,
             timestamp: serverTimestamp(),
             admin: 'CEO'
@@ -1101,13 +1203,18 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       await runTransaction(db, async (transaction) => {
         const txRef = doc(db, 'transactions', tx.id!);
         const userRef = doc(db, 'users', tx.userId);
+        const adminRef = doc(db, 'adminStats', 'global');
         
-        // READ USER DOC FIRST
+        // READ USER & ADMIN FIRST
         const userSnap = await transaction.get(userRef);
+        const adminSnap = await transaction.get(adminRef);
         if (!userSnap.exists()) {
           throw new Error("Specified user does not exist");
         }
         const userData = userSnap.data() as UserProfile;
+        const adminData = (adminSnap.exists() ? adminSnap.data() : {}) as AdminStats;
+
+        const cur = tx.currency || 'NGN';
 
         // WRITE STATUS TO TRANSACTION 
         transaction.update(txRef, { 
@@ -1115,15 +1222,50 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           processedAt: serverTimestamp(),
           processedDateString: processedDateStr,
           processedBy: 'CEO',
-          description: status === 'completed' ? `Manual Deposit Approved & Credited by CEO` : `Manual Deposit Rejected by CEO`
+          description: status === 'completed' ? `Manual Deposit (${cur}) Approved & Credited by CEO` : `Manual Deposit Rejected by CEO`
         });
 
         if (status === 'completed') {
-          // Increment both depositWallet and playerWallet for manual deposit funding
-          transaction.update(userRef, {
-            playerWallet: (userData.playerWallet || 0) + tx.amount,
-            depositWallet: ((userData as any).depositWallet || 0) + tx.amount
-          });
+          // Segregated Multi-Currency Crediting
+          if (cur === 'USD') {
+            transaction.update(userRef, {
+              usd_balance: (userData.usd_balance || 0) + tx.amount
+            });
+            transaction.update(adminRef, {
+              adminWalletUSD: (adminData.adminWalletUSD || 0) + tx.amount,
+              totalHouseGainUSD: (adminData.totalHouseGainUSD || 0) + tx.amount,
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'EUR') {
+            transaction.update(userRef, {
+              eur_balance: (userData.eur_balance || 0) + tx.amount
+            });
+            transaction.update(adminRef, {
+              adminWalletEUR: (adminData.adminWalletEUR || 0) + tx.amount,
+              totalHouseGainEUR: (adminData.totalHouseGainEUR || 0) + tx.amount,
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'GBP') {
+            transaction.update(userRef, {
+              gbp_balance: (userData.gbp_balance || 0) + tx.amount
+            });
+            transaction.update(adminRef, {
+              adminWalletGBP: (adminData.adminWalletGBP || 0) + tx.amount,
+              totalHouseGainGBP: (adminData.totalHouseGainGBP || 0) + tx.amount,
+              lastUpdated: serverTimestamp()
+            });
+          } else {
+            // NGN Sovereign Deposit
+            transaction.update(userRef, {
+              playerWallet: (userData.playerWallet || 0) + tx.amount,
+              depositWallet: ((userData as any).depositWallet || 0) + tx.amount
+            });
+            transaction.update(adminRef, {
+              adminWallet: (adminData.adminWallet || 0) + tx.amount,
+              totalHouseGain: (adminData.totalHouseGain || 0) + tx.amount,
+              lastUpdated: serverTimestamp()
+            });
+          }
           
           // Audit Log
           const logRef = doc(collection(db, 'admin_logs'));
@@ -1131,6 +1273,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             action: 'APPROVE_MANUAL_DEPOSIT',
             targetUser: userData.email,
             amount: tx.amount,
+            currency: cur,
             processedDate: processedDateStr,
             timestamp: serverTimestamp(),
             admin: 'CEO'
@@ -1150,11 +1293,18 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', depositDoc.userId);
+        const adminRef = doc(db, 'adminStats', 'global');
+        
         const userSnap = await transaction.get(userRef);
+        const adminSnap = await transaction.get(adminRef);
         if (!userSnap.exists()) {
           throw new Error("Specified user does not exist");
         }
         const userData = userSnap.data() as UserProfile;
+        const adminData = (adminSnap.exists() ? adminSnap.data() : {}) as AdminStats;
+
+        const cur = depositDoc.currency || 'NGN';
+        const depositAmt = Number(depositDoc.amount) || 0;
 
         // Update deposit doc if it exists in deposits collection
         if (depositDoc.id && depositsList.some(d => d.id === depositDoc.id)) {
@@ -1176,22 +1326,58 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             processedAt: serverTimestamp(),
             processedDateString: processedDateStr,
             processedBy: 'CEO',
-            description: status === 'completed' ? `Direct Bank Transfer Approved by CEO` : `Direct Bank Transfer Declined by CEO`
+            description: status === 'completed' ? `Direct Bank Transfer (${cur}) Approved by CEO` : `Direct Bank Transfer Declined by CEO`
           });
         }
 
         if (status === 'completed') {
-          transaction.update(userRef, {
-            playerWallet: (userData.playerWallet || 0) + (depositDoc.amount || 0),
-            depositWallet: ((userData as any).depositWallet || 0) + (depositDoc.amount || 0)
-          });
+          if (cur === 'USD') {
+            transaction.update(userRef, {
+              usd_balance: (userData.usd_balance || 0) + depositAmt
+            });
+            transaction.update(adminRef, {
+              adminWalletUSD: (adminData.adminWalletUSD || 0) + depositAmt,
+              totalHouseGainUSD: (adminData.totalHouseGainUSD || 0) + depositAmt,
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'EUR') {
+            transaction.update(userRef, {
+              eur_balance: (userData.eur_balance || 0) + depositAmt
+            });
+            transaction.update(adminRef, {
+              adminWalletEUR: (adminData.adminWalletEUR || 0) + depositAmt,
+              totalHouseGainEUR: (adminData.totalHouseGainEUR || 0) + depositAmt,
+              lastUpdated: serverTimestamp()
+            });
+          } else if (cur === 'GBP') {
+            transaction.update(userRef, {
+              gbp_balance: (userData.gbp_balance || 0) + depositAmt
+            });
+            transaction.update(adminRef, {
+              adminWalletGBP: (adminData.adminWalletGBP || 0) + depositAmt,
+              totalHouseGainGBP: (adminData.totalHouseGainGBP || 0) + depositAmt,
+              lastUpdated: serverTimestamp()
+            });
+          } else {
+            // NGN
+            transaction.update(userRef, {
+              playerWallet: (userData.playerWallet || 0) + depositAmt,
+              depositWallet: ((userData as any).depositWallet || 0) + depositAmt
+            });
+            transaction.update(adminRef, {
+              adminWallet: (adminData.adminWallet || 0) + depositAmt,
+              totalHouseGain: (adminData.totalHouseGain || 0) + depositAmt,
+              lastUpdated: serverTimestamp()
+            });
+          }
 
           const logRef = doc(collection(db, 'admin_logs'));
           transaction.set(logRef, {
             action: 'APPROVE_MANUAL_DIRECT_DEPOSIT',
             targetUser: userData.email,
             targetUid: userData.uid,
-            amount: depositDoc.amount,
+            amount: depositAmt,
+            currency: cur,
             reference: depositDoc.reference || depositDoc.id,
             processedDate: processedDateStr,
             timestamp: serverTimestamp(),
@@ -1819,51 +2005,163 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   </div>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 shadow-xl golden-card-border flex flex-col justify-between min-h-[140px]">
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-indigo-500/20 rounded-lg">
-                          <Wallet className="w-5 h-5 text-indigo-400" />
+                {/* Stats Grid - Segregated Multi-Currency Master Vaults & House Gains */}
+                <div className="space-y-6">
+                  {/* Row 1: Segregated Admin Wallets / Liquid Vaults */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                          <Wallet className="w-4 h-4 text-indigo-400" />
                         </div>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Admin Wallet</span>
+                        <h4 className="text-xs font-black uppercase text-white tracking-widest">Sovereign Admin Liquid Vaults (Segregated by Currency)</h4>
                       </div>
-                      <p className="text-3xl font-black text-white font-display mb-3">{formatPrice(adminStats?.adminWallet || 0)}</p>
+                      <button 
+                        onClick={() => setShowAdminWithdrawModal(true)}
+                        className="px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-[10px] text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-indigo-600/20"
+                      >
+                        ⚡ Withdraw Benefit Vault
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => setShowAdminWithdrawModal(true)}
-                      className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-[10px] text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-indigo-600/20"
-                    >
-                      Withdraw Benefit
-                    </button>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* NGN Vault */}
+                      <div className="bg-slate-900/60 p-5 rounded-3xl border border-emerald-500/20 shadow-xl relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Naira Vault (NGN)
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-500">₦ NGN</span>
+                        </div>
+                        <p className="text-2xl font-black text-white font-display mb-1">
+                          ₦{(adminStats?.adminWallet || 0).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-medium">Primary Domestic Settlement Vault</p>
+                      </div>
+
+                      {/* USD Vault */}
+                      <div className="bg-slate-900/60 p-5 rounded-3xl border border-blue-500/20 shadow-xl relative overflow-hidden group hover:border-blue-500/40 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                            Dollar Vault (USD)
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-500">$ USD</span>
+                        </div>
+                        <p className="text-2xl font-black text-white font-display mb-1">
+                          ${(adminStats?.adminWalletUSD || 0).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-medium">International US Dollar Reserve</p>
+                      </div>
+
+                      {/* EUR Vault */}
+                      <div className="bg-slate-900/60 p-5 rounded-3xl border border-cyan-500/20 shadow-xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                            Euro Vault (EUR)
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-500">€ EUR</span>
+                        </div>
+                        <p className="text-2xl font-black text-white font-display mb-1">
+                          €{(adminStats?.adminWalletEUR || 0).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-medium">European Union Cross-Border Reserve</p>
+                      </div>
+
+                      {/* GBP Vault */}
+                      <div className="bg-slate-900/60 p-5 rounded-3xl border border-purple-500/20 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                            Pound Vault (GBP)
+                          </span>
+                          <span className="text-xs font-mono font-bold text-slate-500">£ GBP</span>
+                        </div>
+                        <p className="text-2xl font-black text-white font-display mb-1">
+                          £{(adminStats?.adminWalletGBP || 0).toLocaleString()}
+                        </p>
+                        <p className="text-[9px] text-slate-400 font-medium">British Pound Sterling Reserve</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 shadow-xl golden-card-border">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-emerald-500/20 rounded-lg">
-                        <TrendingUp className="w-5 h-5 text-emerald-400" />
+
+                  {/* Row 2: House Gains & Ecosystem Metrics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Cumulative House Gains Segregated */}
+                    <div className="bg-slate-800/40 p-5 rounded-3xl border border-white/5 shadow-xl golden-card-border">
+                      <div className="flex items-center gap-2.5 mb-3">
+                        <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total House Gains</span>
                       </div>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total House Gain</span>
-                    </div>
-                    <p className="text-3xl font-black text-white font-display">{formatPrice(adminStats?.totalHouseGain || 0)}</p>
-                  </div>
-                  <div className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 shadow-xl golden-card-border">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-amber-500/20 rounded-lg">
-                        <Users className="w-5 h-5 text-amber-400" />
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[11px] text-slate-400">NGN:</span>
+                          <span className="text-base font-black text-emerald-400 font-display">₦{(adminStats?.totalHouseGain || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[11px] text-slate-400">USD:</span>
+                          <span className="text-sm font-black text-blue-400 font-display">${(adminStats?.totalHouseGainUSD || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-[11px] text-slate-400">EUR / GBP:</span>
+                          <span className="text-xs font-bold text-slate-300 font-display">€{(adminStats?.totalHouseGainEUR || 0).toLocaleString()} | £{(adminStats?.totalHouseGainGBP || 0).toLocaleString()}</span>
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Players</span>
                     </div>
-                    <p className="text-3xl font-black text-white font-display">{users.length}</p>
-                  </div>
-                  <div className="bg-slate-800/50 p-6 rounded-3xl border border-white/5 shadow-xl golden-card-border">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-rose-500/20 rounded-lg">
-                        <AlertCircle className="w-5 h-5 text-rose-400" />
+
+                    {/* Total Active Players */}
+                    <div className="bg-slate-800/40 p-5 rounded-3xl border border-white/5 shadow-xl golden-card-border flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="p-1.5 bg-amber-500/20 rounded-lg">
+                            <Users className="w-4 h-4 text-amber-400" />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Players</span>
+                        </div>
+                        <p className="text-3xl font-black text-white font-display">{users.length}</p>
                       </div>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pending Payouts</span>
+                      <p className="text-[9px] text-slate-400">Verified sovereign registered accounts</p>
                     </div>
-                    <p className="text-3xl font-black text-white font-display">{withdrawals.filter(w => w.status === 'pending').length}</p>
+
+                    {/* Pending Cash Out Requests */}
+                    <div className="bg-slate-800/40 p-5 rounded-3xl border border-white/5 shadow-xl golden-card-border flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="p-1.5 bg-rose-500/20 rounded-lg">
+                            <AlertCircle className="w-4 h-4 text-rose-400" />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Payouts</span>
+                        </div>
+                        <p className="text-3xl font-black text-rose-400 font-display">{withdrawals.filter(w => w.status === 'pending').length}</p>
+                      </div>
+                      <p className="text-[9px] text-slate-400">Awaiting CEO disbursement approval</p>
+                    </div>
+
+                    {/* Pending Deposits */}
+                    <div className="bg-slate-800/40 p-5 rounded-3xl border border-white/5 shadow-xl golden-card-border flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                            <CreditCard className="w-4 h-4 text-indigo-400" />
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pending Deposits</span>
+                        </div>
+                        {(() => {
+                          const depCount = [
+                            ...depositsList.filter(d => d.status === 'pending'),
+                            ...transactions.filter(t => t.type === 'deposit' && t.status === 'pending' && !depositsList.some(d => d.id === t.id))
+                          ].length;
+                          return (
+                            <p className="text-3xl font-black text-indigo-400 font-display">{depCount}</p>
+                          );
+                        })()}
+                      </div>
+                      <p className="text-[9px] text-slate-400">Direct manual bank proof submissions</p>
+                    </div>
                   </div>
                 </div>
 
@@ -4976,69 +5274,99 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                <div className="space-y-4">
                 {/* Real-time wallet readout for tracking individual wallets */}
                 <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-2 text-[11px] font-mono">
-                  <span className="text-[8px] font-black uppercase text-amber-500 tracking-wider block border-b border-white/5 pb-1">Current User Wallets</span>
+                  <span className="text-[8px] font-black uppercase text-amber-500 tracking-wider block border-b border-white/5 pb-1">Current User Wallets (Segregated)</span>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">🏦 DEPOSIT WALLET:</span>
+                    <span className="text-slate-400">🏦 NAIRA DEPOSIT WALLET:</span>
                     <span className="text-white font-black">₦{(selectedUser.depositWallet || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">🏆 PLAYER (PLAY) WALLET:</span>
+                    <span className="text-slate-400">🏆 NAIRA PLAYER (PLAY) WALLET:</span>
                     <span className="text-white font-black">₦{(selectedUser.playerWallet || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">💰 CASH OUT WALLET:</span>
+                    <span className="text-slate-400">💰 NAIRA CASH OUT WALLET:</span>
                     <span className="text-white font-black">₦{(selectedUser.cashOutWallet || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">⛏️ MINING WALLET:</span>
-                    <span className="text-white font-black">₦{(selectedUser.miningWallet || 0).toLocaleString()}</span>
+                    <span className="text-emerald-400">💵 DOLLAR VAULT (USD):</span>
+                    <span className="text-emerald-400 font-black">${((selectedUser as any).usd_balance || 0).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-white/10 pt-2 font-bold text-indigo-400">
-                    <span>COMBINED SOVEREIGN ASSETS:</span>
-                    <span>₦{((selectedUser.depositWallet || 0) + (selectedUser.playerWallet || 0) + (selectedUser.cashOutWallet || 0) + (selectedUser.miningWallet || 0) * 0.01).toLocaleString()}</span>
+                  <div className="flex justify-between">
+                    <span className="text-blue-400">💶 EURO VAULT (EUR):</span>
+                    <span className="text-blue-400 font-black">€{((selectedUser as any).eur_balance || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-purple-400">💷 BRITISH POUND VAULT (GBP):</span>
+                    <span className="text-purple-400 font-black">£{((selectedUser as any).gbp_balance || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">⛏️ MINING WALLET:</span>
+                    <span className="text-white font-black">{(selectedUser.miningWallet || 0).toLocaleString()} EC</span>
                   </div>
                 </div>
 
                  <div>
-                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Wallet Type</label>
-                   <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-white/10">
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Target Currency / Wallet Vault</label>
+                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-white/10">
                      <button
                        onClick={() => setCreditType('playerWallet')}
-                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'playerWallet' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'playerWallet' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                      >
-                       PLAYER
+                       ₦ PLAY (NGN)
                      </button>
                      <button
                        onClick={() => setCreditType('depositWallet')}
-                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'depositWallet' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'depositWallet' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                      >
-                       DEPOSIT
+                       ₦ DEPOSIT (NGN)
+                     </button>
+                     <button
+                       onClick={() => setCreditType('usd_balance')}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'usd_balance' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       $ DOLLAR (USD)
+                     </button>
+                     <button
+                       onClick={() => setCreditType('eur_balance')}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'eur_balance' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       € EURO (EUR)
+                     </button>
+                     <button
+                       onClick={() => setCreditType('gbp_balance')}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'gbp_balance' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                     >
+                       £ POUND (GBP)
                      </button>
                      <button
                        onClick={() => setCreditType('cashOutWallet')}
-                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'cashOutWallet' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'cashOutWallet' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                      >
-                       CASH OUT
+                       ₦ CASH OUT
                      </button>
                      <button
                        onClick={() => setCreditType('miningWallet')}
-                       className={`py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'miningWallet' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                       className={`py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${creditType === 'miningWallet' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                      >
-                       MINED
+                       ⛏️ MINING (EC)
                      </button>
                    </div>
                  </div>
 
                  <div>
-                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">Enter Credit Amount (₦)</label>
+                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                     Enter Credit Amount ({creditType === 'usd_balance' ? '$' : creditType === 'eur_balance' ? '€' : creditType === 'gbp_balance' ? '£' : creditType === 'miningWallet' ? 'EC' : '₦'})
+                   </label>
                    <div className="relative">
-                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-amber-500 font-mono select-none">₦</div>
+                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-amber-500 font-mono select-none">
+                       {creditType === 'usd_balance' ? '$' : creditType === 'eur_balance' ? '€' : creditType === 'gbp_balance' ? '£' : creditType === 'miningWallet' ? 'EC' : '₦'}
+                     </div>
                      <input 
                        type="number"
                        value={creditAmount || ''}
                        onChange={(e) => setCreditAmount(Number(e.target.value))}
                        placeholder="0.00"
-                       className="w-full bg-slate-800 border border-white/10 rounded-2xl pl-10 pr-6 py-4 text-white focus:border-indigo-500 outline-none transition-all text-xl font-black font-display"
+                       className="w-full bg-slate-800 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-indigo-500 outline-none transition-all text-xl font-black font-display"
                      />
                    </div>
                  </div>
@@ -5083,7 +5411,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
               <div className="p-8 border-b border-white/5 bg-slate-900/50 flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">Withdraw CEO Benefit</h3>
-                  <p className="text-xs text-slate-400 mt-1">Direct payout from available Admin Wallet balance</p>
+                  <p className="text-xs text-slate-400 mt-1">Direct payout from available Segregated Admin Wallet vault</p>
                 </div>
                 <button 
                   onClick={() => setShowAdminWithdrawModal(false)}
@@ -5097,10 +5425,34 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
               <div className="p-8 space-y-6">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                    Amount to Withdraw (USD)
+                    Select Vault Currency to Withdraw From
+                  </label>
+                  <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-white/10">
+                    {(['NGN', 'USD', 'EUR', 'GBP'] as const).map(curr => (
+                      <button
+                        key={curr}
+                        type="button"
+                        onClick={() => setAdminWithdrawCurrency(curr)}
+                        className={`py-2 rounded-xl text-xs font-black tracking-wider transition-all ${
+                          adminWithdrawCurrency === curr
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {curr === 'NGN' ? '₦ NGN' : curr === 'USD' ? '$ USD' : curr === 'EUR' ? '€ EUR' : '£ GBP'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
+                    Amount to Withdraw ({adminWithdrawCurrency})
                   </label>
                   <div className="relative">
-                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-500" />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-indigo-400 font-mono select-none">
+                      {adminWithdrawCurrency === 'USD' ? '$' : adminWithdrawCurrency === 'EUR' ? '€' : adminWithdrawCurrency === 'GBP' ? '£' : '₦'}
+                    </span>
                     <input 
                       type="number"
                       placeholder="0.00"
@@ -5109,9 +5461,18 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                       className="w-full bg-slate-800 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-indigo-500 outline-none transition-all text-xl font-black font-display text-left"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-500 text-left mt-2">
-                    Available balance: <span className="text-white font-black">{formatPrice(adminStats?.adminWallet || 0)}</span>
-                  </p>
+                  {(() => {
+                    const availableVaultBal = adminWithdrawCurrency === 'USD' ? (adminStats?.adminWalletUSD || 0) :
+                                              adminWithdrawCurrency === 'EUR' ? (adminStats?.adminWalletEUR || 0) :
+                                              adminWithdrawCurrency === 'GBP' ? (adminStats?.adminWalletGBP || 0) :
+                                              (adminStats?.adminWallet || 0);
+                    const currSym = adminWithdrawCurrency === 'USD' ? '$' : adminWithdrawCurrency === 'EUR' ? '€' : adminWithdrawCurrency === 'GBP' ? '£' : '₦';
+                    return (
+                      <p className="text-[10px] text-slate-500 text-left mt-2">
+                        Available {adminWithdrawCurrency} balance: <span className="text-white font-black">{currSym}{availableVaultBal.toLocaleString()}</span>
+                      </p>
+                    );
+                  })()}
                 </div>
 
                 <div>
@@ -5155,13 +5516,21 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button 
-                    onClick={handleWithdrawAdminWallet}
-                    disabled={isProcessing || withdrawAdminAmount <= 0 || withdrawAdminAmount > (adminStats?.adminWallet || 0)}
-                    className="flex-grow py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
-                  >
-                    {isProcessing ? 'Processing Payout...' : 'Process Withdrawal'}
-                  </button>
+                  {(() => {
+                    const availableVaultBal = adminWithdrawCurrency === 'USD' ? (adminStats?.adminWalletUSD || 0) :
+                                              adminWithdrawCurrency === 'EUR' ? (adminStats?.adminWalletEUR || 0) :
+                                              adminWithdrawCurrency === 'GBP' ? (adminStats?.adminWalletGBP || 0) :
+                                              (adminStats?.adminWallet || 0);
+                    return (
+                      <button 
+                        onClick={handleWithdrawAdminWallet}
+                        disabled={isProcessing || withdrawAdminAmount <= 0 || withdrawAdminAmount > availableVaultBal}
+                        className="flex-grow py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                      >
+                        {isProcessing ? 'Processing Payout...' : `Process ${adminWithdrawCurrency} Withdrawal`}
+                      </button>
+                    );
+                  })()}
                   <button 
                     onClick={() => setShowAdminWithdrawModal(false)}
                     className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black uppercase tracking-widest transition-all"

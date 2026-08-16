@@ -84,10 +84,20 @@ export interface Transaction {
 }
 
 export interface AdminStats {
-  adminWallet: number;
-  totalHouseGain: number;
+  adminWallet: number; // NGN Sovereign Admin Wallet
+  totalHouseGain: number; // NGN Total House Gain
   totalPlayers: number;
-  pendingPayouts: number;
+  pendingPayouts: number; // NGN Pending Payouts
+  // Segregated Sovereign Multi-Currency Admin Vaults
+  adminWalletUSD?: number; // USD Dollar Admin Vault
+  adminWalletEUR?: number; // EUR Euro Admin Vault
+  adminWalletGBP?: number; // GBP Pound Admin Vault
+  totalHouseGainUSD?: number;
+  totalHouseGainEUR?: number;
+  totalHouseGainGBP?: number;
+  pendingPayoutsUSD?: number;
+  pendingPayoutsEUR?: number;
+  pendingPayoutsGBP?: number;
   gameWallets: {
     spinGame: number;
     moneyCard: number;

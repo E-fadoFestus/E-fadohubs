@@ -165,7 +165,7 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
                         <h4 className="text-sm font-black uppercase tracking-widest">Nigerian Gaming Regulatory Notice</h4>
                       </div>
                       <p className="text-xs text-amber-700 leading-relaxed font-bold">
-                        In accordance with the National Lottery Regulatory Commission (NLRC) of Nigeria, all participants in the EFADO Gaming Arena (Lucky Spin, DMT, Raffle draws) MUST be 18 years or older. Participating under-age is a violation of federal law and our platform protocols.
+                        In accordance with the National Lottery Regulatory Commission (NLRC) of Nigeria and international digital entertainment standards, all participants in the EFADO Gaming Arena (Lucky Spin, DMT, Skill & Strategy challenges) MUST be 18 years or older. Participating under-age is a violation of platform protocols.
                       </p>
                     </div>
 

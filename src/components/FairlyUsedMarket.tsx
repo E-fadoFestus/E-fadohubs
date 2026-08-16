@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
+import { AdSenseBanner } from './AdSenseBanner';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
@@ -983,6 +984,11 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     </motion.div>
                   ))
                 )}
+              </div>
+
+              {/* Google AdSense Sponsored Marketplace Placement */}
+              <div className="mt-8 mb-4">
+                <AdSenseBanner label="Marketplace Featured Commercial Ads" />
               </div>
             </div>
           </div>

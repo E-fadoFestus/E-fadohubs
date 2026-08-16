@@ -930,7 +930,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                 </div>
               </div>
               <h4 className="text-xl font-black text-white/50 uppercase tracking-tight mb-2">Admin Wallet</h4>
-              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Total house profit from game operations (System View).</p>
+              <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Total ecosystem yield from platform operations (System View).</p>
             </div>
             <div className="p-4 bg-purple-950/20 rounded-2xl border border-purple-500/20 text-center">
               <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Locked Platform Settlement Node</span>
@@ -969,7 +969,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                     }
                   }}
                   hub="SPIN_GAME"
-                  purpose={showPaymentUI.type === 'deposit' ? "EFADO Elite Spin Stake Refunding" : "EFADO Elite Spin Win Cashout"}
+                  purpose={showPaymentUI.type === 'deposit' ? "EFADO Challenge Entry Refunding" : "EFADO Challenge Reward Redemption"}
                 />
               </div>
             </div>

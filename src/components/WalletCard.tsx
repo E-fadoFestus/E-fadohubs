@@ -44,14 +44,14 @@ export function WalletGrid({ wallets, isAdmin }: { wallets: any, isAdmin: boolea
         amount={wallets.playerWallet || 0} 
         icon={<Coins />} 
         color="bg-yellow-500"
-        description="Funds available for staking and playing Game Hub games."
+        description="Funds available for participating in Game Hub challenges."
       />
       <WalletCard 
         title="Cash Out Wallet" 
         amount={wallets.cashOutWallet || 0} 
         icon={<ArrowUpCircle />} 
         color="bg-green-500"
-        description="Winnings ready to be withdrawn."
+        description="Earned rewards ready to be withdrawn."
       />
       {isAdmin && (
         <WalletCard 
@@ -59,7 +59,7 @@ export function WalletGrid({ wallets, isAdmin }: { wallets: any, isAdmin: boolea
           amount={wallets.adminWallet || 0} 
           icon={<ShieldCheck />} 
           color="bg-purple-500"
-          description="Total house profit from game operations."
+          description="Total platform revenue from challenge ecosystem."
         />
       )}
     </div>

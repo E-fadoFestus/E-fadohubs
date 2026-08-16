@@ -868,7 +868,7 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
 
     setIsProcessing(true);
     try {
-      // Deduct stake
+      // Deduct entry fee
       await onUpdateBalance(stakeAmount, 'game_bet');
       await onAddTransaction({
         userId: user.uid,
@@ -876,7 +876,7 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
         amount: stakeAmount,
         currency: 'NGN',
         status: 'completed',
-        description: 'EFADO Money Quiz Stake'
+        description: 'EFADO Academic Quiz Entry Fee'
       });
 
       // Select 6 random questions from selected subjects

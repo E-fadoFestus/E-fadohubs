@@ -90,6 +90,37 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
     }
   };
 
+  const currSymbol = (() => {
+    const curr = (transaction.currency || '').toUpperCase().trim();
+    // If it's a bank transfer, cash out, withdrawal, or Nigerian transaction, always display Naira ₦
+    const isLocalOrNaira = 
+      curr === 'NGN' || 
+      curr === 'NAIRA' || 
+      !curr ||
+      transaction.type === 'withdrawal' ||
+      transaction.purpose?.toLowerCase().includes('cash out') ||
+      transaction.purpose?.toLowerCase().includes('withdrawal') ||
+      transaction.method?.toLowerCase().includes('bank') ||
+      transaction.method?.toLowerCase().includes('paystack') ||
+      transaction.method?.toLowerCase().includes('flutterwave') ||
+      transaction.description?.includes('₦') ||
+      transaction.description?.toLowerCase().includes('naira');
+
+    if (isLocalOrNaira && curr !== 'EUR' && curr !== 'GBP') {
+      return '₦';
+    }
+
+    if (curr === 'USD') return '$';
+    if (curr === 'EUR') return '€';
+    if (curr === 'GBP') return '£';
+    if (curr === 'CAD') return 'C$';
+    if (curr === 'AUD') return 'A$';
+    if (curr === 'GHS') return '₵';
+    if (curr === 'KES') return 'KSh';
+    if (curr === 'ZAR') return 'R';
+    return '₦';
+  })();
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -269,11 +300,11 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
             <div className="bg-slate-50 rounded-3xl p-6 md:p-8 space-y-4 relative z-10">
               <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
                 <span>Sub-Total Allocation</span>
-                <span className="font-mono">{(transaction.currency === 'NGN' ? '₦' : '$')}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono">{currSymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
                 <span>Tactical Service Charge</span>
-                <span className="font-mono">{(transaction.currency === 'NGN' ? '₦' : '$')}{(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="font-mono">{currSymbol}{(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="h-px bg-slate-200" />
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -283,7 +314,7 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
                 </div>
                 <div className="flex flex-col items-end">
                   <div className="flex items-center gap-1 text-3xl md:text-4xl font-black text-slate-900 font-display">
-                    <span className="text-amber-500 font-sans">{(transaction.currency === 'NGN' ? '₦' : '$')}</span>
+                    <span className="text-amber-500 font-sans">{currSymbol}</span>
                     {(transaction.amount + (transaction.fee || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.15em] mt-1.5 bg-emerald-50 px-2 py-0.5 rounded">Completed Success</span>

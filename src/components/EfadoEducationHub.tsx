@@ -65,6 +65,7 @@ import { ExamCategory } from '../data/examData';
 import { UserProfile } from '../types';
 import { AiStudyPlatform } from './education/AiStudyPlatform';
 import { WaecScratchCardPortal } from './education/WaecScratchCardPortal';
+import { AdSenseBanner } from './AdSenseBanner';
 import { 
   CgpaCalculator, 
   SiwesLogbook, 
@@ -657,6 +658,11 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
             </div>
           </div>
         )}
+
+        {/* Google AdSense Educational Sponsor Placement */}
+        <div className="mt-12 mb-6">
+          <AdSenseBanner label="Academic Sponsors & Educational Partner Ads" />
+        </div>
       </main>
 
       {/* Decorative Bottom Glow */}

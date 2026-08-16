@@ -59,6 +59,7 @@ import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
 import { GameManualPayment } from './components/GameManualPayment';
+import { AdSenseBanner } from './components/AdSenseBanner';
 import { 
   Info,  Wallet, Lock,
   LogOut, 
@@ -724,7 +725,7 @@ function AppContent() {
         { id: '2', userId: 'dev-admin', type: 'game_win', amount: 250, status: 'completed', timestamp: { toDate: () => new Date() } as any, currency: 'NGN' }
       ]);
       setAnnouncements([
-        { id: '1', message: 'Welcome to EFADO Hubs! Enjoy our high-stakes games.', timestamp: new Date(), active: true }
+        { id: '1', message: 'Welcome to EFADO Hubs! Experience interactive skill & challenge arenas.', timestamp: new Date(), active: true }
       ]);
       setLoading(false);
       return;
@@ -1526,23 +1527,62 @@ function AppContent() {
 
   const handleWalletUpdate = async (amount: number, type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win', withdrawalAccountDetails?: any) => {
     if (!user) return;
+    const currency = withdrawalAccountDetails?.currency || 'NGN';
+    const sourceWallet = withdrawalAccountDetails?.sourceWallet;
+
     if (DEVELOPMENT_MODE) {
       if (type === 'deposit') {
-        const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
-        setUser({
-          ...user,
-          depositWallet: user.depositWallet + amount,
-          playerWallet: user.playerWallet + bonusToApply,
-          hasReceivedSignupBonus: true
-        });
+        const bonusToApply = !user.hasReceivedSignupBonus && currency === 'NGN' ? 100 : 0;
+        if (currency === 'USD') {
+          setUser({
+            ...user,
+            usd_balance: (user.usd_balance || 0) + amount
+          });
+        } else if (currency === 'EUR') {
+          setUser({
+            ...user,
+            eur_balance: (user.eur_balance || 0) + amount
+          });
+        } else if (currency === 'GBP') {
+          setUser({
+            ...user,
+            gbp_balance: (user.gbp_balance || 0) + amount
+          });
+        } else {
+          setUser({
+            ...user,
+            depositWallet: user.depositWallet + amount,
+            playerWallet: user.playerWallet + bonusToApply,
+            hasReceivedSignupBonus: true
+          });
+        }
       } else if (type === 'withdrawal') {
-        const fee = amount * 0.03;
+        const fee = amount * 0.015;
         const netAmount = amount - fee;
-        const walletToDeduct = withdrawalAccountDetails?.sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
-        setUser({
-          ...user,
-          [walletToDeduct]: Math.max(0, user[walletToDeduct] - amount)
-        });
+        
+        if (currency === 'USD' || sourceWallet === 'usd_balance') {
+          setUser({
+            ...user,
+            usd_balance: Math.max(0, (user.usd_balance || 0) - amount)
+          });
+        } else if (currency === 'EUR' || sourceWallet === 'eur_balance') {
+          setUser({
+            ...user,
+            eur_balance: Math.max(0, (user.eur_balance || 0) - amount)
+          });
+        } else if (currency === 'GBP' || sourceWallet === 'gbp_balance') {
+          setUser({
+            ...user,
+            gbp_balance: Math.max(0, (user.gbp_balance || 0) - amount)
+          });
+        } else {
+          const walletToDeduct = sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
+          setUser({
+            ...user,
+            [walletToDeduct]: Math.max(0, user[walletToDeduct] - amount)
+          });
+        }
+
         if (adminStats) {
           setAdminStats({
             ...adminStats,
@@ -1578,30 +1618,51 @@ function AppContent() {
       const adminRef = doc(db, 'adminStats', 'global');
 
       if (type === 'deposit') {
-        const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
-        await updateDoc(userRef, {
-          depositWallet: increment(amount),
-          playerWallet: increment(bonusToApply),
-          hasReceivedSignupBonus: true
-        });
+        const bonusToApply = !user.hasReceivedSignupBonus && currency === 'NGN' ? 100 : 0;
+        if (currency === 'USD') {
+          await updateDoc(userRef, {
+            usd_balance: increment(amount)
+          });
+        } else if (currency === 'EUR') {
+          await updateDoc(userRef, {
+            eur_balance: increment(amount)
+          });
+        } else if (currency === 'GBP') {
+          await updateDoc(userRef, {
+            gbp_balance: increment(amount)
+          });
+        } else {
+          await updateDoc(userRef, {
+            depositWallet: increment(amount),
+            playerWallet: increment(bonusToApply),
+            hasReceivedSignupBonus: true
+          });
+        }
       } else if (type === 'withdrawal') {
         const withdrawalRef = doc(collection(db, 'withdrawals'));
         const txRef = doc(db, 'transactions', withdrawalRef.id);
 
-        const fee = amount * 0.03;
+        const fee = amount * 0.015;
         const netAmount = amount - fee;
-        const walletToDeduct = withdrawalAccountDetails?.sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
+
+        let walletToDeductField = 'cashOutWallet';
+        if (currency === 'USD' || sourceWallet === 'usd_balance') {
+          walletToDeductField = 'usd_balance';
+        } else if (currency === 'EUR' || sourceWallet === 'eur_balance') {
+          walletToDeductField = 'eur_balance';
+        } else if (currency === 'GBP' || sourceWallet === 'gbp_balance') {
+          walletToDeductField = 'gbp_balance';
+        } else if (sourceWallet === 'playerWallet') {
+          walletToDeductField = 'playerWallet';
+        }
 
         await runTransaction(db, async (transaction) => {
-          const statsSnap = await transaction.get(adminRef);
-          const stats = statsSnap.data() as AdminStats;
-
           transaction.update(userRef, {
-            [walletToDeduct]: increment(-amount)
+            [walletToDeductField]: increment(-amount)
           });
 
           transaction.update(adminRef, {
-            adminWallet: increment(fee), // Credit 3% fee to admin wallet
+            adminWallet: increment(fee),
             pendingPayouts: increment(netAmount),
             lastUpdated: serverTimestamp()
           });
@@ -1612,11 +1673,13 @@ function AppContent() {
             amount: netAmount,
             originalAmount: amount,
             fee: fee,
+            currency: currency,
             status: 'pending',
             timestamp: serverTimestamp(),
             accountDetails: {
               ...(withdrawalAccountDetails || { method: 'default' }),
-              walletSource: walletToDeduct
+              currency,
+              walletSource: walletToDeductField
             }
           });
 
@@ -1628,8 +1691,8 @@ function AppContent() {
             fee: fee,
             status: 'pending',
             timestamp: serverTimestamp(),
-            currency: 'USD',
-            description: `Cashout withdrawal of ${amount} to ${withdrawalAccountDetails?.bankName || 'nominated account'}.`,
+            currency: currency,
+            description: `Cashout withdrawal of ${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦'}${amount.toLocaleString()} to ${withdrawalAccountDetails?.bankName || 'nominated account'}.`,
             method: withdrawalAccountDetails?.method || 'Wallet Payout'
           });
         });
@@ -2790,7 +2853,7 @@ function AppContent() {
                         <Gamepad2 className="w-7 h-7 text-orange-500 group-hover:text-white" />
                       </div>
                       <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-orange-400 transition-colors">Game Arena</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Engage in high-stakes spinning, trading, and tactical card games.</p>
+                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Engage in interactive spinning, trading, and tactical challenge arenas.</p>
                     </button>
 
                     <button 
@@ -2854,7 +2917,7 @@ function AppContent() {
                         <Coins className="w-10 h-10 text-indigo-400 group-hover:text-white" />
                       </div>
                       <h3 className="text-2xl font-black text-white mb-3 tracking-tight">Elite Spin</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">High-stakes architecture with tier-based rewards. Win up to 100x payload.</p>
+                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Tier-based prize architecture with multiplier achievements. Earn up to 100x rewards.</p>
                       <button 
                         onClick={() => setShowSpinWheel(true)}
                         className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
@@ -3957,7 +4020,7 @@ function AppContent() {
                       <option value="deposit">Deposit</option>
                       <option value="withdrawal">Withdrawal</option>
                       <option value="game_win">Game Win</option>
-                      <option value="game_bet">Game Bet</option>
+                      <option value="game_bet">Challenge Entry</option>
                       <option value="payment">Payment</option>
                       <option value="payout font-bold">Payout</option>
                     </select>
@@ -4120,7 +4183,7 @@ function AppContent() {
                                   tx.type === 'game_bet' ? 'text-red-600' : 
                                   tx.type === 'deposit' ? 'text-blue-600' : 'text-orange-600'
                                 }`}>
-                                  {tx.type.replace('_', ' ')}
+                                  {tx.type === 'game_bet' ? 'Challenge Entry' : tx.type === 'game_win' ? 'Game Reward' : tx.type.replace('_', ' ')}
                                 </span>
                                 {tx.purpose && (
                                   <span className="block text-[10px] text-gray-400 uppercase tracking-tighter mt-0.5">
@@ -4234,7 +4297,7 @@ function AppContent() {
                 
                 <div className="space-y-6">
                   <div>
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total House Gain</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Ecosystem Revenue</span>
                     <p className="text-4xl font-black text-indigo-400 mt-1">${(adminStats.totalHouseGain || 0).toFixed(2)}</p>
                   </div>
                   
@@ -4249,8 +4312,7 @@ function AppContent() {
                   </div>
 
                   <p className="text-[10px] text-gray-500 italic leading-relaxed">
-                    * Randomization is weighted to ensure a 25% house edge on every spin. 
-                    This ensures long-term profitability for the site manager.
+                    * Mathematical logic is calibrated to ensure sustainable platform operations and continuous rewards pool liquidity.
                   </p>
                 </div>
               </section>
@@ -4276,6 +4338,11 @@ function AppContent() {
           </div>
         </div>
         )}
+
+        {/* Global Google AdSense Ecosystem Placement for non-CEO pages */}
+        <div className="max-w-7xl mx-auto px-4 mt-8">
+          <AdSenseBanner label="EFADO Global Ecosystem Sponsored Ads" />
+        </div>
       </main>
 
       <footer className="glass-card-ultra border-t border-white/5 py-12 mt-12 bg-slate-950/80 backdrop-blur-3xl">

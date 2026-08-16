@@ -65,7 +65,7 @@ interface UserWalletProps {
 }
 
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
-  const { selectedCurrency, formatPrice } = useCurrency();
+  const { selectedCurrency, setCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
   const [depositMethod, setDepositMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('bank_transfer');
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
@@ -107,7 +107,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   const [filterType, setFilterType] = useState('all');
   const [withdrawSource, setWithdrawSource] = useState<'cashOutWallet' | 'playerWallet'>('playerWallet');
   const [showSwapModal, setShowSwapModal] = useState(false);
-  const [swapSource, setSwapSource] = useState<'playerWallet' | 'cashOutWallet'>('playerWallet');
+  const [swapSource, setSwapSource] = useState<'playerWallet' | 'cashOutWallet' | 'usd_balance' | 'eur_balance' | 'gbp_balance'>('playerWallet');
   const [swapAmount, setSwapAmount] = useState('');
 
   // Dynamic Payment Methods State
@@ -406,13 +406,42 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       return;
     }
 
-    const sourceBalance = swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
-    const label = swapSource === 'playerWallet' ? 'Game Winnings' : 'Cash Out Wallet';
+    let sourceBalance = 0;
+    let label = 'Game Winnings';
+    let creditedNaira = amtToConvert;
+    let sourceSymbol = '₦';
+
+    if (swapSource === 'playerWallet') {
+      sourceBalance = user.playerWallet;
+      label = 'Game Winnings (NGN)';
+      creditedNaira = amtToConvert;
+      sourceSymbol = '₦';
+    } else if (swapSource === 'cashOutWallet') {
+      sourceBalance = user.cashOutWallet || 0;
+      label = 'Cash Out Wallet (NGN)';
+      creditedNaira = amtToConvert;
+      sourceSymbol = '₦';
+    } else if (swapSource === 'usd_balance') {
+      sourceBalance = user.usd_balance || 0;
+      label = 'US Dollar Vault ($)';
+      creditedNaira = amtToConvert * 1500; // 1 USD = ₦1,500
+      sourceSymbol = '$';
+    } else if (swapSource === 'eur_balance') {
+      sourceBalance = user.eur_balance || 0;
+      label = 'Euro Vault (€)';
+      creditedNaira = amtToConvert * 1620; // 1 EUR = ₦1,620
+      sourceSymbol = '€';
+    } else if (swapSource === 'gbp_balance') {
+      sourceBalance = user.gbp_balance || 0;
+      label = 'British Pound Vault (£)';
+      creditedNaira = amtToConvert * 1900; // 1 GBP = ₦1,900
+      sourceSymbol = '£';
+    }
 
     if (amtToConvert > sourceBalance) {
       setNotifications(prev => [...prev, {
         id: Date.now().toString(),
-        message: `Insufficient funds in ${label}.`,
+        message: `Insufficient funds in ${label}. Available: ${sourceSymbol}${sourceBalance.toLocaleString()}`,
         type: 'warning'
       }]);
       return;
@@ -423,27 +452,27 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         [swapSource]: increment(-amtToConvert),
-        depositWallet: increment(amtToConvert)
+        depositWallet: increment(creditedNaira)
       });
 
       const reference = `SWAP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
       const txId = await TransactionService.recordTransaction({
         userId: user.uid,
         type: 'deposit',
-        amount: amtToConvert,
-        currency: 'USD',
+        amount: creditedNaira,
+        currency: 'NGN',
         status: 'completed',
-        method: 'Internal Swap',
+        method: 'Internal Sovereign Swap',
         hub: 'WALLET',
-        purpose: 'Winnings Swap to Stakes',
+        purpose: 'Currency Swap to Stakes',
         reference,
-        description: `Swapped ₦${amtToConvert.toLocaleString()} from ${label} to Deposit Wallet`,
+        description: `Swapped ${sourceSymbol}${amtToConvert.toLocaleString()} from ${label} to ₦${creditedNaira.toLocaleString()} Deposit Stakes`,
         skipWalletUpdate: true
       });
 
       setNotifications(prev => [...prev, {
         id: Date.now().toString(),
-        message: `Successfully swapped ₦${amtToConvert.toLocaleString()} from ${label} to Deposit Wallet!`,
+        message: `Successfully swapped ${sourceSymbol}${amtToConvert.toLocaleString()} into ₦${creditedNaira.toLocaleString()} Deposit Stakes!`,
         type: 'info'
       }]);
 
@@ -556,6 +585,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       let txId = '';
       const reference = `EFD-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
+      const activeCurrencyCode = selectedCurrency?.code || 'NGN';
+      const activeCurrencySymbol = selectedCurrency?.symbol || '₦';
+
       if (type === 'deposit') {
         const isManualDep = !['Direct Wallet', 'player_wallet', 'mining_wallet'].includes(selectedMethod);
         await onUpdateBalance(actionAmount, 'deposit');
@@ -563,7 +595,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           userId: user.uid,
           type: 'deposit',
           amount: actionAmount,
-          currency: 'USD',
+          currency: activeCurrencyCode,
           status: isManualDep ? 'pending' : 'completed',
           method: selectedMethod || 'Direct Deposit',
           hub: 'WALLET',
@@ -589,13 +621,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           userId: user.uid,
           type: 'withdrawal',
           amount: actionAmount,
-          currency: 'USD',
+          currency: activeCurrencyCode,
           status: 'pending',
           method: selectedMethod || 'Bank Transfer',
           hub: 'WALLET',
           purpose: 'Cash Out Request',
           reference,
-          description: 'Withdrawal Request',
+          description: `Withdrawal Request to ${accountDetails.bankName || 'Bank'} (${accountDetails.accountNumber || ''})`,
           skipWalletUpdate: true
         });
       }
@@ -605,7 +637,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         userId: user.uid,
         type: type === 'deposit' ? 'deposit' : 'withdrawal',
         amount: actionAmount,
-        currency: 'USD',
+        currency: activeCurrencyCode,
         status: type === 'deposit' ? 'completed' : 'pending',
         method: selectedMethod || (type === 'deposit' ? 'Direct Deposit' : 'Bank Transfer'),
         hub: 'WALLET',
@@ -619,7 +651,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
       setNotifications(prev => [...prev, { 
         id: Date.now().toString(), 
-        message: `Successfully processed ${type} of $${actionAmount}`, 
+        message: `Successfully processed ${type} of ${activeCurrencySymbol}${actionAmount.toLocaleString()}`, 
         type: 'info' 
       }]);
       setAmount('');
@@ -1172,6 +1204,177 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   </div>
                 </div>
 
+                {/* Segregated International Sovereign Currency Vaults Section */}
+                <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 md:p-8 text-white space-y-6 relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2">
+                        <Globe className="w-3.5 h-3.5 text-emerald-400" /> Segregated Currency Vaults
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                        International Multi-Currency Accounts
+                      </h3>
+                      <p className="text-xs text-slate-400 font-medium mt-1">
+                        Each currency is maintained in an independent sovereign balance to eliminate currency mixing.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSwapSource('usd_balance');
+                        setSwapAmount('');
+                        setShowSwapModal(true);
+                      }}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30"
+                    >
+                      <ArrowRightLeft className="w-3.5 h-3.5" /> Instant Currency Swap
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* USD Vault */}
+                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-emerald-500/40 transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">🇺🇸</span>
+                          <div>
+                            <p className="text-xs font-black text-white">US Dollar Vault</p>
+                            <p className="text-[10px] text-slate-400 font-mono">USD ($)</p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                          1 USD ≈ ₦1,500
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-2xl font-black text-emerald-400 font-mono">
+                          ${(user.usd_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          ≈ ₦{((user.usd_balance || 0) * 1500).toLocaleString()} Naira Stakes
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                        <button
+                          onClick={() => {
+                            setCurrency('USD');
+                            setActiveTab('deposit');
+                          }}
+                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-emerald-400" /> Deposit $
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSwapSource('usd_balance');
+                            setSwapAmount('');
+                            setShowSwapModal(true);
+                          }}
+                          className="py-2 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-emerald-500/20"
+                        >
+                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* GBP Vault */}
+                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-indigo-500/40 transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">🇬🇧</span>
+                          <div>
+                            <p className="text-xs font-black text-white">British Pound Vault</p>
+                            <p className="text-[10px] text-slate-400 font-mono">GBP (£)</p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                          1 GBP ≈ ₦1,900
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-2xl font-black text-indigo-300 font-mono">
+                          £{(user.gbp_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          ≈ ₦{((user.gbp_balance || 0) * 1900).toLocaleString()} Naira Stakes
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                        <button
+                          onClick={() => {
+                            setCurrency('GBP');
+                            setActiveTab('deposit');
+                          }}
+                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-indigo-400" /> Deposit £
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSwapSource('gbp_balance');
+                            setSwapAmount('');
+                            setShowSwapModal(true);
+                          }}
+                          className="py-2 px-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-indigo-500/20"
+                        >
+                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* EUR Vault */}
+                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-amber-500/40 transition-all">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-2xl">🇪🇺</span>
+                          <div>
+                            <p className="text-xs font-black text-white">Euro Vault</p>
+                            <p className="text-[10px] text-slate-400 font-mono">EUR (€)</p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                          1 EUR ≈ ₦1,620
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-2xl font-black text-amber-300 font-mono">
+                          €{(user.eur_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 font-bold">
+                          ≈ ₦{((user.eur_balance || 0) * 1620).toLocaleString()} Naira Stakes
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                        <button
+                          onClick={() => {
+                            setCurrency('EUR');
+                            setActiveTab('deposit');
+                          }}
+                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
+                        >
+                          <Plus className="w-3 h-3 text-amber-400" /> Deposit €
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSwapSource('eur_balance');
+                            setSwapAmount('');
+                            setShowSwapModal(true);
+                          }}
+                          className="py-2 px-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-amber-500/20"
+                        >
+                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <section>
                   <div className="flex items-center justify-between mb-6">
                     <h4 className="font-black text-gray-900 uppercase tracking-tighter">Recent Activity</h4>
@@ -1616,8 +1819,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       <ul className="space-y-3">
                         {[
                           'Verified Identity Required',
-                          'Processing Window: 24-48 Business Hours',
-                          'Standard Liquidity Fee: $2.00 Flat Rate',
+                          'Processing Window: Instant / Automated Settlement',
+                          'Standard Liquidity Processing: 1.5% Settlement Fee',
                           'Secure Encryption Active'
                         ].map((txt, i) => (
                           <li key={i} className="flex items-start gap-2 text-[10px] text-gray-950 font-black uppercase tracking-tight">
@@ -2048,37 +2251,84 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-md">
                   <ArrowRightLeft className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Convert to Stakes</h3>
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Sovereign Currency Swap Hub</h3>
                 <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                  Transfer funds from your {swapSource === 'playerWallet' ? '🏆 Game Winnings' : '💰 Cash Out Wallet'} directly to your 🏦 Deposit Wallet for instant stakes/gameplay.
+                  Convert funds from any of your segregated vaults directly into 🏦 Deposit Stakes for immediate gaming and lottery gameplay.
                 </p>
               </div>
 
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Available Balance</span>
-                    <span className="text-sm font-black text-slate-900 font-mono">
-                      ₦{(swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)).toLocaleString()}
-                    </span>
+                {/* Source Selection Buttons */}
+                <div className="space-y-1.5">
+                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Select Source Vault</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'playerWallet', label: '🏆 Wins (NGN)', balance: user.playerWallet, sym: '₦' },
+                      { id: 'cashOutWallet', label: '💰 Cashout (NGN)', balance: user.cashOutWallet || 0, sym: '₦' },
+                      { id: 'usd_balance', label: '🇺🇸 USD ($)', balance: user.usd_balance || 0, sym: '$' },
+                      { id: 'gbp_balance', label: '🇬🇧 GBP (£)', balance: user.gbp_balance || 0, sym: '£' },
+                      { id: 'eur_balance', label: '🇪🇺 EUR (€)', balance: user.eur_balance || 0, sym: '€' },
+                    ].map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          setSwapSource(v.id as any);
+                          setSwapAmount('');
+                        }}
+                        className={`p-2 rounded-xl text-left border transition-all ${
+                          swapSource === v.id
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                            : 'bg-gray-50 text-slate-700 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <p className="text-[9px] font-black uppercase truncate">{v.label}</p>
+                        <p className="text-[10px] font-black font-mono mt-0.5 truncate">
+                          {v.sym}{v.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </button>
+                    ))}
                   </div>
-                  <span className="text-[9px] font-black uppercase bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md">
-                    Source Wallet
-                  </span>
                 </div>
 
+                {/* Live Rate Badge */}
+                {['usd_balance', 'gbp_balance', 'eur_balance'].includes(swapSource) && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-bold text-emerald-800">Sovereign Exchange Rate</span>
+                    <span className="text-xs font-black text-emerald-700 font-mono">
+                      {swapSource === 'usd_balance' && '1 USD = ₦1,500'}
+                      {swapSource === 'gbp_balance' && '1 GBP = ₦1,900'}
+                      {swapSource === 'eur_balance' && '1 EUR = ₦1,620'}
+                    </span>
+                  </div>
+                )}
+
                 <div className="space-y-1.5">
-                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Amount to Convert (₦)</label>
+                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">
+                    Amount to Swap ({
+                      swapSource === 'usd_balance' ? '$ USD' :
+                      swapSource === 'gbp_balance' ? '£ GBP' :
+                      swapSource === 'eur_balance' ? '€ EUR' : '₦ NGN'
+                    })
+                  </label>
                   <div className="relative">
                     <input
                       type="number"
-                      placeholder="Enter amount to convert"
+                      placeholder="0.00"
                       value={swapAmount}
                       onChange={e => setSwapAmount(e.target.value)}
                       className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                     />
                     <button
-                      onClick={() => setSwapAmount(String(swapSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)))}
+                      onClick={() => {
+                        const maxVal = 
+                          swapSource === 'playerWallet' ? user.playerWallet :
+                          swapSource === 'cashOutWallet' ? (user.cashOutWallet || 0) :
+                          swapSource === 'usd_balance' ? (user.usd_balance || 0) :
+                          swapSource === 'gbp_balance' ? (user.gbp_balance || 0) :
+                          (user.eur_balance || 0);
+                        setSwapAmount(String(maxVal));
+                      }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-indigo-600 uppercase hover:underline"
                     >
                       MAX
@@ -2086,10 +2336,25 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   </div>
                 </div>
 
+                {/* Conversion Outcome Preview */}
+                {Number(swapAmount) > 0 && (
+                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-bold text-indigo-900">You Will Receive:</span>
+                    <span className="text-sm font-black text-indigo-700 font-mono">
+                      ₦{(
+                        swapSource === 'usd_balance' ? Number(swapAmount) * 1500 :
+                        swapSource === 'gbp_balance' ? Number(swapAmount) * 1900 :
+                        swapSource === 'eur_balance' ? Number(swapAmount) * 1620 :
+                        Number(swapAmount)
+                      ).toLocaleString()} Stakes
+                    </span>
+                  </div>
+                )}
+
                 <button
                   onClick={handleSwapWinningsToDeposit}
                   disabled={isProcessing || !swapAmount || Number(swapAmount) <= 0}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 cursor-pointer"
                 >
                   {isProcessing ? 'Completing Swap...' : 'Confirm Swap & Convert'}
                 </button>

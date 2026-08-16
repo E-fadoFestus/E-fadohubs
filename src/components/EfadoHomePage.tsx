@@ -44,6 +44,7 @@ import { EfadoIntelligenceFeed } from './EfadoIntelligenceFeed';
 import { UserProfile } from '../types';
 import { OFFICE_ADDRESSES, PHONE_NUMBERS, SUPPORT_EMAILS } from '../constants/businessProfile';
 import { AmlPolicyModal } from './AmlPolicyModal';
+import { AdSenseBanner } from './AdSenseBanner';
 
 interface EfadoHomePageProps {
   user: UserProfile;
@@ -55,7 +56,7 @@ const HUBS_DATA = [
   {
     id: 'GAMES',
     title: 'Gaming Arena',
-    description: 'High-stakes games including Lucky Spin, DMT, and Money Card. Win big and cash out instantly!',
+    description: 'Interactive skill games including Lucky Spin, DMT, and Money Card. Earn rewards, top the leaderboards, and redeem rewards!',
     icon: Gamepad2,
     color: 'from-indigo-600 to-purple-700',
     tag: 'Popular',
@@ -709,6 +710,11 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
           </div>
         </div>
       </section>
+
+      {/* Global AdSense Placement */}
+      <div className="max-w-7xl mx-auto px-4 mb-16">
+        <AdSenseBanner label="Featured Partner Sponsors & Network Ads" />
+      </div>
 
       {/* CTA Section */}
       <section className="max-w-7xl mx-auto px-4">

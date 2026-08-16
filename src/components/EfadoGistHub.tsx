@@ -84,6 +84,7 @@ import {
   ChatMessage, 
   Advertisement 
 } from '../types';
+import { AdSenseBanner } from './AdSenseBanner';
 import { 
   db, 
   auth,
@@ -2247,6 +2248,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-4">The global conversation begins with your first gist.</p>
                         </div>
                       )}
+                    </div>
+
+                    {/* Google AdSense Gist Community Placement */}
+                    <div className="my-6">
+                      <AdSenseBanner label="Sponsored Community Partner Ads" />
                     </div>
 
                     {/* Live Activity Ticker */}
