@@ -22,7 +22,13 @@ import {
   where,
   orderBy
 } from './firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInAnonymously,
+  updateProfile, 
+  sendEmailVerification 
+} from 'firebase/auth';
 import { UserProfile, Transaction, AdminStats, Announcement } from './types';
 import { WalletCard, WalletGrid } from './components/WalletCard';
 import { LuckySpinWheel } from './components/LuckySpinWheel';
@@ -348,6 +354,8 @@ function AppContent() {
   
   // Standard User email-based auth states (for fallback logins on WhatsApp / webview / custom domain errors)
   const [standardEmailMode, setStandardEmailMode] = useState<'GOOGLE' | 'EMAIL_LOGIN' | 'EMAIL_REGISTER'>('GOOGLE');
+  const [quickNameOrPhone, setQuickNameOrPhone] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
   const [standardEmail, setStandardEmail] = useState('');
   const [standardPassword, setStandardPassword] = useState('');
   const [standardDisplayName, setStandardDisplayName] = useState('');
@@ -1127,73 +1135,143 @@ function AppContent() {
 
   const handleLogin = async () => {
     setError(null);
+    setLoading(true);
     try {
-      // Prioritize popup for ALL devices because e-fado.com uses a custom domain,
-      // and redirect login (signInWithRedirect) loses storage states (ITP) / loops infinitely on
-      // iOS Safari and modern mobile browsers like Chrome & Edge on iOS/Android due to third-party cookie restrictions.
-      console.log('Initiating secure pop-up connection...');
+      console.log('Initiating secure Google connection...');
       await signInWithPopup(auth, googleProvider);
+      setLoading(false);
     } catch (e: any) {
-      console.error('Login error details:', e);
+      setLoading(false);
+      console.error('Google login error details:', e);
       if (e?.code === 'auth/unauthorized-domain') {
-        const currentHost = window.location.hostname;
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'domain';
         setError(
-          `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
+          `Domain "${currentHost}" needs to be added in Firebase Console (Authentication > Settings > Authorized domains). You can also connect instantly with 1-Tap Fast Access above!`
         );
-      } else if (e?.code === 'auth/popup-blocked' || e?.code === 'auth/cancelled-popup-request' || e?.message?.includes('popup')) {
-        // Fallback to redirect ONLY if popup is blocked by browser-level pop-up blocker
-        try {
-          console.log('Popup blocked or cancelled by user, falling back securely to redirect login...');
-          await signInWithRedirect(auth, googleProvider);
-        } catch (redirectError: any) {
-          setError(`Login failed: ${redirectError.message || redirectError}`);
-        }
+      } else if (e?.code === 'auth/popup-blocked') {
+        setError(
+          'Pop-up was blocked by your browser settings. Please use the 1-Tap Fast Access button above, or enable pop-ups in your browser settings.'
+        );
+      } else if (e?.code === 'auth/cancelled-popup-request' || e?.code === 'auth/popup-closed-by-user') {
+        // User intentionally cancelled the popup
+        setError(null);
+      } else if (isInAppBrowser) {
+        setError(
+          'Google blocks logins inside in-app browsers like WhatsApp. Please enter your name or phone above for 1-Tap Fast Access!'
+        );
       } else if (e?.message) {
-        setError(`Login failed: ${e.message}`);
+        setError(`Login failed: ${e.message}. You can use 1-Tap Fast Access above to connect immediately!`);
       } else {
-        setError('Login failed. Please try again.');
+        setError('Login failed. Please use 1-Tap Fast Access to connect immediately.');
       }
     }
   };
 
-  const handleInstantGuestLogin = async () => {
+  const handleQuickEntrance = async (customNameOrPhone?: string) => {
     setError(null);
     setLoading(true);
     try {
-      console.log('EFADO: Attempting secure zero-latency anonymous auth...');
-      const { signInAnonymously } = await import('firebase/auth');
-      const cred = await signInAnonymously(auth);
-      console.log('EFADO: Anonymous connection established. UID:', cred.user.uid);
-      setLoading(false);
-    } catch (e: any) {
-      console.error('Anonymous login error:', e);
-      try {
-        console.log('EFADO: Anonymous auth disabled, running resilient guest registration...');
-        const randomId = Math.floor(100000 + Math.random() * 900000);
-        const fallbackEmail = `guest_${randomId}@e-fado.com`;
-        const fallbackPassword = `SecureGuest123_${randomId}`;
+      const rawInput = (typeof customNameOrPhone === 'string' ? customNameOrPhone : quickNameOrPhone || '').trim();
+      
+      // Stable device patron identifier for continuous persistent session
+      let storedPatronId = localStorage.getItem('efado_device_patron_id');
+      if (!storedPatronId) {
+        storedPatronId = `patron_${Date.now().toString(36)}_${Math.floor(1000 + Math.random() * 9000)}`;
+        localStorage.setItem('efado_device_patron_id', storedPatronId);
+      }
+      
+      const isPhoneInput = /^[0-9+() -]{7,15}$/.test(rawInput);
+      const cleanId = isPhoneInput ? rawInput.replace(/[^0-9]/g, '') : storedPatronId;
+      const patronEmail = `patron_${cleanId.toLowerCase()}@e-fado.com`;
+      const patronPassword = `EFADO_Patron_2026_${cleanId.slice(-4) || '9999'}!`;
+      const finalDisplayName = rawInput || (isPhoneInput ? `Patron (${rawInput})` : `EFADO Patron #${cleanId.slice(-4)}`);
+
+      let authUser = auth.currentUser;
+
+      if (!authUser) {
+        // First try signing in with deterministic credentials
+        try {
+          const cred = await signInWithEmailAndPassword(auth, patronEmail, patronPassword);
+          authUser = cred.user;
+        } catch (signInErr: any) {
+          // If not registered yet, create the user
+          try {
+            const cred = await createUserWithEmailAndPassword(auth, patronEmail, patronPassword);
+            authUser = cred.user;
+          } catch (createErr: any) {
+            // Fallback to anonymous auth if email exists or fails
+            try {
+              const anonCred = await signInAnonymously(auth);
+              authUser = anonCred.user;
+            } catch (anonErr) {
+              console.warn('Anonymous fallback auth note:', anonErr);
+            }
+          }
+        }
+      }
+
+      if (authUser) {
+        // Update Auth Profile display name
+        await updateProfile(authUser, { displayName: finalDisplayName }).catch(() => {});
         
-        await createUserWithEmailAndPassword(auth, fallbackEmail, fallbackPassword);
-        console.log('EFADO: Guest registered securely:', fallbackEmail);
+        const userRef = doc(db, 'users', authUser.uid);
+        const userSnap = await getDoc(userRef).catch(() => null);
+        
+        if (!userSnap || !userSnap.exists()) {
+          const newUserProfile: UserProfile = {
+            uid: authUser.uid,
+            email: authUser.email || patronEmail,
+            displayName: finalDisplayName,
+            phoneNumber: isPhoneInput ? rawInput : '',
+            playerWallet: 0,
+            depositWallet: 0,
+            cashOutWallet: 0,
+            miningWallet: 0,
+            miningProgress: { stage: 'E', collectedInStage: 0 },
+            role: 'player', // Real player profile with full patronage capabilities!
+            createdAt: new Date().toISOString(),
+            hasReceivedSignupBonus: false
+          };
+          await setDoc(userRef, newUserProfile, { merge: true }).catch(err => {
+            console.warn('Firestore user profile write note:', err);
+          });
+          setUser(newUserProfile);
+        } else {
+          const existingData = userSnap.data() as UserProfile;
+          if (rawInput && (!existingData.displayName || existingData.displayName.includes('Visitor') || existingData.displayName.includes('Guest'))) {
+            await updateDoc(userRef, { displayName: finalDisplayName }).catch(() => {});
+            setUser({ ...existingData, displayName: finalDisplayName });
+          } else {
+            setUser(existingData);
+          }
+        }
+        
+        localStorage.setItem('efado_user_session_exists', 'true');
         setLoading(false);
-      } catch (fallbackError: any) {
-        console.error('High-speed registration fallback failed:', fallbackError);
-        const mockUid = `local_guest_${Math.floor(Math.random() * 1000000)}`;
+      } else {
+        // Resilient local user session if offline
+        const fallbackUid = `offline_${storedPatronId}`;
         const localUser: UserProfile = {
-          uid: mockUid,
-          email: `guest_${mockUid.slice(-6)}@e-fado.com`,
-          displayName: `EFADO Visitor`,
-          playerWallet: 100,
+          uid: fallbackUid,
+          email: patronEmail,
+          displayName: finalDisplayName,
+          phoneNumber: isPhoneInput ? rawInput : '',
+          playerWallet: 0,
           depositWallet: 0,
           cashOutWallet: 0,
           miningWallet: 0,
           miningProgress: { stage: 'E', collectedInStage: 0 },
           role: 'player',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          hasReceivedSignupBonus: false
         };
         setUser(localUser);
         setLoading(false);
       }
+    } catch (error: any) {
+      console.error('Quick entrance error:', error);
+      setError(`Quick connection encountered an issue: ${error.message || error}. Please try again.`);
+      setLoading(false);
     }
   };
 
@@ -2009,13 +2087,54 @@ function AppContent() {
 
         <div className="bg-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 rounded-3xl sm:rounded-[2.5rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 my-auto mx-auto golden-card-border">
           <EfadoLogo size="lg" className="mb-4 mx-auto" />
-          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-2 tracking-tight">Welcome to EFADO</h2>
-          <p className="text-slate-300 mb-6 text-xs sm:text-sm font-medium leading-relaxed">
-            Connect your account or tap Instant Access to enter the platform immediately.
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-1.5 tracking-tight">Welcome to EFADO</h2>
+          <p className="text-slate-300 mb-5 text-xs sm:text-sm font-medium leading-relaxed">
+            Choose 1-Tap Fast Access or Google Sign-In to connect immediately.
           </p>
 
+          {/* In-App Browser (WhatsApp / Social) Detection Notice */}
+          {isInAppBrowser && (
+            <div className="mb-5 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  In-App Browser Detected
+                </span>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                  WhatsApp / Social
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-tight">
+                For the fastest 1-second login on mobile, use the <strong className="text-amber-300">1-Tap Fast Access</strong> below, or copy link to open in Chrome/Safari:
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(window.location.href);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  }
+                }}
+                className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
+              >
+                {copiedLink ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    Link Copied! Paste in Chrome / Safari
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5" />
+                    Copy App Link
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Login Mode Tabs */}
-          <div className="flex border-b border-white/10 mb-6 p-1 bg-slate-950/60 rounded-2xl">
+          <div className="flex border-b border-white/10 mb-5 p-1 bg-slate-950/60 rounded-2xl">
             <button
               onClick={() => { setLoginMode('STANDARD'); setOtpStep(false); setError(null); }}
               className={`flex-1 py-3 text-[11px] font-black uppercase tracking-wider rounded-xl transition-all ${loginMode === 'STANDARD' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
@@ -2033,10 +2152,10 @@ function AppContent() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center gap-2 text-red-400 text-left text-xs">
+            <div className="mb-5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center gap-2 text-red-400 text-left text-xs">
               <div className="flex items-center gap-2 font-bold w-full">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                <span>CONNECTION ERROR</span>
+                <span>CONNECTION NOTICE</span>
               </div>
               <p className="leading-relaxed font-mono">{error}</p>
             </div>
@@ -2070,19 +2189,39 @@ function AppContent() {
               </div>
 
               {standardEmailMode === 'GOOGLE' && (
-                <div className="space-y-4">
+                <div className="space-y-4 text-left">
                   {/* High-speed Seamless Connection Pass */}
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-3">
+                  <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-500/15 via-slate-950/80 to-indigo-950/40 border-2 border-amber-500/40 rounded-3xl text-center space-y-3.5 shadow-xl shadow-amber-500/5">
+                    <div className="space-y-1 text-left">
+                      <label className="text-[9px] font-black text-amber-400 uppercase tracking-widest block pl-1">
+                        Your Name or Phone Number (Optional)
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Okhawere Festus or 08072456836"
+                        value={quickNameOrPhone}
+                        onChange={(e) => setQuickNameOrPhone(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-950/80 border border-white/10 rounded-xl text-xs sm:text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleQuickEntrance();
+                          }
+                        }}
+                      />
+                    </div>
+
                     <button 
-                      onClick={handleInstantGuestLogin}
-                      className="w-full py-4 sm:py-5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/20 active:scale-95 border-b-4 border-amber-700/50"
+                      onClick={() => handleQuickEntrance()}
+                      className="w-full py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/20 active:scale-95 border-b-4 border-amber-700/50"
                       id="login-instant-btn"
                     >
-                      <Zap className="w-5 h-5 text-slate-950 fill-current animate-pulse" />
-                      ⚡ INSTANT ONE-CLICK ENTRANCE
+                      <Zap className="w-5 h-5 text-slate-950 fill-current animate-pulse shrink-0" />
+                      <span>⚡ CONNECT TO EFADO (1-TAP ENTRY)</span>
                     </button>
-                    <p className="text-[11px] text-amber-200/90 font-bold tracking-wide leading-tight">
-                      Instant Access in 1 Second • No Form Required
+                    
+                    <p className="text-[11px] text-amber-200/90 font-bold tracking-wide leading-tight text-center">
+                      Instant Access in 1 Second • Full Access to Shop, Buy, Deposit & Win
                     </p>
                   </div>
 
@@ -2111,10 +2250,10 @@ function AppContent() {
                         setError(`Redirect Connection failed: ${e.message || e}`);
                       }
                     }}
-                    className="w-full py-2.5 text-[10px] font-bold text-slate-400 hover:text-indigo-300 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40"
+                    className="w-full py-2 text-[10px] font-bold text-slate-400 hover:text-indigo-300 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40 text-center"
                     id="login-redirect-btn"
                   >
-                    Having trouble with popups? Click here to redirect
+                    Having trouble with popups? Click here for Redirect Login
                   </button>
                 </div>
               )}
