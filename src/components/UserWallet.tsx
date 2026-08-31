@@ -881,6 +881,33 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   </div>
                 </div>
 
+                {/* Active Balance Card prominently integrated in Profile */}
+                <div className="p-6 bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 rounded-3xl border border-indigo-500/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400">Total Active Balance</span>
+                    <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-display mt-1">
+                      ₦{((user.depositWallet || 0) + (user.cashOutWallet || 0) + (user.playerWallet || 0) + ((user.miningWallet || 0) * 0.01)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-medium mt-1">Combined balance across Deposits, Cashout Wins, Player Wallet, and Mined N-Notes.</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('deposit')}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+                    >
+                      Deposit Funds
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('withdraw')}
+                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+                    >
+                      Withdraw
+                    </button>
+                  </div>
+                </div>
+
                 {/* Wallets & Activity Status Overview inside Profile tab */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-500/20 transition-all">

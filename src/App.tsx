@@ -242,6 +242,7 @@ function AppContent() {
   const [filterReceiver, setFilterReceiver] = useState('');
   const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showSyndicationBanner, setShowSyndicationBanner] = useState(true);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -605,10 +606,18 @@ function AppContent() {
 
 
   const handleNavigate = (hub: any, subview?: any) => {
-    if (hub !== 'GIST') setShowGistHub(false);
-    if (hub !== 'ADVERTISING') setShowAdvertisingHub(false);
-    if (hub !== 'DOMAIN_HUB') setShowDomainHub(false);
-    if (hub !== 'ZOOM') setShowZoomPlans(false);
+    // Reset overlay modal flags when switching hubs
+    setShowGistHub(hub === 'GIST');
+    setShowAdvertisingHub(hub === 'ADVERTISING');
+    setShowDomainHub(hub === 'DOMAIN_HUB');
+    setShowZoomPlans(hub === 'ZOOM');
+    setShowModernMarket(hub === 'MARKET');
+    setShowMarketHub(hub === 'FAIRLY_USED');
+    setShowServiceCorps(hub === 'SERVICE_CORPS');
+    setShowEducationHub(hub === 'EDUCATION');
+    setShowTechHub(hub === 'TECH_HUB' || hub === 'TECH');
+    setShowHepiHandsLoan(hub === 'HEPIHANDS_LOAN');
+    if (hub !== 'COMMUNITY_HUBS') setShowCommunityHub(false);
 
     if (hub === 'DIGITAL_SERVICES_HUB') {
       setDigitalServicesSection(subview || 'crypto');
@@ -617,10 +626,10 @@ function AppContent() {
     }
 
     if (hub === 'COMMUNITY_HUBS') {
+      setActiveHub('COMMUNITY_HUBS');
       if (user && !user.csccRegistered) {
         setShowCSCCRegistration(true);
       } else {
-        setActiveHub('COMMUNITY_HUBS');
         setShowCommunityHub(true);
       }
       return;
@@ -628,51 +637,11 @@ function AppContent() {
 
     setActiveHub(hub);
 
-    if (hub === 'MARKET') {
-      setShowModernMarket(true);
-      return;
-    }
-
-    if (hub === 'FAIRLY_USED') {
-      setShowMarketHub(true);
-      return;
-    }
-
-    if (hub === 'SERVICE_CORPS') {
-      setShowServiceCorps(true);
-      return;
-    }
-
-    if (hub === 'EDUCATION') {
-      setShowEducationHub(true);
-      return;
-    }
-
-    if (hub === 'TECH_HUB' || hub === 'TECH') {
-      setShowTechHub(true);
-      return;
-    }
-
-    if (hub === 'HEPIHANDS_LOAN') {
-      setShowHepiHandsLoan(true);
-      return;
-    }
-
-    if (hub === 'GAMES' && !isAgeVerified) {
-      setShowAgeGate(true);
-      return;
-    }
-    
     if (hub === 'USER_GUIDE') {
       setShowUserGuide(true);
       return;
     }
 
-    if (hub === 'ZOOM') {
-      setShowZoomPlans(true);
-      return;
-    }
-    
     if (hub === 'GIST') {
       setGistInitialView(subview || 'FEED');
       setGistAutoStartLive(false);
@@ -741,9 +710,30 @@ function AppContent() {
 
     // Handle redirect result from Google Sign-In redirect flow (important for mobile)
     getRedirectResult(auth)
-      .then((result) => {
+      .then(async (result) => {
         if (result?.user) {
           console.log('Successfully completed redirect login:', result.user);
+          const token = await result.user.getIdToken().catch(() => '');
+          if (token) localStorage.setItem('efado_token', token);
+          localStorage.setItem('efado_user_session_exists', 'true');
+          
+          const baseProfile: UserProfile = {
+            uid: result.user.uid,
+            email: result.user.email || '',
+            displayName: result.user.displayName || result.user.email?.split('@')[0] || 'EFADO Member',
+            photoURL: result.user.photoURL || '',
+            playerWallet: 0,
+            depositWallet: 0,
+            cashOutWallet: 0,
+            miningWallet: 0,
+            miningProgress: { stage: 'E', collectedInStage: 0 },
+            role: result.user.email === 'efado226@gmail.com' || result.user.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
+            createdAt: new Date().toISOString(),
+            hasReceivedSignupBonus: false
+          };
+          setUser(baseProfile);
+          localStorage.setItem('efado_cached_user', JSON.stringify(baseProfile));
+          setLoading(false);
         }
       })
       .catch((e: any) => {
@@ -751,7 +741,7 @@ function AppContent() {
         if (e?.code === 'auth/unauthorized-domain') {
           const currentHost = window.location.hostname;
           setError(
-            `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
+            `This domain (${currentHost}) is not authorized in your Firebase Project. Please add "${currentHost}" and "www.e-fado.com" to the "Authorized domains" list under Authentication -> Settings -> Authorized domains in your Firebase Console.`
           );
         } else if (e?.message) {
           setError(`Login redirect failed: ${e.message}`);
@@ -780,17 +770,26 @@ function AppContent() {
       cleanupFirestore();
 
       if (firebaseUser) {
+        firebaseUser.getIdToken().then(token => {
+          localStorage.setItem('efado_token', token);
+        }).catch(err => console.warn('Token caching notice:', err));
+        localStorage.setItem('efado_user_session_exists', 'true');
+
         const userRef = doc(db, 'users', firebaseUser.uid);
         
         // Listen for user profile changes
         unsubUser = onSnapshot(userRef, async (snapshot) => {
           if (snapshot.exists()) {
-            setUser(snapshot.data() as UserProfile);
+            const profileData = snapshot.data() as UserProfile;
+            setUser(profileData);
+            localStorage.setItem('efado_cached_user', JSON.stringify(profileData));
           } else {
             // Create initial user profile
             const newUser: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
+              photoURL: firebaseUser.photoURL || '',
               playerWallet: 0, // No starting bonus until first deposit
               depositWallet: 0,
               cashOutWallet: 0,
@@ -802,28 +801,34 @@ function AppContent() {
             };
             
             try {
-              await runTransaction(db, async (transaction) => {
-                const adminRef = doc(db, 'adminStats', 'global');
-                const statsSnap = await transaction.get(adminRef);
-                
-                transaction.set(userRef, newUser);
-                
-                if (statsSnap.exists()) {
-                  transaction.update(adminRef, {
-                    totalPlayers: (statsSnap.data() as AdminStats).totalPlayers + 1
-                  });
-                }
-              });
+              await setDoc(userRef, newUser, { merge: true });
             } catch (e) {
-              handleFirestoreError(e, OperationType.WRITE, `users/${firebaseUser.uid}`);
+              console.warn('Initial user profile write notice:', e);
             }
             
             setUser(newUser);
+            localStorage.setItem('efado_cached_user', JSON.stringify(newUser));
           }
           setLoading(false);
         }, (e) => {
-          handleFirestoreError(e, OperationType.GET, `users/${firebaseUser.uid}`);
-          setLoading(false); // Do not let user hang on white screen if Firestore listener encounters permission or region errors
+          console.warn("Firestore snapshot notice on user profile:", e);
+          const fallbackUser: UserProfile = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
+            photoURL: firebaseUser.photoURL || '',
+            playerWallet: 0,
+            depositWallet: 0,
+            cashOutWallet: 0,
+            miningWallet: 0,
+            miningProgress: { stage: 'E', collectedInStage: 0 },
+            role: firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
+            createdAt: new Date().toISOString(),
+            hasReceivedSignupBonus: false
+          };
+          setUser(fallbackUser);
+          localStorage.setItem('efado_cached_user', JSON.stringify(fallbackUser));
+          setLoading(false);
         });
 
         // Listen for transactions
@@ -835,7 +840,7 @@ function AppContent() {
         unsubTx = onSnapshot(txQuery, (snapshot) => {
           const txs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
           setTransactions(txs);
-        }, (e) => handleFirestoreError(e, OperationType.GET, 'transactions'));
+        }, (e) => console.warn("Transactions listener notice:", e.message));
 
         // Listen for announcements
         unsubAnn = onSnapshot(collection(db, 'announcements'), (snapshot) => {
@@ -854,7 +859,7 @@ function AppContent() {
             .filter(a => a.active)
             .sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp));
           setAnnouncements(ann);
-        }, (e) => handleFirestoreError(e, OperationType.GET, 'announcements'));
+        }, (e) => console.warn("Announcements listener notice:", e.message));
 
         // Listen for global user ad_listings
         unsubAds = onSnapshot(collection(db, 'ad_listings'), (snapshot) => {
@@ -867,23 +872,8 @@ function AppContent() {
           unsubAdmin = onSnapshot(doc(db, 'adminStats', 'global'), (snapshot) => {
             if (snapshot.exists()) {
               setAdminStats(snapshot.data() as AdminStats);
-            } else {
-              const initialStats: AdminStats = {
-                adminWallet: 0,
-                totalHouseGain: 0,
-                totalPlayers: 0,
-                pendingPayouts: 0,
-                gameWallets: {
-                  spinGame: 0,
-                  moneyCard: 0,
-                  tradingGame: 0
-                },
-                lastUpdated: serverTimestamp()
-              };
-              setDoc(doc(db, 'adminStats', 'global'), initialStats).catch(e => handleFirestoreError(e, OperationType.WRITE, 'adminStats/global'));
-              setAdminStats(initialStats);
             }
-          }, (e) => handleFirestoreError(e, OperationType.GET, 'adminStats/global'));
+          }, (e) => console.warn("AdminStats listener notice:", e.message));
         }
       } else {
         // Fallback: Check if we have an active Super Admin session
@@ -920,31 +910,24 @@ function AppContent() {
                 setLoading(false);
               });
 
-              // Listen for announcements
-              unsubAnn = onSnapshot(collection(db, 'announcements'), (snapshot) => {
-                const ann = snapshot.docs
-                  .map(doc => ({ id: doc.id, ...doc.data() } as Announcement))
-                  .filter(a => a.active)
-                  .sort((a, b) => b.timestamp?.seconds - a.timestamp?.seconds);
-                setAnnouncements(ann);
-              }, (e) => {
-                console.warn("Saved session: failed to load announcements:", e.message);
-              });
-
-              // Listen for admin stats
-              unsubAdmin = onSnapshot(doc(db, 'adminStats', 'global'), (snapshot) => {
-                if (snapshot.exists()) {
-                  setAdminStats(snapshot.data() as AdminStats);
-                }
-              }, (e) => {
-                console.warn("Saved session: failed to load adminStats/global:", e.message);
-              });
-
               return; // Skip setting user to null
             }
           } catch (e) {
             console.error("Failed to restore Super Admin session:", e);
           }
+        }
+
+        // Only clear if not guest/offline session
+        const cachedUserStr = localStorage.getItem('efado_cached_user');
+        if (cachedUserStr) {
+          try {
+            const parsed = JSON.parse(cachedUserStr);
+            if (parsed && parsed.uid && parsed.uid.startsWith('offline_')) {
+              setUser(parsed);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {}
         }
 
         setUser(null);
@@ -1050,45 +1033,66 @@ function AppContent() {
       const pathname = window.location.pathname.toLowerCase().replace('/', '').trim();
       const hash = rawHash || pathname;
 
-      if (!hash) {
+      // Check for subviews in search or hash query
+      try {
+        const fullUrl = window.location.href;
+        const queryIdx = fullUrl.indexOf('?');
+        if (queryIdx !== -1) {
+          const params = new URLSearchParams(fullUrl.slice(queryIdx));
+          const subview = params.get('subview');
+          if (subview && (subview === 'crypto' || subview === 'vending' || subview === 'money')) {
+            setDigitalServicesSection(subview as any);
+          }
+        }
+      } catch (err) {
+        console.warn('Subview query parsing notice:', err);
+      }
+
+      if (!hash || hash === 'home' || hash === 'homehub') {
         setActiveHub('HOME');
+        setShowGistHub(false);
+        setShowAdvertisingHub(false);
+        setShowCommunityHub(false);
+        setShowZoomPlans(false);
+        setShowServiceCorps(false);
+        setShowDomainHub(false);
+        setShowTechHub(false);
         return;
       }
 
       console.log('Synchronizing tactical navigation state for route:', hash);
-      if (hash === 'community' || hash === 'community_hubs') {
-        setActiveHub('COMMUNITY_HUBS');
-        if (user) {
-          if (user.csccRegistered) {
-            setShowCommunityHub(true);
-          } else {
-            setShowCSCCRegistration(true);
-          }
-        }
-      } else if (hash === 'gist') {
-        setActiveHub('GIST');
-        setShowGistHub(true);
-      } else if (hash === 'advertising') {
-        setActiveHub('ADVERTISING');
-        setShowAdvertisingHub(true);
-      } else if (hash === 'zoom') {
-        setActiveHub('ZOOM');
-        setShowZoomPlans(true);
-      } else if (hash === 'servicecorps') {
-        setActiveHub('SERVICE_CORPS');
-        setShowServiceCorps(true);
-      } else if (hash === 'domain') {
-        setActiveHub('DOMAIN_HUB');
-        setShowDomainHub(true);
-      } else if (hash === 'tech' || hash === 'tech_hub') {
-        setActiveHub('TECH_HUB');
-        setShowTechHub(true);
-      } else if (['dashboard', 'games', 'market', 'fairly_used', 'hepihands_loan', 'partner_hub', 'education'].includes(hash)) {
-        setActiveHub(hash.toUpperCase() as any);
-      } else if (hash === 'loanhub' || hash === 'loan') {
-        setActiveHub('HEPIHANDS_LOAN');
+      if (hash === 'community' || hash === 'community_hubs' || hash === 'unityhubs') {
+        handleNavigate('COMMUNITY_HUBS');
+      } else if (hash === 'gist' || hash === 'gisthub') {
+        handleNavigate('GIST');
+      } else if (hash === 'advertising' || hash === 'advertise' || hash === 'ads' || hash === 'adverts' || hash === 'sell') {
+        handleNavigate('ADVERTISING', hash === 'sell' ? 'SELL' : 'ADVERT');
+      } else if (hash === 'zoom' || hash === 'zoomlive') {
+        handleNavigate('ZOOM');
+      } else if (hash === 'servicecorps' || hash === 'service_corps') {
+        handleNavigate('SERVICE_CORPS');
+      } else if (hash === 'domain' || hash === 'domain_hub' || hash === 'domainhub') {
+        handleNavigate('DOMAIN_HUB');
+      } else if (hash === 'tech' || hash === 'tech_hub' || hash === 'techhub') {
+        handleNavigate('TECH_HUB');
+      } else if (hash === 'gamearena' || hash === 'games' || hash === 'game') {
+        handleNavigate('GAMES');
+      } else if (hash === 'market') {
+        handleNavigate('MARKET');
+      } else if (hash === 'fairly_used' || hash === 'fairlyused') {
+        handleNavigate('FAIRLY_USED');
+      } else if (hash === 'education' || hash === 'edu') {
+        handleNavigate('EDUCATION');
+      } else if (hash === 'digital' || hash === 'digital_services' || hash === 'digital_services_hub' || hash === 'services') {
+        handleNavigate('DIGITAL_SERVICES_HUB');
+      } else if (hash === 'loanhub' || hash === 'loan' || hash === 'hepihands_loan') {
+        handleNavigate('HEPIHANDS_LOAN');
+      } else if (hash === 'dashboard') {
+        handleNavigate('DASHBOARD');
       } else if (hash === 'partners' || hash === 'join' || hash === 'affiliate' || hash.startsWith('partner')) {
-        setActiveHub('PARTNER_HUB');
+        handleNavigate('PARTNER_HUB');
+      } else if (['dashboard', 'partner_hub'].includes(hash)) {
+        setActiveHub(hash.toUpperCase() as any);
       }
     };
 
@@ -1138,7 +1142,29 @@ function AppContent() {
     setLoading(true);
     try {
       console.log('Initiating secure Google connection...');
-      await signInWithPopup(auth, googleProvider);
+      const userCred = await signInWithPopup(auth, googleProvider);
+      if (userCred && userCred.user) {
+        const token = await userCred.user.getIdToken().catch(() => '');
+        if (token) localStorage.setItem('efado_token', token);
+        localStorage.setItem('efado_user_session_exists', 'true');
+
+        const baseProfile: UserProfile = {
+          uid: userCred.user.uid,
+          email: userCred.user.email || '',
+          displayName: userCred.user.displayName || userCred.user.email?.split('@')[0] || 'EFADO Member',
+          photoURL: userCred.user.photoURL || '',
+          playerWallet: 0,
+          depositWallet: 0,
+          cashOutWallet: 0,
+          miningWallet: 0,
+          miningProgress: { stage: 'E', collectedInStage: 0 },
+          role: userCred.user.email === 'efado226@gmail.com' || userCred.user.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
+          createdAt: new Date().toISOString(),
+          hasReceivedSignupBonus: false
+        };
+        setUser(baseProfile);
+        localStorage.setItem('efado_cached_user', JSON.stringify(baseProfile));
+      }
       setLoading(false);
     } catch (e: any) {
       setLoading(false);
@@ -1559,6 +1585,9 @@ function AppContent() {
   const handleLogout = () => {
     localStorage.removeItem('efado_session');
     localStorage.removeItem('has_free_access');
+    localStorage.removeItem('efado_token');
+    localStorage.removeItem('efado_cached_user');
+    localStorage.removeItem('efado_user_session_exists');
     setUser(null);
     signOut(auth);
   };
@@ -2553,58 +2582,64 @@ function AppContent() {
       )}
 
       {/* Global Browser Add-On & Google Ads Syndication Ticker Bar */}
-      <div className="bg-slate-900 border-b border-indigo-500/30 text-white text-xs py-1.5 px-4 shadow-2xl flex items-center justify-between gap-3 relative z-40 overflow-hidden">
-        <div className="flex items-center gap-2 overflow-hidden max-w-5xl">
-          <button 
-            onClick={() => setShowBrowserAddonModal(true)}
-            className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-rose-600 hover:from-indigo-500 hover:to-rose-500 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shrink-0 flex items-center gap-1.5 shadow-lg animate-pulse"
-          >
-            <Globe className="w-3.5 h-3.5 text-indigo-200" /> BROWSER AD-ON & GOOGLE SYNDICATION
-          </button>
-          
-          {globalAdListings.length > 0 ? (
-            <div className="truncate flex items-center gap-3 text-slate-200">
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 shrink-0">
-                🔥 LIVE ADVERT
+      {showSyndicationBanner && (
+        <div className="bg-slate-900 border-b border-indigo-500/30 text-white text-xs py-1.5 px-3 sm:px-4 shadow-2xl flex items-center justify-between gap-2 sm:gap-3 relative z-40 overflow-hidden">
+          <div className="flex items-center gap-2 overflow-hidden max-w-5xl">
+            <button 
+              onClick={() => setShowBrowserAddonModal(true)}
+              className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-rose-600 hover:from-indigo-500 hover:to-rose-500 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-white shrink-0 flex items-center gap-1 shadow-md cursor-pointer"
+            >
+              <Globe className="w-3 h-3 text-indigo-200" /> BROWSER AD-ON
+            </button>
+            
+            {globalAdListings.length > 0 ? (
+              <div className="truncate flex items-center gap-2 text-slate-200">
+                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                  LIVE AD
+                </span>
+                <span className="font-bold text-white truncate text-xs">
+                  {globalAdListings[0].title}
+                </span>
+                <span className="text-emerald-400 font-mono font-bold shrink-0 text-xs">
+                  ₦{Number(globalAdListings[0].price || 0).toLocaleString()}
+                </span>
+              </div>
+            ) : (
+              <span className="text-[10px] text-slate-400 font-medium italic truncate">
+                All products & ads syndicated live across Google Ads & Web Browsers.
               </span>
-              <span className="font-extrabold text-white truncate">
-                {globalAdListings[0].title}
-              </span>
-              <span className="text-emerald-400 font-mono font-bold shrink-0">
-                ₦{Number(globalAdListings[0].price || 0).toLocaleString()}
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium truncate hidden sm:inline">
-                • {globalAdListings[0].description}
-              </span>
-            </div>
-          ) : (
-            <span className="text-[11px] text-slate-400 font-bold italic">
-              All user products & advertisements are syndicated live across Google Ads, Meta & All Web Browsers worldwide.
-            </span>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setShowBrowserAddonModal(true)}
-            className="px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
-          >
-            View All ({globalAdListings.length})
-          </button>
-          <button
-            onClick={() => handleNavigate('ADVERTISING', 'SELL')}
-            className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-md"
-          >
-            + Sell / Advertise
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              onClick={() => setShowBrowserAddonModal(true)}
+              className="px-2 py-0.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all hidden xs:inline"
+            >
+              All ({globalAdListings.length})
+            </button>
+            <button
+              onClick={() => handleNavigate('ADVERTISING', 'SELL')}
+              className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all shadow-sm"
+            >
+              + Sell
+            </button>
+            <button
+              onClick={() => setShowSyndicationBanner(false)}
+              className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-white/10 transition-colors"
+              title="Dismiss banner"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-xl border-b border-white/5 sticky top-0 z-30 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 min-h-24 py-3 md:py-0 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <EfadoLogo size="sm" className="scale-75 animate-pulse" />
+      {/* Header - Mobile First 60px Height */}
+      <header className="bg-slate-900/90 backdrop-blur-xl border-b border-white/10 sticky top-0 z-30 shadow-xl min-h-[60px] h-[60px] sm:h-[64px] flex items-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 w-full flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <EfadoLogo size="sm" className="scale-90" />
           </div>
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
@@ -2732,17 +2767,37 @@ function AppContent() {
               const isActive = (activeHub === item.id || 
                                (item.id === 'ADVERTISING' && showAdvertisingHub && adInitialType === 'ADVERT') ||
                                (item.id === 'GIST' && showGistHub));
+              const itemHash = (item.id === 'COMMUNITY_HUBS' ? 'community' :
+                                item.id === 'GIST' ? 'gist' :
+                                item.id === 'ADVERTISING' ? 'advertising' :
+                                item.id === 'ZOOM' ? 'zoom' :
+                                item.id === 'SERVICE_CORPS' ? 'servicecorps' :
+                                item.id === 'DOMAIN_HUB' ? 'domain' :
+                                item.id === 'TECH_HUB' ? 'tech' :
+                                item.id === 'GAMES' ? 'gamearena' :
+                                item.id === 'MARKET' ? 'market' :
+                                item.id === 'FAIRLY_USED' ? 'fairly_used' :
+                                item.id === 'HEPIHANDS_LOAN' ? 'loanhub' :
+                                item.id === 'PARTNER_HUB' ? 'partners' :
+                                item.id === 'DIGITAL_SERVICES_HUB' ? 'digital' :
+                                item.id.toLowerCase());
               return (
-                <motion.button 
+                <motion.a 
                   key={item.id}
+                  href={`#${itemHash}`}
                   whileHover={{ 
                     scale: 1.08, 
                     y: -4,
                     boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)"
                   }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={() => handleNavigate(item.id)}
-                  className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border ${item.border} ${
+                  onClick={(e) => {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                      e.preventDefault();
+                      handleNavigate(item.id);
+                    }
+                  }}
+                  className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border no-underline text-inherit ${item.border} ${
                     isActive
                       ? `bg-gradient-to-b ${item.gradient} text-white ring-4 ring-white/30 scale-105 z-10 brightness-110 saturate-125 shadow-[inset_0_2px_0_0_rgba(255,255,255,0.6),0_15px_25px_-5px_rgba(0,0,0,0.5)]` 
                       : `bg-gradient-to-b ${item.gradient} text-white/90 opacity-70 saturate-[0.85] brightness-[0.8] hover:opacity-100 hover:brightness-100 hover:saturate-100 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_8px_16px_-4px_rgba(0,0,0,0.3)]`
@@ -2755,15 +2810,21 @@ function AppContent() {
                   {isActive && (
                     <span className="absolute bottom-1 w-6 h-0.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,1)]" />
                   )}
-                </motion.button>
+                </motion.a>
               );
             })}
 
-            <motion.button 
+            <motion.a 
+              href="#sell"
               whileHover={{ scale: 1.08, y: -4, boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)" }}
               whileTap={{ scale: 0.96 }}
-              onClick={() => handleNavigate('ADVERTISING', 'SELL')}
-              className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border border-rose-800/80 ${
+              onClick={(e) => {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                  e.preventDefault();
+                  handleNavigate('ADVERTISING', 'SELL');
+                }
+              }}
+              className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border border-rose-800/80 no-underline text-inherit ${
                 showAdvertisingHub && adInitialType === 'SELL'
                   ? 'bg-gradient-to-b from-rose-500 via-rose-600 to-rose-700 text-white ring-4 ring-white/30 scale-105 z-10 brightness-110 saturate-125 shadow-[inset_0_2px_0_0_rgba(255,255,255,0.6),0_15px_25px_-5px_rgba(0,0,0,0.5)]' 
                   : 'bg-gradient-to-b from-rose-500 via-rose-600 to-rose-700 text-white/90 opacity-70 saturate-[0.85] brightness-[0.8] hover:opacity-100 hover:brightness-100 hover:saturate-100 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.4),0_8px_16px_-4px_rgba(0,0,0,0.3)]'
@@ -2776,7 +2837,7 @@ function AppContent() {
               {showAdvertisingHub && adInitialType === 'SELL' && (
                 <span className="absolute bottom-1 w-6 h-0.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,1)]" />
               )}
-            </motion.button>
+            </motion.a>
           </div>
 
           {/* Navigation Controls */}
@@ -4376,13 +4437,13 @@ function AppContent() {
                         // For large list, compress
                         if (Math.ceil(filteredTransactions.length / 20) > 5 && Math.abs(pageNum - activePage) > 1 && pageNum !== 1 && pageNum !== Math.ceil(filteredTransactions.length / 20)) {
                           if (pageNum === 2 || pageNum === Math.ceil(filteredTransactions.length / 20) - 1) {
-                            return <span key={pageNum} className="px-1 text-xs text-gray-400">...</span>;
+                            return <span key={`ellipsis-${pageNum}`} className="px-1 text-xs text-gray-400">...</span>;
                           }
                           return null;
                         }
                         return (
                           <button
-                            key={pageNum}
+                            key={`page-btn-${pageNum}`}
                             type="button"
                             onClick={() => setCurrentPage(pageNum)}
                             className={`w-8 h-8 flex items-center justify-center text-xs font-black rounded-xl border transition-all ${

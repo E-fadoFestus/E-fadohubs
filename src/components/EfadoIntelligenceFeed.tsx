@@ -7,6 +7,8 @@ import {
   Globe, 
   ShieldCheck, 
   ChevronRight, 
+  ChevronDown,
+  ChevronUp,
   Clock,
   ExternalLink,
   Layers,
@@ -106,6 +108,12 @@ interface IntelligenceFeedProps {
 
 export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 'full' }) => {
   const [tickerIndex, setTickerIndex] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768;
+    }
+    return false;
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -116,51 +124,79 @@ export const EfadoIntelligenceFeed: React.FC<IntelligenceFeedProps> = ({ mode = 
 
   return (
     <div className="w-full">
-      {/* Dynamic Ticker - Broader, bolder, and more eye-catching */}
-      <div className="bg-slate-900/90 backdrop-blur-xl border-y border-indigo-500/15 py-6 sm:py-8 overflow-hidden relative group shadow-[0_0_50px_rgba(99,102,241,0.1)] rounded-[2.5rem] my-4">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-indigo-500/5 pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-8 flex flex-col md:flex-row items-center gap-6 justify-between">
-          <div className="flex items-center gap-3 shrink-0 bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 rounded-xl shadow-lg shadow-indigo-500/30 border border-indigo-400/20">
-            <Zap className="w-4 h-4 text-white animate-pulse" />
-            <span className="text-xs font-black text-white uppercase tracking-widest italic">Live updates</span>
-          </div>
-          
-          <div className="flex-1 min-h-[8rem] sm:min-h-[6rem] md:min-h-[5rem] relative w-full flex items-center py-4">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={tickerIndex}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -15 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full h-full justify-center"
-              >
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] sm:text-xs font-black text-indigo-400 bg-indigo-950/50 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest">
-                    [{FEED_DATA[tickerIndex].category}]
-                  </span>
-                  <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider hidden sm:inline">
-                    {FEED_DATA[tickerIndex].group}
-                  </span>
-                </div>
-                <div className="h-4 w-px bg-white/10 hidden sm:inline shrink-0" />
-                <p className="text-sm sm:text-base md:text-lg font-extrabold text-white uppercase tracking-tight italic whitespace-normal break-words leading-relaxed flex-1 py-1">
-                  {FEED_DATA[tickerIndex].title}
-                </p>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
-                  <span className="text-[10px] sm:text-xs text-slate-500 font-mono tracking-tighter italic">{FEED_DATA[tickerIndex].timestamp}</span>
-                </div>
-              </motion.div>
-            </AnimatePresence>
+      {/* Collapsible Dynamic Ticker - Mobile First & De-cluttered */}
+      <div className="bg-slate-900/95 backdrop-blur-xl border border-indigo-500/20 shadow-[0_4px_25px_rgba(0,0,0,0.4)] rounded-2xl my-2 sm:my-4 overflow-hidden transition-all duration-300">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-lg shadow-md shadow-indigo-500/20">
+              <Zap className="w-3.5 h-3.5 text-white animate-pulse" />
+              <span className="text-[10px] font-black text-white uppercase tracking-wider">Live Updates</span>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 font-mono hidden xs:inline">
+              [{tickerIndex + 1}/{FEED_DATA.length}]
+            </span>
           </div>
 
-          <div className="hidden lg:flex items-center gap-4 text-slate-400 border-l border-white/15 pl-6 shrink-0">
-            <Globe className="w-4 h-4 text-indigo-400" />
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Efado Academic Node Active</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>{FEED_DATA[tickerIndex].source}</span>
+            </div>
+
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-indigo-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all cursor-pointer"
+              title={isCollapsed ? "Expand Updates" : "Minimize Updates"}
+            >
+              <span>{isCollapsed ? "Show" : "Hide"}</span>
+              {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            </button>
           </div>
         </div>
+
+        <AnimatePresence initial={false}>
+          {!isCollapsed && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeInOut" }}
+              className="overflow-hidden border-t border-white/5"
+            >
+              <div className="px-4 py-3 sm:py-4 bg-slate-950/60">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={tickerIndex}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[9px] font-black text-indigo-400 bg-indigo-950/70 border border-indigo-500/30 px-2 py-0.5 rounded uppercase tracking-wider">
+                        {FEED_DATA[tickerIndex].category}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">
+                        {FEED_DATA[tickerIndex].group}
+                      </span>
+                    </div>
+
+                    <p className="text-xs sm:text-sm font-bold text-slate-100 leading-snug flex-1">
+                      {FEED_DATA[tickerIndex].title}
+                    </p>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                      <span className="text-[9px] font-mono text-slate-400 italic">
+                        {FEED_DATA[tickerIndex].timestamp}
+                      </span>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

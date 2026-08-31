@@ -13,14 +13,47 @@ import {
   sendEmailVerification,
   updatePassword
 } from 'firebase/auth';
-import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, addDoc, onSnapshot, query, where, orderBy, limit, serverTimestamp, runTransaction, increment, getDocFromServer, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { 
+  initializeFirestore,
+  getFirestore, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  serverTimestamp, 
+  runTransaction, 
+  increment, 
+  getDocFromServer, 
+  arrayUnion, 
+  arrayRemove 
+} from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-// Use the named database ID from config
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+
+const databaseId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
+
+// Initialize Firestore with auto-detect long polling to prevent WebChannel stream assertion failures
+export const db = (() => {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    }, databaseId);
+  } catch (e) {
+    return getFirestore(app, databaseId);
+  }
+})();
 export const auth = getAuth(app);
 export const functions = getFunctions(app);
 export const googleProvider = new GoogleAuthProvider();

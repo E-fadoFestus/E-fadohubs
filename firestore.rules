@@ -487,5 +487,19 @@ service cloud.firestore {
     match /manual_game_pins/{pinId} {
       allow read, write: if isAuthenticated();
     }
+    match /blogs/{blogId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /telecom_vendors/{vendorId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    match /telecom_vendor_orders/{orderId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /seerbit_webhook_logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

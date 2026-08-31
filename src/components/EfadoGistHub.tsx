@@ -1462,8 +1462,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                      {ALL_BLOG_POSTS.map(post => (
-                      <div key={post.id} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-xl shadow-gray-100/50 group hover:-translate-y-2 transition-all">
+                      {ALL_BLOG_POSTS.map((post, idx) => (
+                      <div key={`blog-post-${post.id || idx}-${idx}`} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-xl shadow-gray-100/50 group hover:-translate-y-2 transition-all">
                         <div className="h-56 overflow-hidden relative">
                           <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
                           <div className="absolute top-4 left-4 px-4 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
@@ -1716,10 +1716,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="flex flex-col lg:flex-row h-full overflow-hidden"
+                  className="flex flex-col h-full overflow-hidden"
                 >
-                  {/* Left Column: Feed */}
-                  <div className="flex-grow overflow-y-auto custom-scrollbar p-0 md:p-8 space-y-8">
+                  {/* Feed Column - Clean, Focused Social Interface */}
+                  <div className="flex-grow overflow-y-auto custom-scrollbar p-0 md:p-8 space-y-8 pb-28 sm:pb-36 max-w-4xl mx-auto w-full">
                     {/* Enhanced Feed Tabs */}
                     <div className="flex items-center gap-4 bg-white/5 border border-white/5 p-2 rounded-2xl md:max-w-md mx-auto md:mx-0">
                       {(['FOR_YOU', 'FOLLOWING', 'TRENDING'] as const).map(tab => (
@@ -1840,7 +1840,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
 
                     {/* Create Post Social Style */}
-                    <div className="bg-slate-900/60 border border-white/10 p-8 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+                    <div className="bg-slate-900/90 border border-white/10 p-4 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden group">
                       {/* Hidden input structures for post file uploads */}
                       <input 
                         type="file" 
@@ -1857,15 +1857,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         onChange={(e) => handleFeedMediaUpload(e, 'video')} 
                       />
 
-                      <div className="flex gap-4 mb-6">
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 overflow-hidden flex-shrink-0 border-2 border-indigo-500/30">
+                      <div className="flex gap-3 sm:gap-4 mb-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-600/20 overflow-hidden flex-shrink-0 border border-indigo-500/30">
                           <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                         <textarea 
-                          placeholder={`What's the viral gist today, ${user.displayName?.split(' ')[0] || 'Friend'}?`}
+                          placeholder={`What's on your mind today, ${user.displayName?.split(' ')[0] || 'Friend'}?`}
                           value={newPostText}
                           onChange={(e) => setNewPostText(e.target.value)}
-                          className="flex-grow py-4 px-0 bg-transparent border-none focus:ring-0 text-xl font-bold text-white placeholder:text-slate-500 resize-none h-24 whitespace-pre-wrap outline-none"
+                          className="flex-grow py-2 px-0 bg-transparent border-none focus:ring-0 text-base sm:text-lg font-medium text-white placeholder:text-slate-500 resize-none min-h-[90px] whitespace-pre-wrap outline-none"
                         />
                       </div>
 
@@ -2112,30 +2112,30 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
 
                     {/* Dynamic Post Feed */}
-                    <div className="space-y-8 pb-10">
+                    <div className="space-y-4 sm:space-y-6 pb-10">
                       {posts.length > 0 ? posts.map((post) => (
-                        <div key={post.id} className="bg-slate-900/60 border border-white/10 rounded-[3.5rem] overflow-hidden group shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500">
-                          <div className="p-10">
-                            <div className="flex items-center justify-between mb-8">
-                              <div className="flex items-center gap-5">
-                                <div className="w-14 h-14 rounded-2xl overflow-hidden ring-4 ring-white/5 shadow-lg">
+                        <div key={post.id} className="bg-slate-900/90 border border-white/10 rounded-2xl overflow-hidden group shadow-lg hover:shadow-indigo-500/10 transition-all duration-300">
+                          <div className="p-4 sm:p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden ring-2 ring-white/10 shadow-sm">
                                   <img src={post.authorPhoto || `https://picsum.photos/seed/${post.authorId}/100/100`} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </div>
                                 <div>
-                                  <div className="flex items-center gap-2">
-                                    <h4 className="text-base font-black text-white uppercase tracking-tight">{post.authorName}</h4>
-                                    <span className="w-4 h-4 bg-indigo-600 rounded-full flex items-center justify-center border-2 border-slate-900">
+                                  <div className="flex items-center gap-1.5">
+                                    <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">{post.authorName}</h4>
+                                    <span className="w-3.5 h-3.5 bg-indigo-600 rounded-full flex items-center justify-center">
                                       <Zap className="w-2 h-2 text-white fill-current" />
                                     </span>
                                   </div>
-                            <p className="text-[10px] font-black text-slate-200 uppercase tracking-widest">{post.category || 'Global Context'} • 2m ago</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{post.category || 'Global Context'} • 2m ago</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {post.authorId !== user.uid && (
                                   <button 
                                     onClick={() => handleFollowUser(post.authorId)}
-                                    className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                                    className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
                                       user.following?.includes(post.authorId) 
                                         ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30' 
                                         : 'bg-white/5 text-white hover:bg-indigo-600'
@@ -2144,23 +2144,23 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                     {user.following?.includes(post.authorId) ? '✓ Following' : 'Follow'}
                                   </button>
                                 )}
-                                <button className="p-2 text-slate-500 hover:text-white transition-colors">
-                                  <MoreVertical className="w-5 h-5" />
+                                <button className="p-1.5 text-slate-500 hover:text-white transition-colors">
+                                  <MoreVertical className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
 
-                            <p className="text-white text-lg leading-relaxed mb-8 font-black">
+                            <p className="text-slate-100 text-[17px] leading-relaxed mb-4 font-normal">
                               {post.content}
                             </p>
 
                             {/* Render attached interactive Gist Poll */}
                             {post.poll && (
-                              <div className="mb-8 p-6 bg-slate-950/40 border border-white/5 rounded-3xl space-y-4">
-                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                              <div className="mb-4 p-4 bg-slate-950/60 border border-white/5 rounded-2xl space-y-3">
+                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                                   📊 Gist Poll: {post.poll.question}
                                 </h6>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                   {post.poll.options.map((opt, oIdx) => {
                                     const totalVotes = post.poll.options.reduce((sum, o) => sum + o.votes.length, 0);
                                     const pct = totalVotes > 0 ? Math.round((opt.votes.length / totalVotes) * 100) : 0;
@@ -2170,7 +2170,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                         type="button"
                                         key={oIdx}
                                         onClick={() => post.id && handleVotePoll(post.id, oIdx)}
-                                        className={`w-full relative p-4 rounded-2xl flex items-center justify-between overflow-hidden border transition-all text-xs font-bold ${
+                                        className={`w-full relative p-3 rounded-xl flex items-center justify-between overflow-hidden border transition-all text-xs font-bold ${
                                           hasVoted 
                                             ? 'bg-emerald-600/10 border-emerald-500/50 text-emerald-400' 
                                             : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
@@ -2195,47 +2195,47 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             )}
 
                             {post.media && post.media.length > 0 && (
-                              <div className="rounded-[2.5rem] overflow-hidden mb-8 border border-white/5 shadow-inner group-hover:scale-[1.01] transition-transform duration-700">
+                              <div className="rounded-2xl overflow-hidden mb-4 border border-white/5 shadow-inner">
                                 <img src={post.media[0].url} alt="Gist content" className="w-full h-auto" referrerPolicy="no-referrer" />
                               </div>
                             )}
 
-                            <div className="flex items-center justify-between pt-8 border-t border-white/5">
-                              <div className="flex items-center gap-8">
+                            <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                              <div className="flex items-center gap-4 sm:gap-6">
                                 <button 
                                   onClick={() => handleLikePost(post.id, post.likes.includes(user.uid))}
-                                  className={`flex items-center gap-2 group/btn ${post.likes.includes(user.uid) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'} transition-all`}
+                                  className={`flex items-center gap-1.5 ${post.likes.includes(user.uid) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'} transition-all`}
                                 >
-                                  <div className={`p-3 rounded-2xl ${post.likes.includes(user.uid) ? 'bg-rose-500/10' : 'bg-white/5'} group-hover/btn:scale-110 transition-transform`}>
-                                    <Heart className={`w-5 h-5 ${post.likes.includes(user.uid) ? 'fill-rose-500' : 'fill-none'}`} />
+                                  <div className={`p-2 rounded-xl ${post.likes.includes(user.uid) ? 'bg-rose-500/10' : 'bg-white/5'}`}>
+                                    <Heart className={`w-4 h-4 ${post.likes.includes(user.uid) ? 'fill-rose-500' : 'fill-none'}`} />
                                   </div>
-                                  <span className="text-xs font-black tracking-widest">{post.likes.length}</span>
+                                  <span className="text-xs font-bold">{post.likes.length}</span>
                                 </button>
-                                <button className="flex items-center gap-2 group/btn text-slate-400 hover:text-indigo-400 transition-all">
-                                  <div className="p-3 bg-white/5 rounded-2xl group-hover/btn:scale-110 transition-transform">
-                                    <MessageSquare className="w-5 h-5" />
+                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition-all">
+                                  <div className="p-2 bg-white/5 rounded-xl">
+                                    <MessageSquare className="w-4 h-4" />
                                   </div>
-                                  <span className="text-xs font-black tracking-widest">{post.comments.length}</span>
+                                  <span className="text-xs font-bold">{post.comments.length}</span>
                                 </button>
-                                <button className="flex items-center gap-2 group/btn text-slate-400 hover:text-amber-400 transition-all">
-                                  <div className="p-3 bg-white/5 rounded-2xl group-hover/btn:scale-110 transition-transform">
-                                    <Coins className="w-5 h-5" />
+                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-amber-400 transition-all">
+                                  <div className="p-2 bg-white/5 rounded-xl">
+                                    <Coins className="w-4 h-4" />
                                   </div>
-                                  <span className="text-xs font-black tracking-widest">Tip</span>
+                                  <span className="text-xs font-bold hidden xs:inline">Tip</span>
                                 </button>
-                                <button className="flex items-center gap-2 group/btn text-slate-400 hover:text-emerald-400 transition-all">
-                                  <div className="p-3 bg-white/5 rounded-2xl group-hover/btn:scale-110 transition-transform">
-                                    <Repeat className="w-5 h-5" />
+                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition-all">
+                                  <div className="p-2 bg-white/5 rounded-xl">
+                                    <Repeat className="w-4 h-4" />
                                   </div>
-                                  <span className="text-[10px] font-black uppercase tracking-widest">Echo</span>
+                                  <span className="text-[10px] font-bold uppercase hidden xs:inline">Echo</span>
                                 </button>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <button className="p-3 bg-white/5 text-slate-400 hover:text-white rounded-2xl transition-all">
-                                  <Bookmark className="w-5 h-5" />
+                              <div className="flex items-center gap-1.5">
+                                <button className="p-2 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-all">
+                                  <Bookmark className="w-4 h-4" />
                                 </button>
-                                <button className="p-3 bg-white/5 text-slate-400 hover:text-white rounded-2xl transition-all">
-                                  <Share className="w-5 h-5" />
+                                <button className="p-2 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-all">
+                                  <Share className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
@@ -2248,136 +2248,6 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-4">The global conversation begins with your first gist.</p>
                         </div>
                       )}
-                    </div>
-
-                    {/* Google AdSense Gist Community Placement */}
-                    <div className="my-6">
-                      <AdSenseBanner label="Sponsored Community Partner Ads" />
-                    </div>
-
-                    {/* Live Activity Ticker */}
-                    <div className="sticky bottom-0 left-0 right-0 z-50 py-4 bg-gray-950/80 backdrop-blur-2xl border-t border-white/10 overflow-hidden transform group-hover:translate-y-0 transition-transform">
-                       <div className="flex animate-marquee whitespace-nowrap">
-                          {[
-                            "GLOBAL INTEL: New Career Mentor joined Church Hub",
-                            "TACTICAL ALERT: High engagement on Gaming Reel #Win",
-                            "HUB SYNC: 1,240 new gists deployed in the last hour",
-                            "MARKET UPDATE: Price of Crude Oil refined in Nigeria Hub...",
-                            "USER CONNECT: Dr. Sarah just posted a new Strategic Blog",
-                            "VIRAL GIST: Marriage Forum hitting record 25k interactions"
-                          ].map((text, i) => (
-                            <div key={i} className="flex items-center gap-4 mx-8">
-                               <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                               <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{text}</span>
-                            </div>
-                          ))}
-                          {/* Duplicate for seamless scrolling */}
-                          {[
-                            "GLOBAL INTEL: New Career Mentor joined Church Hub",
-                            "TACTICAL ALERT: High engagement on Gaming Reel #Win",
-                            "HUB SYNC: 1,240 new gists deployed in the last hour",
-                            "MARKET UPDATE: Price of Crude Oil refined in Nigeria Hub...",
-                            "USER CONNECT: Dr. Sarah just posted a new Strategic Blog",
-                            "VIRAL GIST: Marriage Forum hitting record 25k interactions"
-                          ].map((text, j) => (
-                            <div key={j} className="flex items-center gap-4 mx-8">
-                               <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                               <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{text}</span>
-                            </div>
-                          ))}
-                       </div>
-                    </div>
-                           {/* Right Column: Trending & Strategic Mining Sidebar */}
-                  <div className="hidden lg:flex xl:hidden w-96 flex-col p-8 space-y-8 border-l border-white/5 overflow-y-auto custom-scrollbar no-scrollbar bg-slate-900/40">
-                    {/* EFADO Mining Strategic Module */}
-                    <div className="space-y-4">
-                       <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-2">Sovereign Extraction</h5>
-                       <MiningMiniCard user={user} onOpenFull={onOpenMining || (() => setShowMiningFull(true))} />
-                    </div>
-
-                    {/* Advertising Entry Point */}
-                    <div className="space-y-4">
-                       <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-2">Strategic Visibility</h5>
-                       <AdvertisingMiniCard 
-                          onAdvert={() => onNavigate?.('ADVERTISING', 'ADVERT')} 
-                          onSell={() => onNavigate?.('ADVERTISING', 'SELL')} 
-                       />
-                    </div>
-
-                    {/* Trending Communities */}
-                    <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 shadow-2xl space-y-6">
-                       <h5 className="text-lg font-black text-white uppercase tracking-tighter italic flex items-center gap-3">
-                          <TrendingUp className="w-6 h-6 text-indigo-400" /> Viral Hubs
-                       </h5>
-                       <div className="space-y-6">
-                          {[
-                            { hub: 'Religious Discourse', tags: '12.4k active', color: 'bg-amber-500' },
-                            { hub: 'Wives Forum', tags: '8.2k active', color: 'bg-rose-500' },
-                            { hub: 'Tech Trends', tags: '15.1k active', color: 'bg-cyan-500' },
-                            { hub: 'Football PL', tags: '25.3k active', color: 'bg-indigo-500' },
-                          ].map((trend, i) => (
-                            <div key={i} className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all">
-                               <div className={`w-2 h-10 rounded-full ${trend.color} opacity-20 group-hover:opacity-100 transition-opacity`} />
-                               <div>
-                                  <p className="text-sm font-black text-white uppercase tracking-tight">{trend.hub}</p>
-                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{trend.tags}</p>
-                                </div>
-                            </div>
-                          ))}
-                       </div>
-                       <button className="w-full py-4 text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 rounded-2xl hover:bg-indigo-500/20 transition-all border border-indigo-500/20">
-                          Explore All Hubs
-                       </button>
-                    </div>
-
-                    {/* Suggested Strategists */}
-                    <div className="space-y-6 pb-20">
-                       <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-2">Top Strategists</h5>
-                       <div className="space-y-4">
-                          {[1,2,3].map(i => (
-                            <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl hover:bg-white/10 hover:shadow-lg transition-all border border-white/10">
-                               <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-xl bg-indigo-600/20 overflow-hidden border border-white/5">
-                                     <img src={`https://picsum.photos/seed/user${i}/100/100`} alt="User" referrerPolicy="no-referrer" />
-                                  </div>
-                                  <div>
-                                     <p className="text-xs font-black text-white uppercase">Strategist_{i}</p>
-                                     <p className="text-[9px] font-bold text-emerald-400 uppercase">Verified</p>
-                                  </div>
-                               </div>
-                               <button className="p-2 text-indigo-400 hover:bg-indigo-600 hover:text-white rounded-lg transition-all">
-                                  <Plus className="w-4 h-4" />
-                                </button>
-                            </div>
-                          ))}
-                       </div>
-          </div>
-
-                       {/* Hub Pulse Meter */}
-                       <div className="p-6 bg-slate-900 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden">
-                          <div className="relative z-10">
-                            <div className="flex items-center justify-between mb-4">
-                              <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Global Hub Pulse</h5>
-                              <Zap className="w-3 h-3 text-indigo-400 animate-pulse" />
-                            </div>
-                            <div className="flex items-end gap-1 h-12 mb-4">
-                              {[30, 45, 60, 40, 80, 95, 70, 50, 85, 90].map((h, i) => (
-                                <motion.div 
-                                  key={i}
-                                  initial={{ height: 0 }}
-                                  animate={{ height: `${h}%` }}
-                                  transition={{ repeat: Infinity, duration: 1, repeatType: 'reverse', delay: i * 0.1 }}
-                                  className="flex-grow bg-indigo-500/30 rounded-t-sm border-t border-indigo-500/50"
-                                />
-                              ))}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sentiment: High</span>
-                              <span className="text-[10px] font-black text-white italic">Viral Flow</span>
-                            </div>
-                          </div>
-                          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-full blur-3xl -mr-16 -mt-16" />
-                       </div>
                     </div>
                   </div>
                 </motion.div>

@@ -859,9 +859,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
               </h3>
               {selectedL3 ? (
                 <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                  {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map(group => (
+                  {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group, idx) => (
                     <button
-                      key={group}
+                      key={`group-${group}-${idx}`}
                       onClick={() => setSelectedL4(group)}
                       className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
                         selectedL4 === group 

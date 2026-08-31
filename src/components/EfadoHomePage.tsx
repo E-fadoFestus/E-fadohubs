@@ -7,6 +7,7 @@ import {
   Users, 
   HandCoins, 
   ArrowRight, 
+  ArrowUpRight,
   ShieldCheck, 
   Globe, 
   Building2,
@@ -175,6 +176,25 @@ const HUBS_DATA = [
   }
 ];
 
+const getHubRoute = (hubId: string, subview?: string) => {
+  switch (hubId) {
+    case 'GAMES': return 'gamearena';
+    case 'MARKET': return 'market';
+    case 'ADVERTISING': return 'advertising';
+    case 'GIST': return 'gist';
+    case 'SERVICE_CORPS': return 'servicecorps';
+    case 'COMMUNITY_HUBS': return 'community';
+    case 'HEPIHANDS_LOAN': return 'loanhub';
+    case 'DOMAIN_HUB': return subview ? `domain?subview=${subview}` : 'domain';
+    case 'DIGITAL_SERVICES_HUB': return subview ? `digital?subview=${subview}` : 'digital';
+    case 'PARTNER_HUB': return 'partners';
+    case 'EDUCATION': return 'education';
+    case 'ZOOM': return 'zoom';
+    case 'DASHBOARD': return 'dashboard';
+    default: return hubId.toLowerCase();
+  }
+};
+
 export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, onOpenMining }) => {
   const { formatPrice } = useCurrency();
   const [showUniversalSearch, setShowUniversalSearch] = useState(false);
@@ -183,7 +203,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
   const hubs = HUBS_DATA;
 
   return (
-    <div className="space-y-12 md:space-y-24 pb-32">
+    <div className="space-y-12 md:space-y-24 pb-28 sm:pb-36">
       {/* Global Intelligence Ticker - Always Displayed */}
       <EfadoIntelligenceFeed mode="ticker-only" />
 
@@ -192,7 +212,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
         <HubHeroCarousel hubType="HOME" onAction={(view, subview) => onNavigate(view as any, subview)} />
         
         {/* Scrolling Strategic Text Section - ADLaM Display & Bouncing Animation */}
-        <section className="relative z-30 py-24 overflow-hidden" style={{ contain: 'paint' }}>
+        <section className="relative z-30 py-16 sm:py-24 overflow-hidden" style={{ contain: 'paint' }}>
           <div className="flex whitespace-nowrap">
             <motion.div 
               animate={{ x: ["0%", "-50%"] }}
@@ -228,20 +248,17 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
           </div>
         </section>
 
-        {/* Growth Triggers & Hub Shortcuts immediately following hero */}
-        <div className="max-w-7xl mx-auto px-4 w-full -mt-12 relative z-30">
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                 <MiningMiniCard user={user} onOpenFull={onOpenMining} />
-              </div>
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-2xl flex flex-col justify-center">
-                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Network Status</p>
-                 <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-                    <p className="text-sm font-black text-gray-900 uppercase">Universal Protocol Synchronized</p>
-                 </div>
-              </div>
-           </div>
+        {/* Network Synchronized Status */}
+        <div className="max-w-7xl mx-auto px-4 w-full -mt-8 relative z-30">
+          <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+              <p className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">Universal Protocol Synchronized</p>
+            </div>
+            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20">
+              Live Network
+            </span>
+          </div>
         </div>
       </section>
 
@@ -271,64 +288,88 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
         </div>
       </section>
 
-      {/* Hubs Grid */}
-      <section className="max-w-7xl mx-auto px-4">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-20 border-b border-white/5 pb-12">
+      {/* Hubs Grid - Ecosystem Navigation Launcher */}
+      <section className="max-w-7xl mx-auto px-3 sm:px-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-12 border-b border-white/10 pb-6">
           <div>
-            <h2 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-white tracking-tighter leading-tight mb-4">Tactical Hubs</h2>
-            <p className="text-slate-500 text-lg md:text-xl font-medium max-w-2xl">Synchronised performance layers for the modern ecosystem.</p>
-          </div>
-          <div className="flex items-center gap-6 p-6 glass-card-ultra rounded-[2rem]">
-            <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center">
-              <Globe className="w-7 h-7 text-indigo-400" />
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Ecosystem Hubs</span>
             </div>
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">Tactical Hubs</h2>
+            <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Tap any card to launch your destination hub in a new tab.</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl">
+            <Globe className="w-5 h-5 text-indigo-400" />
             <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Global Presence</p>
-              <p className="text-xl font-extrabold text-white">Integrated 100+</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Global Reach</p>
+              <p className="text-sm font-extrabold text-white">100+ Nodes</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {hubs.map((hub, i) => (
-            <motion.div
-              key={`${hub.id}-${i}`}
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.02, y: -8 }}
-              transition={{ 
-                type: "spring",
-                stiffness: 300,
-                damping: 20
-              }}
-              viewport={{ once: true }}
-              onClick={() => onNavigate(hub.id as any, (hub as any).subview)}
-              className="group cursor-pointer"
-            >
-              <div className="glass-card-ultra golden-card-border p-10 rounded-[3rem] text-left transition-all duration-500 group-hover:shadow-[0_40px_80px_rgba(0,0,0,0.6)] border-t-[6px] border-t-white/10 group-hover:border-t-indigo-500 h-full flex flex-col">
-                <div className="relative z-10 flex flex-col h-full uppercase">
-                  <div className="flex justify-between items-start mb-8">
-                    <div className="w-16 h-16 bg-white/5 backdrop-blur-3xl rounded-[1.5rem] flex items-center justify-center group-hover:bg-indigo-600 transition-all duration-500 group-hover:scale-110 shadow-lg">
-                      <hub.icon className="w-8 h-8 text-white" />
+        {/* 2-Column on Mobile, 3 on Tablet, 6 on Desktop */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+          {hubs.map((hub, i) => {
+            const routeHash = getHubRoute(hub.id, (hub as any).subview);
+            const targetUrl = `#${routeHash}`;
+            return (
+              <motion.a
+                key={`${hub.id}-${i}`}
+                href={targetUrl}
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.03, y: -4 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ duration: 0.2 }}
+                viewport={{ once: true }}
+                onClick={(e) => {
+                  // If standard left click without modifier keys, navigate in-app instantly
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
+                    e.preventDefault();
+                    onNavigate(hub.id as any, (hub as any).subview);
+                  }
+                }}
+                className="group cursor-pointer flex flex-col no-underline text-inherit"
+              >
+                <div className="bg-gradient-to-b from-slate-900/90 to-slate-950/95 hover:from-slate-850 hover:to-slate-900 border border-white/10 hover:border-indigo-500/50 p-4 rounded-2xl min-h-[120px] shadow-lg hover:shadow-indigo-500/10 transition-all flex flex-col justify-between h-full relative overflow-hidden">
+                  {/* Subtle top accent gradient */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${hub.color} opacity-80 group-hover:opacity-100 transition-opacity`} />
+                  
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0 group-hover:bg-indigo-600 transition-colors shadow-inner">
+                        <hub.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-indigo-300 bg-indigo-950/60 border border-indigo-500/20 px-1.5 py-0.5 rounded">
+                          {hub.tag}
+                        </span>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all" />
+                      </div>
                     </div>
-                    <span className="px-4 py-1.5 bg-white/5 text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-widest border border-white/10 group-hover:bg-indigo-500/20 group-hover:text-indigo-200 transition-all">
-                      {hub.tag}
+
+                    <h3 className="text-base font-bold text-white tracking-tight group-hover:text-indigo-300 transition-colors line-clamp-1 mb-1">
+                      {hub.title}
+                    </h3>
+
+                    <p className="text-[13px] text-slate-300 font-normal leading-snug line-clamp-2">
+                      {hub.description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-white/5">
+                    <span className="text-[9px] font-mono text-slate-400 truncate">
+                      {hub.stats}
+                    </span>
+                    <span className="text-[9px] font-bold text-indigo-400 group-hover:text-indigo-300 flex items-center gap-0.5">
+                      Launch →
                     </span>
                   </div>
-                  <h3 className="text-3xl font-black text-white mb-6 tracking-tighter group-hover:text-indigo-300 transition-colors">{hub.title}</h3>
-                  <p className="text-slate-200 text-sm mb-12 flex-grow leading-relaxed font-bold tracking-tight opacity-90 group-hover:opacity-100 transition-opacity">
-                    {hub.description}
-                  </p>
-                  <div className="flex items-center justify-between pt-8 border-t border-white/10 mt-auto">
-                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-100 transition-colors">{hub.stats}</span>
-                    <div className="flex items-center gap-3 font-black uppercase tracking-[0.3em] text-[11px] text-indigo-400 group-hover:gap-6 transition-all group-hover:text-indigo-300">
-                      Synchronise <ChevronRight className="w-5 h-5" />
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.a>
+            );
+          })}
         </div>
       </section>      {/* Partner Logos / Trust Bar */}
       <section className="py-32 relative overflow-hidden">

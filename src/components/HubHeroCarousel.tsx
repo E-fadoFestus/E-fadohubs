@@ -144,7 +144,7 @@ export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAct
   };
 
   return (
-    <div className="relative w-full h-[600px] rounded-b-[4rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl mb-12 group border-4 border-white/5">
+    <div className="relative w-full h-[400px] sm:h-[460px] md:h-[520px] lg:h-[580px] rounded-2xl sm:rounded-3xl md:rounded-[3rem] overflow-hidden shadow-2xl mb-6 sm:mb-10 group border-2 sm:border-4 border-white/5">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
@@ -171,43 +171,43 @@ export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAct
           </motion.div>
 
           {/* Cinematic Overlays */}
-          <div className={`absolute inset-0 bg-gradient-to-r ${slides[currentIndex].color} opacity-70 mix-blend-multiply`} />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent opacity-90" />
+          <div className={`absolute inset-0 bg-gradient-to-r ${slides[currentIndex].color} opacity-75 mix-blend-multiply`} />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent opacity-95" />
           
           {/* Live Indicator Overlay (Advert Mode) */}
-          <div className="absolute top-10 left-12 z-20 flex items-center gap-4">
-             <div className="px-4 py-2 bg-rose-600 text-white rounded-full flex items-center gap-2">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest mt-0.5">Live Broadcast</span>
+          <div className="absolute top-4 sm:top-8 left-4 sm:left-8 z-20 flex items-center gap-2 sm:gap-3">
+             <div className="px-3 py-1 bg-rose-600/90 backdrop-blur-md text-white rounded-full flex items-center gap-1.5 shadow-md">
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">Live Broadcast</span>
              </div>
-             <div className="flex items-center gap-2 text-white/60">
-                <Activity className="w-4 h-4" />
-                <span className="text-[10px] font-bold uppercase tracking-widest">Feed Active</span>
+             <div className="hidden xs:flex items-center gap-1.5 text-white/70">
+                <Activity className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-bold uppercase tracking-wider">Feed Active</span>
              </div>
           </div>
 
-          <div className="absolute inset-0 flex flex-col justify-end pb-24 px-12 md:px-24">
-            <div className="max-w-4xl">
+          <div className="absolute inset-0 flex flex-col justify-end pb-6 sm:pb-10 md:pb-14 px-4 sm:px-8 md:px-16">
+            <div className="max-w-3xl">
               <motion.div
-                initial={{ opacity: 0, x: -30 }}
+                initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center gap-4 mb-8"
+                transition={{ delay: 0.2 }}
+                className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-4"
               >
-                <div className="px-5 py-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl">
-                  <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">
+                <div className="px-3 py-1 bg-white/10 backdrop-blur-xl border border-white/20 rounded-lg">
+                  <span className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-[0.2em]">
                     {slides[currentIndex].tag}
                   </span>
                 </div>
-                <div className="h-px w-24 bg-gradient-to-r from-white/40 to-transparent" />
-                <MonitorPlay className="w-5 h-5 text-white/60" />
+                <div className="h-px w-12 sm:w-16 bg-gradient-to-r from-white/40 to-transparent" />
+                <MonitorPlay className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/60" />
               </motion.div>
 
               <motion.h2
-                initial={{ opacity: 0, y: 50 }}
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, type: "spring", stiffness: 100 }}
-                className="text-4xl sm:text-6xl md:text-8xl font-display font-black text-white uppercase tracking-tighter mb-8 leading-[0.85] drop-shadow-2xl"
+                transition={{ delay: 0.3, type: "spring", stiffness: 120 }}
+                className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-black text-white uppercase tracking-tight mb-2 sm:mb-4 leading-tight drop-shadow-2xl"
               >
                 {slides[currentIndex].title.split(" ").map((word, i) => (
                   <span key={i} className={i % 2 === 1 ? 'text-indigo-400' : ''}>{word} </span>
@@ -217,26 +217,29 @@ export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAct
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
-                className="text-xl md:text-2xl text-slate-300 font-medium max-w-2xl mb-12 leading-relaxed drop-shadow-lg"
+                transition={{ delay: 0.4 }}
+                className="text-xs sm:text-sm md:text-base text-slate-300 font-medium max-w-xl mb-4 sm:mb-6 leading-relaxed line-clamp-2 sm:line-clamp-3 drop-shadow"
               >
                 {slides[currentIndex].description}
               </motion.p>
 
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-                className="flex flex-wrap items-center gap-6"
+                transition={{ delay: 0.5 }}
+                className="flex flex-wrap items-center gap-4"
               >
                 <button 
                   onClick={() => onAction && onAction(slides[currentIndex].action || 'DASHBOARD', slides[currentIndex].subview)}
-                  className="px-12 py-6 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs shadow-[0_20px_50px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
+                  className="min-h-[48px] px-6 sm:px-8 py-3 bg-white text-slate-950 rounded-xl font-bold uppercase tracking-wider text-base shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Play className="w-5 h-5 fill-current" /> Enter Arena
+                  <Play className="w-4 h-4 fill-current" /> Enter Arena
                 </button>
-                <button className="px-12 py-6 bg-white/10 backdrop-blur-2xl text-white border border-white/20 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/20 transition-all flex items-center gap-4 group">
-                  <Video className="w-5 h-5 text-indigo-400 group-hover:text-white transition-colors" /> View Intel
+                <button 
+                  onClick={() => onAction && onAction(slides[currentIndex].action || 'GIST', slides[currentIndex].subview)}
+                  className="min-h-[48px] px-6 sm:px-8 py-3 bg-white/10 backdrop-blur-2xl text-white border border-white/20 rounded-xl font-bold uppercase tracking-wider text-base hover:bg-white/20 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <Video className="w-4 h-4 text-indigo-400 group-hover:text-white transition-colors" /> View Intel
                 </button>
               </motion.div>
             </div>
