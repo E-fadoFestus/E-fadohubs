@@ -646,31 +646,30 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl overflow-hidden"
+      className="fixed inset-0 z-[100] flex flex-col bg-slate-950 overflow-hidden"
     >
       <div 
-        className="relative w-full max-w-7xl h-[90vh] border border-amber-200/50 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden"
-        style={{ backgroundImage: `url(${bokehBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden"
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-amber-200/30 bg-white/75 backdrop-blur-md z-20 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
+        <div className="px-6 md:px-10 py-5 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                 <ShoppingBag className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-indigo-800 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">Fairly Used</span> Market Hub</h2>
-                <p className="text-xs font-black text-slate-800 uppercase tracking-widest mt-1">Where Fairly Used Products Find New Homes</p>
+                <h2 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">EFADO <span className="text-indigo-400">Fairly Used</span> Market Hub</h2>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Where Fairly Used Products Find New Homes</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-3 px-5 py-3 text-slate-600 hover:text-slate-900 transition-all bg-slate-100 rounded-2xl hover:bg-slate-200 group border border-slate-200"
+                className="relative flex items-center gap-2.5 px-4 py-2.5 text-slate-200 hover:text-white transition-all bg-slate-800 rounded-2xl hover:bg-slate-700 group border border-slate-700"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-6 h-6 text-slate-700" />
+                  <ShoppingBag className="w-5 h-5 text-indigo-400" />
                   {cart.length > 0 && (
                     <span className="absolute -top-2 -right-2 w-5 h-5 bg-indigo-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -678,36 +677,36 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                   )}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">My Cart</p>
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">View & Checkout</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">My Cart</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">View & Checkout</p>
                 </div>
               </button>
               <button 
                 onClick={() => setShowRegModal(true)}
-                className="group flex flex-col items-center bg-indigo-600 hover:bg-indigo-500 px-6 py-2 rounded-2xl transition-all shadow-lg shadow-indigo-500/20"
+                className="group flex flex-col items-center bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-2xl transition-all shadow-lg shadow-indigo-500/20"
               >
-                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1.5">
                   <UserPlus className="w-3 h-3" /> Vendor Registration
                 </span>
                 <span className="text-[8px] font-bold text-indigo-200 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-3 text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 rounded-2xl hover:bg-slate-200">
+              <button onClick={onClose} className="p-2.5 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-2xl hover:bg-slate-700 border border-slate-700" title="Close Hub">
                 <X className="w-6 h-6" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 mt-4">
             <button 
               onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-indigo-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-indigo-400 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
             >
               Browse Items
             </button>
             <button 
               onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-indigo-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-indigo-400 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
             >
               My Orders & Tracking
             </button>
@@ -723,25 +722,25 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="h-full flex flex-col p-8 overflow-y-auto custom-scrollbar"
+                className="h-full flex flex-col p-6 md:p-8 overflow-y-auto custom-scrollbar"
               >
                 {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 mb-8 bg-white px-6 py-3 rounded-2xl border border-slate-200 self-start shadow-sm">
-            <ShoppingBag className="w-4 h-4 text-indigo-500" />
-            <ChevronRight className="w-3 h-3 text-slate-300" />
-            <span className={`text-xs font-black uppercase tracking-widest ${selectedL1 ? 'text-slate-800' : 'text-slate-400'}`}>
+          <div className="flex items-center gap-2 mb-6 bg-slate-900 px-5 py-3 rounded-2xl border border-slate-800 self-start shadow-sm">
+            <ShoppingBag className="w-4 h-4 text-indigo-400" />
+            <ChevronRight className="w-3 h-3 text-slate-600" />
+            <span className={`text-xs font-black uppercase tracking-widest ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
               {selectedL1 || 'Select Category'}
             </span>
             {selectedL2 && (
               <>
-                <ChevronRight className="w-3 h-3 text-slate-300" />
-                <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{selectedL2}</span>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL2}</span>
               </>
             )}
             {selectedL3 && (
               <>
-                <ChevronRight className="w-3 h-3 text-slate-300" />
-                <span className="text-xs font-black text-slate-800 uppercase tracking-widest">{selectedL3}</span>
+                <ChevronRight className="w-3 h-3 text-slate-600" />
+                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL3}</span>
               </>
             )}
             {selectedL4 && (
@@ -754,12 +753,12 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Level 1: Category */}
-            <div className="space-y-4">
-              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
-                <span>Category</span>
-                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">1</span>
+            <div className="space-y-3 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
+                <span>1. Category</span>
+                <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
               </h3>
-              <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+              <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                 {Object.keys(CATEGORIES).map(cat => (
                   <button
                     key={cat}
@@ -769,27 +768,27 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                       setSelectedL3(null);
                       setSelectedL4(null);
                     }}
-                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
                       selectedL1 === cat 
                         ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20 font-black' 
-                        : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                     }`}
                   >
-                    <span className="text-[10px] uppercase tracking-tight leading-tight">{cat}</span>
-                    <ChevronRight className={`w-3 h-3 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
+                    <span className="text-xs uppercase tracking-tight leading-tight">{cat}</span>
+                    <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Level 2: Section */}
-            <div className="space-y-4">
-              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
-                <span>Section</span>
-                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">2</span>
+            <div className="space-y-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
+              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
+                <span>2. Section</span>
+                <span className="w-5 h-5 rounded-lg bg-purple-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
               </h3>
               {selectedL1 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                   {Object.keys(CATEGORIES[selectedL1]).map(sub => (
                     <button
                       key={sub}
@@ -798,33 +797,33 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                         setSelectedL3(null);
                         setSelectedL4(null);
                       }}
-                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
                         selectedL2 === sub 
                           ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20 font-black' 
-                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                       }`}
                     >
-                      <span className="text-[10px] uppercase tracking-tight leading-tight">{sub}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
+                      <span className="text-xs uppercase tracking-tight leading-tight">{sub}</span>
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
-                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Category First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
+                  <Info className="w-6 h-6 mb-2 text-slate-600" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Category First</p>
                 </div>
               )}
             </div>
 
             {/* Level 3: Subcategory */}
-            <div className="space-y-4">
-              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
-                <span>Subcategory</span>
-                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">3</span>
+            <div className="space-y-3 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
+                <span>3. Subcategory</span>
+                <span className="w-5 h-5 rounded-lg bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
               </h3>
               {selectedL2 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                   {Object.keys(CATEGORIES[selectedL1!][selectedL2]).map(subSub => (
                     <button
                       key={subSub}
@@ -832,67 +831,67 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                         setSelectedL3(subSub);
                         setSelectedL4(null);
                       }}
-                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
                         selectedL3 === subSub 
                           ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20 font-black' 
-                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                       }`}
                     >
-                      <span className="text-[10px] uppercase tracking-tight leading-tight">{subSub}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-900 font-black'}`} />
+                      <span className="text-xs uppercase tracking-tight leading-tight">{subSub}</span>
+                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
-                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Section First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
+                  <Info className="w-6 h-6 mb-2 text-slate-600" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Section First</p>
                 </div>
               )}
             </div>
 
             {/* Level 4: Group */}
-            <div className="space-y-4">
-              <h3 className="text-[11px] font-black text-slate-900 drop-shadow-sm uppercase tracking-[0.25em] px-2 border-b border-amber-500/20 pb-1.5 flex items-center justify-between">
-                <span>Group</span>
-                <span className="w-4 h-4 rounded-full bg-slate-950 text-white text-[9px] font-black flex items-center justify-center">4</span>
+            <div className="space-y-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
+              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
+                <span>4. Group</span>
+                <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
               </h3>
               {selectedL3 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                   {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group, idx) => (
                     <button
                       key={`group-${group}-${idx}`}
                       onClick={() => setSelectedL4(group)}
-                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all text-left group ${
+                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
                         selectedL4 === group 
                           ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20 font-black' 
-                          : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                       }`}
                     >
-                      <span className="text-[10px] uppercase tracking-tight leading-tight">{group}</span>
-                      <CheckCircle2 className={`w-3 h-3 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0 text-slate-900 font-black'}`} />
+                      <span className="text-xs uppercase tracking-tight leading-tight">{group}</span>
+                      <CheckCircle2 className={`w-3.5 h-3.5 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0 text-slate-400'}`} />
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200 text-slate-500">
-                  <Info className="w-8 h-8 mb-2 opacity-60 text-slate-600" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-800">Select Subcategory First</p>
+                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
+                  <Info className="w-6 h-6 mb-2 text-slate-600" />
+                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Subcategory First</p>
                 </div>
               )}
             </div>
 
             {/* Product Display Area */}
-            <div className="lg:col-span-1 space-y-4">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-2 flex justify-between items-center">
-                <span>Available Products</span>
-                <span className="bg-indigo-500/10 text-indigo-600 px-2 py-0.5 rounded-full text-[8px]">{filteredProducts.length} Items</span>
+            <div className="lg:col-span-1 space-y-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+              <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex justify-between items-center">
+                <span>Products</span>
+                <span className="bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full text-[9px] font-black border border-indigo-500/30">{filteredProducts.length} Items</span>
               </h3>
-              <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+              <div className="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
                 {filteredProducts.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-100/50 rounded-3xl border border-dashed border-slate-200">
-                    <Package className="w-12 h-12 text-slate-400 mx-auto mb-3 opacity-35" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No items in this category yet</p>
+                  <div className="p-6 text-center bg-slate-900 rounded-2xl border border-dashed border-slate-800">
+                    <Package className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">No items in this category yet</p>
                   </div>
                 ) : (
                   filteredProducts.map(product => (
@@ -901,48 +900,31 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                        initial={{ opacity: 0, scale: 0.9 }}
                        animate={{ opacity: 1, scale: 1 }}
                        key={product.id}
-                       className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 group hover:border-indigo-500/50 transition-all cursor-pointer"
+                       className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl p-3 group hover:border-indigo-500/50 transition-all cursor-pointer"
                     >
-                      <div className="relative aspect-video rounded-xl overflow-hidden mb-3">
+                      <div className="relative aspect-video rounded-xl overflow-hidden mb-2.5">
                         <img 
                           src={product.photos[0]} 
                           alt={product.title} 
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           referrerPolicy="no-referrer"
                         />
                         <div className="absolute top-2 right-2 flex flex-col gap-1">
-                          <div className="px-2 py-1 bg-white/95 backdrop-blur-md rounded-lg border border-slate-200 shadow-sm">
-                            <span className="text-[10px] font-black text-indigo-600">${product.price}</span>
+                          <div className="px-2 py-0.5 bg-slate-900/90 backdrop-blur-md rounded-lg border border-slate-700 shadow-sm">
+                            <span className="text-[10px] font-black text-indigo-400">${product.price}</span>
                           </div>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const text = `Check out this amazing deal on EFADO Fairly Used Market! 🚀\nItem: ${product.title}\nPrice: ${formatPrice(product.price, true)}\nLocation: ${product.location}`;
-                              if (navigator.share) {
-                                navigator.share({ title: product.title, text, url: window.location.href });
-                              } else {
-                                navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-                                alert("Viral promotion link copied to clipboard! Share it everywhere! 🚀");
-                              }
-                            }}
-                            className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-rose-500 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
-                            title="Share & Go Viral"
-                          >
-                            <Globe className="w-3 h-3 animate-pulse" />
-                            <span className="text-[8px] font-black uppercase tracking-tighter hidden group-hover/share:block text-white">Viral Share</span>
-                          </button>
                         </div>
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-indigo-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">
+                        <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-indigo-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">
                           {product.condition}
                         </div>
                       </div>
-                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight truncate">{product.title}</h4>
-                      <div className="flex items-center justify-between mt-2 mb-3">
-                        <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                          <MapPin className="w-3 h-3" />
+                      <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">{product.title}</h4>
+                      <div className="flex items-center justify-between mt-1 mb-2.5">
+                        <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[100px]">
+                          <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
                           {product.location}
                         </div>
-                        <span className="text-[10px] font-black text-indigo-600">{formatPrice(product.price, true)}</span>
+                        <span className="text-[10px] font-black text-indigo-400">{formatPrice(product.price, true)}</span>
                       </div>
                       
                       {product.video && (
@@ -952,7 +934,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                             onNavigate?.('GIST', 'REELS');
                             onClose();
                           }}
-                          className="w-full mb-3 py-2 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
+                          className="w-full mb-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
                         >
                           <Film className="w-3.5 h-3.5 animate-pulse" /> Watch Product Reel
                         </button>
@@ -964,10 +946,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                             e.stopPropagation();
                             addToCart(product);
                           }}
-                          className="flex items-center justify-center gap-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-all border border-slate-200"
+                          className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
                         >
-                          <Plus className="w-3 h-3 text-slate-600" />
-                          <span className="text-[9px] font-black uppercase tracking-tighter">Add</span>
+                          <Plus className="w-3 h-3 text-indigo-400" /> Add
                         </button>
                         <button 
                           onClick={(e) => {
@@ -975,10 +956,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                             addToCart(product);
                             setShowCart(true);
                           }}
-                          className="flex items-center justify-center gap-2 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-all shadow-lg shadow-indigo-500/20"
+                          className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-indigo-900/30"
                         >
-                          <ShoppingBag className="w-3 h-3" />
-                          <span className="text-[9px] font-black uppercase tracking-tighter">Buy</span>
+                          <ShoppingBag className="w-3 h-3" /> Buy Now
                         </button>
                       </div>
                     </motion.div>
@@ -987,7 +967,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
               </div>
 
               {/* Google AdSense Sponsored Marketplace Placement */}
-              <div className="mt-8 mb-4">
+              <div className="mt-4 mb-2">
                 <AdSenseBanner label="Marketplace Featured Commercial Ads" />
               </div>
             </div>

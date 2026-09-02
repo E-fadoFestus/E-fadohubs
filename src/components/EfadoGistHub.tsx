@@ -38,6 +38,7 @@ import {
   Sticker,
   Zap,
   Plus,
+  Award,
   Heart as HeartIcon,
   MessageCircle,
   Repeat,
@@ -75,16 +76,34 @@ import {
   ArrowRight,
   Eye,
   VolumeX,
-  Sparkles
+  Sparkles,
+  Radio,
+  ShoppingBag,
+  SmilePlus,
+  Flame,
+  ThumbsUp,
+  Tag,
+  TrendingUp as TrendingUpIcon,
+  CheckCheck
 } from 'lucide-react';
 import { 
   UserProfile, 
   SocialPost, 
   Reel, 
   ChatMessage, 
-  Advertisement 
+  Advertisement,
+  GistStory,
+  CommunityGroup,
+  CreatorStats
 } from '../types';
 import { AdSenseBanner } from './AdSenseBanner';
+import { ReelFeed } from './ReelFeed';
+import { GistLiveStream } from './GistLiveStream';
+import { GistCommunities } from './GistCommunities';
+import { GistCreatorDashboard } from './GistCreatorDashboard';
+import { GistStoriesBar } from './GistStoriesBar';
+import { GistVoiceRecorder } from './GistVoiceRecorder';
+import { CreatorProfileWallet } from './CreatorProfileWallet';
 import { 
   db, 
   auth,
@@ -245,7 +264,6 @@ const GIST_CATEGORIES = [
 ];
 
 import { ReelCreator } from './ReelCreator';
-import { ReelFeed } from './ReelFeed';
 import { SovereignGroupArena } from './SovereignGroupArena';
 
 const PRESET_EMOJIS = [
@@ -337,7 +355,7 @@ interface EfadoGistHubProps {
   onNavigate?: (hub: any, subview?: any) => void;
 }
 
-type HubView = 'FEED' | 'REELS' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS' | 'MONETIZATION';
+type HubView = 'FEED' | 'REELS' | 'LIVE' | 'COMMUNITIES' | 'MONETIZATION' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS';
 
 export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initialView, autoStartLive, onOpenMining, onNavigate }) => {
   const [activeView, setActiveView] = useState<HubView>(initialView || 'FEED');
@@ -356,6 +374,59 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
   const [isNewsletterSubscribed, setIsNewsletterSubscribed] = useState(false);
+
+  // Marketplace Composer & Reaction states
+  const [isSellingItem, setIsSellingItem] = useState(false);
+  const [marketTitle, setMarketTitle] = useState('');
+  const [marketPrice, setMarketPrice] = useState('');
+  const [marketCondition, setMarketCondition] = useState<'Brand New' | 'Like New' | 'Used'>('Brand New');
+  const [marketLocation, setMarketLocation] = useState('Lagos, Nigeria');
+  const [activeMarketplaceFilter, setActiveMarketplaceFilter] = useState(false);
+  const [hoveredReactionPostId, setHoveredReactionPostId] = useState<string | null>(null);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [selectedHashtagFilter, setSelectedHashtagFilter] = useState<string | null>(null);
+  const [isChatVoiceRecording, setIsChatVoiceRecording] = useState(false);
+  const [showQuickWithdrawModal, setShowQuickWithdrawModal] = useState(false);
+  const [quickWithdrawAmount, setQuickWithdrawAmount] = useState('1840');
+  const [quickWithdrawBank, setQuickWithdrawBank] = useState('Access Bank');
+  const [quickWithdrawAccount, setQuickWithdrawAccount] = useState('0123456789');
+
+  // Creator Quick Stats
+  const [creatorStats, setCreatorStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem(`efado_creator_stats_${user.uid}`);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      totalViews: 24520,
+      qualifiedViews: 18400,
+      totalEarnings: 1840,
+      earnings: 1840,
+      payoutRate: '₦100 / 1k views',
+      unpaidEarnings: 1840
+    };
+  });
+  const creatorQuickStats = creatorStats;
+  const setCreatorQuickStats = setCreatorStats;
+
+  // Profile View Sub-tab & Privacy Badge Controls
+  const [profileSubTab, setProfileSubTab] = useState<'POSTS' | 'REELS' | 'SETTINGS'>('POSTS');
+  const [showEarningsBadge, setShowEarningsBadge] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`efado_show_earnings_badge_${user.uid}`);
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleEarningsBadge = (val: boolean) => {
+    setShowEarningsBadge(val);
+    try {
+      localStorage.setItem(`efado_show_earnings_badge_${user.uid}`, JSON.stringify(val));
+    } catch {}
+  };
+
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>('sarah');
   const activeRoomDef = {
     name: activeChatRoomId === 'sarah' ? 'Sarah Alade' :
@@ -392,6 +463,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [buzzActive, setBuzzActive] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [userVerifiedRooms, setUserVerifiedRooms] = useState<string[]>([]);
+  const [showVoiceRecorderModal, setShowVoiceRecorderModal] = useState(false);
 
   const handleJoinPrivateRoom = (code: string, customName?: string, customPhone?: string, customRole?: string) => {
     const cleanCode = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -1029,14 +1101,20 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!newMessageText.trim() && !chatAttachedMediaUrl.trim()) return;
+  const handleSendMessage = async (eOrText?: React.FormEvent | string) => {
+    if (eOrText && typeof eOrText !== 'string' && 'preventDefault' in eOrText) {
+      eOrText.preventDefault();
+    }
+    const isCustomText = typeof eOrText === 'string';
+    const textToSend = isCustomText ? eOrText : newMessageText.trim();
+    if (!textToSend && !chatAttachedMediaUrl.trim()) return;
     if (isSendingMessage) return;
 
-    const text = newMessageText.trim();
+    const text = textToSend;
     const media = chatAttachedMediaUrl.trim();
-    setNewMessageText('');
+    if (!isCustomText) {
+      setNewMessageText('');
+    }
     setChatAttachedMediaUrl('');
     setIsSendingMessage(true);
 
@@ -1215,7 +1293,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 bg-slate-950/95 backdrop-blur-3xl overflow-hidden"
+      className="fixed inset-0 z-[100] flex bg-slate-950 overflow-hidden"
     >
       <AnimatePresence>
         {showGuide && (
@@ -1223,40 +1301,40 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md"
           >
-            <div className="w-full max-w-xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -mr-24 -mt-24 opacity-50" />
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden text-white">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none" />
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-900 transition-all font-black"
+                className="absolute top-6 right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black"
               >
                 <X className="w-6 h-6" />
               </button>
               
               <div className="relative z-10">
-                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 mb-8">
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-900/40 mb-6">
                   <MessageSquare className="w-8 h-8" />
                 </div>
-                <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight uppercase">Strategic Feed Guide</h2>
-                <p className="text-gray-950 font-black mb-8 leading-relaxed uppercase tracking-[0.1em] text-xs">
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight uppercase">Strategic Feed Guide</h2>
+                <p className="text-slate-300 font-bold mb-6 leading-relaxed uppercase tracking-[0.1em] text-xs">
                   Social discourse protocols active. Here is how you navigate the EFADO Gist Hub:
                 </p>
                 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {[
                     { icon: MessageSquare, title: "Global Feed", desc: "Participate in diverse discussions across religious, social, and professional categories." },
                     { icon: Video, title: "EFADO Reels", desc: "Short-form tactical video content. Swipe and engage with the global community." },
                     { icon: Users, title: "Specialized Groups", desc: "Join vetted groups focused on marriage, business, and talent development." },
                     { icon: Shield, title: "Secure Discourse", desc: "All communication is encrypted and verified to ensure high-fidelity interactions." }
                   ].map((item, i) => (
-                    <div key={i} className="flex gap-4 group">
-                      <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-indigo-600 transition-all duration-300 pointer-events-none">
-                        <item.icon className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
+                    <div key={i} className="flex gap-4 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+                      <div className="w-10 h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-xl flex items-center justify-center shrink-0">
+                        <item.icon className="w-5 h-5 text-indigo-400" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-1">{item.title}</h4>
-                        <p className="text-xs text-gray-950 leading-relaxed font-black">{item.desc}</p>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest mb-0.5">{item.title}</h4>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -1264,7 +1342,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 
                 <button 
                   onClick={() => setShowGuide(false)}
-                  className="w-full mt-10 py-5 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-gray-300 hover:scale-[1.02] active:scale-95 transition-all"
+                  className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all"
                 >
                   Initiate Discourse
                 </button>
@@ -1274,44 +1352,46 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         )}
       </AnimatePresence>
 
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-indigo-500/5 to-transparent pointer-events-none" />
-      <div className="relative w-full max-w-[1600px] h-full md:h-[95vh] bg-slate-950/80 backdrop-blur-xl border border-white/10 md:rounded-[3rem] flex overflow-hidden shadow-2xl">
+      <div className="relative w-full h-full min-h-screen bg-gradient-to-br from-[#0A0F1E] via-[#121A2F] to-[#0A0F1E] text-white flex overflow-hidden">
         
         {/* Left Sidebar - Navigation */}
-        <div className="w-20 md:w-72 flex-shrink-0 bg-slate-900 border-r border-white/5 flex flex-col z-30">
-          <div className="p-6 md:p-8 flex items-center gap-4">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20 flex-shrink-0">
+        <div className="w-20 md:w-72 flex-shrink-0 bg-[#0A0F1E]/90 backdrop-blur-xl border-r border-white/10 flex flex-col z-30">
+          <div className="p-4 md:p-6 flex items-center gap-3 border-b border-white/10">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-[#8B5CF6] to-[#06B6D4] flex items-center justify-center shadow-lg shadow-[#8B5CF6]/30 flex-shrink-0">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div className="hidden md:block">
-                             <div>
-                                <h2 className="text-3xl font-black text-white uppercase tracking-tighter">Efado <span className="text-indigo-600 font-black">Gist Hub</span></h2>
-                             </div>
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Efado <span className="text-[#8B5CF6] font-black">Gist Hub</span></h2>
+              </div>
               <button 
                 onClick={() => setShowGuide(true)}
-                className="text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors mt-1"
+                className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-0.5 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
               >
                 <HelpCircle className="w-3 h-3" /> Tactical Guide
               </button>
             </div>
           </div>
 
-          <nav className="flex-grow px-2 md:px-4 space-y-4 md:space-y-2 mt-4">
+          <nav className="flex-grow px-2 md:px-4 space-y-3 md:space-y-1.5 mt-3 overflow-y-auto custom-scrollbar">
             {[
-              { id: 'FEED', label: 'Feed', icon: Home, color: 'text-indigo-400' },
+              { id: 'FEED', label: 'Feed', icon: Home, color: 'text-[#8B5CF6]' },
               { id: 'REELS', label: 'Reels', icon: Video, color: 'text-rose-400' },
+              { id: 'LIVE', label: 'EFADO Live', icon: Radio, color: 'text-rose-500', badge: 'LIVE' },
+              { id: 'COMMUNITIES', label: 'Communities', icon: Users, color: 'text-[#06B6D4]' },
+              { id: 'MONETIZATION', label: 'Creator Earnings', icon: Coins, color: 'text-amber-400', badge: '₦100/1k' },
               { id: 'CHAT', label: 'Messages', icon: MessageCircle, color: 'text-blue-400' },
-              { id: 'CATEGORIES', label: 'Hubs', icon: Users, color: 'text-emerald-400' },
+              { id: 'CATEGORIES', label: 'Hubs', icon: Church, color: 'text-emerald-400' },
               { id: 'BLOG', label: 'Blog', icon: ClipboardList, color: 'text-amber-400' },
               { id: 'TOOLS', label: 'Tools', icon: Calculator, color: 'text-cyan-400' },
               { id: 'FAQ', label: 'FAQ', icon: HelpCircle, color: 'text-slate-400' },
               { id: 'ADS', label: 'Advertise on EFADO', icon: DollarSign, color: 'text-emerald-400' },
-              { id: 'PROFILE', label: 'Account', icon: UserCircle, color: 'text-indigo-400' },
+              { id: 'PROFILE', label: 'Account', icon: UserCircle, color: 'text-[#8B5CF6]' },
             ].map((item) => (
               <motion.button
                 key={item.id}
-                whileHover={{ scale: 1.1, x: 5 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02, x: 3 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   setSelectedGroup(null);
                   setSelectedSubCategory(null);
@@ -1322,45 +1402,56 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     setActiveView(item.id as HubView);
                   }
                 }}
-                className={`w-full flex flex-col md:flex-row items-center gap-1 md:gap-4 p-2 md:p-4 rounded-2xl transition-all group ${
+                className={`w-full flex flex-col md:flex-row items-center justify-between p-2.5 md:p-3.5 rounded-2xl transition-all group ${
                   activeView === item.id 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-indigo-400'
+                    ? 'bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] text-white shadow-lg shadow-[#8B5CF6]/30' 
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <item.icon className="w-5 h-5 md:w-6 md:h-6 flex-shrink-0" />
-                <span className="font-black uppercase tracking-tighter md:tracking-widest text-[8px] md:text-xs text-center md:text-left leading-none uppercase">{item.label}</span>
+                <div className="flex flex-col md:flex-row items-center gap-1 md:gap-3">
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-bold tracking-wider text-[8px] md:text-xs text-center md:text-left leading-none">{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span className={`hidden md:inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                    item.badge === 'LIVE' ? 'bg-rose-500 text-white animate-pulse' : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                  }`}>
+                    {item.badge}
+                  </span>
+                )}
               </motion.button>
             ))}
           </nav>
 
           {/* User Profile Mini */}
-          <div className="p-6 border-t border-white/5">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-indigo-600/10 overflow-hidden flex-shrink-0 p-0.5 border border-white/10">
+          <div className="p-4 md:p-6 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-[#8B5CF6]/20 overflow-hidden flex-shrink-0 p-0.5 border border-[#8B5CF6]/30">
                 <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
               </div>
               <div className="hidden md:block overflow-hidden">
-                                <p className="text-sm font-black text-white truncate uppercase tracking-tight">{user.displayName || user.email.split('@')[0]}</p>
-                                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Tactical Node Active</p>
+                <p className="text-sm font-bold text-white truncate">{user.displayName || user.email.split('@')[0]}</p>
+                <p className="text-[10px] font-bold text-[#06B6D4] uppercase tracking-widest">Active Member</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-grow flex flex-col bg-slate-950 relative overflow-hidden">
+        <div className="flex-grow flex flex-col bg-transparent relative overflow-hidden">
           {/* Top Header */}
-          <header className={`px-4 sm:px-8 py-3 sm:py-6 border-b border-white/5 flex items-center justify-between ${activeView === 'REELS' ? 'bg-slate-950' : 'bg-slate-950/80 backdrop-blur-3xl'} z-20`}>
+          <header className={`px-4 sm:px-8 py-3 sm:py-5 border-b border-white/10 flex items-center justify-between ${activeView === 'REELS' ? 'bg-black/60' : 'bg-[#0A0F1E]/80 backdrop-blur-xl'} z-20`}>
             <div className="flex items-center gap-2 max-w-[50%] overflow-hidden">
-              <h3 className="text-xs xs:text-sm sm:text-2xl font-black text-white tracking-tighter uppercase italic truncate">
-                {activeView === 'MONETIZATION' && 'Creator Monetization Terminal'}
+              <h3 className="text-xs xs:text-sm sm:text-2xl font-bold text-white tracking-tight truncate">
+                {activeView === 'MONETIZATION' && 'Creator Monetization & Earnings'}
+                {activeView === 'LIVE' && 'EFADO Live Streaming'}
+                {activeView === 'COMMUNITIES' && 'Community Groups'}
                 {activeView === 'BLOG' && 'Knowledge Hub'}
                 {activeView === 'TOOLS' && 'Tactical Industry Tools'}
                 {activeView === 'FAQ' && 'Help & FAQ Desk'}
-                {activeView === 'FEED' && 'Community Feed'}
-                {activeView === 'REELS' && 'Efado Reels'}
-                {activeView === 'CHAT' && 'Direct Messages'}
+                {activeView === 'FEED' && 'Social Gist Feed'}
+                {activeView === 'REELS' && 'Viral Video Reels'}
+                {activeView === 'CHAT' && 'Direct Messages & Audio'}
                 {activeView === 'CATEGORIES' && 'Explore Hubs'}
                 {activeView === 'ADS' && 'Advertise on EFADO'}
                 {activeView === 'PROFILE' && 'My Social Space'}
@@ -1369,19 +1460,59 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               <div className="relative hidden lg:block">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
-                  placeholder="Tactical Search..."
-                  className="pl-11 pr-6 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold uppercase tracking-widest focus:ring-2 focus:ring-indigo-500 outline-none transition-all w-64"
+                  placeholder="Search gists, reels, people..."
+                  className="pl-11 pr-6 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-xs font-medium text-white placeholder:text-slate-500 focus:border-[#8B5CF6] outline-none transition-all w-64"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-              <button className="hidden xs:flex p-2 sm:p-3 bg-gray-50 text-gray-400 hover:text-indigo-600 rounded-full border border-gray-100 transition-all relative">
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
-              </button>
+
+              {/* Notifications Dropdown */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+                  className="p-2 sm:p-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-full border border-white/10 transition-all relative"
+                >
+                  <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-[#0A0F1E]" />
+                </button>
+
+                <AnimatePresence>
+                  {showNotificationsDropdown && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                      className="absolute right-0 top-12 w-80 bg-[#121A2F] border border-white/15 rounded-2xl shadow-2xl p-4 z-50 text-white space-y-3"
+                    >
+                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Notifications</h4>
+                        <span className="text-[10px] font-bold text-[#8B5CF6]">Mark all read</span>
+                      </div>
+                      <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+                        {[
+                          { text: "Dr. Sarah started a new Live Stream", time: "2m ago", icon: Radio, color: "text-rose-400" },
+                          { text: "You earned ₦184 from video qualified views", time: "1h ago", icon: Coins, color: "text-amber-400" },
+                          { text: "Chief Emeka liked your post in Lagos Tech", time: "3h ago", icon: Heart, color: "text-purple-400" },
+                          { text: "New marketplace item listed in Electronics", time: "5h ago", icon: ShoppingBag, color: "text-cyan-400" }
+                        ].map((notif, idx) => (
+                          <div key={idx} className="flex items-start gap-3 p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all cursor-pointer">
+                            <notif.icon className={`w-4 h-4 mt-0.5 ${notif.color} flex-shrink-0`} />
+                            <div>
+                              <p className="text-xs font-medium text-slate-200 leading-snug">{notif.text}</p>
+                              <span className="text-[10px] text-slate-400">{notif.time}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <button 
                 onClick={() => {
                   const shareUrl = window.location.href;
@@ -1393,25 +1524,25 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     alert("Viral invite link copied! Promote this hub across social media for global responses! 🚀");
                   }
                 }}
-                className="hidden sm:flex items-center gap-2 px-8 py-3 bg-rose-600 text-white rounded-full shadow-lg shadow-rose-200 hover:scale-105 active:scale-95 transition-all text-[11px] font-black uppercase tracking-widest"
+                className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white rounded-full shadow-lg shadow-[#8B5CF6]/30 hover:scale-105 active:scale-95 transition-all text-xs font-bold"
               >
                 <Globe className="w-4 h-4" />
-                Invite & Promote Globally
+                Invite Friends
               </button>
               <button
-                onClick={() => setActiveView('REELS')}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 text-white rounded-full font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                onClick={() => setActiveView('LIVE')}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-full font-bold text-[10px] sm:text-xs uppercase tracking-wider shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
               >
-                <Film className="w-4 h-4 text-rose-200" />
-                <span>Live Reels</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <Radio className="w-3.5 h-3.5" />
+                <span>Go Live</span>
+                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
               </button>
               <div className="hidden md:block">
                 <CurrencySelector />
               </div>
               <button 
                 onClick={onClose} 
-                className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl border border-rose-500/20 transition-all font-black text-[10px] sm:text-xs uppercase tracking-widest cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 hover:text-rose-300 rounded-xl border border-rose-500/20 transition-all font-bold text-[10px] sm:text-xs uppercase tracking-widest cursor-pointer"
               >
                 <X className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
                 <span>Exit</span>
@@ -1719,129 +1850,103 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   className="flex flex-col h-full overflow-hidden"
                 >
                   {/* Feed Column - Clean, Focused Social Interface */}
-                  <div className="flex-grow overflow-y-auto custom-scrollbar p-0 md:p-8 space-y-8 pb-28 sm:pb-36 max-w-4xl mx-auto w-full">
-                    {/* Enhanced Feed Tabs */}
-                    <div className="flex items-center gap-4 bg-white/5 border border-white/5 p-2 rounded-2xl md:max-w-md mx-auto md:mx-0">
-                      {(['FOR_YOU', 'FOLLOWING', 'TRENDING'] as const).map(tab => (
-                          <button
-                            key={tab}
-                            onClick={() => setFeedTab(tab)}
-                            className={`flex-grow py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                              feedTab === tab 
-                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
-                                : 'text-gray-950 hover:text-indigo-600 hover:bg-gray-100'
-                            }`}
-                          >
-                          {tab.replace('_', ' ')}
-                        </button>
-                      ))}
+                  <div className="flex-grow overflow-y-auto custom-scrollbar p-3 sm:p-6 md:p-8 space-y-6 pb-28 sm:pb-36 max-w-4xl mx-auto w-full">
+                    
+                    {/* Sticky Enhanced Feed Tabs (For You, Following, Trending, Marketplace, Live) */}
+                    <div className="sticky top-0 z-30 bg-[#0A0F1E]/90 backdrop-blur-xl py-2 -mx-2 px-2 border-b border-white/10">
+                      <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 p-1.5 rounded-2xl overflow-x-auto no-scrollbar">
+                        {[
+                          { id: 'FOR_YOU', label: 'For You', icon: Sparkles },
+                          { id: 'FOLLOWING', label: 'Following', icon: Users },
+                          { id: 'TRENDING', label: 'Trending', icon: Flame },
+                          { id: 'MARKETPLACE', label: 'Marketplace', icon: ShoppingBag },
+                          { id: 'LIVE', label: 'Live Now', icon: Radio, live: true }
+                        ].map((tab) => {
+                          const isActive = (tab.id === 'MARKETPLACE' && activeMarketplaceFilter) || (feedTab === tab.id && !activeMarketplaceFilter);
+                          return (
+                            <button
+                              key={tab.id}
+                              onClick={() => {
+                                if (tab.id === 'LIVE') {
+                                  setActiveView('LIVE');
+                                  return;
+                                }
+                                if (tab.id === 'MARKETPLACE') {
+                                  setActiveMarketplaceFilter(!activeMarketplaceFilter);
+                                } else {
+                                  setActiveMarketplaceFilter(false);
+                                  setFeedTab(tab.id as any);
+                                }
+                              }}
+                              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                                isActive 
+                                  ? 'bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white shadow-lg shadow-[#8B5CF6]/30 scale-[1.02]' 
+                                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <tab.icon className={`w-3.5 h-3.5 ${tab.live ? 'text-rose-400 animate-pulse' : ''}`} />
+                              <span>{tab.label}</span>
+                              {tab.live && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    {/* FACEBOOK / INSTAGRAM STYLE REELS & STORIES CAROUSEL */}
-                    <div className="bg-slate-900/80 border border-indigo-500/30 p-5 rounded-[2.5rem] shadow-2xl space-y-3 relative overflow-hidden">
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg animate-pulse">
-                            <Film className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                              EFADO Viral Video Reels
-                              <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-full text-[8px] font-black uppercase tracking-widest">GLOBAL BROADCAST</span>
-                            </h4>
-                            <p className="text-[10px] text-slate-400 font-medium">Watch, create & stream short video reels worldwide</p>
-                          </div>
+                    {/* Creator Quick Earnings Banner (₦100/1000 views monetization) */}
+                    <div className="bg-gradient-to-r from-[#8B5CF6]/20 via-[#06B6D4]/15 to-[#8B5CF6]/20 border border-white/15 backdrop-blur-xl p-4 sm:p-5 rounded-2xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#8B5CF6] to-[#06B6D4] flex items-center justify-center text-white shadow-lg flex-shrink-0">
+                          <Coins className="w-5 h-5" />
                         </div>
-                        <button
-                          onClick={() => setActiveView('REELS')}
-                          className="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-widest flex items-center gap-1.5 transition-all bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20"
-                        >
-                          Watch All ({reels.length}) <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-white">Creator Monetization Fund</h4>
+                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-bold">₦100 / 1K Qualified Views</span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-0.5">
+                            Earned: <span className="font-extrabold text-[#06B6D4] text-sm">₦{creatorStats.earnings.toFixed(2)}</span> • {creatorStats.qualifiedViews.toLocaleString()} 5s+ views
+                          </p>
+                        </div>
                       </div>
-
-                      <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pb-2 pt-1">
-                        {/* Card 1: Create Reel */}
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => setIsCreateReelOpen(true)}
-                          className="relative shrink-0 w-32 h-52 rounded-2xl bg-gradient-to-b from-indigo-950 via-slate-900 to-purple-950 border-2 border-dashed border-indigo-500/50 hover:border-rose-500 flex flex-col items-center justify-between p-3 text-center shadow-xl group overflow-hidden cursor-pointer"
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (creatorStats.earnings < 500) {
+                              alert(`Your current earnings are ₦${creatorStats.earnings.toFixed(2)}. Minimum withdrawal threshold is ₦500. Keep posting viral reels and videos!`);
+                            } else {
+                              alert(`Withdrawal request of ₦${creatorStats.earnings.toFixed(2)} submitted to your linked Nigerian bank account! Processing via EFADO Escrow.`);
+                            }
+                          }}
+                          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
                         >
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-rose-600 to-indigo-600 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform mt-4">
-                            <Plus className="w-6 h-6" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-black text-white uppercase tracking-tight">Create Reel</p>
-                            <p className="text-[8px] font-bold text-indigo-300 uppercase tracking-widest mt-0.5">Publish to World</p>
-                          </div>
-                        </motion.button>
-
-                        {/* Live User Video Reels Cards */}
-                        {(reels.length > 0 ? reels : DEFAULT_MOCK_REELS).map((reel, idx) => (
-                          <motion.div
-                            key={reel.id || idx}
-                            whileHover={{ scale: 1.04 }}
-                            whileTap={{ scale: 0.96 }}
-                            onClick={() => setSelectedReelForModal(reel)}
-                            className="relative shrink-0 w-32 h-52 rounded-2xl bg-slate-950 border border-slate-800 hover:border-indigo-500/80 overflow-hidden cursor-pointer shadow-xl group"
-                          >
-                            {/* Video Preview or Poster */}
-                            {reel.videoUrl && (reel.videoUrl.includes('.mp4') || reel.videoUrl.includes('.webm') || reel.videoUrl.startsWith('data:video') || reel.videoUrl.includes('mixkit') || reel.videoUrl.includes('pexels')) ? (
-                              <video 
-                                src={reel.videoUrl} 
-                                muted 
-                                loop 
-                                playsInline
-                                onMouseOver={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
-                                onMouseOut={(e) => (e.target as HTMLVideoElement).pause()}
-                                className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 group-hover:scale-110 transition-all duration-500" 
-                              />
-                            ) : (
-                              <img 
-                                src={reel.videoUrl || `https://picsum.photos/seed/${reel.id}/300/500`} 
-                                alt="Reel" 
-                                className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500" 
-                                referrerPolicy="no-referrer" 
-                              />
-                            )}
-
-                            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/90" />
-
-                            {/* Author Avatar */}
-                            <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
-                              <div className="w-7 h-7 rounded-full border-2 border-indigo-500 overflow-hidden p-0.5 bg-slate-900 shadow-md">
-                                <img src={reel.authorPhoto || `https://picsum.photos/seed/${reel.authorId || idx}/100/100`} alt="User" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
-                              </div>
-                            </div>
-
-                            {/* Play Button Icon */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-80 group-hover:opacity-100 group-hover:scale-125 transition-all">
-                              <div className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-lg">
-                                <Play className="w-4 h-4 fill-white ml-0.5" />
-                              </div>
-                            </div>
-
-                            {/* Reel Title & Author Handle */}
-                            <div className="absolute bottom-2 left-2 right-2 z-10">
-                              <p className="text-[10px] font-black text-white uppercase truncate drop-shadow-md">
-                                @{reel.authorName ? reel.authorName.toLowerCase().replace(/\s/g, '_') : 'efado_viral'}
-                              </p>
-                              <p className="text-[9px] text-slate-300 font-medium line-clamp-1 mt-0.5 leading-tight drop-shadow-sm">
-                                {reel.caption || 'EFADO Short Video'}
-                              </p>
-                              <span className="inline-block mt-1 text-[8px] font-black text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded border border-rose-500/30">
-                                🔥 {(reel.shares || 120) + (reel.likes?.length || 10)} Views
-                              </span>
-                            </div>
-                          </motion.div>
-                        ))}
+                          ⚡ Withdraw ₦
+                        </button>
+                        <button
+                          onClick={() => setActiveView('MONETIZATION')}
+                          className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/10 active:scale-95 cursor-pointer"
+                        >
+                          Studio Analytics →
+                        </button>
                       </div>
                     </div>
 
-                    {/* Create Post Social Style */}
-                    <div className="bg-slate-900/90 border border-white/10 p-4 sm:p-6 rounded-2xl shadow-xl relative overflow-hidden group">
-                      {/* Hidden input structures for post file uploads */}
+                    {/* WhatsApp/IMO Style Stories Bar */}
+                    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-xl">
+                      <GistStoriesBar 
+                        user={user}
+                        onOpenLive={() => setActiveView('LIVE')}
+                        onSelectStory={(story) => {
+                          alert(`Viewing Story from ${story.authorName}: "${story.mediaUrl || 'Interactive Story'}"`);
+                        }}
+                      />
+                    </div>
+
+                    {/* Post Composer - Glassmorphism */}
+                    <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-4 sm:p-6 rounded-2xl shadow-2xl space-y-4 hover:border-[#8B5CF6]/40 transition-all">
+                      {/* Hidden upload inputs */}
                       <input 
                         type="file" 
                         id="feed-post-image-uploader" 
@@ -1857,222 +1962,193 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         onChange={(e) => handleFeedMediaUpload(e, 'video')} 
                       />
 
-                      <div className="flex gap-3 sm:gap-4 mb-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-indigo-600/20 overflow-hidden flex-shrink-0 border border-indigo-500/30">
-                          <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0">
+                          <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
-                        <textarea 
-                          placeholder={`What's on your mind today, ${user.displayName?.split(' ')[0] || 'Friend'}?`}
-                          value={newPostText}
-                          onChange={(e) => setNewPostText(e.target.value)}
-                          className="flex-grow py-2 px-0 bg-transparent border-none focus:ring-0 text-base sm:text-lg font-medium text-white placeholder:text-slate-500 resize-none min-h-[90px] whitespace-pre-wrap outline-none"
-                        />
-                      </div>
-
-                      {/* Attached Media Preview Frame */}
-                      {newPostMediaUrl && (
-                        <div className="relative rounded-[2.5rem] overflow-hidden mb-6 border border-white/10 max-h-80 max-w-md mx-auto group/preview shadow-2xl">
-                          {newPostMediaUrl.startsWith('data:video') || newPostMediaUrl.includes('.mp4') || newPostMediaUrl.includes('.webm') ? (
-                            <video src={newPostMediaUrl} controls className="w-full h-auto object-contain max-h-80" />
-                          ) : (
-                            <img src={newPostMediaUrl} alt="Attached Media Preview" className="w-full h-auto object-cover max-h-80" />
-                          )}
-                          <button 
-                            type="button"
-                            onClick={() => setNewPostMediaUrl('')}
-                            className="absolute top-4 right-4 p-3 bg-slate-950/80 hover:bg-rose-600 rounded-full text-white transition-all shadow-lg"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      )}
-
-                      {showMediaInput && !newPostMediaUrl && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mb-6 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4"
-                        >
-                          <input 
-                            type="text"
-                            placeholder="Paste image or video URL (or click upload icon below)..."
-                            value={newPostMediaUrl}
-                            onChange={(e) => setNewPostMediaUrl(e.target.value)}
-                            className="bg-transparent border-none text-xs text-white focus:ring-0 flex-grow outline-none font-semibold"
+                        <div className="flex-grow space-y-3">
+                          <textarea 
+                            placeholder={`What's happening in your world, ${user.displayName?.split(' ')[0] || 'friend'}?`}
+                            value={newPostText}
+                            onChange={(e) => setNewPostText(e.target.value)}
+                            rows={3}
+                            className="w-full bg-transparent border-none focus:ring-0 text-white placeholder:text-slate-400 text-sm sm:text-base resize-none outline-none font-normal leading-relaxed"
                           />
+
+                          {/* Marketplace Selling Panel Toggle */}
+                          {isSellingItem && (
+                            <motion.div 
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="bg-[#121A2F]/90 border border-[#06B6D4]/40 rounded-2xl p-4 space-y-3 shadow-xl"
+                            >
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                                <span className="text-xs font-bold text-[#06B6D4] flex items-center gap-1.5">
+                                  <ShoppingBag className="w-4 h-4" /> Marketplace Item Details
+                                </span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setIsSellingItem(false)} 
+                                  className="text-[10px] text-slate-400 hover:text-rose-400 font-bold"
+                                >
+                                  Cancel Selling
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <input 
+                                  type="text"
+                                  placeholder="Item Title (e.g., iPhone 15 Pro, Toyota Corolla)"
+                                  value={marketTitle}
+                                  onChange={(e) => setMarketTitle(e.target.value)}
+                                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#06B6D4]"
+                                />
+                                <input 
+                                  type="text"
+                                  placeholder="Price (e.g., ₦450,000 or $300)"
+                                  value={marketPrice}
+                                  onChange={(e) => setMarketPrice(e.target.value)}
+                                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#06B6D4]"
+                                />
+                                <select
+                                  value={marketCondition}
+                                  onChange={(e) => setMarketCondition(e.target.value as any)}
+                                  className="bg-[#0A0F1E] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-[#06B6D4]"
+                                >
+                                  <option value="Brand New">Brand New</option>
+                                  <option value="Like New">Like New</option>
+                                  <option value="Used">Used (Good Condition)</option>
+                                </select>
+                                <input 
+                                  type="text"
+                                  placeholder="Location (e.g., Lagos, Abuja, Port Harcourt)"
+                                  value={marketLocation}
+                                  onChange={(e) => setMarketLocation(e.target.value)}
+                                  className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#06B6D4]"
+                                />
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {/* Media Preview */}
                           {newPostMediaUrl && (
-                            <button 
-                              onClick={() => setNewPostMediaUrl('')}
-                              className="text-[9px] font-black text-rose-400 hover:text-rose-300 uppercase tracking-widest"
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </motion.div>
-                      )}
-
-                      {/* Interactive Poll Creator Component Panel */}
-                      {showPollSetup && (
-                        <div className="mb-6 p-6 bg-slate-950/80 border border-white/10 rounded-[2rem] space-y-4 shadow-xl">
-                          <h5 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4" /> Create Interactive Gist Poll
-                          </h5>
-                          <input 
-                            type="text" 
-                            placeholder="Type Poll Question / Prompt..." 
-                            value={pollQuestion}
-                            onChange={(e) => setPollQuestion(e.target.value)}
-                            className="w-full bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-                          />
-                          <div className="grid grid-cols-2 gap-4">
-                            <input 
-                              type="text" 
-                              placeholder="Choice A" 
-                              value={pollOptionA}
-                              onChange={(e) => setPollOptionA(e.target.value)}
-                              className="bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-                            />
-                            <input 
-                              type="text" 
-                              placeholder="Choice B" 
-                              value={pollOptionB}
-                              onChange={(e) => setPollOptionB(e.target.value)}
-                              className="bg-white/5 border border-white/10 px-4 py-3 rounded-xl text-xs text-white outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
-                            />
-                          </div>
-                          <div className="flex gap-2 justify-end">
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                if (!pollQuestion.trim() || !pollOptionA.trim() || !pollOptionB.trim()) {
-                                  alert("Please specify a question and both poll options!");
-                                  return;
-                                }
-                                setShowPollSetup(false);
-                              }}
-                              className="px-5 py-2.5 bg-emerald-600 text-white font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-emerald-500 transition-all"
-                            >
-                              Attach Poll
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                setPollQuestion('');
-                                setPollOptionA('');
-                                setPollOptionB('');
-                                setShowPollSetup(false);
-                              }}
-                              className="px-5 py-2.5 bg-slate-800 text-slate-400 font-black text-[9px] uppercase tracking-widest rounded-xl hover:bg-slate-700 transition-all"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Inline Emoji Picker Panel */}
-                      {showEmojiPicker && (
-                        <div className="absolute z-50 bottom-24 left-4 right-4 p-4 bg-slate-950 border border-white/15 rounded-3xl grid grid-cols-8 gap-2 shadow-2xl">
-                          {PRESET_EMOJIS.map(emo => (
-                            <button 
-                              type="button"
-                              key={emo}
-                              onClick={() => {
-                                setNewPostText(prev => prev + emo);
-                                setShowEmojiPicker(false);
-                              }}
-                              className="text-2xl p-2 hover:bg-white/10 rounded-xl transition-all"
-                            >
-                              {emo}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Inline Preset GIF Picker Trays */}
-                      {showGifPicker && (
-                        <div className="absolute z-50 bottom-24 left-4 right-4 p-6 bg-slate-950 border border-white/15 rounded-3xl shadow-2xl">
-                          <div className="flex justify-between items-center mb-4">
-                            <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Select Reaction GIF Attachment</h6>
-                            <button type="button" onClick={() => setShowGifPicker(false)} className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400">Close</button>
-                          </div>
-                          <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar">
-                            {PRESET_GIFS.map((gif, index) => (
+                            <div className="relative rounded-2xl overflow-hidden border border-white/10 max-h-72 max-w-md shadow-2xl bg-black/40">
+                              {newPostMediaUrl.startsWith('data:video') || newPostMediaUrl.includes('.mp4') || newPostMediaUrl.includes('.webm') ? (
+                                <video src={newPostMediaUrl} controls className="w-full h-auto max-h-72 object-contain" />
+                              ) : (
+                                <img src={newPostMediaUrl} alt="Attached Preview" className="w-full h-auto max-h-72 object-cover" />
+                              )}
                               <button 
                                 type="button"
-                                key={index}
-                                onClick={() => {
-                                  setNewPostMediaUrl(gif.url);
-                                  setShowGifPicker(false);
-                                }}
-                                className="relative rounded-xl overflow-hidden hover:scale-105 transition-all aspect-video border border-white/5 active:ring-2 active:ring-indigo-500"
+                                onClick={() => setNewPostMediaUrl('')}
+                                className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-rose-600 rounded-full text-white transition-all shadow-md"
                               >
-                                <img src={gif.url} alt={gif.name} className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40 flex items-end p-2">
-                                  <span className="text-[8px] font-black text-white uppercase">{gif.name}</span>
-                                </div>
+                                <X className="w-4 h-4" />
                               </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            </div>
+                          )}
 
-                      <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                        <div className="flex items-center gap-1 sm:gap-3">
+                          {/* Interactive Poll Panel */}
+                          {showPollSetup && (
+                            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+                              <h5 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                <BarChart3 className="w-4 h-4" /> Create Interactive Gist Poll
+                              </h5>
+                              <input 
+                                type="text" 
+                                placeholder="Type poll question..." 
+                                value={pollQuestion}
+                                onChange={(e) => setPollQuestion(e.target.value)}
+                                className="w-full bg-white/5 border border-white/10 px-3 py-2 rounded-xl text-xs text-white outline-none focus:border-emerald-500"
+                              />
+                              <div className="grid grid-cols-2 gap-3">
+                                <input 
+                                  type="text" 
+                                  placeholder="Option A" 
+                                  value={pollOptionA}
+                                  onChange={(e) => setPollOptionA(e.target.value)}
+                                  className="bg-white/5 border border-white/10 px-3 py-2 rounded-xl text-xs text-white outline-none focus:border-emerald-500"
+                                />
+                                <input 
+                                  type="text" 
+                                  placeholder="Option B" 
+                                  value={pollOptionB}
+                                  onChange={(e) => setPollOptionB(e.target.value)}
+                                  className="bg-white/5 border border-white/10 px-3 py-2 rounded-xl text-xs text-white outline-none focus:border-emerald-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Emoji Picker */}
+                          {showEmojiPicker && (
+                            <div className="p-3 bg-[#121A2F] border border-white/15 rounded-2xl grid grid-cols-8 gap-1.5 shadow-2xl">
+                              {PRESET_EMOJIS.map(emo => (
+                                <button 
+                                  type="button" 
+                                  key={emo} 
+                                  onClick={() => {
+                                    setNewPostText(prev => prev + emo);
+                                    setShowEmojiPicker(false);
+                                  }}
+                                  className="text-xl p-1.5 hover:bg-white/10 rounded-lg transition-all"
+                                >
+                                  {emo}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Tools Bar */}
+                      <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <button 
                             type="button"
-                            onClick={() => {
-                              document.getElementById('feed-post-image-uploader')?.click();
-                            }}
-                            className="p-3 rounded-xl transition-all text-indigo-400 hover:bg-white/5"
-                            title="Upload Custom Image"
+                            onClick={() => document.getElementById('feed-post-image-uploader')?.click()}
+                            className="p-2 text-[#8B5CF6] hover:bg-white/5 rounded-xl transition-all cursor-pointer"
+                            title="Upload Photo"
                           >
-                            <ImageIcon className="w-5 h-5" />
+                            <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button 
                             type="button"
-                            onClick={() => {
-                              document.getElementById('feed-post-video-uploader')?.click();
-                            }}
-                            className="p-3 rounded-xl transition-all text-rose-400 hover:bg-white/5"
-                            title="Upload Custom Video"
+                            onClick={() => document.getElementById('feed-post-video-uploader')?.click()}
+                            className="p-2 text-rose-400 hover:bg-white/5 rounded-xl transition-all cursor-pointer"
+                            title="Upload Video"
                           >
-                            <VideoIcon className="w-5 h-5" />
+                            <VideoIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setIsSellingItem(!isSellingItem)}
+                            className={`p-2 rounded-xl transition-all cursor-pointer ${isSellingItem ? 'bg-[#06B6D4]/20 text-[#06B6D4]' : 'text-[#06B6D4] hover:bg-white/5'}`}
+                            title="Sell on Marketplace"
+                          >
+                            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button 
                             type="button"
                             onClick={() => setShowPollSetup(!showPollSetup)}
-                            className={`p-3 rounded-xl transition-all ${showPollSetup ? 'bg-emerald-600/20 text-emerald-400' : 'text-emerald-400 hover:bg-white/5'}`}
-                            title="Create Interactive Poll"
+                            className={`p-2 rounded-xl transition-all cursor-pointer ${showPollSetup ? 'bg-emerald-500/20 text-emerald-400' : 'text-emerald-400 hover:bg-white/5'}`}
+                            title="Poll"
                           >
-                            <BarChart3 className="w-5 h-5" />
+                            <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                           <button 
                             type="button"
-                            onClick={() => {
-                              setShowEmojiPicker(!showEmojiPicker);
-                              setShowGifPicker(false);
-                            }}
-                            className={`p-3 rounded-xl transition-all ${showEmojiPicker ? 'bg-amber-600/20 text-amber-400' : 'text-amber-400 hover:bg-white/5'}`}
-                            title="Insert Emoji"
+                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            className={`p-2 rounded-xl transition-all cursor-pointer ${showEmojiPicker ? 'bg-amber-500/20 text-amber-400' : 'text-amber-400 hover:bg-white/5'}`}
+                            title="Emoji"
                           >
-                            <Smile className="w-5 h-5" />
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setShowGifPicker(!showGifPicker);
-                              setShowEmojiPicker(false);
-                            }}
-                            className={`p-2.5 rounded-xl border font-black text-[9px] uppercase tracking-widest transition-all ${showGifPicker ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/40' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
-                            title="Share reaction GIF"
-                          >
-                            GIF
+                            <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
                           </button>
                         </div>
+
                         <button 
                           onClick={async () => {
-                            if (!newPostText.trim() && !newPostMediaUrl.trim() && !pollQuestion.trim()) return;
+                            if (!newPostText.trim() && !newPostMediaUrl.trim() && !pollQuestion.trim() && !marketTitle.trim()) return;
+                            
                             const mediaArr = [];
                             if (newPostMediaUrl.trim()) {
                               const isVideo = newPostMediaUrl.match(/\.(mp4|webm|ogg|mov)/i) || newPostMediaUrl.startsWith('data:video');
@@ -2081,7 +2157,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 url: newPostMediaUrl.trim()
                               });
                             }
-                            
+
                             let attachedPoll = undefined;
                             if (pollQuestion.trim() && pollOptionA.trim() && pollOptionB.trim()) {
                               attachedPoll = {
@@ -2093,71 +2169,133 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               };
                             }
 
-                            await handleCreatePost(newPostText, mediaArr, attachedPoll);
+                            let marketplaceListing = undefined;
+                            if (isSellingItem && marketTitle.trim()) {
+                              marketplaceListing = {
+                                title: marketTitle.trim(),
+                                price: marketPrice.trim() || '₦50,000',
+                                condition: marketCondition,
+                                location: marketLocation.trim() || 'Lagos, Nigeria'
+                              };
+                            }
+
+                            await handleCreatePost(
+                              newPostText + (marketplaceListing ? `\n\n📦 [MARKETPLACE LISTING: ${marketplaceListing.title} - ${marketplaceListing.price}]` : ''),
+                              mediaArr,
+                              attachedPoll
+                            );
+
                             setNewPostText('');
                             setNewPostMediaUrl('');
                             setPollQuestion('');
                             setPollOptionA('');
                             setPollOptionB('');
-                            setShowMediaInput(false);
+                            setIsSellingItem(false);
+                            setMarketTitle('');
+                            setMarketPrice('');
                             setShowPollSetup(false);
                             setShowEmojiPicker(false);
-                            setShowGifPicker(false);
                           }}
-                          className="px-10 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all"
+                          className="px-6 py-2.5 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white rounded-xl font-bold text-xs shadow-lg shadow-[#8B5CF6]/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
                         >
-                          Post Gist
+                          Publish Gist
                         </button>
                       </div>
                     </div>
 
-                    {/* Dynamic Post Feed */}
-                    <div className="space-y-4 sm:space-y-6 pb-10">
-                      {posts.length > 0 ? posts.map((post) => (
-                        <div key={post.id} className="bg-slate-900/90 border border-white/10 rounded-2xl overflow-hidden group shadow-lg hover:shadow-indigo-500/10 transition-all duration-300">
-                          <div className="p-4 sm:p-6">
-                            <div className="flex items-center justify-between mb-4">
+                    {/* Feed Posts List (Glassmorphism cards) */}
+                    <div className="space-y-5">
+                      {posts.length > 0 ? (
+                        posts
+                          .filter((p: any) => {
+                            if (activeMarketplaceFilter) {
+                              return p.content?.includes('MARKETPLACE') || p.marketplaceListing;
+                            }
+                            if (feedTab === 'FOLLOWING') {
+                              return user.following?.includes(p.authorId) || p.authorId === user.uid;
+                            }
+                            return true;
+                          })
+                          .map((post) => (
+                          <div 
+                            key={post.id} 
+                            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl hover:border-[#8B5CF6]/50 transition-all p-5 sm:p-6 text-white space-y-4"
+                          >
+                            {/* Author & Header */}
+                            <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden ring-2 ring-white/10 shadow-sm">
+                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#8B5CF6]/40 overflow-hidden">
                                   <img src={post.authorPhoto || `https://picsum.photos/seed/${post.authorId}/100/100`} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-1.5">
                                     <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">{post.authorName}</h4>
-                                    <span className="w-3.5 h-3.5 bg-indigo-600 rounded-full flex items-center justify-center">
+                                    <span className="w-3.5 h-3.5 bg-[#8B5CF6] rounded-full flex items-center justify-center">
                                       <Zap className="w-2 h-2 text-white fill-current" />
                                     </span>
                                   </div>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{post.category || 'Global Context'} • 2m ago</p>
+                                  <p className="text-[11px] text-slate-400 font-medium">
+                                    {post.category || 'Global EFADO'} • 5m ago
+                                  </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 {post.authorId !== user.uid && (
                                   <button 
                                     onClick={() => handleFollowUser(post.authorId)}
-                                    className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${
+                                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
                                       user.following?.includes(post.authorId) 
-                                        ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30' 
-                                        : 'bg-white/5 text-white hover:bg-indigo-600'
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                                        : 'bg-white/10 text-white hover:bg-[#8B5CF6]'
                                     }`}
                                   >
-                                    {user.following?.includes(post.authorId) ? '✓ Following' : 'Follow'}
+                                    {user.following?.includes(post.authorId) ? '✓ Following' : '+ Follow'}
                                   </button>
                                 )}
-                                <button className="p-1.5 text-slate-500 hover:text-white transition-colors">
-                                  <MoreVertical className="w-4 h-4" />
-                                </button>
                               </div>
                             </div>
 
-                            <p className="text-slate-100 text-[17px] leading-relaxed mb-4 font-normal">
+                            {/* Post Text Content */}
+                            <p className="text-slate-100 text-[15px] font-normal leading-relaxed whitespace-pre-line">
                               {post.content}
                             </p>
 
-                            {/* Render attached interactive Gist Poll */}
+                            {/* Attached Marketplace Item Card */}
+                            {(post.content?.includes('MARKETPLACE LISTING') || (post as any).marketplaceListing) && (
+                              <div className="bg-[#121A2F]/90 border border-[#06B6D4]/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 bg-[#06B6D4]/20 text-[#06B6D4] text-[10px] font-bold rounded-full border border-[#06B6D4]/30">
+                                      Marketplace Item
+                                    </span>
+                                    <span className="text-[11px] text-slate-400 font-medium">📍 Lagos & Global Delivery</span>
+                                  </div>
+                                  <h5 className="text-sm font-bold text-white">Verified EFADO Merchant Listing</h5>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => {
+                                      setActiveChatRoomId('sarah');
+                                      setActiveView('CHAT');
+                                    }}
+                                    className="px-3.5 py-1.5 bg-[#06B6D4] hover:bg-[#06B6D4]/80 text-black font-bold text-xs rounded-xl transition-all"
+                                  >
+                                    💬 DM Seller
+                                  </button>
+                                  <button 
+                                    onClick={() => alert("Initiating EFADO Escrow Buyer Protection Checkout...")}
+                                    className="px-3.5 py-1.5 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white font-bold text-xs rounded-xl transition-all"
+                                  >
+                                    🛒 Buy Escrow
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Attached Poll */}
                             {post.poll && (
-                              <div className="mb-4 p-4 bg-slate-950/60 border border-white/5 rounded-2xl space-y-3">
-                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2.5">
+                                <h6 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                                   📊 Gist Poll: {post.poll.question}
                                 </h6>
                                 <div className="space-y-2">
@@ -2167,26 +2305,17 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                     const hasVoted = opt.votes.includes(user.uid);
                                     return (
                                       <button 
-                                        type="button"
                                         key={oIdx}
                                         onClick={() => post.id && handleVotePoll(post.id, oIdx)}
-                                        className={`w-full relative p-3 rounded-xl flex items-center justify-between overflow-hidden border transition-all text-xs font-bold ${
-                                          hasVoted 
-                                            ? 'bg-emerald-600/10 border-emerald-500/50 text-emerald-400' 
-                                            : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                                        className={`w-full relative p-2.5 rounded-xl flex items-center justify-between border transition-all text-xs font-bold ${
+                                          hasVoted ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
                                         }`}
                                       >
-                                        <div 
-                                          className="absolute left-0 top-0 bottom-0 bg-indigo-600/10 transition-all duration-700" 
-                                          style={{ width: `${pct}%` }}
-                                        />
+                                        <div className="absolute left-0 top-0 bottom-0 bg-[#8B5CF6]/20 transition-all duration-500" style={{ width: `${pct}%` }} />
                                         <span className="relative z-10 flex items-center gap-2">
-                                          {hasVoted && <span className="text-emerald-500 font-extrabold">✓</span>}
-                                          {opt.text}
+                                          {hasVoted && <span>✓</span>} {opt.text}
                                         </span>
-                                        <span className="relative z-10 font-mono text-[10px] text-slate-400">
-                                          {pct}% ({opt.votes.length} votes)
-                                        </span>
+                                        <span className="relative z-10 font-mono text-[11px] text-slate-400">{pct}% ({opt.votes.length})</span>
                                       </button>
                                     );
                                   })}
@@ -2194,58 +2323,119 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               </div>
                             )}
 
+                            {/* Attached Media */}
                             {post.media && post.media.length > 0 && (
-                              <div className="rounded-2xl overflow-hidden mb-4 border border-white/5 shadow-inner">
-                                <img src={post.media[0].url} alt="Gist content" className="w-full h-auto" referrerPolicy="no-referrer" />
+                              <div className="rounded-2xl overflow-hidden border border-white/10 max-h-96 bg-black/50">
+                                {post.media[0].type === 'video' || post.media[0].url.includes('.mp4') || post.media[0].url.includes('.webm') ? (
+                                  <video 
+                                    src={post.media[0].url} 
+                                    controls 
+                                    muted 
+                                    autoPlay 
+                                    loop 
+                                    className="w-full h-auto max-h-96 object-contain" 
+                                  />
+                                ) : (
+                                  <img 
+                                    src={post.media[0].url} 
+                                    alt="Content" 
+                                    className="w-full h-auto max-h-96 object-cover" 
+                                    referrerPolicy="no-referrer" 
+                                  />
+                                )}
                               </div>
                             )}
 
-                            <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                              <div className="flex items-center gap-4 sm:gap-6">
+                            {/* Facebook / IMO Style Multi-Reaction Bar & Actions */}
+                            <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                              <div className="flex items-center gap-3 sm:gap-5">
+                                {/* Reaction Picker Trigger */}
+                                <div className="relative group/reactions">
+                                  <button 
+                                    onClick={() => handleLikePost(post.id, post.likes.includes(user.uid))}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
+                                      post.likes.includes(user.uid) 
+                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                                        : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+                                    }`}
+                                  >
+                                    <Heart className={`w-4 h-4 ${post.likes.includes(user.uid) ? 'fill-rose-500' : ''}`} />
+                                    <span className="text-xs font-bold">{post.likes.length || 0}</span>
+                                  </button>
+
+                                  {/* Hover Reaction Popup */}
+                                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/reactions:flex items-center gap-2 bg-[#121A2F] border border-white/20 p-2 rounded-2xl shadow-2xl z-20">
+                                    {['👍', '❤️', '😂', '😮', '🔥', '👏'].map((emo) => (
+                                      <button
+                                        key={emo}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleLikePost(post.id, false);
+                                        }}
+                                        className="text-lg hover:scale-125 transition-transform p-1 cursor-pointer"
+                                      >
+                                        {emo}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
                                 <button 
-                                  onClick={() => handleLikePost(post.id, post.likes.includes(user.uid))}
-                                  className={`flex items-center gap-1.5 ${post.likes.includes(user.uid) ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'} transition-all`}
+                                  onClick={() => {
+                                    alert(`Showing comments for post from ${post.authorName}`);
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
                                 >
-                                  <div className={`p-2 rounded-xl ${post.likes.includes(user.uid) ? 'bg-rose-500/10' : 'bg-white/5'}`}>
-                                    <Heart className={`w-4 h-4 ${post.likes.includes(user.uid) ? 'fill-rose-500' : 'fill-none'}`} />
-                                  </div>
-                                  <span className="text-xs font-bold">{post.likes.length}</span>
+                                  <MessageSquare className="w-4 h-4" />
+                                  <span className="text-xs font-bold">{post.comments?.length || 0}</span>
                                 </button>
-                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition-all">
-                                  <div className="p-2 bg-white/5 rounded-xl">
-                                    <MessageSquare className="w-4 h-4" />
-                                  </div>
-                                  <span className="text-xs font-bold">{post.comments.length}</span>
+
+                                <button 
+                                  onClick={() => alert(`Sent ₦100 Tip to ${post.authorName} via EFADO Creator Fund!`)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-xl transition-all cursor-pointer"
+                                >
+                                  <Coins className="w-4 h-4 text-amber-400" />
+                                  <span className="text-xs font-bold hidden sm:inline">Tip</span>
                                 </button>
-                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-amber-400 transition-all">
-                                  <div className="p-2 bg-white/5 rounded-xl">
-                                    <Coins className="w-4 h-4" />
-                                  </div>
-                                  <span className="text-xs font-bold hidden xs:inline">Tip</span>
-                                </button>
-                                <button className="flex items-center gap-1.5 text-slate-400 hover:text-emerald-400 transition-all">
-                                  <div className="p-2 bg-white/5 rounded-xl">
-                                    <Repeat className="w-4 h-4" />
-                                  </div>
-                                  <span className="text-[10px] font-bold uppercase hidden xs:inline">Echo</span>
+
+                                <button 
+                                  onClick={() => alert("Post echoed across your followers' feeds!")}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
+                                >
+                                  <Repeat className="w-4 h-4 text-emerald-400" />
+                                  <span className="text-xs font-bold hidden sm:inline">Echo</span>
                                 </button>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <button className="p-2 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-all">
+
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => alert("Gist bookmarked to your private library!")}
+                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
+                                >
                                   <Bookmark className="w-4 h-4" />
                                 </button>
-                                <button className="p-2 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-all">
+                                <button 
+                                  onClick={() => {
+                                    if (navigator.share) {
+                                      navigator.share({ title: post.authorName, text: post.content, url: window.location.href });
+                                    } else {
+                                      navigator.clipboard.writeText(window.location.href);
+                                      alert("Post link copied to clipboard!");
+                                    }
+                                  }}
+                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
+                                >
                                   <Share className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )) : (
-                        <div className="p-32 text-center bg-white/5 border border-dashed border-white/10 rounded-[5rem]">
-                          <Globe className="w-20 h-20 text-slate-600 mx-auto mb-8 animate-pulse" />
-                          <h4 className="text-2xl font-black text-slate-400 uppercase tracking-tighter italic">Initializing Viral Pulse...</h4>
-                          <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-4">The global conversation begins with your first gist.</p>
+                        ))
+                      ) : (
+                        <div className="p-16 text-center bg-white/5 border border-dashed border-white/10 rounded-3xl">
+                          <Globe className="w-12 h-12 text-slate-500 mx-auto mb-4 animate-pulse" />
+                          <h4 className="text-base font-bold text-white">No Posts Found</h4>
+                          <p className="text-xs text-slate-400 mt-1">Be the first to post a viral gist or marketplace listing!</p>
                         </div>
                       )}
                     </div>
@@ -2669,37 +2859,73 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                               if (isSelf) {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col items-end gap-2 max-w-[75%] ml-auto animate-fade-in animate-duration-300">
-                                    <div className={`p-5 text-white rounded-3xl rounded-tr-none shadow-2xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/5 p-1' : 'bg-indigo-600 border border-indigo-500'}`}>
-                                      {msg.content && renderSpecialMessageContent(msg.content, true)}
+                                  <div key={msg.id || idx} className="flex flex-col items-end gap-1.5 max-w-[80%] ml-auto animate-fade-in">
+                                    <div className={`p-4 sm:p-5 text-white rounded-3xl rounded-tr-none shadow-2xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/10 p-1' : 'bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] border border-white/15'}`}>
+                                      {msg.content?.startsWith('[VOICE_NOTE]') ? (
+                                        <div className="flex items-center gap-3 py-1 px-2">
+                                          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white shadow-md">
+                                            <Mic className="w-4 h-4" />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <span className="w-1 h-3 bg-white/80 rounded-full animate-pulse" />
+                                              <span className="w-1 h-5 bg-white rounded-full animate-pulse" />
+                                              <span className="w-1 h-2 bg-white/80 rounded-full animate-pulse" />
+                                              <span className="w-1 h-4 bg-white rounded-full animate-pulse" />
+                                              <span className="w-1 h-6 bg-white rounded-full animate-pulse" />
+                                              <span className="w-1 h-3 bg-white/80 rounded-full animate-pulse" />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-white/90">Voice Note (0:12)</p>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        msg.content && renderSpecialMessageContent(msg.content, true)
+                                      )}
                                       {msg.mediaUrl && (
                                         <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10 hover:scale-[1.02] transition-transform duration-300">
                                           <img src={msg.mediaUrl} alt="Secure link attachment" className="w-full h-auto object-cover max-h-48" />
                                         </div>
                                       )}
                                     </div>
-                                    <div className="flex items-center gap-2 mr-4">
-                                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                    <div className="flex items-center gap-1.5 mr-2">
+                                       <p className="text-[10px] font-bold text-slate-400">
                                          {msg.timestamp?.seconds 
                                            ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
                                            : 'Sending...'}
                                        </p>
-                                       <Zap className="w-3 h-3 text-indigo-400" />
+                                       <span className="text-[#06B6D4] text-xs font-bold" title="Seen">✓✓</span>
                                     </div>
                                   </div>
                                 );
                               } else {
                                 return (
-                                  <div key={msg.id || idx} className="flex flex-col gap-2 max-w-[75%] animate-fade-in animate-duration-300">
-                                    <div className={`p-5 text-slate-100 rounded-3xl rounded-tl-none shadow-xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/5 p-1' : 'bg-slate-900 border border-white/10'}`}>
-                                      {msg.content && renderSpecialMessageContent(msg.content, false)}
+                                  <div key={msg.id || idx} className="flex flex-col gap-1.5 max-w-[80%] animate-fade-in">
+                                    <div className={`p-4 sm:p-5 text-slate-100 rounded-3xl rounded-tl-none shadow-xl ${msg.content && (msg.content.includes('[LEDGER_TX]') || msg.content.includes('[FLASH_BUZZ]') || msg.content.includes('[VERIFICATION_REQ]')) ? 'bg-transparent border border-white/10 p-1' : 'bg-white/10 backdrop-blur-xl border border-white/10'}`}>
+                                      {msg.content?.startsWith('[VOICE_NOTE]') ? (
+                                        <div className="flex items-center gap-3 py-1 px-2">
+                                          <div className="w-9 h-9 rounded-full bg-[#8B5CF6]/30 flex items-center justify-center text-[#8B5CF6] shadow-md">
+                                            <Mic className="w-4 h-4" />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                              <span className="w-1 h-3 bg-[#06B6D4] rounded-full animate-pulse" />
+                                              <span className="w-1 h-5 bg-[#06B6D4] rounded-full animate-pulse" />
+                                              <span className="w-1 h-2 bg-[#06B6D4] rounded-full animate-pulse" />
+                                              <span className="w-1 h-4 bg-[#06B6D4] rounded-full animate-pulse" />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-slate-300">Voice Note (0:15)</p>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        msg.content && renderSpecialMessageContent(msg.content, false)
+                                      )}
                                       {msg.mediaUrl && (
                                         <div className="mt-3 rounded-2xl overflow-hidden max-w-xs border border-white/10">
                                           <img src={msg.mediaUrl} alt="Received link attachment" className="w-full h-auto object-cover max-h-48" />
                                         </div>
                                       )}
                                     </div>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                    <p className="text-[10px] font-bold text-slate-400 ml-2">
                                       {msg.senderName} • {msg.timestamp?.seconds 
                                         ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
                                         : 'Now'}
@@ -2709,6 +2935,21 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               }
                             })}
                           </div>
+
+                          {/* Voice Note Recorder Modal */}
+                          {showVoiceRecorderModal && (
+                            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+                              <div className="w-full max-w-md">
+                                <GistVoiceRecorder 
+                                  onSendVoiceNote={(audioUrl, duration) => {
+                                    handleSendMessage(`[VOICE_NOTE] audioUrl:${audioUrl}|duration:${duration}`);
+                                    setShowVoiceRecorderModal(false);
+                                  }}
+                                  onCancel={() => setShowVoiceRecorderModal(false)}
+                                />
+                              </div>
+                            </div>
+                          )}
 
                           {/* Chat Input Area */}
                           <div className="relative">
@@ -2819,18 +3060,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 e.preventDefault();
                                 handleSendMessage();
                               }}
-                              className="p-6 bg-slate-900 border-t border-white/5 shadow-[0_-4px_30px_rgba(0,0,0,0.2)]"
+                              className="p-4 sm:p-6 bg-[#0A0F1E]/95 border-t border-white/10 shadow-[0_-4px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl"
                             >
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center bg-white/5 rounded-2xl p-1">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
                                   <button 
                                     type="button" 
                                     onClick={() => {
                                       setShowGifPickerChat(!showGifPickerChat);
                                       setShowStickerPickerChat(false);
                                     }}
-                                    className={`px-3 py-2 border font-black text-[9px] uppercase tracking-widest rounded-xl transition-all mr-1 ${showGifPickerChat ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/20' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
-                                    title="Choose a reaction GIF"
+                                    className={`px-2.5 py-1.5 border font-bold text-[10px] rounded-xl transition-all mr-1 ${showGifPickerChat ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/40' : 'text-slate-300 border-white/10 hover:bg-white/5'}`}
+                                    title="Choose a GIF"
                                   >
                                     GIF
                                   </button>
@@ -2840,18 +3081,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                       setShowStickerPickerChat(!showStickerPickerChat);
                                       setShowGifPickerChat(false);
                                     }}
-                                    className={`px-3 py-2 border font-black text-[9px] uppercase tracking-widest rounded-xl transition-all mr-1 ${showStickerPickerChat ? 'bg-indigo-600/20 text-indigo-400 border-indigo-500/20' : 'text-slate-400 border-white/10 hover:bg-white/5'}`}
-                                    title="Choose a community Sticker"
+                                    className={`px-2.5 py-1.5 border font-bold text-[10px] rounded-xl transition-all mr-1 ${showStickerPickerChat ? 'bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/40' : 'text-slate-300 border-white/10 hover:bg-white/5'}`}
+                                    title="Choose a Sticker"
                                   >
                                     STK
                                   </button>
                                   <button 
                                     type="button" 
                                     onClick={() => document.getElementById('chat-media-loader')?.click()} 
-                                    className="p-3 text-slate-400 hover:text-indigo-400 transition-all hover:bg-white/5 rounded-xl animate-pulse"
-                                    title="Attach custom photo file"
+                                    className="p-2 text-slate-300 hover:text-[#8B5CF6] transition-all hover:bg-white/5 rounded-xl"
+                                    title="Attach Photo"
                                   >
-                                    <ImageIcon className="w-5 h-5" />
+                                    <ImageIcon className="w-4 h-4" />
                                   </button>
                                 </div>
                                 <div className="flex-grow relative group">
@@ -2860,7 +3101,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                     value={newMessageText}
                                     onChange={(e) => setNewMessageText(e.target.value)}
                                     placeholder={`Message ${activeRoomDef.name}...`}
-                                    className="w-full pl-6 pr-14 py-4 bg-white/5 border border-white/10 rounded-3xl text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all shadow-inner placeholder:text-slate-500"
+                                    className="w-full pl-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white focus:border-[#8B5CF6] outline-none transition-all placeholder:text-slate-500"
                                   />
                                   <button 
                                     type="button" 
@@ -2868,46 +3109,57 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                       setShowEmojiPickerChat(!showEmojiPickerChat);
                                       setShowGifPickerChat(false);
                                     }}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-amber-400 transition-all"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-amber-400 transition-all"
                                   >
-                                    <Smile className="w-5 h-5" />
+                                    <Smile className="w-4 h-4" />
                                   </button>
                                 </div>
+                                
+                                {/* Voice Note Mic Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => setShowVoiceRecorderModal(true)}
+                                  className="p-3 bg-white/5 hover:bg-[#8B5CF6]/20 text-[#8B5CF6] border border-white/10 hover:border-[#8B5CF6]/40 rounded-2xl transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                                  title="Record Voice Note"
+                                >
+                                  <Mic className="w-5 h-5" />
+                                </button>
+
                                 <button 
                                   type="submit"
-                                  className="p-5 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                                  className="p-3.5 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white rounded-2xl shadow-lg shadow-[#8B5CF6]/30 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer"
                                 >
-                                  <Send className="w-6 h-6" />
+                                  <Send className="w-5 h-5" />
                                 </button>
                               </div>
-                              <div className="flex items-center gap-6 mt-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar">
+                              <div className="flex items-center gap-4 sm:gap-6 mt-3 px-2 overflow-x-auto no-scrollbar">
                                 <button 
                                   type="button" 
                                   onClick={() => document.getElementById('chat-media-loader')?.click()}
-                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                  className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
                                 >
-                                  <Contact className="w-3.5 h-3.5 text-indigo-400" /> Share Intels
+                                  <Contact className="w-3.5 h-3.5 text-[#8B5CF6]" /> Share Contact
                                 </button>
                                 <button 
                                   type="button" 
                                   onClick={() => setShowLedgerModal(true)}
-                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                  className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
                                 >
-                                  <Download className="w-3.5 h-3.5 text-emerald-400" /> Transmit Ledger
+                                  <Download className="w-3.5 h-3.5 text-emerald-400" /> Send ₦ Escrow
                                 </button>
                                 <button 
                                   type="button" 
                                   onClick={handleFlashBuzzAction}
-                                  className="flex items-center gap-2 text-[9px] font-black text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                                  className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-white transition-all whitespace-nowrap cursor-pointer"
                                 >
                                   <Zap className="w-3.5 h-3.5 text-amber-400 animate-bounce" /> Flash Buzz
                                 </button>
                                 <button 
                                   type="button" 
                                   onClick={handleVerificationReqAction}
-                                  className="flex items-center gap-2 text-[9px] font-black text-emerald-500 hover:text-emerald-400 transition-all whitespace-nowrap ml-auto cursor-pointer"
+                                  className="flex items-center gap-1.5 text-xs font-bold text-[#06B6D4] hover:text-[#06B6D4]/80 transition-all whitespace-nowrap ml-auto cursor-pointer"
                                 >
-                                  <Shield className="w-3.5 h-3.5" /> Verification Req
+                                  <Shield className="w-3.5 h-3.5" /> ID Verified
                                 </button>
                               </div>
                             </form>
@@ -3289,9 +3541,16 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       </div>
                       <div className="pt-20 flex items-center justify-between">
                         <div>
-                          <h3 className="text-3xl font-black text-white uppercase tracking-tight">
-                            {user.fullName || user.displayName || user.email.split('@')[0]}
-                          </h3>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-3xl font-black text-white uppercase tracking-tight">
+                              {user.fullName || user.displayName || user.email.split('@')[0]}
+                            </h3>
+                            {showEarningsBadge && (
+                              <span className="px-3 py-1 bg-gradient-to-r from-amber-400 to-[#FACC15] text-slate-950 font-black text-xs rounded-full shadow-lg flex items-center gap-1.5 normal-case tracking-normal">
+                                🏆 ₦10K+ Earner
+                              </span>
+                            )}
+                          </div>
                           {user.fullName && user.displayName && (
                             <p className="text-xs font-semibold text-indigo-400">@{user.displayName}</p>
                           )}
@@ -3328,360 +3587,448 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Following</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-2xl font-black text-white">156</p>
+                          <p className="text-2xl font-black text-white">{posts.filter(p => p.authorId === user.uid).length || 156}</p>
                           <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Gists</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Security Credentials Card */}
-                  <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-[3.5rem] p-12 overflow-hidden shadow-2xl relative group mt-8">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-white/5 pb-8">
-                      <div>
-                        <h4 className="text-xl font-black text-white uppercase tracking-tight italic flex items-center gap-2">
-                          <Lock className="w-5 h-5 text-amber-400" /> Security Credentials
-                        </h4>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
-                          Manage account security and update passcodes instantly under threat
-                        </p>
-                      </div>
-                      <div className="px-4 py-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-xl flex items-center gap-2 self-start md:self-auto">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Connection Safe</span>
-                      </div>
-                    </div>
+                  {/* 1. SEPARATE CREATOR WALLET - ABOVE "MY POSTS | MY REELS" */}
+                  <CreatorProfileWallet 
+                    userId={user.uid}
+                    followersCount={1240}
+                    showEarningsBadge={showEarningsBadge}
+                    onToggleEarningsBadge={handleToggleEarningsBadge}
+                    isOwner={true}
+                  />
 
-                    <div className="max-w-md space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">New Secret Password</label>
-                        <div className="relative">
-                          <input 
-                            type="password"
-                            placeholder="Enter new strong passcode..."
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/50"
-                          />
+                  {/* SUB-TABS: MY POSTS | MY REELS | PROFILE SETTINGS */}
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-3 mb-2 flex-wrap">
+                    <button 
+                      onClick={() => setProfileSubTab('POSTS')}
+                      className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        profileSubTab === 'POSTS' 
+                          ? 'bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/30' 
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>My Posts ({posts.filter(p => p.authorId === user.uid).length})</span>
+                    </button>
+                    <button 
+                      onClick={() => setProfileSubTab('REELS')}
+                      className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        profileSubTab === 'REELS' 
+                          ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' 
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      <span>My Reels ({reels.filter(r => r.authorId === user.uid).length})</span>
+                    </button>
+                    <button 
+                      onClick={() => setProfileSubTab('SETTINGS')}
+                      className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all ml-auto flex items-center gap-2 ${
+                        profileSubTab === 'SETTINGS' 
+                          ? 'bg-[#06B6D4] text-black shadow-lg shadow-[#06B6D4]/30' 
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Profile Settings</span>
+                    </button>
+                  </div>
+
+                  {/* TAB 1: MY POSTS */}
+                  {profileSubTab === 'POSTS' && (
+                    <div className="space-y-4">
+                      {posts.filter(p => p.authorId === user.uid).length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {posts.filter(p => p.authorId === user.uid).map((post) => (
+                            <div key={post.id} className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+                              <div className="flex items-center gap-3">
+                                <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-8 h-8 rounded-full object-cover" />
+                                <div>
+                                  <h5 className="text-xs font-bold text-white">{post.authorName}</h5>
+                                  <span className="text-[10px] text-slate-400">{post.category || 'General'}</span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-200 line-clamp-3">{post.content}</p>
+                              {post.media && post.media.length > 0 && (
+                                <img src={post.media[0].url} alt="Attachment" className="w-full h-36 object-cover rounded-xl" />
+                              )}
+                              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-white/5">
+                                <span className="flex items-center gap-1">❤️ {post.likes?.length || 0}</span>
+                                <span className="flex items-center gap-1">💬 {post.comments?.length || 0}</span>
+                                <span>{post.viewsCount || 0} views</span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-
-                      {passwordStatus.text && (
-                        <div className={`p-4 rounded-xl text-xs font-bold uppercase tracking-widest border ${
-                          passwordStatus.type === 'SUCCESS' 
-                            ? 'bg-emerald-500/15 border-emerald-500/20 text-emerald-400' 
-                            : 'bg-rose-500/15 border-rose-500/20 text-rose-400'
-                        }`}>
-                          {passwordStatus.text}
+                      ) : (
+                        <div className="text-center py-12 p-8 bg-white/5 border border-white/10 rounded-3xl space-y-3">
+                          <MessageSquare className="w-10 h-10 text-[#8B5CF6] mx-auto" />
+                          <h4 className="text-sm font-bold text-white">No Gists Published Yet</h4>
+                          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                            Share what's happening around you on EFADO Gist Hub! Earn monetization rewards on views and engagements.
+                          </p>
+                          <button 
+                            onClick={() => setActiveView('FEED')}
+                            className="px-5 py-2.5 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white text-xs font-bold rounded-xl shadow-lg hover:brightness-110 transition-all"
+                          >
+                            Create First Gist Post
+                          </button>
                         </div>
                       )}
-
-                      <button 
-                        disabled={isUpdatingPassword}
-                        onClick={async () => {
-                          if (!newPassword || newPassword.length < 6) {
-                            setPasswordStatus({ text: 'Password must be at least 6 characters long.', type: 'ERROR' });
-                            return;
-                          }
-                          setIsUpdatingPassword(true);
-                          setPasswordStatus({ text: '', type: '' });
-                          try {
-                            if (auth.currentUser) {
-                              await updatePassword(auth.currentUser, newPassword);
-                              setPasswordStatus({ text: 'Sovereign passcode updated successfully. Keep this credential safe!', type: 'SUCCESS' });
-                              setNewPassword('');
-                            } else {
-                              setPasswordStatus({ text: 'No active user found. Please authenticate.', type: 'ERROR' });
-                            }
-                          } catch (err: any) {
-                            console.error("Error updating password:", err);
-                            setPasswordStatus({ 
-                              text: err?.message || 'Failed to update passcode. Try logging out and back in to refresh credentials.', 
-                              type: 'ERROR' 
-                            });
-                          } finally {
-                            setIsUpdatingPassword(false);
-                          }
-                        }}
-                        className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-50 active:scale-[0.98] rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
-                      >
-                        {isUpdatingPassword ? 'Synchronising Key...' : 'Update Security Passcode'}
-                      </button>
                     </div>
-                  </div>
+                  )}
+
+                  {/* TAB 2: MY REELS */}
+                  {profileSubTab === 'REELS' && (
+                    <div className="space-y-4">
+                      {reels.filter(r => r.authorId === user.uid).length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {reels.filter(r => r.authorId === user.uid).map((reel) => (
+                            <div key={reel.id} className="relative aspect-[9/16] bg-slate-800 rounded-2xl overflow-hidden group shadow-lg">
+                              <img src={reel.videoUrl || `https://picsum.photos/seed/${reel.id}/400/700`} alt="Reel" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 p-3 flex flex-col justify-between">
+                                <span className="text-[10px] bg-black/60 px-2 py-0.5 rounded-full text-white self-start">
+                                  Reel
+                                </span>
+                                <div>
+                                  <p className="text-xs font-semibold text-white line-clamp-2">{reel.caption}</p>
+                                  <div className="flex items-center justify-between text-[10px] text-slate-300 mt-1">
+                                    <span>❤️ {reel.likes?.length || 0}</span>
+                                    <span>📤 {reel.shares || 0}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 p-8 bg-white/5 border border-white/10 rounded-3xl space-y-3">
+                          <Video className="w-10 h-10 text-rose-500 mx-auto" />
+                          <h4 className="text-sm font-bold text-white">No Reels Recorded Yet</h4>
+                          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                            Publish vertical short-form reels to earn ₦200 per 1,000 qualified views (₦500 Launch Bonus until Dec 2026)!
+                          </p>
+                          <button 
+                            onClick={() => setActiveView('REELS')}
+                            className="px-5 py-2.5 bg-gradient-to-r from-rose-500 to-amber-500 text-white text-xs font-bold rounded-xl shadow-lg hover:brightness-110 transition-all"
+                          >
+                            Record a Reel Now
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: PROFILE SETTINGS & PRIVACY */}
+                  {profileSubTab === 'SETTINGS' && (
+                    <div className="space-y-6">
+                      {/* Privacy & Earnings Badge Card */}
+                      <div className="bg-slate-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6">
+                        <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-6">
+                          <div>
+                            <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                              <Award className="w-5 h-5 text-amber-400" />
+                              Creator Privacy & Earnings Badge
+                            </h4>
+                            <p className="text-xs text-slate-400 mt-1 max-w-md">
+                              Creator Wallet is strictly PRIVATE. Only you can view exact balances. Enable this toggle to show the official <span className="text-amber-300 font-bold">"🏆 ₦10K+ Earner"</span> badge on your profile.
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox"
+                              checked={showEarningsBadge}
+                              onChange={(e) => handleToggleEarningsBadge(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#06B6D4]"></div>
+                          </label>
+                        </div>
+
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between flex-wrap gap-3">
+                          <div>
+                            <span className="text-xs text-slate-300 font-semibold block">Preview Public Badge:</span>
+                            <span className="text-[11px] text-slate-400">Other users will see this next to your name</span>
+                          </div>
+                          {showEarningsBadge ? (
+                            <span className="px-3.5 py-1.5 bg-gradient-to-r from-amber-400 to-[#FACC15] text-slate-950 font-black text-xs rounded-full shadow-lg flex items-center gap-1.5">
+                              🏆 ₦10K+ Earner
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-500 italic">Badge hidden (Disabled)</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Security Credentials Card */}
+                      <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6 sm:p-8 overflow-hidden shadow-2xl relative group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-white/5 pb-8">
+                          <div>
+                            <h4 className="text-xl font-black text-white uppercase tracking-tight italic flex items-center gap-2">
+                              <Lock className="w-5 h-5 text-amber-400" /> Security Credentials
+                            </h4>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                              Manage account security and update passcodes instantly under threat
+                            </p>
+                          </div>
+                          <div className="px-4 py-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-xl flex items-center gap-2 self-start md:self-auto">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Connection Safe</span>
+                          </div>
+                        </div>
+
+                        <div className="max-w-md space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">New Secret Password</label>
+                            <div className="relative">
+                              <input 
+                                type="password"
+                                placeholder="Enter new strong passcode..."
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/50"
+                              />
+                            </div>
+                          </div>
+
+                          {passwordStatus.text && (
+                            <div className={`p-4 rounded-xl text-xs font-bold uppercase tracking-widest border ${
+                              passwordStatus.type === 'SUCCESS' 
+                                ? 'bg-emerald-500/15 border-emerald-500/20 text-emerald-400' 
+                                : 'bg-rose-500/15 border-rose-500/20 text-rose-400'
+                            }`}>
+                              {passwordStatus.text}
+                            </div>
+                          )}
+
+                          <button 
+                            disabled={isUpdatingPassword}
+                            onClick={async () => {
+                              if (!newPassword || newPassword.length < 6) {
+                                setPasswordStatus({ text: 'Password must be at least 6 characters long.', type: 'ERROR' });
+                                return;
+                              }
+                              setIsUpdatingPassword(true);
+                              setPasswordStatus({ text: '', type: '' });
+                              try {
+                                if (auth.currentUser) {
+                                  await updatePassword(auth.currentUser, newPassword);
+                                  setPasswordStatus({ text: 'Sovereign passcode updated successfully. Keep this credential safe!', type: 'SUCCESS' });
+                                  setNewPassword('');
+                                } else {
+                                  setPasswordStatus({ text: 'No active user found. Please authenticate.', type: 'ERROR' });
+                                }
+                              } catch (err: any) {
+                                console.error("Error updating password:", err);
+                                setPasswordStatus({ 
+                                  text: err?.message || 'Failed to update passcode. Try logging out and back in to refresh credentials.', 
+                                  type: 'ERROR' 
+                                });
+                              } finally {
+                                setIsUpdatingPassword(false);
+                              }
+                            }}
+                            className="w-full py-4 bg-indigo-600 text-white hover:bg-indigo-500 active:scale-[0.98] rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                          >
+                            {isUpdatingPassword ? 'Synchronising Key...' : 'Update Security Passcode'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {activeView === 'LIVE' && (
+                <motion.div 
+                  key="live"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-full"
+                >
+                  <GistLiveStream 
+                    user={user} 
+                    onClose={() => setActiveView('FEED')} 
+                    onTip={(streamId, gift) => {
+                      alert(`Sent ${gift.name} (${gift.cost}) to live stream!`);
+                    }} 
+                  />
+                </motion.div>
+              )}
+
+              {activeView === 'COMMUNITIES' && (
+                <motion.div 
+                  key="communities"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-full"
+                >
+                  <GistCommunities 
+                    user={user} 
+                    onOpenCommunityChat={(group) => {
+                      setActiveChatRoomId(group.id);
+                      setChatSubTab('GROUPS');
+                      setActiveView('CHAT');
+                    }} 
+                  />
                 </motion.div>
               )}
 
               {activeView === 'MONETIZATION' && (
                 <motion.div 
                   key="monetization"
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="max-w-6xl mx-auto p-8 space-y-12 pb-24 h-full overflow-y-auto no-scrollbar"
+                  exit={{ opacity: 0, y: -15 }}
+                  className="h-full overflow-y-auto custom-scrollbar p-4 md:p-8"
                 >
-                  {/* Hero Stats */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="md:col-span-2 bg-gradient-to-br from-indigo-600 to-indigo-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32 group-hover:scale-110 transition-transform duration-700" />
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-8">
-                          <div className="p-4 bg-white/10 rounded-2xl border border-white/10">
-                            <TrendingUp className="w-8 h-8 text-white" />
-                          </div>
-                          <div className="px-5 py-2 bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/20">
-                            Active Payout Profile
-                          </div>
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-2">Total Creator Earnings</p>
-                        <h3 className="text-5xl font-black italic tracking-tighter mb-8 italic">
-                          {formatPrice(user.creatorEarnings?.totalTips || 425.50)}
-                        </h3>
-                        <div className="flex items-center gap-4">
-                          <button className="flex-grow py-4 bg-white text-indigo-950 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
-                            Withdraw Earnings
-                          </button>
-                          <button className="p-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-all">
-                             <BarChart3 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-xl shadow-gray-100/50 flex flex-col justify-between">
-                       <div>
-                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Ad Revenue Share</p>
-                         <h4 className="text-3xl font-black text-gray-900">{formatPrice(user.creatorEarnings?.adRevenueShare || 128.00)}</h4>
-                       </div>
-                       <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
-                         <span className="text-[10px] font-bold text-emerald-500 uppercase">+12% this month</span>
-                         <BarChart3 className="w-4 h-4 text-gray-300" />
-                       </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-xl shadow-gray-100/50 flex flex-col justify-between">
-                       <div>
-                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Traffic Rewards</p>
-                         <h4 className="text-3xl font-black text-gray-900">{formatPrice(user.creatorEarnings?.trafficRewards || 82.50)}</h4>
-                       </div>
-                       <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
-                         <span className="text-[10px] font-bold text-indigo-500 uppercase">Level: {user.creatorEarnings?.level || 'Influencer'}</span>
-                         <Zap className="w-4 h-4 text-gray-300" />
-                       </div>
-                    </div>
-                  </div>
-
-                  {/* Monetization Roadmap */}
-                  <div className="bg-white border border-gray-100 rounded-[3rem] p-10 shadow-xl shadow-gray-100/50">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
-                      <div>
-                        <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight italic">Monetization Status & Eligibility</h3>
-                        <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Become a Global EFADO Partner</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                         <div className="w-16 h-16 rounded-full border-4 border-indigo-600 flex items-center justify-center text-indigo-600 font-black text-xs">
-                           85%
-                         </div>
-                         <div className="text-left">
-                           <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Global Authority Level</p>
-                           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Next tier: Sovereign Creator</p>
-                         </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                       {[
-                         { title: "Engagement Metrics", value: "85,420", target: "100k", status: "In Progress", icon: Users },
-                         { title: "Weekly Content Yield", value: "14 Gists", target: "10 Gists", status: "Complete", icon: MessageSquareIcon },
-                         { title: "Community Integrity", value: "99.8%", target: "95%", status: "Complete", icon: Shield }
-                       ].map((step, i) => (
-                         <div key={i} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 group hover:border-indigo-200 transition-all">
-                            <div className="flex items-center justify-between mb-4">
-                               <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-indigo-600">
-                                  <step.icon className="w-5 h-5" />
-                               </div>
-                               <span className={`text-[9px] font-black uppercase tracking-widest ${step.status === 'Complete' ? 'text-emerald-500' : 'text-amber-500'}`}>{step.status}</span>
-                            </div>
-                            <h5 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-2">{step.title}</h5>
-                            <div className="flex items-center gap-2">
-                               <div className="flex-grow h-2 bg-gray-200 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-600" style={{ width: step.status === 'Complete' ? '100%' : '85%' }} />
-                               </div>
-                               <span className="text-[10px] font-bold text-gray-400">{step.value}/{step.target}</span>
-                            </div>
-                         </div>
-                       ))}
-                    </div>
-                  </div>
-
-                  {/* Transaction History & Tips Feed */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                     <div className="bg-white border border-gray-100 rounded-[3rem] p-10 shadow-xl shadow-gray-100/50 overflow-hidden">
-                        <div className="flex items-center justify-between mb-8">
-                           <h4 className="text-lg font-black text-gray-900 uppercase tracking-tighter italic">Recent Tips & Support</h4>
-                           <button className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">View All Notifications</button>
-                        </div>
-                        <div className="space-y-6">
-                           {[1, 2, 3, 4].map(i => (
-                             <div key={i} className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl hover:bg-white hover:scale-[1.02] hover:shadow-lg transition-all cursor-pointer">
-                                <div className="flex items-center gap-4">
-                                   <div className="w-12 h-12 rounded-xl bg-indigo-100 overflow-hidden border border-indigo-200">
-                                      <img src={`https://picsum.photos/seed/${i + 70}/100/100`} alt="Supporter" referrerPolicy="no-referrer" />
-                                   </div>
-                                   <div>
-                                      <p className="text-xs font-black text-gray-900 uppercase tracking-tight">Supporter {i + 14}</p>
-                                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Sent a tip for your "Future of AI" gist</p>
-                                   </div>
-                                </div>
-                                <div className="text-right">
-                                   <p className="text-sm font-black text-emerald-600">+{formatPrice(5.00 * i)}</p>
-                                   <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">2h ago</p>
-                                </div>
-                             </div>
-                           ))}
-                        </div>
-                     </div>
-
-                     <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-32 -mt-32" />
-                        <div className="relative z-10">
-                           <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-10">
-                              <ShieldCheck className="w-8 h-8 text-emerald-400" />
-                           </div>
-                           <h4 className="text-3xl font-black uppercase tracking-tighter italic mb-4">Sovereign Monetization Account</h4>
-                           <p className="text-slate-400 text-sm font-medium leading-relaxed mb-10">
-                             Your earnings are protected by EFADO's tactical escrow bridges. You can withdraw your balance directly to your Tactical Wallet or synchronized bank accounts at any time.
-                           </p>
-                           
-                           <div className="space-y-4">
-                              <div className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5">
-                                 <div className="flex items-center gap-3">
-                                    <CreditCard className="w-5 h-5 text-indigo-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Synchronized Bank</span>
-                                 </div>
-                                 <span className="text-[10px] font-bold text-white uppercase tracking-widest">Zenith Bank ****4242</span>
-                              </div>
-                              <div className="flex items-center justify-between p-5 bg-white/5 rounded-2xl border border-white/5">
-                                 <div className="flex items-center gap-3">
-                                    <Globe className="w-5 h-5 text-emerald-400" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Payout Hub</span>
-                                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[8px] font-black rounded uppercase">Standard</span>
-                                 </div>
-                                 <span className="text-[10px] font-bold text-white uppercase tracking-widest">Global Transit Enabled</span>
-                              </div>
-                           </div>
-                        </div>
-
-                        <button className="mt-10 w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-500/40 hover:bg-indigo-500 transition-all active:scale-95">
-                           Configure Payout Strategy
-                        </button>
-                     </div>
-                  </div>
+                  <GistCreatorDashboard 
+                    user={user} 
+                    onOpenReels={() => setActiveView('REELS')} 
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
 
-        {/* Right Sidebar - Trending & Suggestions */}
-        <div className="hidden xl:flex w-80 flex-shrink-0 bg-slate-900/50 backdrop-blur-3xl border-l border-white/5 flex-col p-8 space-y-10 overflow-y-auto no-scrollbar">
-          <section>
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 pl-1">Tactical Trending</h4>
-            {!trendingRevealed ? (
-              <button 
-                onClick={() => setTrendingRevealed(true)}
-                className="w-full py-4 bg-indigo-600/10 hover:bg-indigo-600/25 border border-indigo-500/20 hover:border-indigo-500/50 text-indigo-400 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
-              >
-                <TrendingUp className="w-4 h-4" /> Reveal Trending Nodes
-              </button>
-            ) : (
-              <div className="space-y-6">
-                <div className="space-y-6">
-                  {GIST_CATEGORIES.slice(0, 4).map((cat) => (
-                    <div 
-                      key={cat.id} 
-                      onClick={() => {
-                        setSelectedGroup(null);
-                        setSelectedSubCategory(null);
-                        setSelectedCategory(cat);
-                        setActiveView('CATEGORIES');
-                      }}
-                      className="flex items-center gap-4 group cursor-pointer hover:translate-x-1 transition-all"
-                    >
-                      <div className={`w-12 h-12 rounded-2xl bg-${cat.color}-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-${cat.color}-500/20 transition-all shadow-lg`}>
-                        <cat.icon className={`w-6 h-6 text-${cat.color}-400`} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">{cat.title}</p>
-                        <p className="text-[9px] font-bold text-slate-600 uppercase tracking-widest flex items-center gap-2 mt-0.5">
-                          <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                          4.2K Active Units
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+        {/* Right Sidebar - Trending, Suggested & Creator Fund */}
+        <div className="hidden xl:flex w-80 flex-shrink-0 bg-[#0A0F1E]/60 backdrop-blur-2xl border-l border-white/10 flex-col p-6 space-y-6 overflow-y-auto no-scrollbar">
+          
+          {/* Creator Fund Quick Widget */}
+          <section className="bg-gradient-to-br from-[#8B5CF6]/20 via-[#121A2F] to-[#06B6D4]/20 border border-white/15 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#8B5CF6]/30 flex items-center justify-center text-[#8B5CF6]">
+                  <Zap className="w-4 h-4" />
                 </div>
-                <button 
-                  onClick={() => setTrendingRevealed(false)}
-                  className="w-full text-center py-2 text-[9px] font-black text-slate-500 hover:text-slate-400 uppercase tracking-widest transition-all"
-                >
-                  Hide Trending
-                </button>
+                <div>
+                  <h5 className="text-xs font-bold text-white">Creator Fund</h5>
+                  <p className="text-[10px] text-[#06B6D4] font-semibold">₦100 / 1K Qualified Views</p>
+                </div>
               </div>
-            )}
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[9px] font-bold">Active</span>
+            </div>
+            
+            <div className="bg-white/5 rounded-xl p-3 border border-white/5 flex items-center justify-between mb-3">
+              <div>
+                <p className="text-[10px] font-medium text-slate-400">Total Balance</p>
+                <p className="text-lg font-black text-white">₦12,450.00</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-medium text-slate-400">Qualified Views</p>
+                <p className="text-sm font-bold text-[#06B6D4]">124.5K</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setActiveView('MONETIZATION')}
+              className="w-full py-2 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-[#8B5CF6]/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              Withdraw to Bank / OPay <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </section>
 
-          <section>
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 pl-1">Suggested Connections</h4>
-            {!suggestionsRevealed ? (
-              <button 
-                onClick={() => setSuggestionsRevealed(true)}
-                className="w-full py-4 bg-emerald-600/10 hover:bg-emerald-600/25 border border-emerald-500/20 hover:border-emerald-500/50 text-emerald-400 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95"
-              >
-                <Users className="w-4 h-4" /> Reveal Suggested Intel
-              </button>
-            ) : (
-              <div className="space-y-6">
-                <div className="space-y-6">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-800 overflow-hidden ring-2 ring-white/5 group-hover:ring-indigo-500/50 transition-all">
-                          <img src={`https://picsum.photos/seed/${i + 50}/100/100`} alt="User" referrerPolicy="no-referrer" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-white uppercase tracking-tight">Agent {i + 10}</p>
-                          <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Mutual Intel</p>
-                        </div>
-                      </div>
-                      <button className="text-[10px] font-black text-indigo-400 uppercase tracking-widest hover:text-white transition-colors">Sync</button>
-                    </div>
-                  ))}
-                </div>
-                <button 
-                  onClick={() => setSuggestionsRevealed(false)}
-                  className="w-full text-center py-2 text-[9px] font-black text-slate-500 hover:text-slate-400 uppercase tracking-widest transition-all"
+          {/* Trending Hashtags */}
+          <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-[#8B5CF6]" /> Trending Hashtags
+              </h4>
+              <span className="text-[10px] font-bold text-[#06B6D4]">Live</span>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { tag: '#EfadoTech', posts: '28.4K posts', category: 'Tech' },
+                { tag: '#LagosGist', posts: '54.2K posts', category: 'Entertainment' },
+                { tag: '#Afrobeats2026', posts: '91.6K posts', category: 'Music' },
+                { tag: '#Web3Africa', posts: '14.8K posts', category: 'Crypto & Finance' },
+                { tag: '#NaijaCreatives', posts: '39.1K posts', category: 'Art & Video' },
+              ].map((item, idx) => (
+                <div 
+                  key={idx}
+                  onClick={() => {
+                    setSearchQuery(item.tag);
+                    setActiveView('FEED');
+                  }}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-all group"
                 >
-                  Hide Suggestions
-                </button>
-              </div>
-            )}
+                  <div>
+                    <p className="text-xs font-bold text-white group-hover:text-[#8B5CF6] transition-colors">{item.tag}</p>
+                    <p className="text-[10px] text-slate-400">{item.category} • {item.posts}</p>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-white transition-colors" />
+                </div>
+              ))}
+            </div>
           </section>
 
-          <section className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-3xl p-5 text-white relative overflow-hidden shadow-xl shadow-indigo-500/5">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-16 -mt-16" />
-            <div className="relative z-10 flex items-center justify-between gap-4">
-               <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
-                   <Shield className="w-5 h-5 text-indigo-400" />
+          {/* Suggested People to Follow */}
+          <section className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#06B6D4]" /> Suggested People
+              </h4>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { name: 'Dr. Chidi Okafor', handle: '@chidi_tech', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80', bio: 'AI & FinTech Architect' },
+                { name: 'Amina Bello', handle: '@amina_gist', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80', bio: 'Content Creator' },
+                { name: 'Tunde Adeleke', handle: '@tunde_live', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80', bio: 'Afrobeats DJ & Streamer' },
+              ].map((person, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition-all">
+                  <div className="flex items-center gap-2.5">
+                    <img src={person.avatar} alt={person.name} className="w-9 h-9 rounded-full object-cover border border-white/10" referrerPolicy="no-referrer" />
+                    <div>
+                      <p className="text-xs font-bold text-white truncate max-w-[100px]">{person.name}</p>
+                      <p className="text-[10px] text-slate-400">{person.handle}</p>
+                    </div>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      const btn = e.currentTarget;
+                      if (btn.innerText === 'Follow') {
+                        btn.innerText = 'Following';
+                        btn.className = 'px-3 py-1 bg-white/10 text-slate-300 rounded-full text-[10px] font-bold border border-white/10';
+                      } else {
+                        btn.innerText = 'Follow';
+                        btn.className = 'px-3 py-1 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white rounded-full text-[10px] font-bold shadow-md';
+                      }
+                    }}
+                    className="px-3 py-1 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white rounded-full text-[10px] font-bold shadow-md transition-all cursor-pointer"
+                  >
+                    Follow
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* EFADO Elite Badge */}
+          <section className="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 border border-indigo-500/20 rounded-2xl p-4 text-white relative overflow-hidden shadow-xl">
+            <div className="relative z-10 flex items-center justify-between gap-3">
+               <div className="flex items-center gap-2.5">
+                 <div className="w-8 h-8 bg-indigo-600/20 rounded-lg flex items-center justify-center border border-indigo-500/30">
+                   <Shield className="w-4 h-4 text-indigo-400" />
                  </div>
                  <div>
-                   <h5 className="text-xs font-black tracking-tight uppercase italic flex items-center gap-1.5">
+                   <h5 className="text-xs font-bold tracking-tight uppercase italic flex items-center gap-1">
                      EFADO™ Elite
-                     <span className="bg-amber-500/20 text-amber-300 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest border border-amber-500/10">PRO</span>
+                     <span className="bg-amber-500/20 text-amber-300 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">PRO</span>
                    </h5>
-                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Zero-latency security priority support</p>
+                   <p className="text-[9px] text-slate-400 font-semibold">Priority VIP support & Verification</p>
                  </div>
                </div>
                <button 
@@ -3689,9 +4036,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                  onClick={() => {
                    alert("EFADO™ Elite Synchronisation initiated. Handshaking secure terminal node...");
                  }}
-                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-500/20 cursor-pointer flex-shrink-0"
+                 className="px-3 py-1.5 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white rounded-xl text-[9px] font-bold uppercase transition-all active:scale-95 shadow-md cursor-pointer flex-shrink-0"
                >
-                 Sync Now
+                 Get Pro
                </button>
             </div>
           </section>

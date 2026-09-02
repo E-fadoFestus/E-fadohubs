@@ -501,5 +501,29 @@ service cloud.firestore {
     match /seerbit_webhook_logs/{logId} {
       allow read, write: if isAuthenticated();
     }
+    match /creator_stats/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /wallets/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /gist_live_rooms/{roomId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /gist_communities/{communityId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /partner_applications/{appId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /zoom_subscriptions/{subId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /crypto_conversions/{convId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /waec_scratch_cards/{cardId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

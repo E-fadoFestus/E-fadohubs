@@ -269,14 +269,41 @@ export interface SocialPost {
   authorName: string;
   authorPhoto?: string;
   content: string;
+  postType?: 'text' | 'image' | 'video' | 'poll' | 'voice_note' | 'location' | 'product_listing';
   media?: {
     type: 'image' | 'video';
     url: string;
   }[];
   likes: string[];
+  reactions?: {
+    like?: string[];
+    love?: string[];
+    laugh?: string[];
+    wow?: string[];
+    sad?: string[];
+    angry?: string[];
+  };
+  bookmarks?: string[];
+  reposts?: string[];
+  voiceNoteUrl?: string;
+  voiceNoteDuration?: number;
+  locationTag?: {
+    name: string;
+    city?: string;
+    country?: string;
+  };
   comments: SocialComment[];
   category?: string;
-  createdAt: any;
+  community?: string;
+  communityTag?: string;
+  marketplaceListing?: {
+    title: string;
+    price: number;
+    currency: string;
+    condition: 'Brand New' | 'Like New' | 'Fairly Used';
+    location: string;
+    contactPhone?: string;
+  };
   poll?: {
     question: string;
     options: {
@@ -284,6 +311,100 @@ export interface SocialPost {
       votes: string[];
     }[];
   };
+  viewsCount?: number;
+  watchTimeSeconds?: number;
+  sharesCount?: number;
+  createdAt: any;
+}
+
+export interface CreatorStats {
+  userId?: string;
+  availableBalance: number;
+  pendingBalance: number;
+  totalViews: number;
+  todayViews: number;
+  todayEarnings: number;
+  inviteBonus: number;
+  rate?: number;
+  launchBonusRate?: number;
+  launchBonusEnd?: string;
+  qualifiedViews?: number;
+  totalEarnings?: number;
+  invitedFriends?: number;
+  followersCount?: number;
+  withdrawnAmount?: number;
+  pendingEarnings?: number;
+  lastUpdated?: any;
+}
+
+export interface WalletsDoc {
+  userId?: string;
+  mainWallet: {
+    balance: number;
+  };
+  creatorWallet: {
+    available: number;
+    pending: number;
+  };
+}
+
+export interface EfadoCoinTransaction {
+  id?: string;
+  userId: string;
+  amount: number;
+  type: 'purchase' | 'gift_sent' | 'gift_received' | 'withdrawal' | 'tip' | 'invite_bonus';
+  date: any;
+  metadata?: any;
+}
+
+export interface EfadoGift {
+  id: string;
+  name: string;
+  coinPrice: number;
+  icon: string;
+  emoji?: string;
+  animationType?: string;
+}
+
+export interface GistStory {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorPhoto?: string;
+  mediaUrl: string;
+  mediaType: 'image' | 'video';
+  caption?: string;
+  createdAt: any;
+  expiresAt: any;
+  views?: string[];
+}
+
+export interface CommunityGroup {
+  id: string;
+  name: string;
+  tag: string;
+  category: string;
+  description: string;
+  avatarUrl: string;
+  bannerUrl: string;
+  membersCount: number;
+  members: string[];
+  moderators: string[];
+  rules: string[];
+}
+
+export interface LiveStreamSession {
+  id: string;
+  hostId: string;
+  hostName: string;
+  hostPhoto?: string;
+  title: string;
+  category: string;
+  status: 'live' | 'ended';
+  viewersCount: number;
+  likesCount: number;
+  totalCoinsEarned: number;
+  startedAt: any;
 }
 
 export interface SocialComment {

@@ -770,7 +770,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl overflow-hidden"
+      className="fixed inset-0 z-[100] flex flex-col bg-slate-950 overflow-hidden"
     >
       <AnimatePresence>
         {showGuide && (
@@ -778,40 +778,40 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md"
           >
-            <div className="w-full max-w-xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full blur-3xl -mr-24 -mt-24 opacity-50" />
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden text-white">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none" />
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-900 transition-all font-black"
+                className="absolute top-6 right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black"
               >
                 <X className="w-6 h-6" />
               </button>
               
               <div className="relative z-10">
-                <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-100 mb-8">
+                <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-900/40 mb-6">
                   <ShieldCheck className="w-8 h-8" />
                 </div>
-                <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight uppercase">Tactical Marketplace Guide</h2>
-                <p className="text-gray-600 font-bold mb-8 leading-relaxed uppercase tracking-[0.1em] text-xs">
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight uppercase">Tactical Marketplace Guide</h2>
+                <p className="text-slate-300 font-bold mb-6 leading-relaxed uppercase tracking-[0.1em] text-xs">
                   Strategic commerce protocols active. Here is how you navigate the EFADO Marketplace:
                 </p>
                 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {[
                     { icon: ShoppingBag, title: "Modern Categories", desc: "Browse high-fidelity products across specialized categories from electronics to real estate." },
                     { icon: QrCode, title: "QR Strategic Link", desc: "Scan physical product markers to instantly link into the digital inventory system." },
                     { icon: UserPlus, title: "Vendor Protocol", desc: "Initialize your professional profile to start deploying products to the EFADO network." },
                     { icon: CreditCard, title: "Wallet Settlement", desc: "Seamless transactions using your EFADO Deposit Wallet for instant asset acquisition." }
                   ].map((item, i) => (
-                    <div key={i} className="flex gap-4 group">
-                      <div className="w-12 h-12 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-emerald-600 transition-all duration-300 pointer-events-none">
-                        <item.icon className="w-6 h-6 text-emerald-600 group-hover:text-white transition-colors" />
+                    <div key={i} className="flex gap-4 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+                      <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center shrink-0">
+                        <item.icon className="w-5 h-5 text-emerald-400" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-1">{item.title}</h4>
-                        <p className="text-xs text-gray-500 leading-relaxed font-bold">{item.desc}</p>
+                        <h4 className="text-xs font-black text-white uppercase tracking-widest mb-0.5">{item.title}</h4>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -819,7 +819,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 
                 <button 
                   onClick={() => setShowGuide(false)}
-                  className="w-full mt-10 py-5 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-gray-300 hover:scale-[1.02] active:scale-95 transition-all"
+                  className="w-full mt-6 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all"
                 >
                   Initiate Trade
                 </button>
@@ -829,43 +829,40 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         )}
       </AnimatePresence>
       <div 
-        className="relative w-full max-w-7xl h-[90vh] border border-amber-200/50 rounded-[3rem] flex flex-col shadow-2xl overflow-hidden"
-        style={{ backgroundImage: `url(${bokehBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden"
       >
         {/* Header Block */}
-        <div className="px-10 py-8 border-b border-amber-200/30 bg-white/75 backdrop-blur-md z-20 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-                <ShoppingBasket className="w-8 h-8 text-white" />
+        <div className="px-6 md:px-10 py-5 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+                <ShoppingBasket className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h2 className="text-3xl font-display font-black text-slate-900 tracking-tight">EFADO <span className="text-cyan-600">Modern Market</span> Hub</h2>
-                <div className="flex flex-col mt-1">
-                  <div className="flex items-center gap-4">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                      <Zap className="w-3 h-3 text-yellow-500 animate-pulse" /> New + Fairly Used Products Sold
-                    </p>
-                    <button 
-                      onClick={() => setShowGuide(true)}
-                      className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-500 transition-colors"
-                    >
-                      <Info className="w-3 h-3" /> Tactical Guide
-                    </button>
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                    <Globe className="w-3 h-3 text-blue-500" /> Vendors Meet Buyers (Local + International)
+                <h2 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">EFADO <span className="text-cyan-400">Modern Market</span> Hub</h2>
+                <div className="flex flex-wrap items-center gap-3 mt-1">
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Zap className="w-3 h-3 text-yellow-400 animate-pulse" /> New + Fairly Used Products Sold
+                  </p>
+                  <button 
+                    onClick={() => setShowGuide(true)}
+                    className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30"
+                  >
+                    <Info className="w-3 h-3" /> Tactical Guide
+                  </button>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Globe className="w-3 h-3 text-blue-400" /> Global & Local
                   </p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button 
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-3 px-5 py-3 text-slate-600 hover:text-slate-900 transition-all bg-slate-100 rounded-2xl hover:bg-slate-200 group border border-slate-200"
+                className="relative flex items-center gap-2.5 px-4 py-2.5 text-slate-200 hover:text-white transition-all bg-slate-800 rounded-2xl hover:bg-slate-700 group border border-slate-700"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-6 h-6 text-slate-700" />
+                  <ShoppingBag className="w-5 h-5 text-cyan-400" />
                   {cart.length > 0 && (
                     <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 animate-bounce">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -873,36 +870,36 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                   )}
                 </div>
                 <div className="text-left hidden sm:block">
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">My Cart</p>
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">View & Checkout</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">My Cart</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">View & Checkout</p>
                 </div>
               </button>
               <button 
                 onClick={() => setShowRegModal(true)}
-                className="group flex flex-col items-center bg-cyan-600 hover:bg-cyan-500 px-6 py-2 rounded-2xl transition-all shadow-lg shadow-cyan-500/20"
+                className="group flex flex-col items-center bg-cyan-600 hover:bg-cyan-500 px-5 py-2 rounded-2xl transition-all shadow-lg shadow-cyan-500/20"
               >
-                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1.5">
                   <UserPlus className="w-3 h-3" /> Vendor Registration
                 </span>
-                <span className="text-[8px] font-bold text-cyan-200 uppercase tracking-tighter">Register & Upload Products</span>
+                <span className="text-[8px] font-bold text-cyan-100 uppercase tracking-tighter">Register & Upload Products</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-3 text-slate-500 hover:text-slate-800 transition-colors bg-slate-100 rounded-2xl hover:bg-slate-200">
-                <X className="w-7 h-7" />
+              <button onClick={onClose} className="p-2.5 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-2xl hover:bg-slate-700 border border-slate-700" title="Close Market Hub">
+                <X className="w-6 h-6" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-6 mt-6">
+          <div className="flex items-center gap-6 mt-4">
             <button 
               onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-blue-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
             >
               Browse Market
             </button>
             <button 
               onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-blue-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
             >
               My Orders & Tracking
             </button>
@@ -910,31 +907,31 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
 
           {/* Breadcrumb / Selection Path UI */}
           {activeView === 'browse' && (
-            <div className="flex items-center gap-3 bg-white px-6 py-4 rounded-2xl border border-slate-200 mt-6 shadow-sm">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL1 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-300'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL1 ? 'text-slate-800' : 'text-slate-400'}`}>
+            <div className="flex items-center gap-3 bg-slate-800/90 px-5 py-3 rounded-2xl border border-slate-700/80 mt-3 shadow-sm overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={`w-2 h-2 rounded-full ${selectedL1 ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
                 {selectedL1 || 'Category'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL2 ? 'bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'bg-slate-300'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL2 ? 'text-slate-800' : 'text-slate-400'}`}>
-                {selectedL2 || 'Subcategory'}
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={`w-2 h-2 rounded-full ${selectedL2 ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'bg-slate-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL2 ? 'text-white' : 'text-slate-500'}`}>
+                {selectedL2 || 'Section'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL3 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL3 ? 'text-slate-800' : 'text-slate-400'}`}>
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={`w-2 h-2 rounded-full ${selectedL3 ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL3 ? 'text-white' : 'text-slate-500'}`}>
                 {selectedL3 || 'Subcategory'}
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${selectedL4 ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-300'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL4 ? 'text-slate-800' : 'text-slate-400'}`}>
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={`w-2 h-2 rounded-full ${selectedL4 ? 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-600'}`} />
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL4 ? 'text-white' : 'text-slate-500'}`}>
                 {selectedL4 || 'Group'}
               </span>
             </div>
@@ -943,7 +940,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
               <motion.div 
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="ml-auto flex items-center gap-2 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20"
+                className="ml-auto flex items-center gap-2 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40 shrink-0"
               >
                 <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                 <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Path Complete</span>
@@ -965,154 +962,154 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 className="h-full flex flex-col lg:flex-row"
               >
                 {/* Level 1: Category */}
-                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/40 backdrop-blur-sm">
-                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/90">
+                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
+                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
                       <span className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">1</span>
                       Category
                     </h3>
                   </div>
-                  <div className="flex-grow overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
                     {Object.keys(MODERN_CATEGORIES).map(cat => (
                       <button
                         key={cat}
                         onClick={() => handleL1Select(cat)}
-                        className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
+                        className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
                           selectedL1 === cat 
                             ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20 font-black' 
-                            : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                         }`}
                       >
-                        <div className="relative z-10 flex items-center gap-4">
-                          {cat.includes('Electronics') && <Cpu className="w-5 h-5" />}
-                          {cat.includes('Fashion') && <Shirt className="w-5 h-5" />}
-                          {cat.includes('Home') && <Home className="w-5 h-5" />}
-                          <span className="text-sm font-black uppercase tracking-tight leading-tight">{cat}</span>
+                        <div className="relative z-10 flex items-center gap-3">
+                          {cat.includes('Electronics') && <Cpu className="w-4 h-4 text-cyan-400" />}
+                          {cat.includes('Fashion') && <Shirt className="w-4 h-4 text-rose-400" />}
+                          {cat.includes('Home') && <Home className="w-4 h-4 text-emerald-400" />}
+                          <span className="text-xs font-black uppercase tracking-tight leading-tight">{cat}</span>
                         </div>
-                        <ChevronRight className={`w-5 h-5 relative z-10 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                        <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
                       </button>
                     ))}
                   </div>
                 </div>
 
                 {/* Level 2: Section */}
-                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/20 backdrop-blur-sm">
-                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/70">
+                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
+                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
                       <span className="w-5 h-5 rounded-lg bg-cyan-600 text-white flex items-center justify-center text-[10px] font-black">2</span>
                       Section
                     </h3>
                   </div>
-                  <div className="flex-grow overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
                     {selectedL1 ? (
                       Object.keys(MODERN_CATEGORIES[selectedL1]).map(sub => (
                         <button
                           key={sub}
                           onClick={() => handleL2Select(sub)}
-                          className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
+                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
                             selectedL2 === sub 
                               ? 'bg-cyan-600 border-cyan-400 text-white shadow-xl shadow-cyan-500/20 font-black' 
-                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                           }`}
                         >
-                          <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{sub}</span>
-                          <ChevronRight className={`w-5 h-5 relative z-10 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{sub}</span>
+                          <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-400" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
+                          <ArrowRight className="w-6 h-6 text-slate-500" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Category First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Category First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Level 3: Subcategory */}
-                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/40 backdrop-blur-sm">
-                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/90">
+                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
+                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
                       <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">3</span>
                       Subcategory
                     </h3>
                   </div>
-                  <div className="flex-grow overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
                     {selectedL2 ? (
                       Object.keys(MODERN_CATEGORIES[selectedL1!][selectedL2]).map(subSub => (
                         <button
                           key={subSub}
                           onClick={() => handleL3Select(subSub)}
-                          className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
+                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
                             selectedL3 === subSub 
                               ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20 font-black' 
-                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                           }`}
                         >
-                          <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{subSub}</span>
-                          <ChevronRight className={`w-5 h-5 relative z-10 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{subSub}</span>
+                          <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-400" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
+                          <ArrowRight className="w-6 h-6 text-slate-500" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Section First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Section First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Level 4: Group */}
-                <div className="lg:w-1/5 border-r border-slate-200/30 flex flex-col bg-white/20 backdrop-blur-sm">
-                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/70">
+                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
+                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
                       <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">4</span>
                       Group
                     </h3>
                   </div>
-                  <div className="flex-grow overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
                     {selectedL3 ? (
                       MODERN_CATEGORIES[selectedL1!][selectedL2!][selectedL3].map(group => (
                         <button
                           key={group}
                           onClick={() => handleL4Select(group)}
-                          className={`w-full flex items-center justify-between p-5 rounded-[1.5rem] border transition-all text-left group relative overflow-hidden ${
+                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
                             selectedL4 === group 
                               ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 font-black' 
-                              : 'bg-white/60 backdrop-blur-sm border-slate-200/50 text-slate-900 font-extrabold hover:bg-white/95 hover:border-amber-400'
+                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
                           }`}
                         >
-                          <span className="relative z-10 text-sm font-black uppercase tracking-tight leading-tight">{group}</span>
-                          <CheckCircle2 className={`w-5 h-5 relative z-10 transition-all ${selectedL4 === group ? 'scale-110' : 'opacity-0'}`} />
+                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{group}</span>
+                          <CheckCircle2 className={`w-4 h-4 relative z-10 transition-all ${selectedL4 === group ? 'scale-110 text-white' : 'opacity-0'}`} />
                         </button>
                       ))
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                        <div className="w-16 h-16 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-4">
-                          <ArrowRight className="w-8 h-8 text-slate-400" />
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
+                          <ArrowRight className="w-6 h-6 text-slate-500" />
                         </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Select Subcategory First</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Subcategory First</p>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Product Feed Area */}
-                <div className="lg:w-1/5 flex flex-col bg-slate-100/30 backdrop-blur-sm">
-                  <div className="p-6 border-b border-amber-500/20 bg-amber-500/5 flex items-center justify-between">
-                    <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Live Feed</h3>
-                    <div className="px-2 py-0.5 bg-blue-600 rounded-full">
-                      <span className="text-[8px] font-black text-white uppercase tracking-widest">{filteredProducts.length} Items</span>
+                <div className="lg:w-1/5 flex flex-col bg-slate-950">
+                  <div className="p-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em]">Live Feed</h3>
+                    <div className="px-2.5 py-0.5 bg-blue-600 rounded-full">
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">{filteredProducts.length} Items</span>
                     </div>
                   </div>
-                  <div className="p-4 flex-grow overflow-y-auto space-y-4 custom-scrollbar">
+                  <div className="p-3 flex-grow overflow-y-auto space-y-3 custom-scrollbar">
                     {filteredProducts.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-40">
-                        <Package className="w-12 h-12 text-slate-400 mb-4" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">No items found</p>
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
+                        <Package className="w-12 h-12 text-slate-600 mb-3" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">No items found</p>
                       </div>
                     ) : (
                       filteredProducts.map((product, idx) => (
@@ -1122,46 +1119,29 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.05 }}
                           key={product.id}
-                          className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden group hover:border-blue-500/50 transition-all cursor-pointer"
+                          className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl overflow-hidden group hover:border-cyan-500/50 transition-all cursor-pointer"
                         >
-                          <div className="aspect-square relative overflow-hidden">
+                          <div className="aspect-video relative overflow-hidden">
                             <img 
                               src={product.photos[0]} 
                               alt={product.title} 
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               referrerPolicy="no-referrer"
                             />
                             <div className="absolute top-2 right-2 flex flex-col gap-1">
-                              <div className="px-2 py-1 bg-white/95 backdrop-blur-md rounded-lg border border-slate-200 shadow-sm">
-                                <span className="text-[10px] font-black text-blue-600">{formatPrice(product.price, true)}</span>
+                              <div className="px-2 py-0.5 bg-slate-900/90 backdrop-blur-md rounded-lg border border-slate-700 shadow-sm">
+                                <span className="text-[10px] font-black text-cyan-400">{formatPrice(product.price, true)}</span>
                               </div>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const text = `Check out this ${product.title} on EFADO Hubs! 🚀\nPrice: ${formatPrice(product.price, true)}\nLocation: ${product.location}`;
-                                  if (navigator.share) {
-                                    navigator.share({ title: product.title, text, url: window.location.href });
-                                  } else {
-                                    navigator.clipboard.writeText(`${text}\n${window.location.href}`);
-                                    alert("Promotion link copied to clipboard! Share it on social media to go viral! 🚀");
-                                  }
-                                }}
-                                className="p-2 bg-rose-600/90 hover:bg-rose-500 text-white rounded-lg border border-rose-500 shadow-lg backdrop-blur-md transition-all flex items-center gap-1 group/share"
-                                title="Share & Go Viral"
-                              >
-                                <Globe className="w-3 h-3 animate-pulse" />
-                                <span className="text-[8px] font-black uppercase tracking-tighter hidden group-hover/share:block">Viral Share</span>
-                              </button>
                             </div>
                           </div>
                           <div className="p-3">
-                            <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-tight truncate mb-1">{product.title}</h4>
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-2 text-[8px] font-bold text-slate-500 uppercase tracking-widest">
-                                <MapPin className="w-3 h-3 text-slate-400" />
+                            <h4 className="text-xs font-black text-white uppercase tracking-tight truncate mb-1">{product.title}</h4>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
+                                <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
                                 {product.location}
                               </div>
-                              <span className="text-[10px] font-black text-blue-600">{formatPrice(product.price, true)}</span>
+                              <span className="text-[10px] font-black text-cyan-400">{formatPrice(product.price, true)}</span>
                             </div>
                             
                             {product.video && (
@@ -1171,7 +1151,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                   onNavigate?.('GIST', 'REELS');
                                   onClose();
                                 }}
-                                className="w-full mb-3 py-2 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
+                                className="w-full mb-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
                               >
                                 <Film className="w-3.5 h-3.5 animate-pulse" /> Watch Product Reel
                               </button>
@@ -1183,10 +1163,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                   e.stopPropagation();
                                   addToCart(product);
                                 }}
-                                className="flex items-center justify-center gap-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg transition-all border border-slate-200"
+                                className="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
                               >
-                                <Plus className="w-3 h-3 text-slate-600" />
-                                <span className="text-[9px] font-black uppercase tracking-tighter">Add to Cart</span>
+                                <Plus className="w-3 h-3 text-cyan-400" /> Cart
                               </button>
                               <button 
                                 onClick={(e) => {
@@ -1194,10 +1173,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                   addToCart(product);
                                   setShowCart(true);
                                 }}
-                                className="flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all shadow-lg shadow-blue-500/20"
+                                className="py-2 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-cyan-900/30"
                               >
-                                <ShoppingBag className="w-3 h-3" />
-                                <span className="text-[9px] font-black uppercase tracking-tighter">Buy Now</span>
+                                <ShoppingBag className="w-3 h-3" /> Buy Now
                               </button>
                             </div>
                           </div>

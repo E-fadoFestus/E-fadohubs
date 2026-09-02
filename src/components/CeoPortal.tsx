@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { CurrencySelector } from './CurrencySelector';
 import { useCurrency } from '../lib/CurrencyContext';
+import { CeoHubsManager } from './CeoHubsManager';
 import { 
   ShieldCheck, 
   Users, 
@@ -77,7 +78,7 @@ import { PatronageTracker } from './PatronageTracker';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { monetizationService } from '../services/monetizationService';
 import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
-import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff, Copy, ExternalLink, Filter, Layers, Send, Check, BookOpen, Cpu } from 'lucide-react';
+import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff, Copy, ExternalLink, Filter, Layers, Send, Check, BookOpen, Cpu, Radio, Video, PhoneCall, Package, GraduationCap, Award, Smartphone, Share2, Compass, Tv, Activity, RefreshCw, Play, Flame, Gift } from 'lucide-react';
 
 interface CeoPortalProps {
   onClose: () => void;
@@ -132,8 +133,25 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [contentSearchQuery, setContentSearchQuery] = useState('');
 
   // Extended Interactive Hub Tab Navigator
-  const [selectedHubTab, setSelectedHubTab] = useState<'stream' | 'corps' | 'cscc' | 'loans' | 'market' | 'ads' | 'gist' | 'domain' | 'quiz' | 'education' | 'email' | 'mining' | 'tech' | 'support'>('stream');
+  const [selectedHubTab, setSelectedHubTab] = useState<string>('overview');
   const [hubActionFeedback, setHubActionFeedback] = useState<string | null>(null);
+
+  // New Comprehensive Hub Tracking States
+  const [creatorStatsList, setCreatorStatsList] = useState<any[]>([]);
+  const [creatorWalletsList, setCreatorWalletsList] = useState<any[]>([]);
+  const [liveRooms, setLiveRooms] = useState<any[]>([]);
+  const [gistCommunities, setGistCommunities] = useState<any[]>([]);
+  const [vendingPurchases, setVendingPurchases] = useState<any[]>([]);
+  const [sourcingRequests, setSourcingRequests] = useState<any[]>([]);
+  const [cryptoConversions, setCryptoConversions] = useState<any[]>([]);
+  const [partnerApplications, setPartnerApplications] = useState<any[]>([]);
+  const [zoomSubscriptions, setZoomSubscriptions] = useState<any[]>([]);
+  const [jambCandidates, setJambCandidates] = useState<any[]>([]);
+  const [waecCards, setWaecCards] = useState<any[]>([]);
+
+  // Real-Time Site Activity Radar Filters
+  const [siteActivityFilter, setSiteActivityFilter] = useState<'all' | 'creators' | 'finance' | 'market' | 'social' | 'education' | 'services' | 'digital'>('all');
+  const [siteActivitySearch, setSiteActivitySearch] = useState('');
 
   // Dedicated Cash Out & Withdrawal Filtering
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'completed' | 'failed'>('pending');
@@ -720,6 +738,55 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       setLiveBroadcastClasses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (e) => handleSnapError(e, 'live_classes'));
 
+    // Fetch Creator Stats & Monetization Wallets
+    const unsubCreatorStats = onSnapshot(collection(db, 'creator_stats'), (snap) => {
+      setCreatorStatsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'creator_stats'));
+
+    const unsubCreatorWallets = onSnapshot(collection(db, 'wallets'), (snap) => {
+      setCreatorWalletsList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'wallets'));
+
+    // Fetch Gist Live Rooms & Communities
+    const unsubLiveRooms = onSnapshot(collection(db, 'gist_live_rooms'), (snap) => {
+      setLiveRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'gist_live_rooms'));
+
+    const unsubCommunities = onSnapshot(collection(db, 'gist_communities'), (snap) => {
+      setGistCommunities(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'gist_communities'));
+
+    // Fetch Digital Services (Vending, Sourcing, Crypto)
+    const unsubVending = onSnapshot(collection(db, 'vending_purchases'), (snap) => {
+      setVendingPurchases(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'vending_purchases'));
+
+    const unsubSourcing = onSnapshot(collection(db, 'sourcing_requests'), (snap) => {
+      setSourcingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'sourcing_requests'));
+
+    const unsubCrypto = onSnapshot(collection(db, 'crypto_conversions'), (snap) => {
+      setCryptoConversions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'crypto_conversions'));
+
+    // Fetch Partners & Zoom Subscriptions
+    const unsubPartners = onSnapshot(collection(db, 'partner_applications'), (snap) => {
+      setPartnerApplications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'partner_applications'));
+
+    const unsubZoom = onSnapshot(collection(db, 'zoom_subscriptions'), (snap) => {
+      setZoomSubscriptions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'zoom_subscriptions'));
+
+    // Fetch Education Hub (JAMB Candidates & WAEC Cards)
+    const unsubJamb = onSnapshot(collection(db, 'jamb_candidates'), (snap) => {
+      setJambCandidates(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'jamb_candidates'));
+
+    const unsubWaec = onSnapshot(collection(db, 'waec_scratch_cards'), (snap) => {
+      setWaecCards(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'waec_scratch_cards'));
+
     return () => {
       unsubUsers();
       unsubWithdrawals();
@@ -750,6 +817,17 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       unsubSupport();
       unsubIdeas();
       unsubLiveClasses();
+      unsubCreatorStats();
+      unsubCreatorWallets();
+      unsubLiveRooms();
+      unsubCommunities();
+      unsubVending();
+      unsubSourcing();
+      unsubCrypto();
+      unsubPartners();
+      unsubZoom();
+      unsubJamb();
+      unsubWaec();
     };
   }, []);
 
@@ -810,6 +888,324 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     list.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp));
     return list;
   }, [transactions, manualGamePins, depositsList]);
+
+  // Aggregated Creator Monetization Statistics
+  const creatorStatsAggregate = React.useMemo(() => {
+    const totalAvailable = creatorStatsList.reduce((acc, c) => acc + (Number(c.availableBalance) || 0), 0);
+    const totalPending = creatorStatsList.reduce((acc, c) => acc + (Number(c.pendingBalance) || 0), 0);
+    const totalViews = creatorStatsList.reduce((acc, c) => acc + (Number(c.totalViews) || 0), 0);
+    const totalEarnings = creatorStatsList.reduce((acc, c) => acc + (Number(c.totalEarnings) || 0), 0);
+    const todayEarnings = creatorStatsList.reduce((acc, c) => acc + (Number(c.todayEarnings) || 0), 0);
+    const todayViews = creatorStatsList.reduce((acc, c) => acc + (Number(c.todayViews) || 0), 0);
+    const totalBonuses = creatorStatsList.reduce((acc, c) => acc + (Number(c.inviteBonus) || 0), 0);
+
+    const topCreators = [...creatorStatsList].sort((a, b) => (Number(b.totalEarnings) || 0) - (Number(a.totalEarnings) || 0)).slice(0, 15);
+
+    return {
+      totalAvailable,
+      totalPending,
+      totalViews,
+      totalEarnings,
+      todayEarnings,
+      todayViews,
+      totalBonuses,
+      topCreators,
+      totalCount: creatorStatsList.length
+    };
+  }, [creatorStatsList]);
+
+  // Master Unified Site Activity Radar Stream
+  const allSiteActivities = React.useMemo(() => {
+    const items: Array<{
+      id: string;
+      category: 'creators' | 'finance' | 'market' | 'social' | 'education' | 'services' | 'digital';
+      hubName: string;
+      title: string;
+      description: string;
+      amount?: string;
+      user: string;
+      userEmail?: string;
+      userId?: string;
+      timestamp: number;
+      status?: string;
+      badgeColor: string;
+      actionType?: string;
+      rawData?: any;
+    }> = [];
+
+    const parseTime = (val: any) => {
+      if (!val) return Date.now();
+      if (typeof val.toMillis === 'function') return val.toMillis();
+      if (typeof val.seconds === 'number') return val.seconds * 1000;
+      if (val instanceof Date) return val.getTime();
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') return new Date(val).getTime();
+      return Date.now();
+    };
+
+    // 1. Transactions & Deposits
+    transactions.forEach(t => {
+      items.push({
+        id: `tx-${t.id}`,
+        category: 'finance',
+        hubName: 'Financial Hub',
+        title: `${(t.type || 'Transaction').toUpperCase()}: ₦${(t.amount || 0).toLocaleString()}`,
+        description: t.description || `Platform transaction via ${t.reference || 'internal ledger'}`,
+        amount: `₦${(t.amount || 0).toLocaleString()}`,
+        user: t.userId || 'User',
+        userId: t.userId,
+        timestamp: parseTime(t.timestamp),
+        status: t.status,
+        badgeColor: t.type === 'deposit' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30',
+        rawData: t
+      });
+    });
+
+    // 2. Withdrawals / Cash-Outs
+    withdrawals.forEach(w => {
+      const itemW = w as any;
+      items.push({
+        id: `wd-${w.id}`,
+        category: 'finance',
+        hubName: 'Cash Out Desk',
+        title: `Withdrawal Request: ₦${(w.amount || 0).toLocaleString()}`,
+        description: `Beneficiary: ${itemW.accountName || w.userEmail || 'User'} (${itemW.bankName || 'Direct Transfer'})`,
+        amount: `₦${(w.amount || 0).toLocaleString()}`,
+        user: itemW.accountName || w.userEmail || w.userId,
+        userEmail: w.userEmail,
+        userId: w.userId,
+        timestamp: parseTime(w.timestamp),
+        status: w.status,
+        badgeColor: w.status === 'pending' ? 'text-amber-400 bg-amber-500/10 border-amber-500/30' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+        rawData: w
+      });
+    });
+
+    // 3. Creator Monetization & Wallets
+    creatorStatsList.forEach(c => {
+      if ((c.totalViews || 0) > 0 || (c.availableBalance || 0) > 0 || (c.todayEarnings || 0) > 0) {
+        items.push({
+          id: `cr-${c.id}`,
+          category: 'creators',
+          hubName: 'Creator Monetization',
+          title: `Creator Yield: ₦${(c.todayEarnings || 0).toLocaleString()} (Today)`,
+          description: `${(c.todayViews || 0).toLocaleString()} Views Today | ₦${(c.availableBalance || 0).toLocaleString()} Available | ₦${(c.pendingBalance || 0).toLocaleString()} in 7d Escrow`,
+          amount: `₦${(c.availableBalance || 0).toLocaleString()}`,
+          user: c.id,
+          userId: c.id,
+          timestamp: parseTime(c.lastViewedAt || c.updatedAt),
+          status: 'verified_creator',
+          badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/30',
+          rawData: c
+        });
+      }
+    });
+
+    // 4. Gist Live Rooms
+    liveRooms.forEach(room => {
+      items.push({
+        id: `room-${room.id}`,
+        category: 'social',
+        hubName: 'Gist Live Broadcast',
+        title: `Live Room: ${room.title || 'Interactive Broadcast'}`,
+        description: `Host: ${room.hostName || room.hostId} • ${room.viewerCount || 0} active live viewers • ₦${(room.totalGifts || 0).toLocaleString()} in gifts`,
+        user: room.hostName || room.hostId,
+        userId: room.hostId,
+        timestamp: parseTime(room.createdAt || room.startedAt),
+        status: room.status || 'live',
+        badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
+        rawData: room
+      });
+    });
+
+    // 5. Video Reels & Social Posts
+    reels.forEach(r => {
+      items.push({
+        id: `reel-${r.id}`,
+        category: 'social',
+        hubName: 'Gist Hub Reels',
+        title: `Reel Published: "${(r.caption || 'Video Reel').slice(0, 40)}..."`,
+        description: `Creator: ${r.authorName || 'Creator'} • ${r.views || 0} Views • ${r.likes?.length || 0} Likes`,
+        user: r.authorName || 'Creator',
+        userId: r.authorId,
+        timestamp: parseTime(r.createdAt),
+        status: 'published',
+        badgeColor: 'text-pink-400 bg-pink-500/10 border-pink-500/30',
+        rawData: r
+      });
+    });
+
+    // 6. Marketplace Orders & Products
+    marketOrders.forEach(mo => {
+      items.push({
+        id: `mo-${mo.id}`,
+        category: 'market',
+        hubName: 'Marketplace',
+        title: `Market Order Placed: ₦${(mo.totalPrice || mo.amountCharged || 0).toLocaleString()}`,
+        description: `Customer: ${mo.buyerEmail || mo.customerName || 'Customer'} • Product: ${mo.productTitle || 'Goods'}`,
+        amount: `₦${(mo.totalPrice || mo.amountCharged || 0).toLocaleString()}`,
+        user: mo.buyerEmail || mo.customerName,
+        userEmail: mo.buyerEmail,
+        timestamp: parseTime(mo.createdAt),
+        status: mo.status || 'processing',
+        badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+        rawData: mo
+      });
+    });
+
+    // 7. Digital Services (Airtime/Data Vending & Sourcing)
+    vendingPurchases.forEach(vp => {
+      items.push({
+        id: `vp-${vp.id}`,
+        category: 'digital',
+        hubName: 'Telecom & Vending',
+        title: `${(vp.serviceType || 'Airtime/Data').toUpperCase()} Purchase`,
+        description: `Target: ${vp.phoneNumber || 'Recipient'} (${vp.network || 'Telecom Provider'}) • Plan: ${vp.planName || vp.amount}`,
+        amount: `₦${(vp.amount || 0).toLocaleString()}`,
+        user: vp.userEmail || vp.userId,
+        timestamp: parseTime(vp.createdAt),
+        status: vp.status || 'success',
+        badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30',
+        rawData: vp
+      });
+    });
+
+    sourcingRequests.forEach(sr => {
+      items.push({
+        id: `sr-${sr.id}`,
+        category: 'digital',
+        hubName: 'China Direct Sourcing',
+        title: `China Wholesale Quote: ${sr.productName || 'Factory Sourcing'}`,
+        description: `Requested Qty: ${sr.quantity || 1} units • Port: ${sr.destinationPort || 'Lagos / Air Cargo'}`,
+        user: sr.userEmail || sr.contactName,
+        timestamp: parseTime(sr.createdAt),
+        status: sr.status || 'in_review',
+        badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
+        rawData: sr
+      });
+    });
+
+    cryptoConversions.forEach(cc => {
+      items.push({
+        id: `cc-${cc.id}`,
+        category: 'digital',
+        hubName: 'Crypto OTC Terminal',
+        title: `OTC Conversion: ${cc.cryptoAmount || 0} ${cc.cryptoSymbol || 'USDT'}`,
+        description: `Rate: ₦${(cc.rate || 0).toLocaleString()} • Payout Due: ₦${(cc.payoutNaira || 0).toLocaleString()}`,
+        amount: `₦${(cc.payoutNaira || 0).toLocaleString()}`,
+        user: cc.userEmail || cc.userId,
+        timestamp: parseTime(cc.createdAt),
+        status: cc.status || 'pending',
+        badgeColor: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+        rawData: cc
+      });
+    });
+
+    // 8. Education Hub (JAMB CBT & WAEC)
+    jambCandidates.forEach(jc => {
+      items.push({
+        id: `jc-${jc.id}`,
+        category: 'education',
+        hubName: 'JAMB CBT Terminal',
+        title: `CBT Mock Practice Session: ${jc.subject || 'All Subjects'}`,
+        description: `Candidate: ${jc.fullName || jc.email} • Score: ${jc.score || 0}/400`,
+        user: jc.fullName || jc.email,
+        timestamp: parseTime(jc.createdAt),
+        status: 'completed',
+        badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30',
+        rawData: jc
+      });
+    });
+
+    // 9. Service Corps Requests
+    serviceRequests.forEach(sr => {
+      const itemSR = sr as any;
+      items.push({
+        id: `req-${sr.id}`,
+        category: 'services',
+        hubName: 'Service Corps',
+        title: `Service Request: ${itemSR.serviceCategory || 'Artisan Task'}`,
+        description: `Client: ${itemSR.customerName || itemSR.customerEmail || 'Client'} • Location: ${sr.location || 'Local Area'}`,
+        user: itemSR.customerName || itemSR.customerEmail || 'Client',
+        timestamp: parseTime(sr.createdAt),
+        status: sr.status,
+        badgeColor: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+        rawData: sr
+      });
+    });
+
+    // 10. HEPIHANDS Loans
+    loanApplications.forEach(la => {
+      const itemLA = la as any;
+      items.push({
+        id: `la-${la.id}`,
+        category: 'services',
+        hubName: 'HEPIHANDS Loans',
+        title: `Loan Application: ₦${(itemLA.amountRequested || itemLA.amount || 0).toLocaleString()}`,
+        description: `Applicant: ${itemLA.applicantName || itemLA.email || 'Applicant'} • Purpose: ${itemLA.purpose || 'Business Expansion'}`,
+        amount: `₦${(itemLA.amountRequested || itemLA.amount || 0).toLocaleString()}`,
+        user: itemLA.applicantName || itemLA.email || 'Applicant',
+        timestamp: parseTime(la.createdAt),
+        status: la.status,
+        badgeColor: 'text-red-400 bg-red-500/10 border-red-500/30',
+        rawData: la
+      });
+    });
+
+    // 11. Domain Orders
+    domainOrders.forEach(do_item => {
+      const itemDO = do_item as any;
+      items.push({
+        id: `dom-${do_item.id}`,
+        category: 'digital',
+        hubName: 'DomainHub',
+        title: `Domain Registration: ${do_item.domainName}`,
+        description: `Buyer: ${itemDO.buyerEmail || 'Customer'} • Registrar Term: 1 Year`,
+        amount: `$${(do_item.amountCharged || 0).toLocaleString()}`,
+        user: itemDO.buyerEmail || 'Customer',
+        timestamp: parseTime(do_item.createdAt),
+        status: do_item.status || 'active',
+        badgeColor: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
+        rawData: do_item
+      });
+    });
+
+    // 12. Quiz Sessions
+    quizSessions.forEach(qs => {
+      const itemQS = qs as any;
+      items.push({
+        id: `quiz-${qs.id}`,
+        category: 'education',
+        hubName: 'EFADO Money Quiz',
+        title: `Quiz Game: ₦${(qs.stake || 0).toLocaleString()} Stake`,
+        description: `Player: ${qs.userId} • Outcome: ${(qs.status || 'active').toUpperCase()} • Win: ₦${(qs.potentialWin || 0).toLocaleString()}`,
+        user: qs.userId,
+        timestamp: parseTime(itemQS.createdAt || itemQS.timestamp),
+        status: qs.status,
+        badgeColor: qs.status === 'won' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-slate-400 bg-slate-500/10 border-slate-500/30',
+        rawData: qs
+      });
+    });
+
+    // Sort all in descending chronological order
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items;
+  }, [
+    transactions,
+    withdrawals,
+    creatorStatsList,
+    liveRooms,
+    reels,
+    marketOrders,
+    vendingPurchases,
+    sourcingRequests,
+    cryptoConversions,
+    jambCandidates,
+    serviceRequests,
+    loanApplications,
+    domainOrders,
+    quizSessions
+  ]);
 
   const handleApproveManualGamePin = async (pinDoc: any) => {
     setIsProcessing(true);
@@ -2163,6 +2559,179 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                       <p className="text-[9px] text-slate-400">Direct manual bank proof submissions</p>
                     </div>
                   </div>
+
+                  {/* Row 3: Live Creator Monetization & Cross-Hub Pulse */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Creator Escrow Pool */}
+                    <div className="bg-gradient-to-br from-purple-950/40 via-slate-900/60 to-purple-950/20 p-5 rounded-3xl border border-purple-500/30 shadow-xl relative overflow-hidden group hover:border-purple-500/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 flex items-center gap-1.5">
+                          <Flame className="w-3.5 h-3.5 text-purple-400" />
+                          Creator Escrow Pool
+                        </span>
+                        <span className="text-[9px] font-bold text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full">
+                          {creatorStatsAggregate.totalCount} Creators
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display mb-1">
+                        ₦{(creatorStatsAggregate.totalAvailable + creatorStatsAggregate.totalPending).toLocaleString()}
+                      </p>
+                      <p className="text-[9px] text-slate-400">
+                        ₦{creatorStatsAggregate.totalAvailable.toLocaleString()} Avail • ₦{creatorStatsAggregate.totalPending.toLocaleString()} in 7d Escrow
+                      </p>
+                    </div>
+
+                    {/* Total Qualified Monetized Views */}
+                    <div className="bg-gradient-to-br from-cyan-950/40 via-slate-900/60 to-cyan-950/20 p-5 rounded-3xl border border-cyan-500/30 shadow-xl relative overflow-hidden group hover:border-cyan-500/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                          Qualified Views (5s)
+                        </span>
+                        <span className="text-[9px] font-bold text-cyan-300 bg-cyan-500/20 px-2 py-0.5 rounded-full">
+                          ₦700 / 1K Rate
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display mb-1">
+                        {creatorStatsAggregate.totalViews.toLocaleString()}
+                      </p>
+                      <p className="text-[9px] text-slate-400">
+                        +₦{creatorStatsAggregate.todayEarnings.toLocaleString()} Paid Out Today
+                      </p>
+                    </div>
+
+                    {/* Active Digital Hubs Operational */}
+                    <div className="bg-gradient-to-br from-emerald-950/40 via-slate-900/60 to-emerald-950/20 p-5 rounded-3xl border border-emerald-500/30 shadow-xl relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          All 14 Hubs
+                        </span>
+                        <span className="text-[9px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full">
+                          100% Online
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display mb-1">
+                        14 Digital Nodes
+                      </p>
+                      <p className="text-[9px] text-slate-400">
+                        {liveRooms.length} Live Rooms • {vendingPurchases.length} Vending Trans
+                      </p>
+                    </div>
+
+                    {/* Real-time Site Activities Tracked */}
+                    <div className="bg-gradient-to-br from-indigo-950/40 via-slate-900/60 to-indigo-950/20 p-5 rounded-3xl border border-indigo-500/30 shadow-xl relative overflow-hidden group hover:border-indigo-500/50 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
+                          <Activity className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                          Site Activity Radar
+                        </span>
+                        <button 
+                          onClick={() => {
+                            setActiveTab('hubs');
+                            setSelectedHubTab('activity_stream');
+                          }}
+                          className="text-[9px] font-black text-indigo-300 hover:text-white underline transition-colors"
+                        >
+                          View All →
+                        </button>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display mb-1">
+                        {allSiteActivities.length} Signals
+                      </p>
+                      <p className="text-[9px] text-slate-400">
+                        Live real-time ecosystem activity stream
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* REAL-TIME SITE ACTIVITY RADAR (DASHBOARD PREVIEW) */}
+                <div className="bg-slate-900/50 p-6 rounded-[2.5rem] border border-white/5 space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-500/20 border border-indigo-500/30 rounded-xl">
+                        <Activity className="w-5 h-5 text-indigo-400 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
+                          🔴 Real-Time Site Activity Radar
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        </h4>
+                        <p className="text-[10px] text-slate-400">Live operational telemetry across all 14 website hubs</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setActiveTab('hubs');
+                          setSelectedHubTab('creators');
+                        }}
+                        className="px-3.5 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                      >
+                        💰 Creator Wallets
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveTab('hubs');
+                          setSelectedHubTab('activity_stream');
+                        }}
+                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-600/20"
+                      >
+                        ⚡ Open Full Activity Stream →
+                      </button>
+                    </div>
+                  </div>
+
+                  {allSiteActivities.length === 0 ? (
+                    <p className="text-center py-6 text-slate-500 text-xs font-bold uppercase">No site activities recorded yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {allSiteActivities.slice(0, 6).map((act) => {
+                        const relativeTime = (() => {
+                          const diff = Math.floor((Date.now() - act.timestamp) / 1000);
+                          if (diff < 60) return `${diff}s ago`;
+                          if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                          if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                          return `${Math.floor(diff / 86400)}d ago`;
+                        })();
+
+                        return (
+                          <div 
+                            key={act.id} 
+                            className="bg-slate-950/70 border border-white/5 hover:border-white/20 rounded-2xl p-4 space-y-2 transition-all group"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider border ${act.badgeColor}`}>
+                                {act.hubName}
+                              </span>
+                              <span className="text-[9px] font-mono text-slate-400 font-bold flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {relativeTime}
+                              </span>
+                            </div>
+                            <h5 className="text-xs font-black text-white truncate">{act.title}</h5>
+                            <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{act.description}</p>
+                            <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                              <span className="text-[9px] text-slate-400 truncate max-w-[150px]">
+                                👤 {act.user}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const found = users.find(u => u.uid === act.userId || u.email === act.userEmail);
+                                  setDirectMsgTargetUser(found || { uid: act.userId || 'user', email: act.userEmail || `${act.user}@efado.net`, accountName: act.user } as any);
+                                  setShowMessageUserModal(true);
+                                }}
+                                className="text-[9px] font-black text-indigo-400 hover:text-indigo-300 uppercase tracking-wider group-hover:underline"
+                              >
+                                Message →
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* CEO URGENT ACTION CENTER - PENDING DEPOSITS & PAYOUTS COMMAND PANEL */}
@@ -3898,649 +4467,56 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                {/* MASTER ECOSYSTEM ADVERTISING, MARKETPLACE & MEDIA CONTENT COMMAND CENTER */}
-                <div className="bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 p-8 rounded-[2.5rem] border-2 border-indigo-500/40 shadow-2xl space-y-8 text-left">
-                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-3.5 py-1 bg-indigo-500/20 border border-indigo-500/40 rounded-full text-[9px] font-black uppercase text-indigo-300 tracking-widest flex items-center gap-1.5">
-                          <Zap className="w-3 h-3 text-indigo-400" /> MASTER ECOSYSTEM MEDIA TERMINAL
-                        </span>
-                        <span className="px-3.5 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-[9px] font-black uppercase text-emerald-300 tracking-widest flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" /> LIVE DATABASE SYNC
-                        </span>
-                      </div>
-                      <h3 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tight font-display flex items-center gap-3">
-                        <Megaphone className="w-7 h-7 text-indigo-400" />
-                        Ecosystem Advertisements, Products, Posts & Reels
-                      </h3>
-                      <p className="text-xs text-slate-300 font-medium max-w-3xl leading-relaxed">
-                        Full CEO oversight of every item advertised, sold, or shared across EFADO Hubs. You can view, search, mark items as <strong>SOLD OUT</strong>, <strong>ACTIVE</strong>, or <strong>ARCHIVED</strong> (so expired or sold products don't cluster the platform), or message users directly.
-                      </p>
-                    </div>
+                <CeoHubsManager
+                  selectedHubTab={selectedHubTab}
+                  setSelectedHubTab={setSelectedHubTab}
+                  creatorStatsAggregate={creatorStatsAggregate}
+                  creatorStatsList={creatorStatsList}
+                  creatorWalletsList={creatorWalletsList}
+                  allSiteActivities={allSiteActivities}
+                  siteActivityFilter={siteActivityFilter}
+                  setSiteActivityFilter={setSiteActivityFilter}
+                  siteActivitySearch={siteActivitySearch}
+                  setSiteActivitySearch={setSiteActivitySearch}
+                  users={users}
+                  liveRooms={liveRooms}
+                  gistCommunities={gistCommunities}
+                  reels={reels}
+                  socialPosts={socialPosts}
+                  posts={posts}
+                  adListings={adListings}
+                  ads={ads}
+                  marketProducts={marketProducts}
+                  marketOrders={marketOrders}
+                  vendors={vendors}
+                  vendingPurchases={vendingPurchases}
+                  sourcingRequests={sourcingRequests}
+                  cryptoConversions={cryptoConversions}
+                  jambCandidates={jambCandidates}
+                  waecCards={waecCards}
+                  serviceRequests={serviceRequests}
+                  serviceProviders={serviceProviders}
+                  csccGroups={csccGroups}
+                  loans={loans}
+                  loanApplications={loanApplications}
+                  loanVendors={loanVendors}
+                  domainOrders={domainOrders}
+                  domainSellers={domainSellers}
+                  quizSessions={quizSessions}
+                  emailAccounts={emailAccounts}
+                  partnerApplications={partnerApplications}
+                  zoomSubscriptions={zoomSubscriptions}
+                  liveBroadcastClasses={liveBroadcastClasses}
+                  handleUpdateContentStatus={handleUpdateContentStatus}
+                  handleDeleteContentItem={handleDeleteContentItem}
+                  onDirectMessageUser={(targetUser) => {
+                    setDirectMsgTargetUser(targetUser);
+                    setShowMessageUserModal(true);
+                  }}
+                  isProcessing={isProcessing}
+                />
 
-                    {/* Sub-tab Navigation */}
-                    <div className="flex flex-wrap items-center gap-2 bg-slate-950 p-2 rounded-2xl border border-white/10">
-                      <button
-                        onClick={() => setEcosystemContentTab('ads')}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                          ecosystemContentTab === 'ads' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <Megaphone className="w-4 h-4" /> Ads ({adListings.length + ads.length})
-                      </button>
-                      <button
-                        onClick={() => setEcosystemContentTab('market')}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                          ecosystemContentTab === 'market' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <ShoppingBag className="w-4 h-4" /> Market Catalog ({marketProducts.length})
-                      </button>
-                      <button
-                        onClick={() => setEcosystemContentTab('social')}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                          ecosystemContentTab === 'social' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <MessageSquare className="w-4 h-4" /> Social Gists ({socialPosts.length + posts.length})
-                      </button>
-                      <button
-                        onClick={() => setEcosystemContentTab('reels')}
-                        className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-                          ecosystemContentTab === 'reels' ? 'bg-rose-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <Sparkles className="w-4 h-4" /> Video Reels ({reels.length})
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Search Bar */}
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={`Search across ${ecosystemContentTab.toUpperCase()} by title, author, email, category, or status...`}
-                      value={contentSearchQuery}
-                      onChange={(e) => setContentSearchQuery(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3.5 bg-slate-950 border border-white/10 rounded-2xl text-xs font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                    />
-                  </div>
-
-                  {/* SUB-TAB 1: AD LISTINGS */}
-                  {ecosystemContentTab === 'ads' && (
-                    <div className="space-y-4">
-                      {adListings.length === 0 && ads.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 italic">No ad listings found in the database.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {[...adListings, ...ads]
-                            .filter(ad => {
-                              if (!contentSearchQuery) return true;
-                              const q = contentSearchQuery.toLowerCase();
-                              return (ad.title || '').toLowerCase().includes(q) ||
-                                     (ad.description || '').toLowerCase().includes(q) ||
-                                     (ad.category || '').toLowerCase().includes(q) ||
-                                     (ad.sellerEmail || ad.userEmail || '').toLowerCase().includes(q) ||
-                                     (ad.status || '').toLowerCase().includes(q);
-                            })
-                            .map((ad, idx) => {
-                              const createdDateStr = ad.createdAt?.toDate ? ad.createdAt.toDate().toLocaleString() : 'N/A';
-                              return (
-                                <div key={ad.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all">
-                                  <div className="space-y-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-indigo-500/30">
-                                            {ad.category || 'GENERAL AD'}
-                                          </span>
-                                          <span className={`px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full border ${
-                                            ad.status === 'sold_out' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
-                                            ad.status === 'archived' ? 'bg-slate-800 text-slate-400 border-slate-700' :
-                                            'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                                          }`}>
-                                            {ad.status === 'sold_out' ? '🏷️ SOLD OUT' : ad.status === 'archived' ? '📁 ARCHIVED' : '🟢 ACTIVE'}
-                                          </span>
-                                        </div>
-                                        <h4 className="text-lg font-black text-white font-display leading-tight">{ad.title || 'Untitled Listing'}</h4>
-                                      </div>
-                                      <span className="text-base font-black text-emerald-400 font-mono shrink-0">
-                                        ${(ad.price || ad.budget || 0).toLocaleString()}
-                                      </span>
-                                    </div>
-                                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{ad.description || 'No description'}</p>
-                                    <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
-                                      <p>👤 Advertiser: <strong className="text-white">{ad.sellerEmail || ad.userEmail || ad.userId || 'System'}</strong></p>
-                                      <p>📅 Date: {createdDateStr} • ID: {ad.id}</p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
-                                    {ad.status !== 'sold_out' ? (
-                                      <button
-                                        onClick={() => handleUpdateContentStatus('ad_listings', ad.id, 'sold_out')}
-                                        disabled={isProcessing}
-                                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                      >
-                                        Mark Sold Out
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() => handleUpdateContentStatus('ad_listings', ad.id, 'active')}
-                                        disabled={isProcessing}
-                                        className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                      >
-                                        Reactivate (Active)
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => {
-                                        const email = ad.sellerEmail || ad.userEmail;
-                                        const found = users.find(u => u.email === email || u.uid === ad.userId);
-                                        setDirectMsgTargetUser(found || { uid: ad.userId || 'unknown', email: email || 'user@efado.net', accountName: ad.sellerName || 'Advertiser' } as any);
-                                        setShowMessageUserModal(true);
-                                      }}
-                                      className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                    >
-                                      Message Seller
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteContentItem('ad_listings', ad.id)}
-                                      disabled={isProcessing}
-                                      className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
-                                    >
-                                      Delete Ad
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* SUB-TAB 2: MARKETPLACE PRODUCTS */}
-                  {ecosystemContentTab === 'market' && (
-                    <div className="space-y-4">
-                      {marketProducts.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 italic">No marketplace catalog products found.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {marketProducts
-                            .filter(prod => {
-                              if (!contentSearchQuery) return true;
-                              const q = contentSearchQuery.toLowerCase();
-                              return (prod.title || prod.name || '').toLowerCase().includes(q) ||
-                                     (prod.category || '').toLowerCase().includes(q) ||
-                                     (prod.vendorEmail || prod.vendorName || '').toLowerCase().includes(q);
-                            })
-                            .map((prod, idx) => (
-                              <div key={prod.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-emerald-500/30 transition-all">
-                                <div className="space-y-3">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-emerald-500/30">
-                                        {prod.category || 'CATALOG ITEM'}
-                                      </span>
-                                      <h4 className="text-lg font-black text-white font-display mt-1">{prod.title || prod.name || 'Market Item'}</h4>
-                                    </div>
-                                    <span className="text-base font-black text-emerald-400 font-mono">
-                                      ${(prod.price || 0).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs text-slate-300 line-clamp-2">{prod.description || 'No product details'}</p>
-                                  <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
-                                    <p>🏬 Store/Vendor: <strong className="text-white">{prod.vendorName || prod.vendorEmail || 'Verified Vendor'}</strong></p>
-                                    <p>📦 Stock: {prod.stockQuantity ?? prod.stock ?? 'In Stock'} • Status: <span className="text-emerald-400 font-bold">{prod.status || 'Active'}</span></p>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/10">
-                                  {prod.status !== 'sold_out' ? (
-                                    <button
-                                      onClick={() => handleUpdateContentStatus('marketProducts', prod.id, 'sold_out')}
-                                      disabled={isProcessing}
-                                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                    >
-                                      Mark Sold Out
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleUpdateContentStatus('marketProducts', prod.id, 'active')}
-                                      disabled={isProcessing}
-                                      className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                    >
-                                      Mark Active
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      const email = prod.vendorEmail;
-                                      const found = users.find(u => u.email === email || u.uid === prod.userId);
-                                      setDirectMsgTargetUser(found || { uid: prod.userId || 'unknown', email: email || 'vendor@efado.net', accountName: prod.vendorName || 'Vendor' } as any);
-                                      setShowMessageUserModal(true);
-                                    }}
-                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                  >
-                                    Message Vendor
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteContentItem('marketProducts', prod.id)}
-                                    disabled={isProcessing}
-                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
-                                  >
-                                    Delete Product
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* SUB-TAB 3: SOCIAL GIST POSTS */}
-                  {ecosystemContentTab === 'social' && (
-                    <div className="space-y-4">
-                      {[...socialPosts, ...posts].length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 italic">No social posts found in the database.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {[...socialPosts, ...posts]
-                            .filter(post => {
-                              if (!contentSearchQuery) return true;
-                              const q = contentSearchQuery.toLowerCase();
-                              return (post.content || '').toLowerCase().includes(q) ||
-                                     (post.authorName || '').toLowerCase().includes(q) ||
-                                     (post.category || '').toLowerCase().includes(q);
-                            })
-                            .map((post, idx) => (
-                              <div key={post.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-6 space-y-4 flex flex-col justify-between hover:border-purple-500/30 transition-all">
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <span className="px-2.5 py-0.5 bg-purple-500/20 text-purple-300 text-[9px] font-black uppercase tracking-wider rounded-full border border-purple-500/30">
-                                      {post.category || 'GIST HUB'}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-slate-400">ID: {post.id}</span>
-                                  </div>
-                                  <p className="text-xs text-slate-200 leading-relaxed font-medium">{post.content || 'No text content'}</p>
-                                  <div className="text-[10px] font-mono text-slate-400 space-y-0.5 pt-2 border-t border-white/5">
-                                    <p>👤 Author: <strong className="text-white">{post.authorName || 'Anonymous Gister'}</strong> ({post.authorId || 'ID'})</p>
-                                    <p>👍 Likes: {post.likes?.length || 0} • 💬 Comments: {post.comments?.length || 0}</p>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 pt-3 border-t border-white/10">
-                                  <button
-                                    onClick={() => {
-                                      const found = users.find(u => u.uid === post.authorId || u.email === post.authorEmail);
-                                      setDirectMsgTargetUser(found || { uid: post.authorId || 'unknown', email: post.authorEmail || 'user@efado.net', accountName: post.authorName || 'Gister' } as any);
-                                      setShowMessageUserModal(true);
-                                    }}
-                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                  >
-                                    Message Author
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteContentItem('social_posts', post.id)}
-                                    disabled={isProcessing}
-                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
-                                  >
-                                    Delete Post
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* SUB-TAB 4: VIDEO REELS */}
-                  {ecosystemContentTab === 'reels' && (
-                    <div className="space-y-4">
-                      {reels.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500 italic">No video reels uploaded yet.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {reels
-                            .filter(reel => {
-                              if (!contentSearchQuery) return true;
-                              const q = contentSearchQuery.toLowerCase();
-                              return (reel.caption || '').toLowerCase().includes(q) ||
-                                     (reel.authorName || '').toLowerCase().includes(q);
-                            })
-                            .map((reel, idx) => (
-                              <div key={reel.id || idx} className="bg-slate-950/80 border border-white/10 rounded-3xl p-5 space-y-3 flex flex-col justify-between hover:border-rose-500/30 transition-all">
-                                <div className="space-y-2">
-                                  <div className="aspect-[9/12] bg-slate-900 rounded-2xl overflow-hidden relative border border-white/10">
-                                    <video src={reel.videoUrl} className="w-full h-full object-cover" controls preload="metadata" />
-                                    <span className="absolute top-3 left-3 px-2.5 py-0.5 bg-rose-500 text-white text-[8px] font-black uppercase tracking-wider rounded-full shadow-lg">
-                                      VIDEO REEL
-                                    </span>
-                                  </div>
-                                  <h4 className="text-xs font-bold text-white line-clamp-2">{reel.caption || 'No caption'}</h4>
-                                  <p className="text-[10px] font-mono text-slate-400">👤 Creator: <strong className="text-white">{reel.authorName || 'Creator'}</strong></p>
-                                  <p className="text-[10px] font-mono text-slate-400">❤️ Likes: {reel.likes?.length || 0} • 💸 Tips: {reel.tipsCount || 0}</p>
-                                </div>
-
-                                <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-                                  <button
-                                    onClick={() => {
-                                      const found = users.find(u => u.uid === reel.authorId);
-                                      setDirectMsgTargetUser(found || { uid: reel.authorId || 'unknown', email: 'creator@efado.net', accountName: reel.authorName || 'Creator' } as any);
-                                      setShowMessageUserModal(true);
-                                    }}
-                                    className="px-3 py-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
-                                  >
-                                    Message Creator
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteContentItem('reels', reel.id)}
-                                    disabled={isProcessing}
-                                    className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ml-auto"
-                                  >
-                                    Delete Reel
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Service Corps Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <HardHat className="w-6 h-6 text-orange-400" />
-                    Service Corps Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Providers</p>
-                      <p className="text-3xl font-black text-white">{serviceProviders.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Requests</p>
-                      <p className="text-3xl font-black text-white">{serviceRequests.filter(r => r.status === 'pending').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Verified Pros</p>
-                      <p className="text-3xl font-black text-emerald-400">{serviceProviders.filter(p => p.verified).length}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Community Hubs Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <Users className="w-6 h-6 text-purple-400" />
-                    Community Hubs (CSCC)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Groups</p>
-                      <p className="text-3xl font-black text-white">{csccGroups.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Cycles</p>
-                      <p className="text-3xl font-black text-white">{csccGroups.filter(g => g.status === 'active').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Volume</p>
-                      <p className="text-3xl font-black text-purple-400">
-                        ${csccGroups.reduce((acc, g) => acc + (g.contributionAmount * g.maxMembers), 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* HEPIHANDS Loan Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <HandCoins className="w-6 h-6 text-emerald-400" />
-                    HEPIHANDS Loan Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Loans</p>
-                      <p className="text-3xl font-black text-white">{loans.filter(l => l.status === 'active').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Pending Apps</p>
-                      <p className="text-3xl font-black text-amber-400">{loanApplications.filter(a => a.status === 'submitted').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Vendors</p>
-                      <p className="text-3xl font-black text-white">{loanVendors.filter(v => v.status === 'verified').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Debt</p>
-                      <p className="text-3xl font-black text-rose-400">
-                        ${loans.reduce((acc, l) => acc + l.remainingAmount, 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* DomainHub Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <Globe className="w-6 h-6 text-indigo-400" />
-                    Efado DomainHub Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Orders</p>
-                      <p className="text-3xl font-black text-white">{domainOrders.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Sellers</p>
-                      <p className="text-3xl font-black text-white">{domainSellers.filter(s => s.status === 'active').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Revenue</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ${domainOrders.reduce((acc, o) => acc + o.amountCharged, 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Commission</p>
-                      <p className="text-3xl font-black text-indigo-400">
-                        ${domainOrders.reduce((acc, o) => acc + o.commissionAmount, 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Money Quiz Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <Brain className="w-6 h-6 text-indigo-400" />
-                    EFADO Money Quiz Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Games</p>
-                      <p className="text-3xl font-black text-white">{quizSessions.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Stakes</p>
-                      <p className="text-3xl font-black text-white">
-                        ₦{quizSessions.reduce((acc, s) => acc + s.stake, 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Payouts</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ₦{quizSessions.filter(s => s.status === 'won').reduce((acc, s) => acc + s.potentialWin, 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Admin Profit</p>
-                      <p className="text-3xl font-black text-indigo-400">
-                        ₦{quizSessions.filter(s => s.status === 'lost').reduce((acc, s) => acc + s.stake, 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* EFADO Gist Hub Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <MessageSquare className="w-6 h-6 text-indigo-400" />
-                    EFADO Gist Hub Monitor (Social)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Posts</p>
-                      <p className="text-3xl font-black text-white">{posts.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Ads</p>
-                      <p className="text-3xl font-black text-indigo-400">{ads.filter(a => a.status === 'active').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Ad Revenue</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ${ads.reduce((acc, a) => acc + (a.budget || 0), 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Hub Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight">
-                    <Mail className="w-6 h-6 text-indigo-400" />
-                    EFADO Email Hub Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Accounts</p>
-                      <p className="text-3xl font-black text-white">{emailAccounts.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Custom Domains</p>
-                      <p className="text-3xl font-black text-white">{emailAccounts.filter(a => a.isCustomDomain).length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Premium Users</p>
-                      <p className="text-3xl font-black text-emerald-400">{emailAccounts.filter(a => a.plan !== 'free').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Storage</p>
-                      <p className="text-3xl font-black text-indigo-400">
-                        {Math.round(emailAccounts.reduce((acc, a) => acc + a.storageUsed, 0) / (1024 * 1024))}MB
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* EFADO Marketplace & Vendor Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight font-display">
-                    <ShoppingBag className="w-6 h-6 text-emerald-400" />
-                    EFADO Marketplace & Vendor Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Vendors</p>
-                      <p className="text-3xl font-black text-white">{vendors.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Catalog Products</p>
-                      <p className="text-3xl font-black text-white">{marketProducts.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Orders Placed</p>
-                      <p className="text-3xl font-black text-white">{marketOrders.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Turnover Volume</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ${marketOrders.reduce((acc, o) => acc + (o.totalPrice || o.amountCharged || 0), 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* EFADO Advertising Campaign Hub Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight font-display">
-                    <Megaphone className="w-6 h-6 text-indigo-400" />
-                    EFADO Advertising Campaign Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Placed Campaigns</p>
-                      <p className="text-3xl font-black text-white">{adListings.length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Ad Items</p>
-                      <p className="text-3xl font-black text-indigo-400">{adListings.filter(a => a.status === 'active').length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Campaign Budget Allocated</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ${adListings.reduce((acc, a) => acc + (a.budget || 0), 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* EFADO Mining Core Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight font-display">
-                    <Coins className="w-6 h-6 text-amber-500" />
-                    EFADO Mining Core Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Active Workers</p>
-                      <p className="text-3xl font-black text-white">{users.filter(u => (u.miningWallet || 0) > 0).length}</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Points Mined</p>
-                      <p className="text-3xl font-black text-amber-400">
-                        {(users.reduce((acc, u) => acc + (u.miningWallet || 0), 0)).toLocaleString()} pts
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Capital Extracted</p>
-                      <p className="text-3xl font-black text-emerald-400">
-                        ₦{(users.reduce((acc, u) => acc + (u.miningWallet || 0), 0) / 100).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Mining Velocity</p>
-                      <p className="text-3xl font-black text-indigo-400">12.8GH/s</p>
-                    </div>
-                  </div>
-                </div>
-
-                 {/* EFADO Educational Hub & Support Monitor */}
-                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5">
-                  <h3 className="text-xl font-black text-white mb-6 flex items-center gap-3 uppercase tracking-tight font-display">
-                    <Trophy className="w-6 h-6 text-yellow-400" />
-                    EFADO Educational Hub Monitor
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Ecosystem Classrooms</p>
-                      <p className="text-3xl font-black text-white">Online & Encrypted</p>
-                    </div>
-                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Professional Training Tracks</p>
-                      <p className="text-3xl font-black text-indigo-400">Active Guidance</p>
-                    </div>
-                  </div>
-                </div>
               </motion.div>
             )}
 

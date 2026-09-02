@@ -2,6 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Filter out benign Vite HMR websocket connection error in AI Studio sandboxed preview
+      (function() {
+        if (typeof window !== 'undefined') {
+          const _origError = console.error;
+          console.error = function(...args) {
+            if (args[0] && typeof args[0] === 'string' && (args[0].includes('[vite] failed to connect to websocket') || args[0].startsWith('[vite]'))) {
+              console.warn(...args);
+              return;
+            }
+            _origError.apply(console, args);
+          };
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>EFADO Hubs Connect | All-in-One Ecosystem</title>
     <meta name="description" content="The ultimate community-powered commerce, education, and finance ecosystem." />
@@ -12,6 +27,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <!-- Google AdSense -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8208284846339791"
       crossorigin="anonymous"></script>
