@@ -879,3 +879,51 @@ export interface AdPlan {
   durationDays: number;
   features: string[];
 }
+
+export type DeepSeaCurrency = 'NGN' | 'USD' | 'EUR' | 'GBP' | 'BTC' | 'ETH' | 'USDT';
+
+export interface DeepSeaBet {
+  id: string;
+  betAmount: number;
+  currency: DeepSeaCurrency;
+  autoCashoutMultiplier?: number;
+  isAutoCashout: boolean;
+  status: 'idle' | 'placed' | 'cashed_out' | 'crashed';
+  cashoutMultiplier?: number;
+  winAmount?: number;
+  consoleId: 1 | 2;
+}
+
+export interface DeepSeaRoundOutcome {
+  roundId: string;
+  crashMultiplier: number;
+  serverSeed: string;
+  clientSeed: string;
+  nonce: number;
+  hash: string;
+  timestamp: number;
+}
+
+export interface SubmarinePilot {
+  id: string;
+  callsign: string;
+  avatar?: string;
+  betAmount: number;
+  currency: DeepSeaCurrency;
+  status: 'diving' | 'cashed_out' | 'crashed';
+  cashoutMultiplier?: number;
+  profit?: number;
+  isUser?: boolean;
+  rank: string;
+}
+
+export interface RadioCommsMessage {
+  id: string;
+  sender: string;
+  avatar?: string;
+  text: string;
+  timestamp: string;
+  isSystemAlert?: boolean;
+  rank?: string;
+  badge?: string;
+}

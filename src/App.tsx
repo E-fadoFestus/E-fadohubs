@@ -46,6 +46,7 @@ import { EfadoHomePage } from './components/EfadoHomePage';
 import { EfadoDomainHub } from './components/EfadoDomainHub';
 import { EfadoMoneyQuiz } from './components/EfadoMoneyQuiz';
 import { EfadoEquilibrium } from './components/EfadoEquilibrium';
+import { DeepSeaJetGame } from './components/DeepSeaJetGame';
 import { EfadoEducationHub } from './components/EfadoEducationHub';
 import { EfadoTechHub } from './components/tech/EfadoTechHub';
 import { EfadoZoom } from './components/EfadoZoom';
@@ -118,7 +119,10 @@ import {
   ArrowRight,
   Smartphone,
   Laptop,
-  Target
+  Target,
+  Compass,
+  Waves,
+  Anchor
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
@@ -498,6 +502,7 @@ function AppContent() {
 
   const [showMoneyQuiz, setShowMoneyQuiz] = useState(false);
   const [showEquilibrium, setShowEquilibrium] = useState(false);
+  const [showDeepSeaJet, setShowDeepSeaJet] = useState(false);
   const [showWallet, setShowWallet] = useState(false);
   const [walletInitialTab, setWalletInitialTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>('overview');
   
@@ -1075,6 +1080,9 @@ function AppContent() {
         handleNavigate('DOMAIN_HUB');
       } else if (hash === 'tech' || hash === 'tech_hub' || hash === 'techhub') {
         handleNavigate('TECH_HUB');
+      } else if (hash === 'deepseajet' || hash === 'deepsea' || hash === 'jet') {
+        handleNavigate('GAMES');
+        setShowDeepSeaJet(true);
       } else if (hash === 'gamearena' || hash === 'games' || hash === 'game') {
         handleNavigate('GAMES');
       } else if (hash === 'market') {
@@ -1126,6 +1134,8 @@ function AppContent() {
       targetHash = 'domain';
     } else if (showTechHub) {
       targetHash = 'tech';
+    } else if (showDeepSeaJet) {
+      targetHash = 'deepseajet';
     } else if (activeHub !== 'HOME') {
       targetHash = activeHub.toLowerCase();
     }
@@ -1135,7 +1145,7 @@ function AppContent() {
       window.location.hash = targetHash;
       window.scrollTo(0, scrollY);
     }
-  }, [activeHub, showCommunityHub, showGistHub, showAdvertisingHub, showZoomPlans, showServiceCorps, showDomainHub, showTechHub, user, loading]);
+  }, [activeHub, showCommunityHub, showGistHub, showAdvertisingHub, showZoomPlans, showServiceCorps, showDomainHub, showTechHub, showDeepSeaJet, user, loading]);
 
   const handleLogin = async () => {
     setError(null);
@@ -1925,7 +1935,7 @@ function AppContent() {
     setError(null);
   };
 
-  const onResult = async (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium', payoutOverride?: number) => {
+  const onResult = async (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium' | 'deepSeaJet', payoutOverride?: number) => {
     if (!user) return;
     const winAmount = payoutOverride !== undefined ? payoutOverride : bet * multiplier;
 
@@ -3198,6 +3208,38 @@ function AppContent() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Deep Sea Jet Card - Efado Crash Mechanics */}
+                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group border border-cyan-500/30 hover:border-cyan-400/60 transition-all shadow-[0_10px_40px_rgba(6,182,212,0.15)]">
+                    <div className="absolute top-0 left-0 w-full h-[6px] bg-gradient-to-r from-cyan-500 via-teal-400 to-blue-600" />
+                    <div className="absolute top-4 right-4 px-2.5 py-1 bg-cyan-500/20 border border-cyan-500/40 rounded-full text-[9px] font-black text-cyan-300 uppercase tracking-widest flex items-center gap-1.5 animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      Efado Crash
+                    </div>
+                    <div className="relative z-10">
+                      <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] transition-all duration-500">
+                        <Waves className="w-10 h-10 text-cyan-400 group-hover:text-slate-950 transition-colors" />
+                      </div>
+                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight flex items-center justify-center gap-1.5">
+                        <span className="text-cyan-400 font-mono">$</span>deep sea jet
+                      </h3>
+                      <div className="flex items-center justify-center gap-2 mb-3">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">60 FPS Dive</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-950/60 border border-teal-800/60 text-teal-300">Dual Helm</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-800/60 text-blue-300">SHA-256 Fair</span>
+                      </div>
+                      <p className="text-slate-400 mb-8 text-sm font-medium leading-relaxed">
+                        Submerge into the abyss where multiplier acceleration surges with depth. Stake dual helms, monitor live fleet radar, and cash out before catastrophic hull breach.
+                      </p>
+                      <button 
+                        onClick={() => setShowDeepSeaJet(true)}
+                        className="w-full py-5 bg-gradient-to-r from-cyan-600 via-teal-600 to-blue-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.35)] hover:shadow-[0_15px_40px_rgba(6,182,212,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-2 group-hover:brightness-110"
+                      >
+                        <Compass className="w-4 h-4" />
+                        Launch Deep Sea Jet
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {user && (
@@ -4078,6 +4120,18 @@ function AppContent() {
                 onGameStart={handleStakeDeduction}
                 onUpdateBalance={handleWalletUpdate}
                 onAddTransaction={handleAddTransaction}
+              />
+            )}
+
+            {showDeepSeaJet && user && (
+              <DeepSeaJetGame 
+                user={user}
+                onClose={() => setShowDeepSeaJet(false)}
+                onResult={onResult}
+                onGameStart={handleStakeDeduction}
+                onUpdateBalance={() => {
+                  // User balance is synchronized via real-time firestore onSnapshot or local state in DEV mode
+                }}
               />
             )}
 
