@@ -1,9 +1,30 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { db } from './src/firebase';
 import { doc, updateDoc, increment, addDoc, collection, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
+
+// Ensure public logo assets exist safely on startup
+try {
+  const publicDir = path.resolve(process.cwd(), 'public');
+  if (!fs.existsSync(publicDir)) {
+    fs.mkdirSync(publicDir, { recursive: true });
+  }
+  const sourcePath = path.resolve(process.cwd(), 'src', 'assets', 'images', 'efado_logo_1781368963212.jpg');
+  if (fs.existsSync(sourcePath)) {
+    const targets = ['efado_logo_192.jpg', 'efado_logo_512.jpg', 'favicon.ico', 'apple-touch-icon.png'];
+    for (const file of targets) {
+      const dest = path.resolve(publicDir, file);
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(sourcePath, dest);
+      }
+    }
+  }
+} catch (logoErr) {
+  console.warn('[Server] Logo sync non-fatal warning:', logoErr);
+}
 
 // Load environment variables in development
 import dotenv from 'dotenv';
@@ -11,6 +32,14 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Health check endpoints FIRST (Required for container readiness and reverse proxy health checks)
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: Date.now(), uptime: process.uptime() });
+});
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: Date.now(), uptime: process.uptime() });
+});
 
 // Capture raw body for secure Paystack signature verification
 app.use(express.json({
@@ -987,25 +1016,222 @@ app.post('/api/flutterwave/subaccount', async (req: express.Request, res: expres
   }
 });
 
-// Start server with Vite middleware support
-async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[EFADO Fullstack Server] Running on http://localhost:${PORT}`);
-  });
+// ==========================================
+// AVIATOR / DEEP SEA JET GAME ENGINE APIS
+// ==========================================
+interface ActiveGameRound {
+  roundId: string;
+  serverSeed: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  crashMultiplier: number;
+  startTime: number;
+  status: 'betting' | 'diving' | 'flying' | 'crashed';
 }
 
-startServer();
+let activeGameRound: ActiveGameRound | null = null;
+let currentNonceCounter = 1;
+
+function generateProvablyFairCrash(serverSeed: string, clientSeed: string, nonce: number): number {
+  const hash = crypto.createHmac('sha256', serverSeed).update(`${clientSeed}:${nonce}`).digest('hex');
+  // Use first 52 bits (13 hex chars) identically to standard Aviator / crash algorithms
+  const e = Math.pow(2, 52);
+  const h = parseInt(hash.slice(0, 13), 16);
+  // House edge check (~3% probability of instant crash 1.00x)
+  if (h % 33 === 0) {
+    return 1.00;
+  }
+  const rawMult = Math.floor(((100 * e - h) / (e - h)) / 100 * 100) / 100;
+  return Math.max(1.01, Math.min(1000.00, Number(rawMult.toFixed(2))));
+}
+
+// 1. /game/start & /api/game/start - Initialize or fetch current active round
+const handleGameStart = (req: any, res: any) => {
+  const clientSeed = req.body?.clientSeed || 'efado-client-' + Math.random().toString(36).slice(2, 10);
+  const nonce = req.body?.nonce || currentNonceCounter++;
+  const serverSeed = crypto.randomBytes(32).toString('hex');
+  const serverSeedHash = crypto.createHash('sha256').update(serverSeed).digest('hex');
+  const crashMultiplier = generateProvablyFairCrash(serverSeed, clientSeed, nonce);
+
+  activeGameRound = {
+    roundId: `dsj-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`,
+    serverSeed,
+    serverSeedHash,
+    clientSeed,
+    nonce,
+    crashMultiplier,
+    startTime: Date.now(),
+    status: 'flying'
+  };
+
+  return res.json({
+    success: true,
+    roundId: activeGameRound.roundId,
+    serverSeedHash: activeGameRound.serverSeedHash,
+    clientSeed: activeGameRound.clientSeed,
+    nonce: activeGameRound.nonce,
+    crashMultiplier: activeGameRound.crashMultiplier,
+    startTime: activeGameRound.startTime
+  });
+};
+app.post('/game/start', handleGameStart);
+app.post('/api/game/start', handleGameStart);
+
+// 2. /game/bet & /api/game/bet - Place a bet on Console 1 or 2
+const handleGameBet = async (req: any, res: any) => {
+  const { userId, betAmount, currency, consoleId, isAutoCashout, autoCashoutMultiplier } = req.body;
+  if (!betAmount || betAmount <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid bet amount' });
+  }
+
+  // Deduct from real wallet if userId provided and user exists
+  if (userId) {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const available = (userData.playerWallet || 0) + (userData.depositWallet || 0);
+        if (available < betAmount) {
+          return res.status(400).json({ success: false, error: 'Insufficient balance' });
+        }
+        let rem = betAmount;
+        const pDeduct = Math.min(userData.playerWallet || 0, rem);
+        rem -= pDeduct;
+        const dDeduct = rem;
+        await updateDoc(userRef, {
+          playerWallet: increment(-pDeduct),
+          depositWallet: increment(-dDeduct)
+        });
+      }
+    } catch (err) {
+      console.warn('[Game Bet] Wallet deduct warning:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    betId: `bet-${Date.now()}-${consoleId || 1}`,
+    betAmount,
+    currency: currency || 'NGN',
+    consoleId: consoleId || 1,
+    status: 'placed',
+    isAutoCashout: !!isAutoCashout,
+    autoCashoutMultiplier: autoCashoutMultiplier || 2.0
+  });
+};
+app.post('/game/bet', handleGameBet);
+app.post('/api/game/bet', handleGameBet);
+
+// 3. /game/cashout & /api/game/cashout - User cashes out at multiplier
+const handleGameCashout = async (req: any, res: any) => {
+  const { userId, betAmount, multiplier, consoleId } = req.body;
+  const mult = Number(multiplier) || 1.0;
+  const stake = Number(betAmount) || 0;
+  const winPayout = Number((stake * mult).toFixed(2));
+  const profit = Number((winPayout - stake).toFixed(2));
+
+  // Credit user wallet if userId exists
+  if (userId && winPayout > 0) {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        playerWallet: increment(winPayout)
+      });
+      // Log transaction
+      const txRef = doc(collection(db, 'transactions'));
+      await setDoc(txRef, {
+        userId,
+        type: 'game_win',
+        amount: winPayout,
+        currency: 'NGN',
+        status: 'completed',
+        game: 'Deep Sea Jet',
+        multiplier: mult,
+        stake,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('[Game Cashout] Wallet credit warning:', err);
+    }
+  }
+
+  return res.json({
+    success: true,
+    winPayout,
+    multiplier: mult,
+    profit,
+    consoleId: consoleId || 1
+  });
+};
+app.post('/game/cashout', handleGameCashout);
+app.post('/api/game/cashout', handleGameCashout);
+
+// 4. /game/crash & /api/game/crash - Conclude round and reveal server seed for provably fair verification
+const handleGameCrash = (req: any, res: any) => {
+  const round = activeGameRound;
+  if (!round) {
+    return res.json({
+      success: true,
+      message: 'No active round to crash'
+    });
+  }
+  round.status = 'crashed';
+  return res.json({
+    success: true,
+    roundId: round.roundId,
+    serverSeed: round.serverSeed,
+    serverSeedHash: round.serverSeedHash,
+    clientSeed: round.clientSeed,
+    nonce: round.nonce,
+    crashMultiplier: round.crashMultiplier,
+    timestamp: Date.now()
+  });
+};
+app.post('/game/crash', handleGameCrash);
+app.post('/api/game/crash', handleGameCrash);
+
+// Start server with Vite middleware support
+async function startServer() {
+  try {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
+        },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[EFADO Fullstack Server] Running on http://localhost:${PORT}`);
+    });
+
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.warn(`[EFADO Server] Port ${PORT} already occupied, waiting for release...`);
+      } else {
+        console.error('[EFADO Server Error]', err);
+      }
+    });
+  } catch (err) {
+    console.error('[EFADO Server Start Error]', err);
+    // Fallback listener to keep health check alive
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[EFADO Server Fallback] Listening on http://localhost:${PORT}`);
+    });
+  }
+}
+
+startServer().catch((fatal) => {
+  console.error('[EFADO Fatal Boot Error]', fatal);
+});

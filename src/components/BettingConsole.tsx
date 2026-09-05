@@ -7,7 +7,7 @@ interface BettingConsoleProps {
   consoleId: 1 | 2;
   bet: DeepSeaBet;
   onUpdateBet: (updated: Partial<DeepSeaBet>) => void;
-  gameState: 'idle' | 'diving' | 'crashed';
+  gameState: 'idle' | 'diving' | 'flying' | 'crashed' | 'betting';
   currentMultiplier: number;
   onPlaceBet: (consoleId: 1 | 2) => void;
   onCashout: (consoleId: 1 | 2) => void;
@@ -34,7 +34,7 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
   isAutoBetActive,
   onToggleAutoBet,
 }) => {
-  const isDiving = gameState === 'diving';
+  const isDiving = gameState === 'diving' || gameState === 'flying';
   const isCrashed = gameState === 'crashed';
   const isBetActive = bet.status === 'placed';
   const isCashedOut = bet.status === 'cashed_out';

@@ -3844,9 +3844,9 @@ function AppContent() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {globalAdListings.map((ad) => (
+                          {globalAdListings.map((ad, adIdx) => (
                             <div 
-                              key={ad.id}
+                              key={`${ad.id || 'ad'}-${adIdx}`}
                               className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex gap-4 hover:border-indigo-500/50 transition-all group"
                             >
                               <div className="w-28 h-28 bg-slate-900 rounded-xl overflow-hidden shrink-0 relative">
@@ -4362,7 +4362,7 @@ function AppContent() {
                       const uniqueId = tx.id || String(tx.timestamp?.seconds || idx);
                       return (
                         <button
-                          key={`suggestion-${uniqueId}`}
+                          key={`suggestion-${uniqueId}-${idx}`}
                           onClick={() => {
                             const indexInFiltered = filteredTransactions.findIndex(t => (t.id && t.id === tx.id) || t.timestamp?.seconds === tx.timestamp?.seconds);
                             if (indexInFiltered !== -1) {

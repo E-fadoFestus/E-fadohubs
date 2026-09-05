@@ -519,3 +519,8 @@ html[data-text-size="xlarge"] {
   border: 0.5px solid rgba(255, 255, 255, 0.1);
   pointer-events: none;
 }
+
+/* Deep Sea Jet Game & Canvas Styles */
+#game-container { position: relative; z-index: 1; }
+#game-canvas { display: block !important; visibility: visible !important; opacity: 1 !important; }
+#jet { will-change: transform, left, top; transition: none !important; pointer-events: none; }

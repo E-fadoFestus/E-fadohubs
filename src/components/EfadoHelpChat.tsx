@@ -85,7 +85,7 @@ export const EfadoHelpChat: React.FC<EfadoHelpChatProps> = ({ user }) => {
 
   // Listen to user's tickets in real-time
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !auth.currentUser) return;
 
     try {
       const q = query(
@@ -120,14 +120,17 @@ export const EfadoHelpChat: React.FC<EfadoHelpChatProps> = ({ user }) => {
           }
         }
       }, (error) => {
-        console.error("Support Snapshot Error:", error);
+        // Suppress permission-denied noise when auth state changes
+        if (error.code !== 'permission-denied') {
+          console.warn("Support Snapshot Notice:", error);
+        }
       });
 
       return () => unsubscribe();
     } catch (err) {
-      console.error("Failed to list help requests:", err);
+      console.warn("Failed to list help requests:", err);
     }
-  }, [user?.uid, selectedTicket?.id]);
+  }, [user?.uid, selectedTicket?.id, auth.currentUser?.uid]);
 
   // Scroll to bottom during live chat
   useEffect(() => {

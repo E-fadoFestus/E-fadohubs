@@ -31,9 +31,9 @@ export const MultiplierHistoryBar: React.FC<MultiplierHistoryBarProps> = ({
       </div>
 
       <div className="flex items-center gap-2 flex-1 overflow-x-auto no-scrollbar">
-        {history.slice(0, 15).map((item) => (
+        {history.slice(0, 15).map((item, idx) => (
           <button
-            key={item.roundId}
+            key={`${item.roundId || 'round'}-${idx}`}
             onClick={() => onSelectRound(item)}
             className={`px-3 py-1 rounded-xl text-xs font-black border transition-all duration-200 shrink-0 transform active:scale-95 ${getBadgeStyle(
               item.crashMultiplier
