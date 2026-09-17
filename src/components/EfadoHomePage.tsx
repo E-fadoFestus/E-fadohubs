@@ -33,7 +33,8 @@ import {
   Mail,
   Phone,
   MapPin,
-  Coins
+  Coins,
+  Compass
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -178,17 +179,20 @@ const HUBS_DATA = [
 
 const getHubRoute = (hubId: string, subview?: string) => {
   switch (hubId) {
-    case 'GAMES': return 'gamearena';
-    case 'MARKET': return 'market';
-    case 'ADVERTISING': return 'advertising';
+    case 'GAMES': return 'hub/arena';
+    case 'MARKET': return 'hub/market';
+    case 'ADVERTISING': return 'hub/advertising';
     case 'GIST': return 'gist';
-    case 'SERVICE_CORPS': return 'servicecorps';
-    case 'COMMUNITY_HUBS': return 'community';
-    case 'HEPIHANDS_LOAN': return 'loanhub';
-    case 'DOMAIN_HUB': return subview ? `domain?subview=${subview}` : 'domain';
-    case 'DIGITAL_SERVICES_HUB': return subview ? `digital?subview=${subview}` : 'digital';
+    case 'SERVICE_CORPS': return 'hub/services';
+    case 'COMMUNITY_HUBS': return 'hub/community';
+    case 'HEPIHANDS_LOAN': return 'hub/loan';
+    case 'DOMAIN_HUB': return subview === 'sourcing' ? 'hub/china' : 'domain';
+    case 'DIGITAL_SERVICES_HUB': 
+      if (subview === 'vending') return 'hub/data-vending';
+      if (subview === 'crypto') return 'hub/crypto';
+      return 'hub/services';
     case 'PARTNER_HUB': return 'partners';
-    case 'EDUCATION': return 'education';
+    case 'EDUCATION': return 'hub/education';
     case 'ZOOM': return 'zoom';
     case 'DASHBOARD': return 'dashboard';
     default: return hubId.toLowerCase();
@@ -299,11 +303,26 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
             <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">Tactical Hubs</h2>
             <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">Tap any card to launch your destination hub in a new tab.</p>
           </div>
-          <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl">
-            <Globe className="w-5 h-5 text-indigo-400" />
-            <div>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Global Reach</p>
-              <p className="text-sm font-extrabold text-white">100+ Nodes</p>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href="/hubs"
+              onClick={(e) => {
+                e.preventDefault();
+                window.history.pushState({}, '', '/hubs');
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs rounded-2xl transition-all shadow-lg shadow-cyan-900/30 active:scale-95"
+            >
+              <Compass className="w-4 h-4" />
+              <span>All 10 Hubs Directory</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-white/10 rounded-2xl">
+              <Globe className="w-5 h-5 text-indigo-400" />
+              <div>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Global Reach</p>
+                <p className="text-sm font-extrabold text-white">100+ Nodes</p>
+              </div>
             </div>
           </div>
         </div>

@@ -752,9 +752,26 @@ export const DeepSeaCanvas: React.FC<DeepSeaCanvasProps> = ({
         <img
           src="/assets/deepsea-jet.png"
           alt="Deep Sea Jet Submersible"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            const fallback = document.getElementById('jet-fallback-svg');
+            if (fallback) fallback.style.display = 'block';
+          }}
           className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(56,189,248,0.9)] select-none pointer-events-none"
           draggable={false}
         />
+        <svg
+          id="jet-fallback-svg"
+          viewBox="0 0 100 60"
+          className="w-full h-full filter drop-shadow-[0_0_20px_rgba(56,189,248,0.9)] hidden"
+        >
+          <path d="M10,30 Q30,10 70,22 Q95,27 98,30 Q95,33 70,38 Q30,50 10,30 Z" fill="#06b6d4" stroke="#38bdf8" strokeWidth="2" />
+          <ellipse cx="65" cy="30" rx="12" ry="6" fill="#38bdf8" />
+          <ellipse cx="65" cy="30" rx="9" ry="4" fill="#a5f3fc" />
+          <path d="M20,18 L35,26 L20,30 Z" fill="#0891b2" />
+          <path d="M20,42 L35,34 L20,30 Z" fill="#0891b2" />
+          <circle cx="8" cy="30" r="5" fill="#f59e0b" />
+        </svg>
       </div>
 
       {/* Direct In-Game Cashout & Interactive Overlays */}

@@ -48,6 +48,9 @@ import { EfadoMoneyQuiz } from './components/EfadoMoneyQuiz';
 import { EfadoEquilibrium } from './components/EfadoEquilibrium';
 import { DeepSeaJetGame } from './components/DeepSeaJetGame';
 import { EfadoEducationHub } from './components/EfadoEducationHub';
+import { VerticalHubsPage } from './components/VerticalHubsPage';
+import { UniversalHubPage } from './components/UniversalHubPage';
+import { HUBS, getHubBySlug } from './config/hubs';
 import { EfadoTechHub } from './components/tech/EfadoTechHub';
 import { EfadoZoom } from './components/EfadoZoom';
 import { EfadoHelpChat } from './components/EfadoHelpChat';
@@ -608,9 +611,62 @@ function AppContent() {
   const [legalHubSection, setLegalHubSection] = useState<'TERMS' | 'PRIVACY' | 'GAMING' | 'DISCLAIMER'>('TERMS');
   const [showTechHub, setShowTechHub] = useState(false);
 
+  // 10+ Vertical Hubs Routing State (Shareable Links, 1 Login + 1 Wallet)
+  const [verticalHubSlug, setVerticalHubSlug] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase().trim();
+      if (p.startsWith('/hub/')) {
+        const s = p.replace('/hub/', '').split('/')[0].split('?')[0].trim();
+        const found = getHubBySlug(s);
+        if (found) return found.slug;
+      }
+      const h = window.location.hash.toLowerCase().trim();
+      if (h.startsWith('#hub/') || h.startsWith('#/hub/')) {
+        const s = h.replace(/^#\/?hub\//, '').split('?')[0].trim();
+        const found = getHubBySlug(s);
+        if (found) return found.slug;
+      }
+    }
+    return null;
+  });
 
+  const [showVerticalHubsDirectory, setShowVerticalHubsDirectory] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase().trim();
+      if (p === '/hubs' || p === '/vertical-hubs' || p === '/hub') return true;
+      const h = window.location.hash.toLowerCase().trim();
+      if (h === '#hubs' || h === '#/hubs' || h === '#vertical-hubs') return true;
+    }
+    return false;
+  });
+
+  const navigateToVerticalHub = (slug: string, inNewTab?: boolean) => {
+    if (inNewTab) {
+      const url = slug === 'all-hubs' || slug === 'hubs' ? '/hubs' : `/hub/${slug}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (slug === 'all-hubs' || slug === 'hubs') {
+      window.history.pushState({}, '', '/hubs');
+      setShowVerticalHubsDirectory(true);
+      setVerticalHubSlug(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const matched = getHubBySlug(slug);
+    const targetSlug = matched ? matched.slug : slug;
+    window.history.pushState({}, '', `/hub/${targetSlug}`);
+    setVerticalHubSlug(targetSlug);
+    setShowVerticalHubsDirectory(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleNavigate = (hub: any, subview?: any) => {
+    // Reset vertical hub overlay when explicit navigation triggered
+    setVerticalHubSlug(null);
+    setShowVerticalHubsDirectory(false);
     // Reset overlay modal flags when switching hubs
     setShowGistHub(hub === 'GIST');
     setShowAdvertisingHub(hub === 'ADVERTISING');
@@ -1016,6 +1072,45 @@ function AppContent() {
     handleFlutterwaveCallback();
   }, [user]);
 
+  // OPay Automated Callback Redirect Listener
+  useEffect(() => {
+    const handleOpayCallback = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const opayRef = urlParams.get('opay_ref') || urlParams.get('reference');
+        const status = urlParams.get('status');
+        const simAmount = urlParams.get('amount');
+        const simUserId = urlParams.get('userId');
+        const isSimulated = urlParams.get('simulated');
+
+        if (opayRef && opayRef.startsWith('OPAY_')) {
+          console.log('🟢 OPay Return Reference detected in URL:', opayRef, 'Status:', status);
+          const currentUserId = user?.uid || simUserId || '';
+          
+          const verifyUrl = `/api/opay/status/${encodeURIComponent(opayRef)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}${status ? `&status=${status}` : ''}${isSimulated ? `&simulated=${isSimulated}` : ''}`;
+          const res = await fetch(verifyUrl);
+          const data = await res.json();
+
+          if (data.status && (data.verified || data.already_processed)) {
+            const amountText = data.amount ? `₦${Number(data.amount).toLocaleString()}` : (simAmount ? `₦${Number(simAmount).toLocaleString()}` : 'Funds');
+            alert(`✅ OPAY PAYMENT SUCCESSFUL!\n\nReference: ${opayRef}\nAmount: ${amountText}\nYour wallet balance has been successfully credited.`);
+            setShowWallet(true);
+            setWalletInitialTab('overview');
+          } else {
+            console.warn('OPay return verification status:', data);
+          }
+
+          const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (err) {
+        console.error('Error handling OPay URL callback:', err);
+      }
+    };
+
+    handleOpayCallback();
+  }, [user]);
+
   // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
   useEffect(() => {
     const handleHashRoute = () => {
@@ -1033,10 +1128,47 @@ function AppContent() {
         console.warn('URL parsing notice:', err);
       }
 
-      // 2. Clean hash routing
+      // 2. Clean hash and pathname routing
       const rawHash = window.location.hash.replace('#', '').split('?')[0].toLowerCase().trim();
-      const pathname = window.location.pathname.toLowerCase().replace('/', '').trim();
-      const hash = rawHash || pathname;
+      const pathname = window.location.pathname.toLowerCase().trim();
+
+      // Check for hubs directory: /hubs or #hubs
+      if (pathname === '/hubs' || pathname === '/vertical-hubs' || pathname === 'hubs' || rawHash === 'hubs' || rawHash === '/hubs') {
+        setShowVerticalHubsDirectory(true);
+        setVerticalHubSlug(null);
+        return;
+      }
+
+      // Check for /hub/:slug or #hub/:slug
+      let detectedSlug: string | null = null;
+      if (pathname.startsWith('/hub/')) {
+        detectedSlug = pathname.replace('/hub/', '').split('/')[0].split('?')[0].trim();
+      } else if (rawHash.startsWith('hub/')) {
+        detectedSlug = rawHash.replace('hub/', '').split('/')[0].split('?')[0].trim();
+      } else if (rawHash.startsWith('/hub/')) {
+        detectedSlug = rawHash.replace('/hub/', '').split('/')[0].split('?')[0].trim();
+      }
+
+      if (detectedSlug) {
+        const foundHub = getHubBySlug(detectedSlug);
+        if (foundHub) {
+          setVerticalHubSlug(foundHub.slug);
+          setShowVerticalHubsDirectory(false);
+          return;
+        }
+      }
+
+      // Check if hash matches one of the 10 hub slugs directly
+      if (rawHash) {
+        const directHub = getHubBySlug(rawHash);
+        if (directHub) {
+          setVerticalHubSlug(directHub.slug);
+          setShowVerticalHubsDirectory(false);
+          return;
+        }
+      }
+
+      const hash = rawHash || pathname.replace('/', '').trim();
 
       // Check for subviews in search or hash query
       try {
@@ -1054,6 +1186,8 @@ function AppContent() {
       }
 
       if (!hash || hash === 'home' || hash === 'homehub') {
+        setVerticalHubSlug(null);
+        setShowVerticalHubsDirectory(false);
         setActiveHub('HOME');
         setShowGistHub(false);
         setShowAdvertisingHub(false);
@@ -1099,25 +1233,31 @@ function AppContent() {
         handleNavigate('DASHBOARD');
       } else if (hash === 'partners' || hash === 'join' || hash === 'affiliate' || hash.startsWith('partner')) {
         handleNavigate('PARTNER_HUB');
+      } else if (hash === 'wallet' || hash === 'profile-wallet' || hash === 'deposit' || window.location.pathname.startsWith('/wallet')) {
+        setShowWallet(true);
+        if (hash === 'deposit') {
+          setWalletInitialTab('deposit');
+        }
       } else if (['dashboard', 'partner_hub'].includes(hash)) {
         setActiveHub(hash.toUpperCase() as any);
       }
     };
 
-    // Parse the hash if user is logged in & set up
-    if (user && !loading) {
-      handleHashRoute();
-    }
+    // Execute on initial render so direct links load immediately
+    handleHashRoute();
 
     window.addEventListener('hashchange', handleHashRoute);
+    window.addEventListener('popstate', handleHashRoute);
     return () => {
       window.removeEventListener('hashchange', handleHashRoute);
+      window.removeEventListener('popstate', handleHashRoute);
     };
   }, [user, loading]);
 
   // Sync state changes back to url hash for easy link sharing and refreshing
   useEffect(() => {
     if (loading || !user) return;
+    if (verticalHubSlug || showVerticalHubsDirectory) return;
     
     let targetHash = '';
     if (showCommunityHub) {
@@ -2046,6 +2186,61 @@ function AppContent() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // 10+ Vertical Hubs System - All Hubs Directory
+  if (showVerticalHubsDirectory) {
+    const totalSharedWallet = (user?.depositWallet || 0) + (user?.playerWallet || 0);
+    return (
+      <VerticalHubsPage
+        user={user}
+        wallet={totalSharedWallet}
+        onNavigateHub={navigateToVerticalHub}
+        onOpenCashier={() => openWalletWithTab('overview')}
+        onLogin={handleLogin}
+      />
+    );
+  }
+
+  // 10+ Vertical Hubs System - Dedicated Dynamic Universal Hub
+  if (verticalHubSlug) {
+    const totalSharedWallet = (user?.depositWallet || 0) + (user?.playerWallet || 0);
+    return (
+      <UniversalHubPage
+        slug={verticalHubSlug}
+        user={user}
+        wallet={totalSharedWallet}
+        onNavigateHub={navigateToVerticalHub}
+        onOpenCashier={() => openWalletWithTab('overview')}
+        onLogin={handleLogin}
+        onResult={(winAmount, gameId, stake) => {
+          const mult = stake > 0 ? winAmount / stake : 0;
+          onResult(mult, stake, gameId as any, winAmount);
+        }}
+        onStakeDeduction={async (amount, gameId) => {
+          if (!user) return;
+          try {
+            const userRef = doc(db, 'users', user.uid);
+            if ((user.depositWallet || 0) >= amount) {
+              await updateDoc(userRef, { depositWallet: increment(-amount) });
+            } else {
+              await updateDoc(userRef, { playerWallet: increment(-amount) });
+            }
+          } catch (err) {
+            console.error('Stake deduction failed:', err);
+          }
+        }}
+        onUpdateBalance={async (amount) => {
+          if (!user) return;
+          try {
+            const userRef = doc(db, 'users', user.uid);
+            await updateDoc(userRef, { playerWallet: increment(amount) });
+          } catch (err) {
+            console.error('Balance update failed:', err);
+          }
+        }}
+      />
     );
   }
 

@@ -53,6 +53,7 @@ import { TransactionHistory } from './TransactionHistory';
 import { TransactionService } from '../services/TransactionService';
 import { PaystackDeposit } from './PaystackDeposit';
 import { FlutterwaveDeposit } from './FlutterwaveDeposit';
+import { OpayDeposit } from './OpayDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
 import { useCurrency } from '../lib/CurrencyContext';
@@ -67,7 +68,7 @@ interface UserWalletProps {
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
   const { selectedCurrency, setCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('bank_transfer');
+  const [depositMethod, setDepositMethod] = useState<'opay' | 'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('bank_transfer');
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
   const [amount, setAmount] = useState('');
@@ -1482,6 +1483,17 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                     </button>
                     <button 
                       type="button"
+                      onClick={() => setDepositMethod('opay')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        depositMethod === 'opay' 
+                          ? 'border-b-4 border-emerald-500 text-emerald-600 font-extrabold' 
+                          : 'text-gray-400 hover:text-gray-650'
+                      }`}
+                    >
+                      ⚡ OPay Pay-In (Instant)
+                    </button>
+                    <button 
+                      type="button"
                       onClick={() => setDepositMethod('paystack')}
                       className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
                         depositMethod === 'paystack' 
@@ -1518,7 +1530,41 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
                 {/* THE RENDER OF SECURE COMPLIANT MODULE WITH INTEGRATED CALLBACKS */}
                 <div className="bg-white border text-left border-gray-100 p-6 sm:p-8 rounded-[2.5rem] shadow-xl">
-                  {depositMethod === 'paystack' ? (
+                  {depositMethod === 'opay' ? (
+                    <OpayDeposit
+                      user={user}
+                      defaultAmount={1000}
+                      onSuccess={async ({ reference, amount: amt }) => {
+                        try {
+                          await onUpdateBalance(amt, 'deposit');
+                          const txData: any = {
+                            userId: user.uid,
+                            type: 'deposit',
+                            amount: amt,
+                            currency: 'NGN',
+                            status: 'completed',
+                            method: 'OPay Pay-In Gateway',
+                            hub: 'WALLET',
+                            purpose: 'Wallet Top-up',
+                            reference,
+                            description: 'Wallet Top-up via OPay Pay-In Gateway',
+                            skipWalletUpdate: true,
+                            metadata: {
+                              paymentRef: reference,
+                              gateway: 'opay'
+                            }
+                          };
+                          await TransactionService.recordTransaction(txData);
+                          setSelectedReceiptTx({
+                            ...txData,
+                            timestamp: { seconds: Math.floor(Date.now() / 1000) }
+                          });
+                        } catch (err: any) {
+                          console.error("Ledger write error:", err);
+                        }
+                      }}
+                    />
+                  ) : depositMethod === 'paystack' ? (
                     <div className="space-y-6">
                       <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex gap-3 shadow-sm mb-2">
                         <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
