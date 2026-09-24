@@ -63,6 +63,7 @@ import { HubHeroCarousel } from './components/HubHeroCarousel';
 import { UserWallet } from './components/UserWallet';
 import { EfadoMining } from './components/EfadoMining';
 import { EfadoAdvertisingHub } from './components/EfadoAdvertisingHub';
+import { EfadoCosmicWelcome } from './components/EfadoCosmicWelcome';
 import { EfadoIntelligenceFeed } from './components/EfadoIntelligenceFeed';
 import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
@@ -2246,424 +2247,50 @@ function AppContent() {
 
   if (!user && !DEVELOPMENT_MODE) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <NocturnalBackground />
-
-        {/* Floating Simulated SMS & Email Broadcast Hub on Login Screen */}
-        {otpStep && (adminEmail.trim().toLowerCase() === 'festdanemh@gmail.com' || simulatedSmsCode) && (
-          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm p-6 bg-slate-900 border-2 border-amber-500 rounded-3xl shadow-2xl backdrop-blur-xl animate-bounce">
-            <div className="flex items-start gap-3">
-              <div className="p-3 bg-amber-500/10 text-amber-500 rounded-2xl shrink-0">
-                <MessageSquare className="w-6 h-6 text-amber-500 animate-pulse" />
-              </div>
-              <div className="flex-grow text-left space-y-3.5">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-amber-400 uppercase tracking-[0.25em] flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                    Sovereign dual-key broadcaster
-                  </p>
-                  <p className="text-[9px] font-mono text-slate-500">Live Secure Transmission Log</p>
-                </div>
-                
-                <div className="space-y-1 text-[10px] font-mono border-t border-b border-white/5 py-2.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">🛡️ SECURE EMAIL</span>
-                    <span className="text-emerald-400 font-bold">● SENT ALWAYS (festdanemh@gmail.com)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">📱 SECURE PHONE</span>
-                    <span className="text-emerald-400 font-bold">● DISPATCHED (08072456836)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">🧪 GATEWAY HUB</span>
-                    <span className="text-indigo-400">EFADO BROADCAS-NET</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950 p-3 rounded-xl border border-white/5 text-center space-y-1">
-                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Authentication Key</p>
-                  <span className="text-xl font-mono font-black text-amber-400 tracking-[0.25em] block">
-                    {simulatedSmsCode || currentOtpCode}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpInput(simulatedSmsCode || currentOtpCode);
-                    }}
-                    className="flex-grow py-2 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                  >
-                    ⚡ Auto-Fill
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(simulatedSmsCode || currentOtpCode);
-                    }}
-                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => { setOtpStep(false); }} 
-                className="text-slate-500 hover:text-white transition-all p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="bg-slate-900/90 backdrop-blur-2xl p-6 sm:p-10 rounded-3xl sm:rounded-[2.5rem] shadow-2xl max-w-md w-full text-center border border-white/10 relative z-10 my-auto mx-auto golden-card-border">
-          <EfadoLogo size="lg" className="mb-4 mx-auto" />
-          <h2 className="text-xl sm:text-2xl font-extrabold text-white mb-1.5 tracking-tight">Welcome to EFADO</h2>
-          <p className="text-slate-300 mb-5 text-xs sm:text-sm font-medium leading-relaxed">
-            Choose 1-Tap Fast Access or Google Sign-In to connect immediately.
-          </p>
-
-          {/* In-App Browser (WhatsApp / Social) Detection Notice */}
-          {isInAppBrowser && (
-            <div className="mb-5 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-left space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" />
-                  In-App Browser Detected
-                </span>
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
-                  WhatsApp / Social
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 leading-tight">
-                For the fastest 1-second login on mobile, use the <strong className="text-amber-300">1-Tap Fast Access</strong> below, or copy link to open in Chrome/Safari:
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                    navigator.clipboard.writeText(window.location.href);
-                    setCopiedLink(true);
-                    setTimeout(() => setCopiedLink(false), 2500);
-                  }
-                }}
-                className="w-full py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
-              >
-                {copiedLink ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    Link Copied! Paste in Chrome / Safari
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-3.5 h-3.5" />
-                    Copy App Link
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* Login Mode Tabs */}
-          <div className="flex border-b border-white/10 mb-5 p-1 bg-slate-950/60 rounded-2xl">
-            <button
-              onClick={() => { setLoginMode('STANDARD'); setOtpStep(false); setError(null); }}
-              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-wider rounded-xl transition-all ${loginMode === 'STANDARD' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-              id="login-mode-standard"
-            >
-              User Access
-            </button>
-            <button
-              onClick={() => { setLoginMode('CEO'); setError(null); }}
-              className={`flex-1 py-3 text-[11px] font-black uppercase tracking-wider rounded-xl transition-all ${loginMode === 'CEO' ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-              id="login-mode-ceo"
-            >
-              CEO / Admin
-            </button>
-          </div>
-
-          {error && (
-            <div className="mb-5 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex flex-col items-center gap-2 text-red-400 text-left text-xs">
-              <div className="flex items-center gap-2 font-bold w-full">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                <span>CONNECTION NOTICE</span>
-              </div>
-              <p className="leading-relaxed font-mono">{error}</p>
-            </div>
-          )}
-
-          {loginMode === 'STANDARD' ? (
-            <div className="space-y-4">
-              {/* Sub-selector */}
-              <div className="flex bg-slate-950/60 p-1 rounded-xl border border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                <button
-                  type="button"
-                  onClick={() => { setStandardEmailMode('GOOGLE'); setError(null); }}
-                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'GOOGLE' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
-                >
-                  ⚡ Fast Access
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setStandardEmailMode('EMAIL_LOGIN'); setError(null); }}
-                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'EMAIL_LOGIN' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
-                >
-                  Email Login
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setStandardEmailMode('EMAIL_REGISTER'); setError(null); }}
-                  className={`flex-1 py-2 rounded-lg transition-all ${standardEmailMode === 'EMAIL_REGISTER' ? 'bg-indigo-600 text-white font-black' : 'hover:text-slate-200'}`}
-                >
-                  Register
-                </button>
-              </div>
-
-              {standardEmailMode === 'GOOGLE' && (
-                <div className="space-y-4 text-left">
-                  {/* High-speed Seamless Connection Pass */}
-                  <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-500/15 via-slate-950/80 to-indigo-950/40 border-2 border-amber-500/40 rounded-3xl text-center space-y-3.5 shadow-xl shadow-amber-500/5">
-                    <div className="space-y-1 text-left">
-                      <label className="text-[9px] font-black text-amber-400 uppercase tracking-widest block pl-1">
-                        Your Name or Phone Number (Optional)
-                      </label>
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Okhawere Festus or 08072456836"
-                        value={quickNameOrPhone}
-                        onChange={(e) => setQuickNameOrPhone(e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-950/80 border border-white/10 rounded-xl text-xs sm:text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleQuickEntrance();
-                          }
-                        }}
-                      />
-                    </div>
-
-                    <button 
-                      onClick={() => handleQuickEntrance()}
-                      className="w-full py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-amber-500/20 active:scale-95 border-b-4 border-amber-700/50"
-                      id="login-instant-btn"
-                    >
-                      <Zap className="w-5 h-5 text-slate-950 fill-current animate-pulse shrink-0" />
-                      <span>⚡ CONNECT TO EFADO (1-TAP ENTRY)</span>
-                    </button>
-                    
-                    <p className="text-[11px] text-amber-200/90 font-bold tracking-wide leading-tight text-center">
-                      Instant Access in 1 Second • Full Access to Shop, Buy, Deposit & Win
-                    </p>
-                  </div>
-
-                  <div className="relative flex py-1 items-center">
-                    <div className="flex-grow border-t border-white/10"></div>
-                    <span className="flex-shrink mx-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Or sign in with Google</span>
-                    <div className="flex-grow border-t border-white/10"></div>
-                  </div>
-
-                  <button 
-                    onClick={handleLogin}
-                    className="w-full py-4 bg-white text-slate-900 border border-slate-200 rounded-2xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-3 hover:bg-slate-100 transition-all shadow-md active:scale-95"
-                    id="login-standard-btn"
-                  >
-                    <LogIn className="w-4 h-4 shrink-0 text-indigo-600" />
-                    CONTINUE WITH GOOGLE
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      setError(null);
-                      try {
-                        console.log('User requested redirect login explicitly...');
-                        await signInWithRedirect(auth, googleProvider);
-                      } catch (e: any) {
-                        setError(`Redirect Connection failed: ${e.message || e}`);
-                      }
-                    }}
-                    className="w-full py-2 text-[10px] font-bold text-slate-400 hover:text-indigo-300 transition-all active:scale-95 bg-slate-950/20 rounded-xl hover:bg-slate-950/40 text-center"
-                    id="login-redirect-btn"
-                  >
-                    Having trouble with popups? Click here for Redirect Login
-                  </button>
-                </div>
-              )}
-
-              {standardEmailMode === 'EMAIL_LOGIN' && (
-                <form onSubmit={handleStandardEmailLogin} className="space-y-3 text-left">
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Email address</label>
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="e.g. name@domain.com"
-                      value={standardEmail}
-                      onChange={(e) => setStandardEmail(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Password</label>
-                    <input 
-                      type="password" 
-                      required
-                      placeholder="••••••••••••••"
-                      value={standardPassword}
-                      onChange={(e) => setStandardPassword(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-600 transition-all"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl active:scale-95 mt-2"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    Secure Login
-                  </button>
-                </form>
-              )}
-
-              {standardEmailMode === 'EMAIL_REGISTER' && (
-                <form onSubmit={handleStandardEmailRegister} className="space-y-3 text-left">
-                  {standardRegisterSuccess && (
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-semibold leading-relaxed mb-2">
-                      {standardRegisterSuccess}
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Choose Username / Display Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="e.g. Tactician11"
-                      value={standardDisplayName}
-                      onChange={(e) => setStandardDisplayName(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Email address</label>
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="e.g. name@domain.com"
-                      value={standardEmail}
-                      onChange={(e) => setStandardEmail(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block pl-1">Password</label>
-                    <input 
-                      type="password" 
-                      required
-                      placeholder="At least 6 characters"
-                      value={standardPassword}
-                      onChange={(e) => setStandardPassword(e.target.value)}
-                      className="w-full px-4 py-3.5 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full py-4 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-2 hover:bg-emerald-500 transition-all shadow-xl active:scale-95 mt-2"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Register Account
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4 text-left">
-              {!otpStep ? (
-                <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Sovereign Email</label>
-                    <div className="relative">
-                      <input 
-                        type="email" 
-                        required
-                        placeholder="festdanemh@gmail.com"
-                        value={adminEmail}
-                        onChange={(e) => setAdminEmail(e.target.value)}
-                        className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Sovereign Password</label>
-                    <div className="relative">
-                      <input 
-                        type="password" 
-                        required
-                        placeholder="••••••••••••••"
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-sm font-bold text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    className="w-full py-4 mt-6 bg-amber-500 text-slate-950 rounded-xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-3 hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/10 active:scale-95"
-                    id="admin-login-submit-btn"
-                  >
-                    <ShieldCheck className="w-5 h-5" />
-                    Request Authorization
-                  </button>
-
-                  <div className="text-center mt-3">
-                    <span className="text-[8px] font-bold font-mono text-slate-600 uppercase tracking-widest">
-                      Admin clearance required. Use password EFADO_CEO_2026 or CEO phone number.
-                    </span>
-                  </div>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-indigo-400 text-xs">
-                    <p className="font-bold uppercase tracking-widest mb-1 pl-1 text-[10px]">Dual-Key Broadcaster</p>
-                    <p className="leading-relaxed font-mono">{otpMessage}</p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">6-Digit Verification Key</label>
-                    <input 
-                      type="text" 
-                      required
-                      maxLength={6}
-                      placeholder="000000"
-                      value={otpInput}
-                      onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-5 py-4 bg-slate-950/60 border border-white/5 rounded-xl text-center text-xl font-mono font-black tracking-widest text-amber-400 placeholder-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 mt-6">
-                    <button 
-                      type="button"
-                      onClick={() => setOtpStep(false)}
-                      className="flex-1 py-4 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-700 transition-all active:scale-95"
-                    >
-                      Back
-                    </button>
-                    <button 
-                      type="submit"
-                      className="flex-[2] py-4 bg-amber-500 text-slate-950 rounded-xl font-black uppercase tracking-[0.15em] text-xs flex items-center justify-center gap-2 hover:bg-amber-400 transition-all shadow-xl shadow-amber-500/10 active:scale-95"
-                    >
-                      Verify Code <LogIn className="w-4 h-4" />
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <EfadoCosmicWelcome
+        onQuickConnect={async (targetHub?: string, customNameOrPhone?: string) => {
+          await handleQuickEntrance(customNameOrPhone);
+          if (targetHub) {
+            setActiveHub(targetHub as any);
+          }
+        }}
+        onGoogleConnect={handleLogin}
+        onRedirectGoogleConnect={async () => {
+          setError(null);
+          try {
+            console.log('User requested redirect login explicitly...');
+            await signInWithRedirect(auth, googleProvider);
+          } catch (e: any) {
+            setError(`Redirect Connection failed: ${e.message || e}`);
+          }
+        }}
+        onEmailLogin={handleStandardEmailLogin}
+        onEmailRegister={handleStandardEmailRegister}
+        onAdminSubmit={handleAdminLoginSubmit}
+        onVerifyOtp={handleVerifyOtp}
+        error={error}
+        setError={setError}
+        loading={loading}
+        isInAppBrowser={isInAppBrowser}
+        standardEmail={standardEmail}
+        setStandardEmail={setStandardEmail}
+        standardPassword={standardPassword}
+        setStandardPassword={setStandardPassword}
+        standardDisplayName={standardDisplayName}
+        setStandardDisplayName={setStandardDisplayName}
+        standardRegisterSuccess={standardRegisterSuccess}
+        adminEmail={adminEmail}
+        setAdminEmail={setAdminEmail}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
+        otpStep={otpStep}
+        setOtpStep={setOtpStep}
+        otpInput={otpInput}
+        setOtpInput={setOtpInput}
+        otpMessage={otpMessage}
+        simulatedSmsCode={simulatedSmsCode}
+        currentOtpCode={currentOtpCode}
+      />
     );
   }
 
