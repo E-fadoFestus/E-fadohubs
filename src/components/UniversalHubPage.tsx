@@ -16,13 +16,16 @@ import {
   ExternalLink,
   ShieldCheck,
   ArrowRight,
-  LogIn
+  ArrowLeft,
+  LogIn,
+  Home
 } from 'lucide-react';
 import { HUBS, getHubBySlug, HubConfig } from '../config/hubs';
 import { UserProfile } from '../types';
 import { UniversalHubHeader } from './UniversalHubHeader';
 import { ArenaHubView } from './ArenaHubView';
 import { ModernMarketHub } from './ModernMarketHub';
+import { FairlyUsedMarket } from './FairlyUsedMarket';
 import { EfadoAdvertisingHub } from './EfadoAdvertisingHub';
 import { EfadoDigitalServicesHub } from './EfadoDigitalServicesHub';
 import { EfadoCommunityHubs } from './EfadoCommunityHubs';
@@ -30,12 +33,19 @@ import { EfadoHepiHandsLoan } from './EfadoHepiHandsLoan';
 import { EfadoDomainHub } from './EfadoDomainHub';
 import { EfadoEducationHub } from './EfadoEducationHub';
 import { EfadoTechHub } from './tech/EfadoTechHub';
+import { EfadoGistHub } from './EfadoGistHub';
+import { EfadoServiceCorps } from './EfadoServiceCorps';
+import { UserWallet } from './UserWallet';
+import { EfadoPartnerHub } from './EfadoPartnerHub';
+import { EfadoAiLabPage } from './ai/EfadoAiLabPage';
 
 interface UniversalHubPageProps {
   slug: string;
+  itemId?: string;
   user: UserProfile | null;
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
+  onNavigateHome: () => void;
   onOpenCashier?: () => void;
   onLogin?: () => void;
   onResult: (winAmount: number, gameId: string, stake: number, metadata?: any) => void;
@@ -45,9 +55,11 @@ interface UniversalHubPageProps {
 
 export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
   slug,
+  itemId,
   user,
   wallet,
   onNavigateHub,
+  onNavigateHome,
   onOpenCashier,
   onLogin,
   onResult,
@@ -85,7 +97,7 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
 
       case 'market':
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
             <div className="bg-slate-900/90 border-b border-cyan-500/20 px-4 py-2.5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-slate-400 uppercase font-bold">Catalog:</span>
@@ -115,10 +127,19 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
               </div>
             </div>
 
-            <ModernMarketHub 
-              user={effectiveUser} 
-              onClose={() => onNavigateHub('all-hubs', false)}
-            />
+            {marketView === 'new' ? (
+              <ModernMarketHub 
+                user={effectiveUser} 
+                onClose={onNavigateHome}
+                initialItemId={itemId}
+              />
+            ) : (
+              <FairlyUsedMarket
+                user={effectiveUser}
+                onClose={onNavigateHome}
+                initialItemId={itemId}
+              />
+            )}
           </div>
         );
 
@@ -126,27 +147,47 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
         return (
           <EfadoAdvertisingHub
             user={effectiveUser}
-            onClose={() => onNavigateHub('all-hubs', false)}
+            onClose={onNavigateHome}
             initialType="ADVERT"
+            initialItemId={itemId}
           />
         );
 
       case 'services':
         return (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
+            <EfadoServiceCorps
+              user={effectiveUser}
+              onClose={onNavigateHome}
+            />
+          </div>
+        );
+
+      case 'tech':
+        return (
+          <div className="space-y-4 w-full">
             <EfadoTechHub
               user={effectiveUser}
-              onClose={() => onNavigateHub('all-hubs', false)}
+              onClose={onNavigateHome}
               onStartZoomSession={() => {}}
             />
           </div>
+        );
+
+      case 'gist':
+        return (
+          <EfadoGistHub
+            user={effectiveUser}
+            onClose={onNavigateHome}
+            initialView="FEED"
+          />
         );
 
       case 'community':
         return (
           <EfadoCommunityHubs
             user={effectiveUser}
-            onClose={() => onNavigateHub('all-hubs', false)}
+            onClose={onNavigateHome}
           />
         );
 
@@ -185,7 +226,34 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
         return (
           <EfadoEducationHub
             user={effectiveUser}
-            onClose={() => onNavigateHub('all-hubs', false)}
+            onClose={onNavigateHome}
+          />
+        );
+
+      case 'dashboard':
+        return (
+          <UserWallet
+            user={effectiveUser}
+            onUpdateBalance={async () => {}}
+            onClose={onNavigateHome}
+            initialTab="overview"
+          />
+        );
+
+      case 'partners':
+        return (
+          <EfadoPartnerHub
+            user={effectiveUser}
+            onNavigate={(h) => onNavigateHub(h)}
+          />
+        );
+
+      case 'ai-lab':
+        return (
+          <EfadoAiLabPage
+            user={effectiveUser}
+            onNavigateHome={onNavigateHome}
+            onNavigateHub={onNavigateHub}
           />
         );
 
@@ -205,19 +273,42 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#070b19] text-white flex flex-col">
+      {/* Fixed Sticky BACK TO HOME Top Bar across every hub page */}
+      <div className="sticky top-0 z-50 w-full bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/40 px-3 sm:px-6 py-2 shadow-2xl shadow-black/70 flex items-center justify-between gap-3">
+        <button
+          onClick={onNavigateHome}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 hover:scale-[1.03] active:scale-[0.98] transition-all group"
+          title="Return to Home Page"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
+          <span>← BACK TO HOME</span>
+        </button>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 shadow-inner">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-black text-white uppercase tracking-tight">{hubConfig.name}</span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-500/30 font-bold uppercase tracking-wider shadow-sm">
+            {hubConfig.tag}
+          </span>
+        </div>
+      </div>
+
       {/* Universal Sticky Top Header for this Hub */}
       <UniversalHubHeader
         currentHub={hubConfig}
         user={user}
         wallet={wallet}
         onNavigateHub={onNavigateHub}
+        onNavigateHome={onNavigateHome}
         onOpenCashier={onOpenCashier}
         onLogin={onLogin}
       />
 
       {/* Guest Mode Banner (if visitor opened direct link without logging in) */}
       {!user && (
-        <div className="bg-gradient-to-r from-cyan-950 via-slate-900 to-indigo-950 border-b border-cyan-500/20 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 shadow-inner">
+        <div className="bg-gradient-to-r from-cyan-950 via-slate-900 to-indigo-950 border-b border-cyan-500/20 px-4 py-2.5 text-xs flex flex-wrap items-center justify-between gap-3 shadow-inner">
           <div className="flex items-center gap-2 text-cyan-300">
             <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>You are previewing <strong>{hubConfig.name}</strong> as an authenticated guest. Sign in to access your synchronized wallet.</span>
@@ -232,8 +323,8 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
         </div>
       )}
 
-      {/* Hub Body View */}
-      <main className="flex-1 w-full">
+      {/* Hub Body View - Standalone, Fresh, Wide (Not congested) */}
+      <main className="flex-1 w-full max-w-full overflow-x-hidden">
         {renderHubContent()}
       </main>
     </div>

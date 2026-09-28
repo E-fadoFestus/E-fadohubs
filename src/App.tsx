@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, useNavigate, useLocation } from 'react-router-dom';
 import { 
   auth, 
   db, 
@@ -211,13 +212,17 @@ const DEVELOPMENT_MODE = false;
 
 export default function App() {
   return (
-    <CurrencyProvider>
-      <AppContent />
-    </CurrencyProvider>
+    <BrowserRouter>
+      <CurrencyProvider>
+        <AppContent />
+      </CurrencyProvider>
+    </BrowserRouter>
   );
 }
 
 function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<UserProfile | null>(() => {
     // Attempt to load from cache for instant zero-latency UI rendering on app mount
     const cached = localStorage.getItem('efado_cached_user');
@@ -575,25 +580,43 @@ function AppContent() {
         const userRef = doc(db, 'users', user.uid);
         const adminRef = doc(db, 'adminStats', 'global');
         
-        const statsSnap = await transaction.get(adminRef);
-        const stats = statsSnap.data() as AdminStats;
+        let stats: AdminStats | null = null;
+        try {
+          const statsSnap = await transaction.get(adminRef);
+          if (statsSnap.exists()) stats = statsSnap.data() as AdminStats;
+        } catch {
+          // Non-fatal
+        }
 
         transaction.update(userRef, {
           depositWallet: increment(-amount)
         });
 
-        transaction.update(adminRef, {
-          adminWallet: increment(amount),
-          totalHouseGain: increment(amount),
-          gameWallets: {
-            ...stats.gameWallets,
-            [gameId]: ((stats.gameWallets as any)[gameId] || 0) + amount
-          },
-          lastUpdated: serverTimestamp()
-        });
+        if (stats) {
+          transaction.update(adminRef, {
+            adminWallet: increment(amount),
+            totalHouseGain: increment(amount),
+            gameWallets: {
+              ...stats.gameWallets,
+              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + amount
+            },
+            lastUpdated: serverTimestamp()
+          });
+        }
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'stake_deduction');
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, {
+          depositWallet: increment(-amount)
+        });
+      } catch (userErr) {
+        handleFirestoreError(userErr, OperationType.WRITE, 'stake_deduction_user');
+      }
+      setUser(prev => prev ? ({
+        ...prev,
+        depositWallet: Math.max(0, (prev.depositWallet || 0) - amount)
+      }) : null);
     }
   };
 
@@ -621,12 +644,30 @@ function AppContent() {
         const found = getHubBySlug(s);
         if (found) return found.slug;
       }
+      const directMatch = p.replace(/^\/+|\/+$/g, '').split('/')[0].split('?')[0].trim();
+      if (directMatch && directMatch !== 'home' && directMatch !== 'welcome') {
+        const found = getHubBySlug(directMatch);
+        if (found) return found.slug;
+      }
       const h = window.location.hash.toLowerCase().trim();
       if (h.startsWith('#hub/') || h.startsWith('#/hub/')) {
         const s = h.replace(/^#\/?hub\//, '').split('?')[0].trim();
         const found = getHubBySlug(s);
         if (found) return found.slug;
       }
+    }
+    return null;
+  });
+
+  const [hubItemId, setHubItemId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase().trim();
+      if (p.startsWith('/hub/')) {
+        const parts = p.replace('/hub/', '').split('/').filter(Boolean);
+        if (parts[1]) return parts[1].split('?')[0].trim();
+      }
+      const parts = p.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+      if (parts.length >= 2) return parts[1].split('?')[0].trim();
     }
     return null;
   });
@@ -641,32 +682,70 @@ function AppContent() {
     return false;
   });
 
-  const navigateToVerticalHub = (slug: string, inNewTab?: boolean) => {
-    if (inNewTab) {
-      const url = slug === 'all-hubs' || slug === 'hubs' ? '/hubs' : `/hub/${slug}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
+  const navigateToVerticalHub = (slug: string, inNewTab?: boolean, itemId?: string) => {
     if (slug === 'all-hubs' || slug === 'hubs') {
-      window.history.pushState({}, '', '/hubs');
+      if (inNewTab) {
+        window.open('/hubs', '_blank', 'noopener,noreferrer');
+        return;
+      }
+      navigate('/hubs');
       setShowVerticalHubsDirectory(true);
       setVerticalHubSlug(null);
+      setHubItemId(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     const matched = getHubBySlug(slug);
     const targetSlug = matched ? matched.slug : slug;
-    window.history.pushState({}, '', `/hub/${targetSlug}`);
+    const url = itemId ? `/hub/${targetSlug}/${itemId}` : `/hub/${targetSlug}`;
+    if (inNewTab) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    navigate(url);
     setVerticalHubSlug(targetSlug);
+    setHubItemId(itemId || null);
     setShowVerticalHubsDirectory(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateHome = () => {
+    navigate('/home');
+    setVerticalHubSlug(null);
+    setHubItemId(null);
+    setShowVerticalHubsDirectory(false);
+    setActiveHub('HOME');
+    setShowGistHub(false);
+    setShowAdvertisingHub(false);
+    setShowDomainHub(false);
+    setShowZoomPlans(false);
+    setShowModernMarket(false);
+    setShowMarketHub(false);
+    setShowServiceCorps(false);
+    setShowEducationHub(false);
+    setShowTechHub(false);
+    setShowHepiHandsLoan(false);
+    setShowCommunityHub(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleNavigate = (hub: any, subview?: any) => {
+    if (hub === 'HOME') {
+      handleNavigateHome();
+      return;
+    }
+
+    const matchedHub = getHubBySlug(String(hub));
+    if (matchedHub) {
+      navigateToVerticalHub(matchedHub.slug);
+      return;
+    }
+
     // Reset vertical hub overlay when explicit navigation triggered
     setVerticalHubSlug(null);
+    setHubItemId(null);
     setShowVerticalHubsDirectory(false);
     // Reset overlay modal flags when switching hubs
     setShowGistHub(hub === 'GIST');
@@ -1112,9 +1191,9 @@ function AppContent() {
     handleOpayCallback();
   }, [user]);
 
-  // Hash Routing Synchronizer - Handles URL mapping (e.g. /#community) on mount and on change
+  // Path-Based Routing & Deep Linking Synchronizer - Handles URL mapping (e.g. /hub/marketplace/123 or /hub/advertisement)
   useEffect(() => {
-    const handleHashRoute = () => {
+    const handleRouteSync = () => {
       // 1. Capture strategic affiliate code from search params or hash if present
       try {
         const fullHref = window.location.href;
@@ -1130,163 +1209,75 @@ function AppContent() {
       }
 
       // 2. Clean hash and pathname routing
-      const rawHash = window.location.hash.replace('#', '').split('?')[0].toLowerCase().trim();
+      const rawHash = (window.location.hash || '').replace('#', '').split('?')[0].toLowerCase().trim();
       const pathname = window.location.pathname.toLowerCase().trim();
 
       // Check for hubs directory: /hubs or #hubs
       if (pathname === '/hubs' || pathname === '/vertical-hubs' || pathname === 'hubs' || rawHash === 'hubs' || rawHash === '/hubs') {
         setShowVerticalHubsDirectory(true);
         setVerticalHubSlug(null);
+        setHubItemId(null);
         return;
       }
 
-      // Check for /hub/:slug or #hub/:slug
-      let detectedSlug: string | null = null;
+      // Check for /hub/:slug or /hub/:slug/:itemId
       if (pathname.startsWith('/hub/')) {
-        detectedSlug = pathname.replace('/hub/', '').split('/')[0].split('?')[0].trim();
-      } else if (rawHash.startsWith('hub/')) {
-        detectedSlug = rawHash.replace('hub/', '').split('/')[0].split('?')[0].trim();
-      } else if (rawHash.startsWith('/hub/')) {
-        detectedSlug = rawHash.replace('/hub/', '').split('/')[0].split('?')[0].trim();
-      }
-
-      if (detectedSlug) {
-        const foundHub = getHubBySlug(detectedSlug);
-        if (foundHub) {
-          setVerticalHubSlug(foundHub.slug);
+        const parts = pathname.replace('/hub/', '').split('/').filter(Boolean);
+        const slug = parts[0] ? parts[0].split('?')[0].trim() : '';
+        const item = parts[1] ? parts[1].split('?')[0].trim() : null;
+        const matchedHub = getHubBySlug(slug);
+        if (matchedHub) {
+          setVerticalHubSlug(matchedHub.slug);
+          setHubItemId(item);
           setShowVerticalHubsDirectory(false);
           return;
         }
       }
 
-      // Check if hash matches one of the 10 hub slugs directly
-      if (rawHash) {
-        const directHub = getHubBySlug(rawHash);
+      // Check direct clean paths: /marketplace, /advertisement, /education, /gist, /tech, /community, /service, /loan, /dashboard
+      const cleanPath = pathname.replace(/^\/+|\/+$/g, '').split('/')[0].split('?')[0].trim();
+      if (cleanPath && cleanPath !== 'home' && cleanPath !== 'welcome') {
+        const directHub = getHubBySlug(cleanPath);
         if (directHub) {
+          const parts = pathname.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+          const directItem = parts[1] ? parts[1].split('?')[0].trim() : null;
           setVerticalHubSlug(directHub.slug);
+          setHubItemId(directItem);
           setShowVerticalHubsDirectory(false);
           return;
         }
       }
 
-      const hash = rawHash || pathname.replace('/', '').trim();
-
-      // Check for subviews in search or hash query
-      try {
-        const fullUrl = window.location.href;
-        const queryIdx = fullUrl.indexOf('?');
-        if (queryIdx !== -1) {
-          const params = new URLSearchParams(fullUrl.slice(queryIdx));
-          const subview = params.get('subview');
-          if (subview && (subview === 'crypto' || subview === 'vending' || subview === 'money')) {
-            setDigitalServicesSection(subview as any);
-          }
+      // Seamlessly upgrade legacy hash route (e.g. #hub/marketplace or #marketplace) to clean path route
+      if (rawHash) {
+        const cleanHash = rawHash.replace(/^\/?hub\//, '').split('/')[0].split('?')[0].trim();
+        const hashHub = getHubBySlug(cleanHash);
+        if (hashHub) {
+          navigate(`/hub/${hashHub.slug}`, { replace: true });
+          setVerticalHubSlug(hashHub.slug);
+          setShowVerticalHubsDirectory(false);
+          return;
         }
-      } catch (err) {
-        console.warn('Subview query parsing notice:', err);
       }
 
-      if (!hash || hash === 'home' || hash === 'homehub') {
+      if (!pathname || pathname === '/' || pathname === '/home' || pathname === '/welcome') {
         setVerticalHubSlug(null);
+        setHubItemId(null);
         setShowVerticalHubsDirectory(false);
         setActiveHub('HOME');
-        setShowGistHub(false);
-        setShowAdvertisingHub(false);
-        setShowCommunityHub(false);
-        setShowZoomPlans(false);
-        setShowServiceCorps(false);
-        setShowDomainHub(false);
-        setShowTechHub(false);
         return;
       }
-
-      console.log('Synchronizing tactical navigation state for route:', hash);
-      if (hash === 'community' || hash === 'community_hubs' || hash === 'unityhubs') {
-        handleNavigate('COMMUNITY_HUBS');
-      } else if (hash === 'gist' || hash === 'gisthub') {
-        handleNavigate('GIST');
-      } else if (hash === 'advertising' || hash === 'advertise' || hash === 'ads' || hash === 'adverts' || hash === 'sell') {
-        handleNavigate('ADVERTISING', hash === 'sell' ? 'SELL' : 'ADVERT');
-      } else if (hash === 'zoom' || hash === 'zoomlive') {
-        handleNavigate('ZOOM');
-      } else if (hash === 'servicecorps' || hash === 'service_corps') {
-        handleNavigate('SERVICE_CORPS');
-      } else if (hash === 'domain' || hash === 'domain_hub' || hash === 'domainhub') {
-        handleNavigate('DOMAIN_HUB');
-      } else if (hash === 'tech' || hash === 'tech_hub' || hash === 'techhub') {
-        handleNavigate('TECH_HUB');
-      } else if (hash === 'deepseajet' || hash === 'deepsea' || hash === 'jet') {
-        handleNavigate('GAMES');
-        setShowDeepSeaJet(true);
-      } else if (hash === 'gamearena' || hash === 'games' || hash === 'game') {
-        handleNavigate('GAMES');
-      } else if (hash === 'market') {
-        handleNavigate('MARKET');
-      } else if (hash === 'fairly_used' || hash === 'fairlyused') {
-        handleNavigate('FAIRLY_USED');
-      } else if (hash === 'education' || hash === 'edu') {
-        handleNavigate('EDUCATION');
-      } else if (hash === 'digital' || hash === 'digital_services' || hash === 'digital_services_hub' || hash === 'services') {
-        handleNavigate('DIGITAL_SERVICES_HUB');
-      } else if (hash === 'loanhub' || hash === 'loan' || hash === 'hepihands_loan') {
-        handleNavigate('HEPIHANDS_LOAN');
-      } else if (hash === 'dashboard') {
-        handleNavigate('DASHBOARD');
-      } else if (hash === 'partners' || hash === 'join' || hash === 'affiliate' || hash.startsWith('partner')) {
-        handleNavigate('PARTNER_HUB');
-      } else if (hash === 'wallet' || hash === 'profile-wallet' || hash === 'deposit' || window.location.pathname.startsWith('/wallet')) {
-        setShowWallet(true);
-        if (hash === 'deposit') {
-          setWalletInitialTab('deposit');
-        }
-      } else if (['dashboard', 'partner_hub'].includes(hash)) {
-        setActiveHub(hash.toUpperCase() as any);
-      }
     };
 
-    // Execute on initial render so direct links load immediately
-    handleHashRoute();
+    handleRouteSync();
 
-    window.addEventListener('hashchange', handleHashRoute);
-    window.addEventListener('popstate', handleHashRoute);
+    window.addEventListener('popstate', handleRouteSync);
+    window.addEventListener('hashchange', handleRouteSync);
     return () => {
-      window.removeEventListener('hashchange', handleHashRoute);
-      window.removeEventListener('popstate', handleHashRoute);
+      window.removeEventListener('popstate', handleRouteSync);
+      window.removeEventListener('hashchange', handleRouteSync);
     };
-  }, [user, loading]);
-
-  // Sync state changes back to url hash for easy link sharing and refreshing
-  useEffect(() => {
-    if (loading || !user) return;
-    if (verticalHubSlug || showVerticalHubsDirectory) return;
-    
-    let targetHash = '';
-    if (showCommunityHub) {
-      targetHash = 'community';
-    } else if (showGistHub) {
-      targetHash = 'gist';
-    } else if (showAdvertisingHub) {
-      targetHash = 'advertising';
-    } else if (showZoomPlans) {
-      targetHash = 'zoom';
-    } else if (showServiceCorps) {
-      targetHash = 'servicecorps';
-    } else if (showDomainHub) {
-      targetHash = 'domain';
-    } else if (showTechHub) {
-      targetHash = 'tech';
-    } else if (showDeepSeaJet) {
-      targetHash = 'deepseajet';
-    } else if (activeHub !== 'HOME') {
-      targetHash = activeHub.toLowerCase();
-    }
-
-    if (window.location.hash.replace('#', '') !== targetHash) {
-      const scrollY = window.scrollY; // Preserve scroll position
-      window.location.hash = targetHash;
-      window.scrollTo(0, scrollY);
-    }
-  }, [activeHub, showCommunityHub, showGistHub, showAdvertisingHub, showZoomPlans, showServiceCorps, showDomainHub, showTechHub, showDeepSeaJet, user, loading]);
+  }, [location.pathname, location.hash, location.search]);
 
   const handleLogin = async () => {
     setError(null);
@@ -2116,8 +2107,13 @@ function AppContent() {
         const txRef = doc(collection(db, 'transactions'));
 
         // READS FIRST
-        const statsSnap = await transaction.get(adminRef);
-        const stats = statsSnap.data() as AdminStats;
+        let stats: AdminStats | null = null;
+        try {
+          const statsSnap = await transaction.get(adminRef);
+          if (statsSnap.exists()) stats = statsSnap.data() as AdminStats;
+        } catch {
+          // non-fatal read
+        }
 
         // Deduct stake from Player's Deposit Wallet, add wins to Player's Win Wallet
         if (bet > 0) {
@@ -2131,21 +2127,22 @@ function AppContent() {
           });
         }
 
-        // Entire stake goes to admin wallet
-        const currentAdminWalletIncrement = bet;
-        const currentTotalHouseGainIncrement = bet;
-        const currentGameWalletIncrement = bet;
+        // Entire stake goes to admin wallet if admin stats accessible
+        if (stats) {
+          const currentAdminWalletIncrement = bet;
+          const currentTotalHouseGainIncrement = bet;
+          const currentGameWalletIncrement = bet;
 
-        // WRITES AFTER
-        transaction.update(adminRef, {
-          adminWallet: increment(currentAdminWalletIncrement),
-          totalHouseGain: increment(currentTotalHouseGainIncrement),
-          gameWallets: {
-            ...stats.gameWallets,
-            [gameId]: ((stats.gameWallets as any)[gameId] || 0) + currentGameWalletIncrement
-          },
-          lastUpdated: serverTimestamp()
-        });
+          transaction.update(adminRef, {
+            adminWallet: increment(currentAdminWalletIncrement),
+            totalHouseGain: increment(currentTotalHouseGainIncrement),
+            gameWallets: {
+              ...stats.gameWallets,
+              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + currentGameWalletIncrement
+            },
+            lastUpdated: serverTimestamp()
+          });
+        }
 
         // Record Transaction
         if (winAmount > 0 || bet > 0) {
@@ -2159,7 +2156,27 @@ function AppContent() {
         }
       });
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, 'game_result_transaction');
+      // Resilient fallback: update user doc directly and update React state immediately
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        if (bet > 0) {
+          await updateDoc(userRef, {
+            depositWallet: increment(-bet),
+            playerWallet: increment(winAmount)
+          });
+        } else if (winAmount > 0) {
+          await updateDoc(userRef, {
+            playerWallet: increment(winAmount)
+          });
+        }
+      } catch (userErr) {
+        handleFirestoreError(userErr, OperationType.WRITE, 'game_result_user');
+      }
+      setUser(prev => prev ? ({
+        ...prev,
+        depositWallet: bet > 0 ? Math.max(0, (prev.depositWallet || 0) - bet) : (prev.depositWallet || 0),
+        playerWallet: (prev.playerWallet || 0) + winAmount
+      }) : null);
     } finally {
       setIsSpinning(false);
     }
@@ -2198,6 +2215,7 @@ function AppContent() {
         user={user}
         wallet={totalSharedWallet}
         onNavigateHub={navigateToVerticalHub}
+        onNavigateHome={handleNavigateHome}
         onOpenCashier={() => openWalletWithTab('overview')}
         onLogin={handleLogin}
       />
@@ -2210,9 +2228,11 @@ function AppContent() {
     return (
       <UniversalHubPage
         slug={verticalHubSlug}
+        itemId={hubItemId || undefined}
         user={user}
         wallet={totalSharedWallet}
         onNavigateHub={navigateToVerticalHub}
+        onNavigateHome={handleNavigateHome}
         onOpenCashier={() => openWalletWithTab('overview')}
         onLogin={handleLogin}
         onResult={(winAmount, gameId, stake) => {
@@ -2599,24 +2619,25 @@ function AppContent() {
               const isActive = (activeHub === item.id || 
                                (item.id === 'ADVERTISING' && showAdvertisingHub && adInitialType === 'ADVERT') ||
                                (item.id === 'GIST' && showGistHub));
-              const itemHash = (item.id === 'COMMUNITY_HUBS' ? 'community' :
+              const itemSlug = (item.id === 'COMMUNITY_HUBS' ? 'community' :
                                 item.id === 'GIST' ? 'gist' :
-                                item.id === 'ADVERTISING' ? 'advertising' :
-                                item.id === 'ZOOM' ? 'zoom' :
-                                item.id === 'SERVICE_CORPS' ? 'servicecorps' :
-                                item.id === 'DOMAIN_HUB' ? 'domain' :
+                                item.id === 'ADVERTISING' ? 'advertisement' :
+                                item.id === 'ZOOM' ? 'tech' :
+                                item.id === 'SERVICE_CORPS' ? 'service' :
+                                item.id === 'DOMAIN_HUB' ? 'china' :
                                 item.id === 'TECH_HUB' ? 'tech' :
-                                item.id === 'GAMES' ? 'gamearena' :
-                                item.id === 'MARKET' ? 'market' :
-                                item.id === 'FAIRLY_USED' ? 'fairly_used' :
-                                item.id === 'HEPIHANDS_LOAN' ? 'loanhub' :
+                                item.id === 'GAMES' ? 'arena' :
+                                item.id === 'MARKET' ? 'marketplace' :
+                                item.id === 'FAIRLY_USED' ? 'marketplace' :
+                                item.id === 'HEPIHANDS_LOAN' ? 'loan' :
                                 item.id === 'PARTNER_HUB' ? 'partners' :
-                                item.id === 'DIGITAL_SERVICES_HUB' ? 'digital' :
+                                item.id === 'DIGITAL_SERVICES_HUB' ? 'data-vending' :
+                                item.id === 'EDUCATION' ? 'education' :
                                 item.id.toLowerCase());
               return (
                 <motion.a 
                   key={item.id}
-                  href={`#${itemHash}`}
+                  href={`/hub/${itemSlug}`}
                   whileHover={{ 
                     scale: 1.08, 
                     y: -4,
@@ -2626,7 +2647,7 @@ function AppContent() {
                   onClick={(e) => {
                     if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                       e.preventDefault();
-                      handleNavigate(item.id);
+                      navigateToVerticalHub(itemSlug);
                     }
                   }}
                   className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border no-underline text-inherit ${item.border} ${
@@ -2647,13 +2668,13 @@ function AppContent() {
             })}
 
             <motion.a 
-              href="#sell"
+              href="/hub/advertisement"
               whileHover={{ scale: 1.08, y: -4, boxShadow: "0 15px 25px -5px rgba(0,0,0,0.4)" }}
               whileTap={{ scale: 0.96 }}
               onClick={(e) => {
                 if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                   e.preventDefault();
-                  handleNavigate('ADVERTISING', 'SELL');
+                  navigateToVerticalHub('advertisement');
                 }
               }}
               className={`relative py-4 px-6 rounded-xl font-black text-xs transition-all flex flex-col items-center gap-2.5 min-w-[150px] shadow-lg border border-rose-800/80 no-underline text-inherit ${

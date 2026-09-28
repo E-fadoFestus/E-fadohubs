@@ -47,10 +47,13 @@ import {
   LayoutGrid,
   Globe,
   Video,
-  Film
+  Film,
+  Share2,
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { UserProfile, AdListing, AdPlan } from '../types';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAI } from '../hooks/useAI';
 import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
@@ -62,6 +65,7 @@ interface EfadoAdvertisingHubProps {
   onClose: () => void;
   onNavigate?: (hub: any, subview?: any) => void;
   initialType?: 'ADVERT' | 'SELL';
+  initialItemId?: string;
 }
 
 const AD_CATEGORIES = [
@@ -202,14 +206,15 @@ const CATEGORY_FIELDS: Record<string, { label: string; type: string; placeholder
   ]
 };
 
-export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, onClose, onNavigate, initialType }) => {
+export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, onClose, onNavigate, initialType, initialItemId }) => {
   const { formatPrice } = useCurrency();
-  const [view, setView] = useState<'BROWSE' | 'REGISTER' | 'PROMO'>('REGISTER');
+  const [view, setView] = useState<'BROWSE' | 'REGISTER' | 'PROMO'>(initialItemId ? 'BROWSE' : 'REGISTER');
   const [adType, setAdType] = useState<'ADVERT' | 'SELL'>(initialType || 'ADVERT');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [registerStep, setRegisterStep] = useState<'CATEGORY' | 'DETAILS' | 'PREVIEW' | 'PLAN'>('CATEGORY');
   const [listings, setListings] = useState<AdListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<AdPlan | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,6 +228,43 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
   const [engagementMessage, setEngagementMessage] = useState('');
   const [engagementSending, setEngagementSending] = useState(false);
   const [engagementSuccess, setEngagementSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!initialItemId || listings.length === 0) return;
+    const cleanId = String(initialItemId).toLowerCase().trim();
+    const match = listings.find(l => String(l.id).toLowerCase() === cleanId);
+    if (match) {
+      setView('BROWSE');
+      setSelectedAdForEngagement(match);
+      setEngagementMessage(`Hi! I am interested in your listed asset: "${match.title}". Please advise on physical alignment or transaction options.`);
+      setTimeout(() => {
+        const el = document.getElementById(`ad-${match.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [initialItemId, listings]);
+
+  const handleShareAd = (ad: AdListing, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/advertisement/${ad.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareToast(`Ad link copied to clipboard! Share on WhatsApp.`);
+        setTimeout(() => setShareToast(null), 3000);
+      }).catch(() => {
+        prompt('Copy ad link:', shareUrl);
+      });
+    } else {
+      prompt('Copy ad link:', shareUrl);
+    }
+  };
+
+  const handleWhatsAppShareAd = (ad: AdListing, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/advertisement/${ad.id}`;
+    const text = `Check out this listing on EFADO Advertising: "${ad.title}" (${formatPrice(ad.price)}):\n${shareUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -311,6 +353,13 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
     isReelPromotion: false
   });
 
+  const { generateImage, searchWithGrounding, dailyUsage } = useAI();
+  const [showAiImageModal, setShowAiImageModal] = useState(false);
+  const [aiAdPrompt, setAiAdPrompt] = useState('');
+  const [aiGeneratedAdImg, setAiGeneratedAdImg] = useState<string | null>(null);
+  const [isGeneratingAiAd, setIsGeneratingAiAd] = useState(false);
+  const [aiAdError, setAiAdError] = useState<string | null>(null);
+
   const [syndicationData, setSyndicationData] = useState<{
     googleAds: { headline: string; description: string; keywords: string[] } | null;
     socialMedia: { postText: string; hashtags: string } | null;
@@ -325,42 +374,22 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
     if (!formData.title || !formData.description) return;
     setIsGeneratingCampaign(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-
-      const prompt = `
-You are an expert marketing copywriter for the EFADO Sovereign Connection Engine.
-Given this ad/listing details:
-Title: "${formData.title}"
-Description: "${formData.description}"
-Price: "${formData.price}"
-Category: "${formData.category}"
-
-Generate high-conversion global marketing syndication campaign assets in JSON format exactly with this schema:
-{
-  "googleAds": {
-    "headline": "A punchy Google Search Ad headline (max 30 chars)",
-    "description": "A high-conversion Google Search Ad description (max 90 chars)",
-    "keywords": ["5 relevant SEO search keywords"]
-  },
-  "socialMedia": {
-    "postText": "An engaging post caption for Facebook/Instagram/Twitter with emojis and a call to action",
-    "hashtags": "#Trending #Hashtags #Here"
-  },
-  "seo": {
-    "title": "SEO-optimized meta title (max 60 chars)",
-    "metaDescription": "SEO-optimized meta description (max 150 chars)"
-  }
-}
-Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw JSON string.
-`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-      setSyndicationData(parsed);
+      const res = await searchWithGrounding(`Generate 3 marketing SEO keywords and Google Ad headline for: "${formData.title}" - ${formData.description}`);
+      setSyndicationData({
+        googleAds: {
+          headline: formData.title.substring(0, 30),
+          description: formData.description.substring(0, 90),
+          keywords: res.searchQueries && res.searchQueries.length > 0 ? res.searchQueries.slice(0, 5) : [formData.category.toLowerCase() || 'ads', 'efado', 'marketplace', 'nigeria', 'buysell']
+        },
+        socialMedia: {
+          postText: `🚀 NEW LISTING: ${formData.title}! ${formData.description}`,
+          hashtags: "#EFADO #GlobalMarkets #Deals #Classifieds"
+        },
+        seo: {
+          title: `${formData.title} | EFADO Sovereign Hub`,
+          metaDescription: formData.description.substring(0, 150)
+        }
+      });
     } catch (err) {
       console.error("Failed to generate campaign assets:", err);
       setSyndicationData({
@@ -517,6 +546,18 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
           </div>
           
           <div className="flex items-center gap-2 md:gap-4">
+            {/* ✨ AI Generate Product Image button with AI Powered badge */}
+            <button 
+              onClick={() => setShowAiImageModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-wider shadow-md hover:scale-105 transition-all border border-purple-400/30"
+              title="Generate product and advertising visuals with AI"
+            >
+              <span>✨ AI Generate Product Image</span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
+                AI Powered
+              </span>
+            </button>
+
             <button 
               onClick={() => setView(view === 'PROMO' ? 'BROWSE' : 'PROMO')}
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:scale-105 duration-300 ${view === 'PROMO' ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-lg shadow-amber-500/20 animate-pulse' : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'}`}
@@ -763,6 +804,7 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                    <motion.div 
                     layout
                     key={ad.id}
+                    id={`ad-${ad.id}`}
                     className="bg-white border border-gray-100 rounded-[3.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-gray-200 transition-all duration-500"
                    >
                      <div className="aspect-video relative overflow-hidden group-hover:brightness-90 transition-all duration-700">
@@ -827,6 +869,24 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                                Engage Now
                              </button>
                            )}
+                        </div>
+
+                        {/* Direct Deep Linking Share Buttons */}
+                        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+                          <button
+                            onClick={(e) => handleShareAd(ad, e)}
+                            className="flex-1 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                            title="Copy Direct Share Link"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-indigo-600" /> Share Link
+                          </button>
+                          <button
+                            onClick={(e) => handleWhatsAppShareAd(ad, e)}
+                            className="flex-1 py-3 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                            title="Share on WhatsApp"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                          </button>
                         </div>
                      </div>
                    </motion.div>
@@ -1748,11 +1808,141 @@ Return ONLY valid JSON. Do not write markdown blocks or backticks, just the raw 
                       {engagementSending ? "Propagating Signal..." : "Transmit Signal"} 
                       <Zap className="w-4 h-4 text-amber-300" />
                     </button>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <button
+                        onClick={() => handleWhatsAppShareAd(selectedAdForEngagement)}
+                        className="flex-1 py-3 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 text-white" /> Share on WhatsApp
+                      </button>
+                      <button
+                        onClick={() => handleShareAd(selectedAdForEngagement)}
+                        className="flex-1 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-indigo-600" /> Copy Direct Link
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Share Toast Banner */}
+      <AnimatePresence>
+        {shareToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-wider shadow-2xl flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-white" />
+            <span>{shareToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ✨ AI Product & Ad Image Generator Modal */}
+      <AnimatePresence>
+        {showAiImageModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-lg w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 space-y-5 text-white shadow-2xl relative"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm uppercase text-white flex items-center gap-2">
+                      AI Ad Photo Generator
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/40">AI Powered</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">{dailyUsage.usageText}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAiImageModal(false)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {aiAdError && (
+                <div className="p-3 bg-rose-950/60 border border-rose-500/30 rounded-xl text-rose-300 text-xs">
+                  {aiAdError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-slate-300">Listing or Product Ad Brief</label>
+                <textarea
+                  value={aiAdPrompt}
+                  onChange={(e) => setAiAdPrompt(e.target.value)}
+                  placeholder="e.g. Modern Toyota SUV in showroom, dramatic cinematic lighting, billboard advertisement quality"
+                  rows={3}
+                  className="w-full bg-slate-950 border border-white/10 rounded-2xl p-3 text-xs text-white placeholder:text-slate-600 focus:border-purple-500 outline-none resize-none"
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (!aiAdPrompt.trim()) return;
+                  setIsGeneratingAiAd(true);
+                  setAiAdError(null);
+                  const res = await generateImage(aiAdPrompt);
+                  if (res.success && res.imageUrl) {
+                    setAiGeneratedAdImg(res.imageUrl);
+                  } else {
+                    setAiAdError(res.error || 'Failed to synthesize advertisement visual.');
+                  }
+                  setIsGeneratingAiAd(false);
+                }}
+                disabled={isGeneratingAiAd || !aiAdPrompt.trim()}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-purple-600/30"
+              >
+                {isGeneratingAiAd ? 'Synthesizing with Gemini...' : 'Generate Ad Visual Now'}
+              </button>
+
+              {aiGeneratedAdImg && (
+                <div className="space-y-3 pt-2">
+                  <div className="w-full h-48 bg-slate-950 rounded-2xl overflow-hidden border border-purple-500/30 flex items-center justify-center">
+                    <img src={aiGeneratedAdImg} alt="AI Ad Visual" className="h-full object-contain" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          photos: [...prev.photos, aiGeneratedAdImg]
+                        }));
+                        setShowAiImageModal(false);
+                        alert('Visual added directly to your advert photo catalog!');
+                      }}
+                      className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Attach to Ad
+                    </button>
+                    <a
+                      href={aiGeneratedAdImg}
+                      download="efado-ad-photo.png"
+                      className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </a>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

@@ -50,7 +50,7 @@ import { AdSenseBanner } from './AdSenseBanner';
 
 interface EfadoHomePageProps {
   user: UserProfile;
-  onNavigate: (hub: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'ADVERTISING' | 'PARTNER_HUB' | 'DIGITAL_SERVICES_HUB', subview?: string) => void;
+  onNavigate: (hub: any, subview?: string) => void;
   onOpenMining: () => void;
 }
 
@@ -179,21 +179,21 @@ const HUBS_DATA = [
 
 const getHubRoute = (hubId: string, subview?: string) => {
   switch (hubId) {
-    case 'GAMES': return 'hub/arena';
-    case 'MARKET': return 'hub/market';
-    case 'ADVERTISING': return 'hub/advertising';
+    case 'GAMES': return 'arena';
+    case 'MARKET': return 'marketplace';
+    case 'ADVERTISING': return 'advertisement';
     case 'GIST': return 'gist';
-    case 'SERVICE_CORPS': return 'hub/services';
-    case 'COMMUNITY_HUBS': return 'hub/community';
-    case 'HEPIHANDS_LOAN': return 'hub/loan';
-    case 'DOMAIN_HUB': return subview === 'sourcing' ? 'hub/china' : 'domain';
+    case 'SERVICE_CORPS': return 'service';
+    case 'COMMUNITY_HUBS': return 'community';
+    case 'HEPIHANDS_LOAN': return 'loan';
+    case 'DOMAIN_HUB': return subview === 'sourcing' ? 'china' : 'tech';
     case 'DIGITAL_SERVICES_HUB': 
-      if (subview === 'vending') return 'hub/data-vending';
-      if (subview === 'crypto') return 'hub/crypto';
-      return 'hub/services';
+      if (subview === 'vending') return 'data-vending';
+      if (subview === 'crypto') return 'crypto';
+      return 'service';
     case 'PARTNER_HUB': return 'partners';
-    case 'EDUCATION': return 'hub/education';
-    case 'ZOOM': return 'zoom';
+    case 'EDUCATION': return 'education';
+    case 'ZOOM': return 'tech';
     case 'DASHBOARD': return 'dashboard';
     default: return hubId.toLowerCase();
   }
@@ -330,8 +330,8 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
         {/* 2-Column on Mobile, 3 on Tablet, 6 on Desktop */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
           {hubs.map((hub, i) => {
-            const routeHash = getHubRoute(hub.id, (hub as any).subview);
-            const targetUrl = `#${routeHash}`;
+            const routeSlug = getHubRoute(hub.id, (hub as any).subview);
+            const targetUrl = `/hub/${routeSlug}`;
             return (
               <motion.a
                 key={`${hub.id}-${i}`}
@@ -346,7 +346,7 @@ export const EfadoHomePage: React.FC<EfadoHomePageProps> = ({ user, onNavigate, 
                   // If standard left click without modifier keys, navigate in-app instantly
                   if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                     e.preventDefault();
-                    onNavigate(hub.id as any, (hub as any).subview);
+                    onNavigate(routeSlug);
                   }
                 }}
                 className="group cursor-pointer flex flex-col no-underline text-inherit"

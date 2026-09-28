@@ -44,7 +44,9 @@ import {
   AlertCircle,
   FileText,
   Film,
-  Video
+  Video,
+  Share2,
+  MessageCircle
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
@@ -170,9 +172,10 @@ interface FairlyUsedMarketProps {
   onClose: () => void;
   onOpenMining?: () => void;
   onNavigate?: (hub: any, subview?: any) => void;
+  initialItemId?: string;
 }
 
-export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClose, onOpenMining, onNavigate }) => {
+export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClose, onOpenMining, onNavigate, initialItemId }) => {
   const { formatPrice } = useCurrency();
   const [activeView, setActiveView] = useState<'browse' | 'orders'>('browse');
   const [selectedL1, setSelectedL1] = useState<string | null>(null);
@@ -182,6 +185,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
   const [searchQuery, setSearchQuery] = useState('');
   const [adListings, setAdListings] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<MarketProduct[]>(SAMPLE_PRODUCTS);
+  const [previewProduct, setPreviewProduct] = useState<MarketProduct | null>(null);
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [showRegModal, setShowRegModal] = useState(false);
   
   const [cart, setCart] = useState<{product: MarketProduct, quantity: number}[]>([]);
@@ -404,6 +409,42 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
     }
     setFilteredProducts(filtered);
   }, [adListings, selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
+
+  useEffect(() => {
+    if (!initialItemId) return;
+    const cleanId = String(initialItemId).toLowerCase().trim();
+    const match = filteredProducts.find(p => String(p.id).toLowerCase() === cleanId) 
+      || SAMPLE_PRODUCTS.find(p => String(p.id).toLowerCase() === cleanId);
+    if (match) {
+      setPreviewProduct(match);
+      setTimeout(() => {
+        const el = document.getElementById(`used-product-${match.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [initialItemId, filteredProducts]);
+
+  const handleShareProduct = (product: MarketProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareToast(`Link copied: ${shareUrl}`);
+        setTimeout(() => setShareToast(null), 3000);
+      }).catch(() => {
+        prompt('Copy product link:', shareUrl);
+      });
+    } else {
+      prompt('Copy product link:', shareUrl);
+    }
+  };
+
+  const handleWhatsAppShare = (product: MarketProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
+    const text = `Check out "${product.title}" (${formatPrice(product.price, true)}) on EFADO Marketplace:\n${shareUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const addToCart = (product: MarketProduct) => {
     setCart(prev => {
@@ -900,6 +941,8 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                        initial={{ opacity: 0, scale: 0.9 }}
                        animate={{ opacity: 1, scale: 1 }}
                        key={product.id}
+                       id={`used-product-${product.id}`}
+                       onClick={() => setPreviewProduct(product)}
                        className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl p-3 group hover:border-indigo-500/50 transition-all cursor-pointer"
                     >
                       <div className="relative aspect-video rounded-xl overflow-hidden mb-2.5">
@@ -959,6 +1002,24 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-indigo-900/30"
                         >
                           <ShoppingBag className="w-3 h-3" /> Buy Now
+                        </button>
+                      </div>
+
+                      {/* Deep Linking Share Buttons */}
+                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
+                        <button 
+                          onClick={(e) => handleShareProduct(product, e)}
+                          className="flex-1 py-1 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
+                          title="Copy Direct Share Link"
+                        >
+                          <Share2 className="w-3 h-3 text-indigo-400" /> Share
+                        </button>
+                        <button 
+                          onClick={(e) => handleWhatsAppShare(product, e)}
+                          className="flex-1 py-1 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
+                          title="Share on WhatsApp"
+                        >
+                          <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
                         </button>
                       </div>
                     </motion.div>
@@ -2073,6 +2134,131 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
             userEmail={user.email}
             onClose={() => setShowSuccessReceipt(false)}
           />
+        )}
+      </AnimatePresence>
+      {/* Direct Item Showcase Modal (from Deep Link / Sharing / WhatsApp or Card Click) */}
+      <AnimatePresence>
+        {previewProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+            onClick={() => setPreviewProduct(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-indigo-500/30 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30 uppercase font-bold">
+                    {previewProduct.categoryPath?.level1 || 'Fairly Used'}
+                  </span>
+                  <span className="text-xs text-slate-400">ID: {previewProduct.id}</span>
+                </div>
+                <button
+                  onClick={() => setPreviewProduct(null)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
+                <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
+                  <img
+                    src={previewProduct.photos[0] || 'https://picsum.photos/seed/item/600/400'}
+                    alt={previewProduct.title}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute top-3 right-3 px-3 py-1 bg-slate-950/90 backdrop-blur-md rounded-xl border border-indigo-500/40 shadow-lg">
+                    <span className="text-sm font-black text-indigo-400">{formatPrice(previewProduct.price, true)}</span>
+                  </div>
+                  <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-indigo-600 rounded-lg text-[9px] font-black text-white uppercase tracking-widest">
+                    {previewProduct.condition || 'Verified Used'}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2">
+                    {previewProduct.title}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mb-3">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>{previewProduct.location}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    {previewProduct.description}
+                  </p>
+                </div>
+
+                {/* Actions & Sharing */}
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        addToCart(previewProduct);
+                        setPreviewProduct(null);
+                      }}
+                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                    >
+                      <Plus className="w-4 h-4 text-indigo-400" /> Add to Cart
+                    </button>
+                    <button
+                      onClick={() => {
+                        addToCart(previewProduct);
+                        setPreviewProduct(null);
+                        setShowCart(true);
+                      }}
+                      className="py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40"
+                    >
+                      <ShoppingBag className="w-4 h-4" /> Buy Now
+                    </button>
+                  </div>
+
+                  {/* Share on WhatsApp & Copy Link */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleWhatsAppShare(previewProduct)}
+                      className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/50"
+                    >
+                      <MessageCircle className="w-4 h-4" /> Share on WhatsApp
+                    </button>
+                    <button
+                      onClick={() => handleShareProduct(previewProduct)}
+                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                    >
+                      <Share2 className="w-4 h-4 text-indigo-400" /> Copy Link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Share Toast */}
+      <AnimatePresence>
+        {shareToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-2xl flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-white" />
+            <span>{shareToast}</span>
+          </motion.div>
         )}
       </AnimatePresence>
       </div>

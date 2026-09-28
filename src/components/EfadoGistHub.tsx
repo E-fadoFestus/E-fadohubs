@@ -84,7 +84,8 @@ import {
   ThumbsUp,
   Tag,
   TrendingUp as TrendingUpIcon,
-  CheckCheck
+  CheckCheck,
+  ExternalLink
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -104,6 +105,7 @@ import { GistCreatorDashboard } from './GistCreatorDashboard';
 import { GistStoriesBar } from './GistStoriesBar';
 import { GistVoiceRecorder } from './GistVoiceRecorder';
 import { CreatorProfileWallet } from './CreatorProfileWallet';
+import { useAI } from '../hooks/useAI';
 import { 
   db, 
   auth,
@@ -500,12 +502,41 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [isReelModalMuted, setIsReelModalMuted] = useState<boolean>(false);
   const [sharingItem, setSharingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
   const [promotingItem, setPromotingItem] = useState<{ type: 'POST' | 'REEL', id: string } | null>(null);
+  const [mobileChatView, setMobileChatView] = useState<'rooms' | 'chat'>('rooms');
+
+  const shareToWhatsApp = (text: string, customUrl?: string) => {
+    const targetUrl = customUrl || (typeof window !== 'undefined' ? window.location.origin + '/hub/gist-hub' : 'https://efado.com/hub/gist-hub');
+    const msg = encodeURIComponent(`${text}\n\n${targetUrl}`);
+    window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank', 'noopener,noreferrer');
+  };
   const [currentChatSession, setCurrentChatSession] = useState<any>(null);
   const [isAdPaymentOpen, setIsAdPaymentOpen] = useState(false);
   const [selectedAdPlan, setSelectedAdPlan] = useState<any>(null);
   const [showMiningFull, setShowMiningFull] = useState(false);
   const [feedTab, setFeedTab] = useState<'FOR_YOU' | 'FOLLOWING' | 'TRENDING'>('FOR_YOU');
   const { formatPrice, selectedCurrency } = useCurrency();
+  const { searchWithGrounding, dailyUsage } = useAI();
+  const [groundedSearchResult, setGroundedSearchResult] = useState<any>(null);
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const [showGroundedModal, setShowGroundedModal] = useState(false);
+
+  const handleGistSearch = async (queryText?: string) => {
+    const q = (queryText || searchQuery).trim();
+    if (!q) return;
+    setIsAiSearching(true);
+    try {
+      const res = await searchWithGrounding(q);
+      if (res.success) {
+        setGroundedSearchResult(res);
+        setShowGroundedModal(true);
+      }
+    } catch (e) {
+      console.warn("Grounded search error:", e);
+    } finally {
+      setIsAiSearching(false);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ROI Calculator & Blog detail, Content Calendar states
@@ -702,8 +733,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (type === 'video' && file.size > 2 * 1024 * 1024) {
-      alert("This video file is too massive for Firestore direct embedding (Max 2MB). Direct video links are recommend!");
+    if (type === 'video') {
+      if (file.size > 500 * 1024 * 1024) {
+        alert("This video file exceeds the 500MB maximum capacity. Please choose a file up to 500MB.");
+        return;
+      }
+      // Instant streaming URL from video file for HTML5 video player (like Facebook Reels)
+      const localStreamUrl = URL.createObjectURL(file);
+      setNewPostMediaUrl(localStreamUrl);
+      setShowMediaInput(true);
       return;
     }
 
@@ -1352,10 +1390,37 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         )}
       </AnimatePresence>
 
-      <div className="relative w-full h-full min-h-screen bg-gradient-to-br from-[#0A0F1E] via-[#121A2F] to-[#0A0F1E] text-white flex overflow-hidden">
+      <div className="relative w-full h-full min-h-screen bg-gradient-to-br from-[#070a16] via-[#100d24] to-[#080918] text-white flex overflow-hidden">
+        {/* Soft Fanciful Gradient Mesh + Floating Bubbles (Instagram + Facebook Aesthetic) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="absolute -top-[15%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-br from-purple-600/25 via-indigo-600/15 to-transparent blur-[130px] animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute top-[25%] -right-[15%] w-[50vw] h-[50vw] rounded-full bg-gradient-to-bl from-pink-500/20 via-rose-500/15 to-transparent blur-[140px] animate-pulse" style={{ animationDuration: '10s' }} />
+          <div className="absolute -bottom-[20%] left-[20%] w-[45vw] h-[45vw] rounded-full bg-gradient-to-tr from-violet-600/20 via-purple-900/15 to-transparent blur-[130px] animate-pulse" style={{ animationDuration: '12s' }} />
+          <div className="absolute top-[10%] left-[35%] w-[35vw] h-[35vw] rounded-full bg-cyan-500/10 blur-[110px]" />
+          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
+          
+          {/* Subtle Floating Bubbles */}
+          <div className="absolute inset-0 overflow-hidden">
+            {[...Array(14)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full bg-gradient-to-tr from-white/10 to-pink-300/20 border border-white/20 backdrop-blur-[2px] animate-gist-bubble pointer-events-none shadow-[0_0_12px_rgba(236,72,153,0.15)]"
+                style={{
+                  width: `${(i % 5) * 8 + 14}px`,
+                  height: `${(i % 5) * 8 + 14}px`,
+                  left: `${(i * 7.1) % 96}%`,
+                  bottom: `-${(i % 4) * 20 + 25}px`,
+                  animationDuration: `${(i % 4) * 4 + 14}s`,
+                  animationDelay: `${(i % 5) * 2.5}s`,
+                  opacity: 0.45 + (i % 3) * 0.15
+                }}
+              />
+            ))}
+          </div>
+        </div>
         
         {/* Left Sidebar - Navigation */}
-        <div className="w-20 md:w-72 flex-shrink-0 bg-[#0A0F1E]/90 backdrop-blur-xl border-r border-white/10 flex flex-col z-30">
+        <div className="w-20 md:w-72 flex-shrink-0 bg-[#070a16]/85 backdrop-blur-2xl border-r border-white/10 flex flex-col z-30">
           <div className="p-4 md:p-6 flex items-center gap-3 border-b border-white/10">
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-[#8B5CF6] to-[#06B6D4] flex items-center justify-center shadow-lg shadow-[#8B5CF6]/30 flex-shrink-0">
               <Zap className="w-6 h-6 text-white" />
@@ -1440,8 +1505,19 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         {/* Main Content Area */}
         <div className="flex-grow flex flex-col bg-transparent relative overflow-hidden">
           {/* Top Header */}
-          <header className={`px-4 sm:px-8 py-3 sm:py-5 border-b border-white/10 flex items-center justify-between ${activeView === 'REELS' ? 'bg-black/60' : 'bg-[#0A0F1E]/80 backdrop-blur-xl'} z-20`}>
-            <div className="flex items-center gap-2 max-w-[50%] overflow-hidden">
+          <header className={`px-3 sm:px-8 py-2.5 sm:py-4 border-b border-white/10 flex items-center justify-between ${activeView === 'REELS' ? 'bg-black/60' : 'bg-[#070a16]/85 backdrop-blur-2xl'} z-20 sticky top-0`}>
+            <div className="flex items-center gap-2 sm:gap-4 max-w-[65%] overflow-hidden">
+              {/* Fixed Prominent BACK TO HOME Button */}
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-gradient-to-r from-rose-500/20 to-purple-500/20 hover:from-rose-500/30 hover:to-purple-500/30 text-white font-black text-[10px] sm:text-xs uppercase tracking-wider border border-white/20 shadow-md hover:scale-105 active:scale-95 transition-all flex-shrink-0 cursor-pointer"
+                title="Return to Home"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400" />
+                <span className="hidden xs:inline">← BACK TO HOME</span>
+                <span className="xs:hidden">← HOME</span>
+              </button>
+
               <h3 className="text-xs xs:text-sm sm:text-2xl font-bold text-white tracking-tight truncate">
                 {activeView === 'MONETIZATION' && 'Creator Monetization & Earnings'}
                 {activeView === 'LIVE' && 'EFADO Live Streaming'}
@@ -1459,15 +1535,33 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             </div>
             
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              <div className="relative hidden lg:block">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search gists, reels, people..."
-                  className="pl-11 pr-6 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-xs font-medium text-white placeholder:text-slate-500 focus:border-[#8B5CF6] outline-none transition-all w-64"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              <div className="relative hidden lg:flex items-center gap-2">
+                <div className="relative">
+                  <Search 
+                    onClick={() => handleGistSearch()}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 hover:text-purple-400 cursor-pointer transition-colors" 
+                  />
+                  <input 
+                    type="text" 
+                    placeholder="Search gists, tech, live web intel..."
+                    className="pl-11 pr-20 py-2.5 bg-white/5 border border-white/10 rounded-2xl text-xs font-medium text-white placeholder:text-slate-500 focus:border-[#8B5CF6] outline-none transition-all w-72"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleGistSearch();
+                    }}
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
+                      AI Powered
+                    </span>
+                  </div>
+                </div>
+                {isAiSearching && (
+                  <span className="text-[10px] text-purple-400 animate-pulse font-mono font-bold">
+                    Grounded Search...
+                  </span>
+                )}
               </div>
 
               {/* Notifications Dropdown */}
@@ -2203,8 +2297,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       </div>
                     </div>
 
-                    {/* Feed Posts List (Glassmorphism cards) */}
-                    <div className="space-y-5">
+                    {/* Feed Posts List - Responsive Compact Grid (2 cols mobile, 3 cols desktop) */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 items-start">
                       {posts.length > 0 ? (
                         posts
                           .filter((p: any) => {
@@ -2216,225 +2310,194 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             }
                             return true;
                           })
-                          .map((post) => (
-                          <div 
-                            key={post.id} 
-                            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl hover:border-[#8B5CF6]/50 transition-all p-5 sm:p-6 text-white space-y-4"
-                          >
-                            {/* Author & Header */}
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#8B5CF6]/40 overflow-hidden">
-                                  <img src={post.authorPhoto || `https://picsum.photos/seed/${post.authorId}/100/100`} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-1.5">
-                                    <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">{post.authorName}</h4>
-                                    <span className="w-3.5 h-3.5 bg-[#8B5CF6] rounded-full flex items-center justify-center">
-                                      <Zap className="w-2 h-2 text-white fill-current" />
-                                    </span>
+                          .map((post, pIdx) => (
+                          <React.Fragment key={post.id}>
+                            <div 
+                              className="bg-slate-900/75 backdrop-blur-xl border border-white/10 hover:border-[#8B5CF6]/50 rounded-2xl shadow-lg hover:shadow-2xl transition-all p-3 sm:p-4 text-white flex flex-col justify-between overflow-hidden group/card"
+                            >
+                              {/* Author & Header */}
+                              <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-white/5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full ring-1 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0">
+                                    <img src={post.authorPhoto || `https://picsum.photos/seed/${post.authorId}/100/100`} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                   </div>
-                                  <p className="text-[11px] text-slate-400 font-medium">
-                                    {post.category || 'Global EFADO'} • 5m ago
-                                  </p>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1">
+                                      <h4 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">{post.authorName}</h4>
+                                      <span className="w-3 h-3 bg-[#8B5CF6] rounded-full flex items-center justify-center flex-shrink-0">
+                                        <Zap className="w-1.5 h-1.5 text-white fill-current" />
+                                      </span>
+                                    </div>
+                                    <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium truncate">
+                                      {post.category || 'Global EFADO'}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center gap-2">
                                 {post.authorId !== user.uid && (
                                   <button 
                                     onClick={() => handleFollowUser(post.authorId)}
-                                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                                    className={`px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-bold transition-all flex-shrink-0 ${
                                       user.following?.includes(post.authorId) 
                                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
                                         : 'bg-white/10 text-white hover:bg-[#8B5CF6]'
                                     }`}
                                   >
-                                    {user.following?.includes(post.authorId) ? '✓ Following' : '+ Follow'}
+                                    {user.following?.includes(post.authorId) ? '✓' : '+'}
                                   </button>
                                 )}
                               </div>
-                            </div>
 
-                            {/* Post Text Content */}
-                            <p className="text-slate-100 text-[15px] font-normal leading-relaxed whitespace-pre-line">
-                              {post.content}
-                            </p>
-
-                            {/* Attached Marketplace Item Card */}
-                            {(post.content?.includes('MARKETPLACE LISTING') || (post as any).marketplaceListing) && (
-                              <div className="bg-[#121A2F]/90 border border-[#06B6D4]/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-[#06B6D4]/20 text-[#06B6D4] text-[10px] font-bold rounded-full border border-[#06B6D4]/30">
-                                      Marketplace Item
-                                    </span>
-                                    <span className="text-[11px] text-slate-400 font-medium">📍 Lagos & Global Delivery</span>
-                                  </div>
-                                  <h5 className="text-sm font-bold text-white">Verified EFADO Merchant Listing</h5>
+                              {/* Attached Media - Compact & Elegant */}
+                              {post.media && post.media.length > 0 && (
+                                <div className="rounded-xl overflow-hidden border border-white/10 my-2 h-28 sm:h-36 w-full bg-black/60 relative flex-shrink-0">
+                                  {post.media[0].type === 'video' || post.media[0].url.includes('.mp4') || post.media[0].url.includes('.webm') ? (
+                                    <video 
+                                      src={post.media[0].url} 
+                                      controls 
+                                      muted 
+                                      playsInline
+                                      className="w-full h-full object-cover" 
+                                    />
+                                  ) : (
+                                    <img 
+                                      src={post.media[0].url} 
+                                      alt="Post Media" 
+                                      className="w-full h-full object-cover" 
+                                      referrerPolicy="no-referrer" 
+                                    />
+                                  )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                              )}
+
+                              {/* Post Text Content (Compact Line-Clamp) */}
+                              <p className="text-slate-200 text-xs sm:text-sm font-normal leading-snug line-clamp-3 my-2 break-words">
+                                {post.content}
+                              </p>
+
+                              {/* Attached Marketplace Item Tag */}
+                              {(post.content?.includes('MARKETPLACE LISTING') || (post as any).marketplaceListing) && (
+                                <div className="bg-[#06B6D4]/10 border border-[#06B6D4]/30 rounded-xl p-2 my-1.5 flex items-center justify-between text-[10px]">
+                                  <span className="font-bold text-[#06B6D4] truncate">🛍️ Market Item</span>
                                   <button 
                                     onClick={() => {
                                       setActiveChatRoomId('sarah');
                                       setActiveView('CHAT');
                                     }}
-                                    className="px-3.5 py-1.5 bg-[#06B6D4] hover:bg-[#06B6D4]/80 text-black font-bold text-xs rounded-xl transition-all"
+                                    className="px-2 py-0.5 bg-[#06B6D4] text-black font-black rounded-lg text-[9px]"
                                   >
-                                    💬 DM Seller
-                                  </button>
-                                  <button 
-                                    onClick={() => alert("Initiating EFADO Escrow Buyer Protection Checkout...")}
-                                    className="px-3.5 py-1.5 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white font-bold text-xs rounded-xl transition-all"
-                                  >
-                                    🛒 Buy Escrow
+                                    Chat
                                   </button>
                                 </div>
-                              </div>
-                            )}
+                              )}
 
-                            {/* Attached Poll */}
-                            {post.poll && (
-                              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2.5">
-                                <h6 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                                  📊 Gist Poll: {post.poll.question}
-                                </h6>
-                                <div className="space-y-2">
-                                  {post.poll.options.map((opt, oIdx) => {
-                                    const totalVotes = post.poll.options.reduce((sum, o) => sum + o.votes.length, 0);
-                                    const pct = totalVotes > 0 ? Math.round((opt.votes.length / totalVotes) * 100) : 0;
-                                    const hasVoted = opt.votes.includes(user.uid);
-                                    return (
-                                      <button 
+                              {/* Attached Poll Tag */}
+                              {post.poll && (
+                                <div className="p-2 bg-white/5 border border-white/10 rounded-xl my-1.5 space-y-1 text-[10px]">
+                                  <p className="font-bold text-slate-300 truncate">📊 {post.poll.question}</p>
+                                  <div className="grid grid-cols-2 gap-1">
+                                    {post.poll.options.map((opt, oIdx) => (
+                                      <button
                                         key={oIdx}
                                         onClick={() => post.id && handleVotePoll(post.id, oIdx)}
-                                        className={`w-full relative p-2.5 rounded-xl flex items-center justify-between border transition-all text-xs font-bold ${
-                                          hasVoted ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
-                                        }`}
+                                        className="py-1 px-1.5 bg-white/5 hover:bg-[#8B5CF6]/20 rounded-lg text-slate-300 hover:text-white truncate border border-white/5"
                                       >
-                                        <div className="absolute left-0 top-0 bottom-0 bg-[#8B5CF6]/20 transition-all duration-500" style={{ width: `${pct}%` }} />
-                                        <span className="relative z-10 flex items-center gap-2">
-                                          {hasVoted && <span>✓</span>} {opt.text}
-                                        </span>
-                                        <span className="relative z-10 font-mono text-[11px] text-slate-400">{pct}% ({opt.votes.length})</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Attached Media */}
-                            {post.media && post.media.length > 0 && (
-                              <div className="rounded-2xl overflow-hidden border border-white/10 max-h-96 bg-black/50">
-                                {post.media[0].type === 'video' || post.media[0].url.includes('.mp4') || post.media[0].url.includes('.webm') ? (
-                                  <video 
-                                    src={post.media[0].url} 
-                                    controls 
-                                    muted 
-                                    autoPlay 
-                                    loop 
-                                    className="w-full h-auto max-h-96 object-contain" 
-                                  />
-                                ) : (
-                                  <img 
-                                    src={post.media[0].url} 
-                                    alt="Content" 
-                                    className="w-full h-auto max-h-96 object-cover" 
-                                    referrerPolicy="no-referrer" 
-                                  />
-                                )}
-                              </div>
-                            )}
-
-                            {/* Facebook / IMO Style Multi-Reaction Bar & Actions */}
-                            <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                              <div className="flex items-center gap-3 sm:gap-5">
-                                {/* Reaction Picker Trigger */}
-                                <div className="relative group/reactions">
-                                  <button 
-                                    onClick={() => handleLikePost(post.id, post.likes.includes(user.uid))}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
-                                      post.likes.includes(user.uid) 
-                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                                        : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
-                                    }`}
-                                  >
-                                    <Heart className={`w-4 h-4 ${post.likes.includes(user.uid) ? 'fill-rose-500' : ''}`} />
-                                    <span className="text-xs font-bold">{post.likes.length || 0}</span>
-                                  </button>
-
-                                  {/* Hover Reaction Popup */}
-                                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/reactions:flex items-center gap-2 bg-[#121A2F] border border-white/20 p-2 rounded-2xl shadow-2xl z-20">
-                                    {['👍', '❤️', '😂', '😮', '🔥', '👏'].map((emo) => (
-                                      <button
-                                        key={emo}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleLikePost(post.id, false);
-                                        }}
-                                        className="text-lg hover:scale-125 transition-transform p-1 cursor-pointer"
-                                      >
-                                        {emo}
+                                        {opt.text}
                                       </button>
                                     ))}
                                   </div>
                                 </div>
+                              )}
 
-                                <button 
-                                  onClick={() => {
-                                    alert(`Showing comments for post from ${post.authorName}`);
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
-                                >
-                                  <MessageSquare className="w-4 h-4" />
-                                  <span className="text-xs font-bold">{post.comments?.length || 0}</span>
-                                </button>
+                              {/* Compact Action Bar with Direct WhatsApp Sharing */}
+                              <div className="flex items-center justify-between pt-2 border-t border-white/10 mt-auto text-xs">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                  <button 
+                                    onClick={() => handleLikePost(post.id, post.likes.includes(user.uid))}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all ${
+                                      post.likes.includes(user.uid) 
+                                        ? 'bg-rose-500/20 text-rose-400' 
+                                        : 'bg-white/5 text-slate-300 hover:text-white'
+                                    }`}
+                                  >
+                                    <Heart className={`w-3.5 h-3.5 ${post.likes.includes(user.uid) ? 'fill-rose-500' : ''}`} />
+                                    <span className="text-[10px] font-bold">{post.likes.length || 0}</span>
+                                  </button>
 
-                                <button 
-                                  onClick={() => alert(`Sent ₦100 Tip to ${post.authorName} via EFADO Creator Fund!`)}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-xl transition-all cursor-pointer"
-                                >
-                                  <Coins className="w-4 h-4 text-amber-400" />
-                                  <span className="text-xs font-bold hidden sm:inline">Tip</span>
-                                </button>
+                                  <button 
+                                    onClick={() => alert(`Showing comments for post from ${post.authorName}`)}
+                                    className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-all"
+                                  >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-bold">{post.comments?.length || 0}</span>
+                                  </button>
+                                </div>
 
-                                <button 
-                                  onClick={() => alert("Post echoed across your followers' feeds!")}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
-                                >
-                                  <Repeat className="w-4 h-4 text-emerald-400" />
-                                  <span className="text-xs font-bold hidden sm:inline">Echo</span>
-                                </button>
-                              </div>
+                                <div className="flex items-center gap-1">
+                                  {/* Direct WhatsApp Sharing Button */}
+                                  <button 
+                                    onClick={() => shareToWhatsApp(`Check out ${post.authorName}'s gist on EFADO: "${post.content?.slice(0, 100)}..."`, window.location.origin + '/hub/gist-hub')}
+                                    className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded-lg transition-all cursor-pointer"
+                                    title="Direct WhatsApp Share"
+                                  >
+                                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                      <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.073.376-.044.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.099.824z" />
+                                    </svg>
+                                  </button>
 
-                              <div className="flex items-center gap-2">
-                                <button 
-                                  onClick={() => alert("Gist bookmarked to your private library!")}
-                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
-                                >
-                                  <Bookmark className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    if (navigator.share) {
-                                      navigator.share({ title: post.authorName, text: post.content, url: window.location.href });
-                                    } else {
-                                      navigator.clipboard.writeText(window.location.href);
-                                      alert("Post link copied to clipboard!");
-                                    }
-                                  }}
-                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition-all cursor-pointer"
-                                >
-                                  <Share className="w-4 h-4" />
-                                </button>
+                                  <button 
+                                    onClick={() => {
+                                      if (navigator.share) {
+                                        navigator.share({ title: post.authorName, text: post.content, url: window.location.href });
+                                      } else {
+                                        navigator.clipboard.writeText(window.location.href);
+                                        alert("Link copied to clipboard!");
+                                      }
+                                    }}
+                                    className="p-1.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                                    title="Share"
+                                  >
+                                    <Share className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
+
+                            {/* Interleaved Compact Sponsored Advert Card */}
+                            {pIdx % 3 === 1 && (
+                              <div className="bg-gradient-to-br from-indigo-950/70 via-purple-950/50 to-slate-900/80 backdrop-blur-xl border border-purple-500/30 rounded-2xl shadow-lg p-3 sm:p-4 text-white flex flex-col justify-between overflow-hidden">
+                                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                                  <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[9px] font-black uppercase tracking-wider">
+                                    SPONSORED
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-mono">EFADO Ads</span>
+                                </div>
+                                <div className="h-28 sm:h-36 rounded-xl overflow-hidden my-2 border border-white/10 bg-slate-950 relative">
+                                  <img 
+                                    src={`https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80`} 
+                                    alt="Sponsored Campaign" 
+                                    className="w-full h-full object-cover" 
+                                  />
+                                </div>
+                                <h5 className="text-xs sm:text-sm font-bold text-white tracking-tight truncate">
+                                  Boost Your Business Reach
+                                </h5>
+                                <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 my-1 leading-snug">
+                                  Advertise across EFADO Gist Hub & reach millions of verified social members globally.
+                                </p>
+                                <button 
+                                  onClick={() => onNavigate?.('ADVERTISING', 'ADVERT')}
+                                  className="w-full py-2 mt-2 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white rounded-xl text-xs font-bold shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all text-center cursor-pointer"
+                                >
+                                  Learn More 🚀
+                                </button>
+                              </div>
+                            )}
+                          </React.Fragment>
                         ))
                       ) : (
-                        <div className="p-16 text-center bg-white/5 border border-dashed border-white/10 rounded-3xl">
-                          <Globe className="w-12 h-12 text-slate-500 mx-auto mb-4 animate-pulse" />
-                          <h4 className="text-base font-bold text-white">No Posts Found</h4>
+                        <div className="col-span-2 md:col-span-3 p-12 text-center bg-white/5 border border-dashed border-white/10 rounded-2xl">
+                          <Globe className="w-10 h-10 text-slate-500 mx-auto mb-3 animate-pulse" />
+                          <h4 className="text-sm font-bold text-white">No Posts Found</h4>
                           <p className="text-xs text-slate-400 mt-1">Be the first to post a viral gist or marketplace listing!</p>
                         </div>
                       )}
@@ -2570,7 +2633,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                     return (
                       <>
-                        <div className="w-full md:w-96 border-r border-white/5 flex flex-col bg-slate-900">
+                        <div className={`w-full md:w-96 border-r border-white/5 flex flex-col bg-slate-900/90 backdrop-blur-xl shrink-0 ${mobileChatView === 'chat' ? 'hidden md:flex' : 'flex'}`}>
                           <div className="p-6 border-b border-white/5 bg-indigo-600">
                              <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Secure Comms</h4>
                              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-2xl">
@@ -2644,7 +2707,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 { id: 'bridge-zoom', name: 'Tactical Zoom Bridge', desc: 'High-integrity secure teleconferencing & virtual team meetings.', hub: 'ZOOM', status: 'Online' }
                               ].map((bridge) => (
                                 <div 
-                                  key={bridge.id}
+                                  key={bridge.id} 
                                   className="p-5 bg-slate-950/60 border border-white/5 hover:border-indigo-500/30 rounded-2xl transition-all flex flex-col justify-between gap-3 group"
                                 >
                                   <div>
@@ -2678,7 +2741,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               {filteredRooms.map((chat) => (
                                 <button 
                                   key={chat.id} 
-                                  onClick={() => setActiveChatRoomId(chat.id)}
+                                  onClick={() => {
+                                    setActiveChatRoomId(chat.id);
+                                    setMobileChatView('chat');
+                                  }}
                                   className={`w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 ${activeChatRoomId === chat.id ? 'border-l-indigo-600 bg-indigo-600/5' : 'border-l-transparent'}`}
                                 >
                                   <div className="relative flex-shrink-0">
@@ -2704,18 +2770,26 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
 
                         {/* Chat Window */}
-                        <div className="flex-grow flex flex-col bg-slate-950 relative">
+                        <div className={`flex-grow flex flex-col bg-slate-950/90 relative h-full min-w-0 ${mobileChatView === 'rooms' ? 'hidden md:flex' : 'flex'}`}>
                           {/* Chat Header */}
-                          <div className="px-8 py-6 bg-slate-900/60 backdrop-blur-3xl border-b border-white/5 flex items-center justify-between shadow-lg z-10">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
+                          <div className="px-4 sm:px-8 py-4 sm:py-6 bg-slate-900/80 backdrop-blur-3xl border-b border-white/10 flex items-center justify-between shadow-lg z-10 shrink-0">
+                            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => setMobileChatView('rooms')}
+                                className="md:hidden p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all flex items-center justify-center cursor-pointer flex-shrink-0"
+                                title="Back to All Chats"
+                              >
+                                <ArrowLeft className="w-5 h-5 text-purple-400" />
+                              </button>
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
                                 <img src={`https://picsum.photos/seed/${activeChatRoomId}/100/100`} alt="User" className="rounded-2xl w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </div>
-                              <div>
-                                <h5 className="text-base font-black text-white uppercase tracking-tight">{activeRoomDef.name}</h5>
-                                <div className="flex items-center gap-2">
-                                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Encrypted Signal Active</p>
+                              <div className="min-w-0">
+                                <h5 className="text-sm sm:text-base font-black text-white uppercase tracking-tight truncate">{activeRoomDef.name}</h5>
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse flex-shrink-0" />
+                                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest truncate">Encrypted Signal Active</p>
                                 </div>
                               </div>
                             </div>
@@ -3060,7 +3134,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 e.preventDefault();
                                 handleSendMessage();
                               }}
-                              className="p-4 sm:p-6 bg-[#0A0F1E]/95 border-t border-white/10 shadow-[0_-4px_30px_rgba(0,0,0,0.3)] backdrop-blur-xl"
+                              className="sticky bottom-0 z-50 p-3 sm:p-5 bg-[#070a16]/95 border-t border-white/10 shadow-[0_-8px_35px_rgba(0,0,0,0.7)] backdrop-blur-2xl pb-safe pb-4 sm:pb-5"
                             >
                               <div className="flex items-center gap-2 sm:gap-3">
                                 <div className="flex items-center bg-white/5 rounded-2xl p-1 border border-white/10">
@@ -5504,6 +5578,84 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </div>
               </div>
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 🔍 Google Search Grounded Intelligence Modal */}
+        <AnimatePresence>
+          {showGroundedModal && groundedSearchResult && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="max-w-2xl w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 space-y-5 text-white shadow-2xl relative max-h-[85vh] flex flex-col"
+              >
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-600/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+                      <Globe className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-sm uppercase text-white flex items-center gap-2">
+                        AI Grounded Search Intelligence
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/40">
+                          AI Powered
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400">Real-time data retrieved via Google Search</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowGroundedModal(false)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-3 bg-purple-950/40 border border-purple-500/30 rounded-2xl flex items-center justify-between text-xs">
+                  <span className="text-slate-300 font-bold">Query: <strong className="text-white">"{searchQuery}"</strong></span>
+                  <span className="text-[10px] text-purple-300 font-mono">{dailyUsage.usageText}</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-white/5 text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                    {groundedSearchResult.text}
+                  </div>
+
+                  {/* Sources */}
+                  {groundedSearchResult.sources && groundedSearchResult.sources.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Verified Sources & Citations:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {groundedSearchResult.sources.map((src: any, idx: number) => (
+                          <a
+                            key={idx}
+                            href={src.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between gap-2 p-2.5 bg-slate-950 hover:bg-slate-800 rounded-xl border border-white/10 text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                          >
+                            <span className="truncate font-semibold">{src.title || 'Web Intelligence Link'}</span>
+                            <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-white/10">
+                  <button
+                    onClick={() => setShowGroundedModal(false)}
+                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow-md"
+                  >
+                    Close Intel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
     </motion.div>

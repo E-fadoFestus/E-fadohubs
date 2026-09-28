@@ -177,7 +177,7 @@ const HUBS_LIST: HubCardItem[] = [
   },
   {
     id: 'giat',
-    name: 'Giat Hub',
+    name: 'Tech. Hub',
     sub: 'Innovation & Growth',
     hubKey: 'TECH',
     color: '#fb923c',

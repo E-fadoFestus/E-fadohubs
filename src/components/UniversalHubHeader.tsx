@@ -20,6 +20,7 @@ interface UniversalHubHeaderProps {
   user: UserProfile | null;
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
+  onNavigateHome: () => void;
   onOpenCashier?: () => void;
   onLogin?: () => void;
 }
@@ -29,6 +30,7 @@ export const UniversalHubHeader: React.FC<UniversalHubHeaderProps> = ({
   user,
   wallet,
   onNavigateHub,
+  onNavigateHome,
   onOpenCashier,
   onLogin,
 }) => {
@@ -66,11 +68,19 @@ export const UniversalHubHeader: React.FC<UniversalHubHeaderProps> = ({
         {/* Left: Navigation and Hub identity */}
         <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
           <button
+            onClick={onNavigateHome}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black transition-all text-xs shrink-0 shadow-md shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98] group"
+            title="Return to Home"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition-transform" />
+            <span>← BACK TO HOME</span>
+          </button>
+
+          <button
             onClick={() => onNavigateHub('all-hubs', false)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/60 text-slate-300 hover:text-white transition-all text-xs font-semibold shrink-0 group"
             title="Return to Vertical Hubs Directory"
           >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform text-cyan-400" />
             <span className="hidden sm:inline">All Hubs</span>
           </button>
 

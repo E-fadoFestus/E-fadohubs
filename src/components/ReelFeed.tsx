@@ -75,8 +75,13 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
   // 5-second qualified view tracking
   const [watchSeconds, setWatchSeconds] = useState(0);
   const [earnedViewToast, setEarnedViewToast] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+
   const touchStartYRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'reels'), limit(50));
@@ -268,23 +273,81 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="absolute inset-0 z-0 bg-black"
+          className="absolute inset-0 z-0 bg-black flex items-center justify-center"
         >
           {currentReel.videoUrl && (
             currentReel.videoUrl.includes('.mp4') || 
             currentReel.videoUrl.includes('.webm') || 
+            currentReel.videoUrl.includes('.mov') ||
+            currentReel.videoUrl.includes('firebasestorage') ||
+            currentReel.videoUrl.startsWith('blob:') ||
             currentReel.videoUrl.startsWith('data:video') ||
             currentReel.videoUrl.includes('mixkit') ||
-            currentReel.videoUrl.includes('pexels')
+            currentReel.videoUrl.includes('pexels') ||
+            !currentReel.videoUrl.match(/\.(jpeg|jpg|png|webp|gif)/i)
           ) ? (
-            <video 
-              src={currentReel.videoUrl} 
-              autoPlay
-              loop
-              muted={isMuted}
-              playsInline
-              className="w-full h-full object-cover"
-            />
+            <div className="relative w-full h-full">
+              <video 
+                ref={videoPlayerRef}
+                src={currentReel.videoUrl} 
+                autoPlay
+                loop
+                muted={isMuted}
+                playsInline
+                preload="metadata"
+                className="w-full h-full object-cover cursor-pointer"
+                onClick={() => {
+                  if (videoPlayerRef.current) {
+                    if (videoPlayerRef.current.paused) {
+                      videoPlayerRef.current.play();
+                      setIsPlaying(true);
+                    } else {
+                      videoPlayerRef.current.pause();
+                      setIsPlaying(false);
+                    }
+                  }
+                }}
+                onTimeUpdate={() => {
+                  if (videoPlayerRef.current) {
+                    const cur = videoPlayerRef.current.currentTime;
+                    const dur = videoPlayerRef.current.duration || 1;
+                    setPlaybackProgress((cur / dur) * 100);
+                  }
+                }}
+                onWaiting={() => setIsBuffering(true)}
+                onPlaying={() => { setIsBuffering(false); setIsPlaying(true); }}
+              />
+
+              {/* Buffering Spinner */}
+              {isBuffering && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                  <div className="w-12 h-12 border-3 border-purple-500 border-t-transparent rounded-full animate-spin shadow-lg" />
+                </div>
+              )}
+
+              {/* Paused Overlay Indicator */}
+              {!isPlaying && !isBuffering && (
+                <div 
+                  onClick={() => {
+                    videoPlayerRef.current?.play();
+                    setIsPlaying(true);
+                  }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/30 cursor-pointer pointer-events-auto"
+                >
+                  <div className="w-16 h-16 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white scale-110 shadow-2xl">
+                    <div className="w-0 h-0 border-y-[10px] border-y-transparent border-l-[18px] border-l-white ml-1" />
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Video Progress Scrubber */}
+              <div className="absolute bottom-0 inset-x-0 h-1 bg-white/20 z-20">
+                <div 
+                  style={{ width: `${playbackProgress}%` }}
+                  className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-150"
+                />
+              </div>
+            </div>
           ) : (
             <img 
               src={currentReel.videoUrl || `https://picsum.photos/seed/${currentReel.id}/720/1280`} 
@@ -435,6 +498,24 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
           </div>
           <span className="text-[10px] font-bold text-white drop-shadow-md">
             {currentReel.shares || 120}
+          </span>
+        </button>
+
+        {/* WhatsApp Direct Share Button */}
+        <button 
+          onClick={() => {
+            const text = `🔥 Watch this viral reel on EFADO Gist Hub: "${currentReel.caption || 'EFADO Reel'}"`;
+            const url = window.location.origin + '/hub/gist-hub';
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + '\n' + url)}`, '_blank', 'noopener,noreferrer');
+          }}
+          className="flex flex-col items-center gap-1 group active:scale-90 transition-transform cursor-pointer"
+          title="Direct WhatsApp Share"
+        >
+          <div className="w-11 h-11 bg-emerald-600/40 backdrop-blur-md border border-emerald-500/40 hover:bg-emerald-600 rounded-full flex items-center justify-center text-emerald-300 hover:text-white transition-all shadow-lg shadow-emerald-900/30">
+            <Share2 className="w-5 h-5" />
+          </div>
+          <span className="text-[9px] font-bold text-emerald-300 drop-shadow-md">
+            WhatsApp
           </span>
         </button>
       </div>

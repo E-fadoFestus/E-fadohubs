@@ -36,6 +36,9 @@ export default function DynamicHubPage({ params }: DynamicHubPageProps) {
       user={user}
       wallet={wallet}
       onNavigateHub={handleNavigateHub}
+      onNavigateHome={() => {
+        window.location.href = '/home';
+      }}
       onLogin={signInWithGoogle}
       onResult={(win, gameId, stake) => {
         console.log(`[Hub Game Result] ${gameId}: stake=${stake}, win=${win}`);

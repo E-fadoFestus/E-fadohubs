@@ -141,6 +141,8 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
   const multiplierRef = useRef(1.0);
   multiplierRef.current = multiplier;
 
+  const accumulatedMultiplierRef = useRef(1.0);
+
   const crashMultiplierRef = useRef(crashMultiplier);
   crashMultiplierRef.current = crashMultiplier;
 
@@ -208,6 +210,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       // Cancel bet
       setTargetBet((prev) => ({ ...prev, status: 'idle' }));
     } else {
+      // Auto-correct stake between MIN_STAKE (100) and MAX_STAKE (20000)
+      let correctedAmount = Math.min(20000, Math.max(100, targetBet.betAmount));
+      if (correctedAmount !== targetBet.betAmount) {
+        setTargetBet((prev) => ({ ...prev, betAmount: correctedAmount }));
+        targetBet.betAmount = correctedAmount;
+      }
+
       // Check balance
       if (targetBet.betAmount > currentBalance) {
         alert('Insufficient balance to place stake. Please fund via Cashier.');
@@ -242,7 +251,9 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       const isCurrentFlying = gameStateRef.current === 'diving' || gameStateRef.current === 'flying';
       if (!isCurrentFlying || targetBet.status !== 'placed') return;
 
-      const winPayout = Number((targetBet.betAmount * currentVal).toFixed(2));
+      // Max Protection: Max Win: NGN 500,000 per round
+      const rawPayout = targetBet.betAmount * currentVal;
+      const winPayout = Math.min(500000, Number(rawPayout.toFixed(2)));
       const profit = Number((winPayout - targetBet.betAmount).toFixed(2));
 
       soundManager.playCashoutChime();
@@ -299,8 +310,9 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       gameLoopRef.current = null;
     }
 
-    setMultiplier(finalCrash);
-    multiplierRef.current = finalCrash;
+    const effectiveCrash = Math.max(finalCrash, multiplierRef.current);
+    setMultiplier(effectiveCrash);
+    multiplierRef.current = effectiveCrash;
     setGameState('crashed');
     gameStateRef.current = 'crashed';
 
@@ -374,12 +386,25 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       }
     }
 
-    // Synchronous Provably Fair RNG generation for 0ms startup lag
-    const eVal = 2 ** 32;
-    const hVal = Math.floor(Math.random() * (eVal / 100)) + 1;
-    let targetCrash = Math.random() < 0.035
-      ? 1.00
-      : Math.max(1.02, Math.min(1000.0, Math.floor(((100 * eVal - hVal) / (eVal - hVal)) / 100 * 100) / 100));
+    // Balanced Economy Crash Formula (3% House Edge + Distribution Control):
+    // 40% rounds crash 1.00x - 1.50x
+    // 30% rounds crash 1.50x - 2.00x
+    // 30% rounds go high: 0.97 / (1 - random) capped at 1000x
+    const r = Math.random();
+    const randomVal = Math.min(0.999, Math.max(0.0001, Math.random()));
+    let rawCrash: number;
+
+    if (r < 0.40) {
+      rawCrash = 1.00 + randomVal * 0.50;
+    } else if (r < 0.70) {
+      rawCrash = 1.50 + randomVal * 0.50;
+    } else {
+      rawCrash = 0.97 / (1.0 - randomVal);
+      if (rawCrash > 1000.0) rawCrash = 1000.0;
+    }
+
+    if (rawCrash < 1.00) rawCrash = 1.00;
+    let targetCrash = Number(rawCrash.toFixed(2));
 
     const newRoundId = `dsj-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`;
     setCurrentRoundId(newRoundId);
@@ -388,6 +413,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     crashMultiplierRef.current = targetCrash;
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
+    accumulatedMultiplierRef.current = 1.0;
 
     // Background call to backend /game/start
     fetch('/game/start', {
@@ -400,10 +426,11 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data && data.crashMultiplier) {
-          targetCrash = data.crashMultiplier;
-          crashMultiplierRef.current = targetCrash;
-          setCrashMultiplier(targetCrash);
+        if (data && typeof data.crashMultiplier === 'number') {
+          const validCrash = Math.max(1.00, Math.min(1000.0, data.crashMultiplier));
+          targetCrash = validCrash;
+          crashMultiplierRef.current = validCrash;
+          setCrashMultiplier(validCrash);
           if (data.serverSeedHash) setCurrentServerSeed(data.serverSeedHash);
           if (data.roundId) {
             currentRoundIdRef.current = data.roundId;
@@ -451,41 +478,44 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     soundManager.playSonarPing();
     soundManager.startEngineSound(1.0);
 
-    // Set Game State to 'flying' IMMEDIATELY
+    // Set Game State to 'diving' IMMEDIATELY
     setGameState('diving');
     gameStateRef.current = 'diving';
 
     // Start 60 FPS Game Loop
     startTimeRef.current = performance.now();
+    // Dynamic flight duration: minimum 3.0s dive time, extended gracefully for higher multipliers
+    const targetDuration = Math.max(3.0, 3.0 + Math.log(Math.max(1.02, targetCrash)) * 4.5);
 
     const tick = (now: number) => {
       const isCurrentFlying = gameStateRef.current === 'diving' || gameStateRef.current === 'flying';
       if (!isCurrentFlying) return;
 
-      const elapsedSec = (now - startTimeRef.current) / 1000;
-      // Formula matching Aviator velocity & acceleration:
-      // Multiplier = 1 + (elapsed * 0.1) + slight natural acceleration curve
-      const currentVal = Math.max(1.0, 1.0 + (elapsedSec * 0.1) + Math.pow(elapsedSec * 0.08, 1.8));
-      const roundedVal = Number(currentVal.toFixed(2));
+      const elapsedTime = (now - startTimeRef.current) / 1000;
+      
+      // Aviator exponential multiplier curve: grows from 1.00x to targetCrash over targetDuration
+      const k = Math.log(Math.max(1.0001, crashMultiplierRef.current)) / targetDuration;
+      const calculatedMult = Math.max(1.00, Math.exp(k * Math.min(elapsedTime, targetDuration)));
+      const roundedVal = Number(calculatedMult.toFixed(2));
 
       multiplierRef.current = roundedVal;
       setMultiplier(roundedVal);
 
       // Sound update: pitch increases with multiplier
-      soundManager.updateEngineSound(currentVal);
-      if (currentVal > 5.0 && Math.floor(currentVal) % 4 === 0) {
+      soundManager.updateEngineSound(roundedVal);
+      if (roundedVal > 5.0 && Math.floor(roundedVal) % 4 === 0) {
         soundManager.playPressureAlert();
       }
 
       // Check Auto-Cashout 1
       const b1 = bet1Ref.current;
-      if (b1.status === 'placed' && b1.isAutoCashout && b1.autoCashoutMultiplier && currentVal >= b1.autoCashoutMultiplier) {
+      if (b1.status === 'placed' && b1.isAutoCashout && b1.autoCashoutMultiplier && roundedVal >= b1.autoCashoutMultiplier) {
         handleCashout(1);
       }
 
       // Check Auto-Cashout 2
       const b2 = bet2Ref.current;
-      if (b2.status === 'placed' && b2.isAutoCashout && b2.autoCashoutMultiplier && currentVal >= b2.autoCashoutMultiplier) {
+      if (b2.status === 'placed' && b2.isAutoCashout && b2.autoCashoutMultiplier && roundedVal >= b2.autoCashoutMultiplier) {
         handleCashout(2);
       }
 
@@ -493,7 +523,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       if (Math.random() < 0.02) {
         setPilots((prev) =>
           prev.map((p) => {
-            if (!p.isUser && p.status === 'diving' && Math.random() < 0.05 * currentVal) {
+            if (!p.isUser && p.status === 'diving' && Math.random() < 0.05 * roundedVal) {
               return {
                 ...p,
                 status: 'cashed_out',
@@ -506,8 +536,9 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
         );
       }
 
-      // Check for Crash / Catastrophic Hull Breach
-      if (currentVal >= crashMultiplierRef.current) {
+      // Check for Crash / Catastrophic Hull Breach:
+      // Minimum dive time is 3.0 seconds, crash triggers when target duration reached
+      if (elapsedTime >= targetDuration || (elapsedTime >= 3.0 && roundedVal >= crashMultiplierRef.current)) {
         crashGame(crashMultiplierRef.current);
         return;
       }
@@ -541,6 +572,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     gameStateRef.current = 'betting';
     setMultiplier(1.0);
     multiplierRef.current = 1.0;
+    accumulatedMultiplierRef.current = 1.0;
 
     // Handle Auto-Bet
     setBet1((prev) => ({

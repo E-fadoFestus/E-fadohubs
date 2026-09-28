@@ -45,6 +45,7 @@ import { SearchFilter } from './SearchFilter';
 import { db, collection, addDoc, onSnapshot, query, where, doc, updateDoc } from '../../firebase';
 import { useCurrency } from '../../lib/CurrencyContext';
 import { techService } from '../../services/techService';
+import { useAI } from '../../hooks/useAI';
 
 interface EfadoTechHubProps {
   user: UserProfile;
@@ -219,10 +220,15 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
            <input 
              type="text" 
              placeholder="Search Sanctuary Books & Lessons..." 
-             className="pl-11 pr-4 py-2.5 bg-white border border-white/5 rounded-2xl text-xs font-bold text-gray-950 w-64 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+             className="pl-11 pr-20 py-2.5 bg-white border border-white/5 rounded-2xl text-xs font-bold text-gray-950 w-72 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
              value={searchQuery}
              onChange={(e) => setSearchQuery(e.target.value)}
            />
+           <div className="absolute right-2 top-1/2 -translate-y-1/2">
+             <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 uppercase font-black">
+               AI Powered
+             </span>
+           </div>
         </div>
         {/* Go Back Button */}
         <button 

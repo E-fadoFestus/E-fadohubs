@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getFlutterwavePublicKey, createFlutterwavePaymentLink } from '../utils/flutterwave';
 import { resolveBankAccount } from '../utils/bankVerification';
+import { useAI } from '../hooks/useAI';
 import { 
   ShoppingBag, 
   ChevronRight, 
@@ -54,7 +55,11 @@ import {
   ThumbsUp,
   FileText,
   Film,
-  Video
+  Video,
+  Share2,
+  MessageCircle,
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
 import { SAMPLE_PRODUCTS } from '../sampleData';
@@ -228,10 +233,17 @@ interface ModernMarketHubProps {
   onClose: () => void;
   onOpenMining?: () => void;
   onNavigate?: (hub: any, subview?: any) => void;
+  initialItemId?: string;
 }
 
-export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose, onOpenMining, onNavigate }) => {
+export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose, onOpenMining, onNavigate, initialItemId }) => {
   const { formatPrice } = useCurrency();
+  const { generateImage, dailyUsage } = useAI();
+  const [showAiImageModal, setShowAiImageModal] = useState(false);
+  const [aiProductPrompt, setAiProductPrompt] = useState('');
+  const [aiGeneratedProductImg, setAiGeneratedProductImg] = useState<string | null>(null);
+  const [isGeneratingAiProduct, setIsGeneratingAiProduct] = useState(false);
+  const [aiProductError, setAiProductError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'browse' | 'orders'>('browse');
   const [showGuide, setShowGuide] = useState(false);
   const [selectedL1, setSelectedL1] = useState<string | null>(null);
@@ -241,6 +253,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
   const [searchQuery, setSearchQuery] = useState('');
   const [adListings, setAdListings] = useState<any[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<MarketProduct[]>(SAMPLE_PRODUCTS);
+  const [previewProduct, setPreviewProduct] = useState<MarketProduct | null>(null);
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [showRegModal, setShowRegModal] = useState(false);
   const [cart, setCart] = useState<{product: MarketProduct, quantity: number}[]>([]);
   const [showCart, setShowCart] = useState(false);
@@ -427,6 +441,42 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       unsubAds();
     };
   }, [user.uid]);
+
+  useEffect(() => {
+    if (!initialItemId) return;
+    const cleanId = String(initialItemId).toLowerCase().trim();
+    const match = filteredProducts.find(p => String(p.id).toLowerCase() === cleanId) 
+      || SAMPLE_PRODUCTS.find(p => String(p.id).toLowerCase() === cleanId);
+    if (match) {
+      setPreviewProduct(match);
+      setTimeout(() => {
+        const el = document.getElementById(`product-${match.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [initialItemId, filteredProducts]);
+
+  const handleShareProduct = (product: MarketProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShareToast(`Link copied: ${shareUrl}`);
+        setTimeout(() => setShareToast(null), 3000);
+      }).catch(() => {
+        prompt('Copy product link:', shareUrl);
+      });
+    } else {
+      prompt('Copy product link:', shareUrl);
+    }
+  };
+
+  const handleWhatsAppShare = (product: MarketProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
+    const text = `Check out "${product.title}" (${formatPrice(product.price, true)}) on EFADO Marketplace:\n${shareUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  };
 
   const handleSubmitMarketTestimony = async () => {
     if (!selectedOrder) return;
@@ -874,6 +924,19 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">View & Checkout</p>
                 </div>
               </button>
+
+              {/* ✨ AI Generate Product Image button with AI Powered badge */}
+              <button 
+                onClick={() => setShowAiImageModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all border border-purple-400/30"
+                title="Synthesize custom high-converting product photos using EFADO AI"
+              >
+                <span>✨ AI Generate Product Image</span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
+                  AI Powered
+                </span>
+              </button>
+
               <button 
                 onClick={() => setShowRegModal(true)}
                 className="group flex flex-col items-center bg-cyan-600 hover:bg-cyan-500 px-5 py-2 rounded-2xl transition-all shadow-lg shadow-cyan-500/20"
@@ -1119,6 +1182,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: idx * 0.05 }}
                           key={product.id}
+                          id={`product-${product.id}`}
+                          onClick={() => setPreviewProduct(product)}
                           className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl overflow-hidden group hover:border-cyan-500/50 transition-all cursor-pointer"
                         >
                           <div className="aspect-video relative overflow-hidden">
@@ -1176,6 +1241,24 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                 className="py-2 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-cyan-900/30"
                               >
                                 <ShoppingBag className="w-3 h-3" /> Buy Now
+                              </button>
+                            </div>
+
+                            {/* Deep Linking Share Buttons */}
+                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
+                              <button 
+                                onClick={(e) => handleShareProduct(product, e)}
+                                className="flex-1 py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
+                                title="Copy Direct Share Link"
+                              >
+                                <Share2 className="w-3 h-3 text-cyan-400" /> Share
+                              </button>
+                              <button 
+                                onClick={(e) => handleWhatsAppShare(product, e)}
+                                className="flex-1 py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
+                                title="Share on WhatsApp"
+                              >
+                                <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
                               </button>
                             </div>
                           </div>
@@ -2427,6 +2510,230 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
             userEmail={user.email}
             onClose={() => setShowSuccessReceipt(false)}
           />
+        )}
+      </AnimatePresence>
+      {/* Direct Item Showcase Modal (from Deep Link / Sharing / WhatsApp or Card Click) */}
+      <AnimatePresence>
+        {previewProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
+            onClick={() => setPreviewProduct(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 border border-cyan-500/30 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30 uppercase font-bold">
+                    {(previewProduct as any).category || previewProduct.categoryPath?.level1 || 'Marketplace Item'}
+                  </span>
+                  <span className="text-xs text-slate-400">ID: {previewProduct.id}</span>
+                </div>
+                <button
+                  onClick={() => setPreviewProduct(null)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
+                <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
+                  <img
+                    src={previewProduct.photos[0] || 'https://picsum.photos/seed/item/600/400'}
+                    alt={previewProduct.title}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute top-3 right-3 px-3 py-1 bg-slate-950/90 backdrop-blur-md rounded-xl border border-cyan-500/40 shadow-lg">
+                    <span className="text-sm font-black text-cyan-400">{formatPrice(previewProduct.price, true)}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2">
+                    {previewProduct.title}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mb-3">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{previewProduct.location}</span>
+                    </div>
+                    {previewProduct.condition && (
+                      <span className="px-2 py-0.5 bg-slate-800 rounded text-slate-300 font-bold uppercase text-[10px]">
+                        Condition: {previewProduct.condition}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                    {previewProduct.description}
+                  </p>
+                </div>
+
+                {/* Actions & Sharing */}
+                <div className="space-y-3 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        addToCart(previewProduct);
+                        setPreviewProduct(null);
+                      }}
+                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                    >
+                      <Plus className="w-4 h-4 text-cyan-400" /> Add to Cart
+                    </button>
+                    <button
+                      onClick={() => {
+                        addToCart(previewProduct);
+                        setPreviewProduct(null);
+                        setShowCart(true);
+                      }}
+                      className="py-3 px-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-900/40"
+                    >
+                      <ShoppingBag className="w-4 h-4" /> Buy Now
+                    </button>
+                  </div>
+
+                  {/* Share on WhatsApp & Copy Link */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleWhatsAppShare(previewProduct)}
+                      className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/50"
+                    >
+                      <MessageCircle className="w-4 h-4" /> Share on WhatsApp
+                    </button>
+                    <button
+                      onClick={() => handleShareProduct(previewProduct)}
+                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
+                    >
+                      <Share2 className="w-4 h-4 text-cyan-400" /> Copy Link
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Share Toast */}
+      <AnimatePresence>
+        {shareToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-cyan-500 text-slate-950 font-black text-xs uppercase tracking-wider shadow-2xl flex items-center gap-2"
+          >
+            <CheckCircle2 className="w-4 h-4 text-slate-950" />
+            <span>{shareToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ✨ AI Product Image Generator Modal */}
+      <AnimatePresence>
+        {showAiImageModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-lg w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 space-y-5 text-white shadow-2xl relative"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm uppercase text-white flex items-center gap-2">
+                      AI Product Photo Studio
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 border border-purple-500/40">AI Powered</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">{dailyUsage.usageText}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAiImageModal(false)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {aiProductError && (
+                <div className="p-3 bg-rose-950/60 border border-rose-500/30 rounded-xl text-rose-300 text-xs">
+                  {aiProductError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-slate-300">Product Title or Description</label>
+                <textarea
+                  value={aiProductPrompt}
+                  onChange={(e) => setAiProductPrompt(e.target.value)}
+                  placeholder="e.g. Premium wireless gaming headset with neon lighting, modern studio background, commercial product photography"
+                  rows={3}
+                  className="w-full bg-slate-950 border border-white/10 rounded-2xl p-3 text-xs text-white placeholder:text-slate-600 focus:border-purple-500 outline-none resize-none"
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (!aiProductPrompt.trim()) return;
+                  setIsGeneratingAiProduct(true);
+                  setAiProductError(null);
+                  const res = await generateImage(aiProductPrompt);
+                  if (res.success && res.imageUrl) {
+                    setAiGeneratedProductImg(res.imageUrl);
+                  } else {
+                    setAiProductError(res.error || 'Failed to synthesize product image.');
+                  }
+                  setIsGeneratingAiProduct(false);
+                }}
+                disabled={isGeneratingAiProduct || !aiProductPrompt.trim()}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-purple-600/30"
+              >
+                {isGeneratingAiProduct ? 'Synthesizing with Gemini...' : 'Generate Product Image Now'}
+              </button>
+
+              {aiGeneratedProductImg && (
+                <div className="space-y-3 pt-2">
+                  <div className="w-full h-48 bg-slate-950 rounded-2xl overflow-hidden border border-purple-500/30 flex items-center justify-center">
+                    <img src={aiGeneratedProductImg} alt="AI Product" className="h-full object-contain" />
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={aiGeneratedProductImg}
+                      download="ai-product-photo.png"
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download Photo
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(aiGeneratedProductImg);
+                        alert('Product Image URL copied to clipboard! You can paste it into your product listing.');
+                      }}
+                      className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copy Image URI
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </motion.div>

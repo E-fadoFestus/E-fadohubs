@@ -37,6 +37,7 @@ import {
   arrayRemove 
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -56,6 +57,7 @@ export const db = (() => {
 })();
 export const auth = getAuth(app);
 export const functions = getFunctions(app);
+export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
@@ -104,6 +106,9 @@ export {
   arrayUnion,
   arrayRemove,
   getFunctions,
-  httpsCallable
+  httpsCallable,
+  storageRef,
+  uploadBytesResumable,
+  getDownloadURL
 };
 

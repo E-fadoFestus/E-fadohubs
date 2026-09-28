@@ -49,10 +49,15 @@ import {
   Mail,
   Brain,
   CreditCard,
-  TrendingUp
+  TrendingUp,
+  Mic,
+  MicOff,
+  Send,
+  Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SUPPORT_EMAILS } from '../constants/businessProfile';
+import { useAI } from '../hooks/useAI';
 import { ExamSimulator } from './education/ExamSimulator';
 import { VendorMarketplace } from './VendorMarketplace';
 import { EfadoMining, AdvertisingMiniCard, MiningMiniCard } from './EfadoMining';
@@ -330,6 +335,85 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
   const [showJambPaymentModal, setShowJambPaymentModal] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showMining, setShowMining] = useState(false);
+  const [showAiTutor, setShowAiTutor] = useState(false);
+  const { startVoiceChat, dailyUsage } = useAI();
+  const [aiTutorMessages, setAiTutorMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+    { role: 'assistant', text: `Greetings! I am your EFADO AI Academic & Strategic Tutor. Ask me any concept, exam question, or career pathway!` }
+  ]);
+  const [aiTutorInput, setAiTutorInput] = useState('');
+  const [aiTutorSpeaking, setAiTutorSpeaking] = useState(false);
+  const [aiTutorListening, setAiTutorListening] = useState(false);
+  const [aiTutorLoading, setAiTutorLoading] = useState(false);
+  const voiceSessionRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
+
+  React.useEffect(() => {
+    voiceSessionRef.current = startVoiceChat({
+      onSpeakingChange: (speaking) => setAiTutorSpeaking(speaking)
+    });
+
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRec) {
+      const rec = new SpeechRec();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          handleSendAiTutorMessage(transcript);
+        }
+      };
+
+      rec.onerror = () => setAiTutorListening(false);
+      rec.onend = () => setAiTutorListening(false);
+      recognitionRef.current = rec;
+    }
+
+    return () => {
+      voiceSessionRef.current?.stopAudio();
+      if (recognitionRef.current) recognitionRef.current.abort();
+    };
+  }, [startVoiceChat]);
+
+  const toggleAiTutorListening = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in this browser. Please type your message below.');
+      return;
+    }
+
+    if (aiTutorListening) {
+      recognitionRef.current.stop();
+      setAiTutorListening(false);
+    } else {
+      voiceSessionRef.current?.stopAudio();
+      try {
+        recognitionRef.current.start();
+        setAiTutorListening(true);
+      } catch (e) {
+        console.warn('Speech recognition warning:', e);
+      }
+    }
+  };
+
+  const handleSendAiTutorMessage = async (textToSend?: string) => {
+    const text = (textToSend || aiTutorInput).trim();
+    if (!text) return;
+
+    setAiTutorMessages(prev => [...prev, { role: 'user', text }]);
+    setAiTutorInput('');
+    setAiTutorLoading(true);
+
+    try {
+      const res = await voiceSessionRef.current.sendMessage(text);
+      setAiTutorMessages(prev => [...prev, { role: 'assistant', text: res.reply }]);
+    } catch (e) {
+      console.error('AI Tutor send error:', e);
+    } finally {
+      setAiTutorLoading(false);
+    }
+  };
 
   // New AI-powered study states & dynamic modals
   const [showAiStudyPortal, setShowAiStudyPortal] = useState(false);
@@ -464,6 +548,17 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           </div>
           
           <div className="flex items-center gap-3">
+            {/* 🎙️ Talk to AI Tutor Button with AI Powered badge */}
+            <button 
+              onClick={() => setShowAiTutor(true)}
+              className="flex items-center gap-1.5 px-4 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-purple-600/30 border border-purple-400/30 hover:scale-105 active:scale-95 shrink-0"
+              title="Voice conversation with EFADO AI Tutor"
+            >
+              <span>🎙️ Talk to AI Tutor</span>
+              <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
+                AI Powered
+              </span>
+            </button>
             <CurrencySelector />
             <button 
               onClick={onClose}
@@ -902,6 +997,128 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                 {activeInteractiveTool.type === 'SCREENING_CHECKER' && <ScreeningRequirementsChecker />}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 🎙️ Talk to AI Tutor Voice Conversation Modal */}
+        {showAiTutor && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-xl w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 space-y-5 text-white shadow-2xl relative flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-600/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+                    <Brain className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm uppercase text-white flex items-center gap-2">
+                      EFADO AI Academic Tutor
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/40">
+                        AI Powered
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">{dailyUsage.usageText}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    voiceSessionRef.current?.stopAudio();
+                    setShowAiTutor(false);
+                  }}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Status / Speaking wave indicator */}
+              <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-slate-950 border border-white/5">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${aiTutorSpeaking ? 'bg-purple-400 animate-ping' : aiTutorListening ? 'bg-rose-400 animate-pulse' : 'bg-emerald-400'}`} />
+                  <span className="text-[11px] font-bold uppercase text-slate-300">
+                    {aiTutorSpeaking ? 'AI Tutor is speaking...' : aiTutorListening ? 'Listening to your microphone...' : 'Ready for questions'}
+                  </span>
+                </div>
+                {aiTutorSpeaking && (
+                  <button
+                    onClick={() => voiceSessionRef.current?.stopAudio()}
+                    className="text-[10px] text-purple-300 font-bold hover:underline"
+                  >
+                    Mute Audio
+                  </button>
+                )}
+              </div>
+
+              {/* Chat Message Stream */}
+              <div className="flex-1 overflow-y-auto space-y-3 min-h-[220px] max-h-[340px] pr-1 custom-scrollbar">
+                {aiTutorMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div
+                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-purple-600 text-white rounded-tr-none'
+                          : 'bg-slate-800 text-slate-200 border border-white/10 rounded-tl-none'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+                {aiTutorLoading && (
+                  <div className="flex items-center gap-2 text-xs text-purple-400 animate-pulse p-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>AI Tutor is preparing response...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Voice & Text Input Controls */}
+              <div className="space-y-3 pt-2 border-t border-white/10">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleAiTutorListening}
+                    className={`p-3.5 rounded-2xl transition-all flex items-center justify-center shrink-0 ${
+                      aiTutorListening
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/40 animate-pulse'
+                        : 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/40'
+                    }`}
+                    title={aiTutorListening ? 'Tap to stop recording' : 'Tap to speak via microphone'}
+                  >
+                    {aiTutorListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+                  <input
+                    type="text"
+                    value={aiTutorInput}
+                    onChange={(e) => setAiTutorInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSendAiTutorMessage();
+                    }}
+                    placeholder="Ask syllabus question, formula, or exam concept..."
+                    className="flex-1 bg-slate-950 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white placeholder:text-slate-500 outline-none focus:border-purple-500 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSendAiTutorMessage()}
+                    disabled={!aiTutorInput.trim() || aiTutorLoading}
+                    className="p-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white rounded-2xl transition-all shadow-md shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                  <span>Press mic or enter text to talk. Speaks response with audio.</span>
+                  <span className="text-purple-400 font-mono">Gemini Live API</span>
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

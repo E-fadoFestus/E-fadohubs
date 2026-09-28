@@ -6,5 +6,7 @@
   "firestoreDatabaseId": "ai-studio-ae55e9a4-6837-4ca3-a2d6-3ec7ce41d18a",
   "storageBucket": "efado-market-hubs-8leju.firebasestorage.app",
   "messagingSenderId": "101379452246",
-  "measurementId": ""
+  "measurementId": "",
+  "oAuthClientId": "101379452246-vlnf16suvpvpqcruemotdsq6pgq80tcm.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

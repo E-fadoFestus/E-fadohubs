@@ -19,7 +19,8 @@ import {
   ShieldCheck, 
   Sparkles,
   Layers,
-  Compass
+  Compass,
+  ArrowLeft
 } from 'lucide-react';
 import { HUBS, HubConfig } from '../config/hubs';
 import { UserProfile } from '../types';
@@ -28,6 +29,7 @@ interface VerticalHubsPageProps {
   user: UserProfile | null;
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
+  onNavigateHome?: () => void;
   onOpenCashier?: () => void;
   onLogin?: () => void;
 }
@@ -49,6 +51,7 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
   user,
   wallet,
   onNavigateHub,
+  onNavigateHome,
   onOpenCashier,
   onLogin,
 }) => {
@@ -90,6 +93,20 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#070b19] text-white pb-24 selection:bg-cyan-500 selection:text-black">
+      {/* Fixed Sticky BACK TO HOME Top Bar */}
+      {onNavigateHome && (
+        <div className="sticky top-0 z-50 w-full bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/40 px-3 sm:px-6 py-2 shadow-2xl flex items-center justify-between gap-3">
+          <button
+            onClick={onNavigateHome}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 hover:scale-[1.03] active:scale-[0.98] transition-all group"
+            title="Return to Home Page"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
+            <span>← BACK TO HOME</span>
+          </button>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:inline">10 Vertical Hubs</span>
+        </div>
+      )}
       {/* Hero Header */}
       <div className="relative overflow-hidden bg-gradient-to-b from-[#0a1128] via-[#080e20] to-[#070b19] border-b border-cyan-500/20 pt-10 pb-12 px-4 sm:px-6">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />

@@ -524,3 +524,15 @@ html[data-text-size="xlarge"] {
 #game-container { position: relative; z-index: 1; }
 #game-canvas { display: block !important; visibility: visible !important; opacity: 1 !important; }
 #jet { will-change: transform, left, top; transition: none !important; pointer-events: none; }
+
+/* Gist Hub Social Gradient Mesh & Floating Bubbles */
+@keyframes gistBubble {
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  20% { opacity: 0.6; }
+  80% { opacity: 0.5; }
+  100% { transform: translateY(-115vh) scale(1.2); opacity: 0; }
+}
+.animate-gist-bubble {
+  animation: gistBubble linear infinite;
+}
+

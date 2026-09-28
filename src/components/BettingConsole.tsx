@@ -39,8 +39,12 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
   const isBetActive = bet.status === 'placed';
   const isCashedOut = bet.status === 'cashed_out';
 
-  // Live cashout potential
-  const liveWinValue = bet.betAmount * currentMultiplier;
+  const MIN_STAKE = 100;
+  const MAX_STAKE = 20000;
+  const MAX_WIN = 500000;
+
+  // Live cashout potential capped at Max Win: NGN 500,000 per round
+  const liveWinValue = Math.min(MAX_WIN, bet.betAmount * currentMultiplier);
 
   const quickChips = currencySymbol === '₦' ? [
     { label: '+100', val: 100 },
@@ -59,30 +63,33 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
   const handleAdjustBet = (type: 'half' | 'double' | 'max') => {
     soundManager.playClick();
     if (type === 'half') {
-      onUpdateBet({ betAmount: Math.max(10, Math.floor(bet.betAmount / 2)) });
+      onUpdateBet({ betAmount: Math.max(MIN_STAKE, Math.floor(bet.betAmount / 2)) });
     } else if (type === 'double') {
-      onUpdateBet({ betAmount: Math.min(userBalance, bet.betAmount * 2) });
+      onUpdateBet({ betAmount: Math.min(MAX_STAKE, Math.min(userBalance, bet.betAmount * 2)) });
     } else if (type === 'max') {
-      onUpdateBet({ betAmount: Math.max(10, Math.floor(userBalance)) });
+      onUpdateBet({ betAmount: Math.min(MAX_STAKE, Math.max(MIN_STAKE, Math.floor(userBalance))) });
     }
   };
 
   const handleAddChip = (amount: number) => {
     soundManager.playChipAdd();
-    const newAmount = Math.min(userBalance, bet.betAmount + amount);
-    onUpdateBet({ betAmount: Math.max(10, newAmount) });
+    const newAmount = Math.min(MAX_STAKE, Math.min(userBalance, bet.betAmount + amount));
+    onUpdateBet({ betAmount: Math.max(MIN_STAKE, newAmount) });
   };
 
   return (
     <div className="bg-slate-900/95 border-2 border-cyan-500/20 rounded-[2rem] p-5 shadow-xl flex flex-col justify-between relative overflow-hidden backdrop-blur-md">
       {/* Console Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-xs font-black text-cyan-400">
             {consoleId}
           </div>
           <span className="text-xs font-black text-white uppercase tracking-wider">
             Consolidated Helm {consoleId === 1 ? 'Alpha' : 'Beta'}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] font-black uppercase tracking-wider">
+            Max Win: NGN 500,000 per round
           </span>
         </div>
 
@@ -115,9 +122,12 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
           <div className="relative">
             <input
               type="number"
+              min={MIN_STAKE}
+              max={MAX_STAKE}
               disabled={gameState === 'diving' && isBetActive}
               value={bet.betAmount}
-              onChange={(e) => onUpdateBet({ betAmount: Math.max(1, Number(e.target.value) || 0) })}
+              onChange={(e) => onUpdateBet({ betAmount: Number(e.target.value) || 0 })}
+              onBlur={() => onUpdateBet({ betAmount: Math.min(MAX_STAKE, Math.max(MIN_STAKE, bet.betAmount || MIN_STAKE)) })}
               className="w-full bg-slate-950/90 border-2 border-slate-800 focus:border-cyan-500 rounded-2xl py-3 px-4 text-white font-black text-lg focus:outline-none transition-all"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
