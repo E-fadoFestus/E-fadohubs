@@ -626,6 +626,7 @@ function AppContent() {
   const [activeZoomSession, setActiveZoomSession] = useState<any>(null);
   const [gistInitialView, setGistInitialView] = useState<'FEED' | 'REELS' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS'>('FEED');
   const [gistAutoStartLive, setGistAutoStartLive] = useState(false);
+  const [gistBargainContext, setGistBargainContext] = useState<any>(null);
   const [activeHub, setActiveHub] = useState<'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'QUIZ' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED' | 'DIGITAL_SERVICES_HUB'>('HOME');
   const [digitalServicesSection, setDigitalServicesSection] = useState<'crypto' | 'money' | 'vending'>('crypto');
   const [activeReferralCode, setActiveReferralCode] = useState<string | null>(() => localStorage.getItem('efado_referral_code'));
@@ -731,7 +732,7 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleNavigate = (hub: any, subview?: any) => {
+  const handleNavigate = (hub: any, subview?: any, extraProps?: any) => {
     if (hub === 'HOME') {
       handleNavigateHome();
       return;
@@ -748,7 +749,7 @@ function AppContent() {
     setHubItemId(null);
     setShowVerticalHubsDirectory(false);
     // Reset overlay modal flags when switching hubs
-    setShowGistHub(hub === 'GIST');
+    setShowGistHub(hub === 'GIST' || hub === 'NEXUS' || hub === 'NEXUS_HUB');
     setShowAdvertisingHub(hub === 'ADVERTISING');
     setShowDomainHub(hub === 'DOMAIN_HUB');
     setShowZoomPlans(hub === 'ZOOM');
@@ -783,9 +784,21 @@ function AppContent() {
       return;
     }
 
-    if (hub === 'GIST') {
+    if (hub === 'GIST' || hub === 'NEXUS' || hub === 'NEXUS_HUB') {
       setGistInitialView(subview || 'FEED');
       setGistAutoStartLive(false);
+      if (extraProps?.bargainItem) {
+        setGistBargainContext({
+          productId: extraProps.bargainItem.id,
+          productTitle: extraProps.bargainItem.title || extraProps.bargainItem.name,
+          productPrice: extraProps.bargainItem.price,
+          sellerName: extraProps.seller || extraProps.bargainItem.sellerName,
+          sellerAvatar: extraProps.bargainItem.imageUrl
+        });
+        setGistInitialView('CHAT');
+      } else {
+        setGistBargainContext(null);
+      }
       setShowGistHub(true);
       return;
     }
@@ -3428,11 +3441,15 @@ function AppContent() {
             {showGistHub && user && (
               <EfadoGistHub 
                 user={user}
-                onClose={() => setShowGistHub(false)} 
+                onClose={() => {
+                  setShowGistHub(false);
+                  setGistBargainContext(null);
+                }} 
                 initialView={gistInitialView}
                 autoStartLive={gistAutoStartLive}
                 onOpenMining={() => setShowEfadoMining(true)}
                 onNavigate={handleNavigate}
+                bargainContext={gistBargainContext}
               />
             )}
 

@@ -105,6 +105,7 @@ import { GistCreatorDashboard } from './GistCreatorDashboard';
 import { GistStoriesBar } from './GistStoriesBar';
 import { GistVoiceRecorder } from './GistVoiceRecorder';
 import { CreatorProfileWallet } from './CreatorProfileWallet';
+import { EfadoNexusHub } from './EfadoNexusHub';
 import { useAI } from '../hooks/useAI';
 import { 
   db, 
@@ -354,13 +355,15 @@ interface EfadoGistHubProps {
   initialView?: HubView;
   autoStartLive?: boolean;
   onOpenMining?: () => void;
-  onNavigate?: (hub: any, subview?: any) => void;
+  onNavigate?: (hub: any, subview?: any, extraProps?: any) => void;
+  bargainContext?: any;
 }
 
 type HubView = 'FEED' | 'REELS' | 'LIVE' | 'COMMUNITIES' | 'MONETIZATION' | 'CHAT' | 'ADS' | 'PROFILE' | 'CATEGORIES' | 'BLOG' | 'FAQ' | 'TOOLS';
 
-export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initialView, autoStartLive, onOpenMining, onNavigate }) => {
+export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initialView, autoStartLive, onOpenMining, onNavigate, bargainContext }) => {
   const [activeView, setActiveView] = useState<HubView>(initialView || 'FEED');
+  const [useNexusHubMode, setUseNexusHubMode] = useState<boolean>(true);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<any | null>(null);
@@ -1427,11 +1430,20 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             </div>
             <div className="hidden md:block">
               <div>
-                <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Efado <span className="text-[#8B5CF6] font-black">Gist Hub</span></h2>
+                <h2 className="text-xl font-black bg-gradient-to-r from-white via-indigo-100 to-indigo-300 text-transparent bg-clip-text uppercase tracking-tight">
+                  EFADO <span className="text-indigo-400 font-black">NEXUS HUB</span>
+                </h2>
+                <div className="flex items-center gap-1 text-[9px] font-mono text-indigo-300/80 hover:text-white cursor-pointer mt-0.5" onClick={() => {
+                  navigator.clipboard.writeText('https://efado-nexus.com/hub');
+                  alert('Copied URL: https://efado-nexus.com/hub');
+                }}>
+                  <Globe className="w-2.5 h-2.5 text-indigo-400" />
+                  <span>efado-nexus.com/hub</span>
+                </div>
               </div>
               <button 
                 onClick={() => setShowGuide(true)}
-                className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-0.5 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
+                className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-1 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
               >
                 <HelpCircle className="w-3 h-3" /> Tactical Guide
               </button>
@@ -2528,13 +2540,51 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               )}
 
               {activeView === 'CHAT' && (
+                useNexusHubMode ? (
+                  <div className="h-full w-full relative flex flex-col">
+                    <div className="px-4 py-1.5 bg-indigo-950/90 border-b border-indigo-500/30 flex items-center justify-between z-30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase text-indigo-300">Hub Engine:</span>
+                        <span className="text-[10px] font-bold text-white px-2 py-0.5 rounded-full bg-indigo-600/80 border border-indigo-400/40">
+                          EFADO NEXUS HUB v2.0
+                        </span>
+                        <button
+                          onClick={() => setUseNexusHubMode(false)}
+                          className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-slate-300 transition-colors"
+                          title="Switch to legacy Gist Hub chat"
+                        >
+                          Toggle Classic View
+                        </button>
+                      </div>
+                      <span className="text-[9px] font-mono text-cyan-300 hidden sm:inline">
+                        efado-nexus.com/hub • 10 Buttons • WebRTC • 500MB
+                      </span>
+                    </div>
+                    <div className="flex-grow relative">
+                      <EfadoNexusHub
+                        user={user}
+                        onClose={() => setActiveView('FEED')}
+                        onNavigate={onNavigate}
+                        bargainContext={bargainContext}
+                      />
+                    </div>
+                  </div>
+                ) : (
                 <motion.div 
                   key="chat"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="h-full flex flex-col md:flex-row"
+                  className="h-full flex flex-col md:flex-row relative"
                 >
+                  <div className="absolute top-2 right-4 z-40">
+                    <button
+                      onClick={() => setUseNexusHubMode(true)}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-[10px] shadow-lg"
+                    >
+                      🚀 Open EFADO NEXUS HUB
+                    </button>
+                  </div>
                   {/* Chat List - Style Tabs */}
                   {(() => {
                     const defaultRooms = [
@@ -3243,6 +3293,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     );
                   })()}
                 </motion.div>
+                )
               )}
 
               {activeView === 'CATEGORIES' && !selectedCategory && (

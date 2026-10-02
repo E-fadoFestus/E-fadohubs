@@ -58,6 +58,7 @@ import {
   Video,
   Share2,
   MessageCircle,
+  MessageSquare,
   Sparkles,
   Download
 } from 'lucide-react';
@@ -232,7 +233,7 @@ interface ModernMarketHubProps {
   user: UserProfile;
   onClose: () => void;
   onOpenMining?: () => void;
-  onNavigate?: (hub: any, subview?: any) => void;
+  onNavigate?: (hub: any, subview?: any, extraProps?: any) => void;
   initialItemId?: string;
 }
 
@@ -1261,6 +1262,24 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                 <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
                               </button>
                             </div>
+
+                            {/* Chat Seller (Bargain Mode -> EFADO NEXUS HUB) */}
+                            <button
+                              onClick={() => {
+                                if (onNavigate) {
+                                  onNavigate('GIST', 'CHAT', {
+                                    bargainItem: product,
+                                    seller: (product as any).sellerName || (product as any).seller || 'Verified Seller',
+                                    bargainPrice: product.price
+                                  });
+                                }
+                              }}
+                              className="w-full mt-2 py-1.5 px-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-indigo-900/30 transition-all cursor-pointer"
+                              title="Open EFADO NEXUS HUB Chat with Bargain Mode & Price Offer Tag"
+                            >
+                              <MessageSquare className="w-3 h-3 text-amber-300" />
+                              <span>Chat Seller (Bargain Mode)</span>
+                            </button>
                           </div>
                         </motion.div>
                       ))

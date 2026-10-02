@@ -122,15 +122,15 @@ export const HUBS: HubConfig[] = [
     accent: "#0ea5e9"
   },
   { 
-    name: "Gist Hub", 
-    slug: "gist", 
-    tag: "SOCIAL", 
-    desc: "Community discussions, reels, live rooms, mentorship, and real-time social connections.", 
-    color: "from-blue-600 to-cyan-600",
-    route: "/hub/gist",
+    name: "EFADO NEXUS HUB", 
+    slug: "nexus-hub", 
+    tag: "NEXUS v2.0", 
+    desc: "EFADO NEXUS HUB: 10 Action Buttons, Deep Linking, WebRTC Video/Voice Calls, Voice Masks, Buzz, 500MB Reels, Creator Fund.", 
+    color: "from-indigo-600 via-purple-600 to-cyan-600",
+    route: "/hub/nexus-hub",
     category: "SOCIAL",
     iconName: "MessageSquare",
-    accent: "#0284c7"
+    accent: "#6366f1"
   },
   { 
     name: "Tech & Innovation Hub", 
