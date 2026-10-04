@@ -347,7 +347,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 <span className="text-[9px] font-black text-white uppercase tracking-widest">Mining Assets</span>
                 <div className="flex items-center gap-2">
                    <Coins className="w-4 h-4 text-amber-400" />
-                   <span className="text-sm font-black text-white italic tracking-widest">{(totalMined / 100).toFixed(2)}</span>
+                   <span className="text-sm font-black text-white italic tracking-widest">{((totalMined || 0) / 100).toFixed(2)}</span>
                    <span className="text-[10px] font-black text-slate-500 uppercase">₦</span>
                 </div>
               </div>
@@ -406,7 +406,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">Sovereign Session Rewards</span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black text-emerald-400 italic tracking-tighter">₦{(sessionCoins / 100).toFixed(2)}</span>
+                  <span className="text-4xl font-black text-emerald-400 italic tracking-tighter">₦{((sessionCoins || 0) / 100).toFixed(2)}</span>
                   <span className="text-[10px] font-black text-white uppercase animate-pulse">Accumulating</span>
                 </div>
               </div>

@@ -225,7 +225,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
             try {
               const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
               setUploadProgress(100);
-              setUploadStatusText('Upload complete! Video stream live on Gist Hub.');
+              setUploadStatusText('Upload complete! Video stream live on EFADO Nexus Hub.');
               setTimeout(() => {
                 onPost(caption, downloadURL);
                 onClose();
@@ -595,7 +595,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
                 </div>
 
                 <div className="space-y-2 max-w-sm w-full">
-                  <h4 className="text-xl font-bold text-white">Streaming Reel to Gist Hub</h4>
+                  <h4 className="text-xl font-bold text-white">Streaming Reel to EFADO Nexus Hub</h4>
                   <p className="text-xs text-slate-300 font-medium">{uploadStatusText}</p>
                 </div>
 

@@ -1245,41 +1245,43 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                               </button>
                             </div>
 
-                            {/* Deep Linking Share Buttons */}
+                            {/* Deep Linking Share Buttons & Chat Seller */}
                             <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
                               <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onNavigate?.('GIST', 'CHAT', {
+                                    bargain: true,
+                                    product: {
+                                      id: product.id,
+                                      title: product.title,
+                                      price: product.price,
+                                      image: product.images?.[0] || 'https://picsum.photos/seed/market/400/400',
+                                      seller: (product as any).seller || 'Verified Merchant',
+                                      sellerId: (product as any).sellerId || 'seller-1'
+                                    }
+                                  });
+                                }}
+                                className="flex-1 py-1.5 px-2 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-indigo-500/40 transition-all"
+                                title="Chat Seller (Bargain Mode)"
+                              >
+                                <MessageSquare className="w-3 h-3 text-indigo-400" /> Chat Seller
+                              </button>
+                              <button 
                                 onClick={(e) => handleShareProduct(product, e)}
-                                className="flex-1 py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
+                                className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
                                 title="Copy Direct Share Link"
                               >
                                 <Share2 className="w-3 h-3 text-cyan-400" /> Share
                               </button>
                               <button 
                                 onClick={(e) => handleWhatsAppShare(product, e)}
-                                className="flex-1 py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
+                                className="py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
                                 title="Share on WhatsApp"
                               >
-                                <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
+                                <MessageCircle className="w-3 h-3 text-emerald-400" /> WA
                               </button>
                             </div>
-
-                            {/* Chat Seller (Bargain Mode -> EFADO NEXUS HUB) */}
-                            <button
-                              onClick={() => {
-                                if (onNavigate) {
-                                  onNavigate('GIST', 'CHAT', {
-                                    bargainItem: product,
-                                    seller: (product as any).sellerName || (product as any).seller || 'Verified Seller',
-                                    bargainPrice: product.price
-                                  });
-                                }
-                              }}
-                              className="w-full mt-2 py-1.5 px-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-indigo-900/30 transition-all cursor-pointer"
-                              title="Open EFADO NEXUS HUB Chat with Bargain Mode & Price Offer Tag"
-                            >
-                              <MessageSquare className="w-3 h-3 text-amber-300" />
-                              <span>Chat Seller (Bargain Mode)</span>
-                            </button>
                           </div>
                         </motion.div>
                       ))

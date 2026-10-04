@@ -773,7 +773,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
       if (flSnap.exists()) {
         const currentRating = flSnap.data().rating || 5;
         const currentCount = flSnap.data().totalJobsCompleted || 1;
-        const newRating = Number(((currentRating * currentCount + reviewRating) / (currentCount + 1)).toFixed(1));
+        const newRating = Number((((currentRating || 5) * (currentCount || 1) + (reviewRating || 5)) / ((currentCount || 1) + 1)).toFixed(1));
         await updateDoc(flProfileRef, {
           rating: newRating
         });

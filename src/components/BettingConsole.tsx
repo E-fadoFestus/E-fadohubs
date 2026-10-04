@@ -225,7 +225,7 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
                   {currencySymbol}{liveWinValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div className="text-[11px] font-black text-slate-900/80">
-                  AT {currentMultiplier.toFixed(2)}x
+                  AT {(currentMultiplier ?? 1.0).toFixed(2)}x
                 </div>
               </button>
             ) : isCashedOut ? (
@@ -239,7 +239,7 @@ export const BettingConsole: React.FC<BettingConsoleProps> = ({
                   +{currencySymbol}{(bet.winAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <div className="text-[11px] text-emerald-400/80 font-bold">
-                  @ {bet.cashoutMultiplier?.toFixed(2)}x Multiplier
+                  @ {(bet.cashoutMultiplier ?? 1.0).toFixed(2)}x Multiplier
                 </div>
               </div>
             ) : (

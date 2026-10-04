@@ -105,7 +105,7 @@ import { GistCreatorDashboard } from './GistCreatorDashboard';
 import { GistStoriesBar } from './GistStoriesBar';
 import { GistVoiceRecorder } from './GistVoiceRecorder';
 import { CreatorProfileWallet } from './CreatorProfileWallet';
-import { EfadoNexusHub } from './EfadoNexusHub';
+import { EfadoNexusHubView } from './EfadoNexusHubView';
 import { useAI } from '../hooks/useAI';
 import { 
   db, 
@@ -305,7 +305,7 @@ const DEFAULT_MOCK_REELS: Reel[] = [
     authorName: 'EFADO Global Hub',
     authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-vertical-shot-of-a-woman-smiling-at-the-camera-41584-large.mp4',
-    caption: '🚀 Welcome to EFADO Gist Hub! The world\'s premier video reels & social syndicate! #Viral #Reels #EFADO',
+    caption: '🚀 Welcome to EFADO Nexus Hub! The world\'s premier video reels & social syndicate! #Viral #Reels #EFADO',
     likes: ['user1', 'user2', 'user3', 'user4', 'user5'],
     comments: [{ id: 'c1', authorName: 'Chioma', text: 'Love this video reel interface! Super smooth 🔥' }],
     shares: 482,
@@ -329,7 +329,7 @@ const DEFAULT_MOCK_REELS: Reel[] = [
     authorName: 'Afritunes Buzz',
     authorPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80',
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-holding-a-smartphone-scrolling-through-a-social-media-app-41126-large.mp4',
-    caption: '🎶 Afrobeats viral dance trends live on EFADO Gist Hub! Create your video reel today! #Music #Vibes',
+    caption: '🎶 Afrobeats viral dance trends live on EFADO Nexus Hub! Create your video reel today! #Music #Vibes',
     likes: ['user5', 'user6', 'user7', 'user8'],
     comments: [],
     shares: 890,
@@ -363,7 +363,6 @@ type HubView = 'FEED' | 'REELS' | 'LIVE' | 'COMMUNITIES' | 'MONETIZATION' | 'CHA
 
 export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initialView, autoStartLive, onOpenMining, onNavigate, bargainContext }) => {
   const [activeView, setActiveView] = useState<HubView>(initialView || 'FEED');
-  const [useNexusHubMode, setUseNexusHubMode] = useState<boolean>(true);
   const [showGuide, setShowGuide] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<any | null>(null);
@@ -379,6 +378,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [isNewsletterSubmitting, setIsNewsletterSubmitting] = useState(false);
   const [isNewsletterSubscribed, setIsNewsletterSubscribed] = useState(false);
+  const [useNexusHubMode, setUseNexusHubMode] = useState(true);
 
   // Marketplace Composer & Reaction states
   const [isSellingItem, setIsSellingItem] = useState(false);
@@ -400,7 +400,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [creatorStats, setCreatorStats] = useState(() => {
     try {
       const raw = localStorage.getItem(`efado_creator_stats_${user.uid}`);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const earnedVal = Number(parsed.earnings ?? parsed.totalEarnings ?? 1840);
+        return {
+          totalViews: Number(parsed.totalViews ?? 24520),
+          qualifiedViews: Number(parsed.qualifiedViews ?? 18400),
+          totalEarnings: Number(parsed.totalEarnings ?? earnedVal),
+          earnings: isNaN(earnedVal) ? 1840 : earnedVal,
+          payoutRate: parsed.payoutRate ?? '₦100 / 1k views',
+          unpaidEarnings: Number(parsed.unpaidEarnings ?? earnedVal)
+        };
+      }
     } catch {}
     return {
       totalViews: 24520,
@@ -873,10 +884,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
   // FAQ Dataset for SEO
   const FAQ_DATA = [
-    { q: "What is EFADO Gist Hub?", a: "EFADO Gist Hub is a global social ecosystem designed for meaningful discourse, community building, and real-time knowledge exchange across various professional and spiritual categories." },
+    { q: "What is EFADO Nexus Hub?", a: "EFADO Nexus Hub is a global social ecosystem designed for meaningful discourse, community building, 10 action bar controls, and real-time knowledge exchange across various professional and spiritual categories." },
     { q: "How do I promote my business here?", a: "You can use the 'Advertisement Center' to create targeted campaigns that reach specific communities within the hub, from technology enthusiasts to spiritual leaders." },
-    { q: "Is the Gist Hub safe for women and youth?", a: "Yes, we have dedicated, moderated sub-sections like 'The Wives Forum' and 'Youth Development' with strict community guidelines and security protocols." },
-    { q: "Can I earn while using the Gist Hub?", a: "Directly through the Ads center or by building industry authority in our tactical communities, which often leads to job opportunities and professional networking." }
+    { q: "Is the EFADO Nexus Hub safe for women and youth?", a: "Yes, we have dedicated, moderated sub-sections like 'The Wives Forum' and 'Youth Development' with strict community guidelines and security protocols." },
+    { q: "Can I earn while using the EFADO Nexus Hub?", a: "Directly through the Ads center, qualified views creator fund, or by building industry authority in our tactical communities, which often leads to job opportunities and professional networking." }
   ];
 
   // Tactical Blog Content
@@ -968,7 +979,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         authorId: 'system-1',
         authorName: 'Dr. Sarah (Lead Eng)',
         authorPhoto: 'https://picsum.photos/seed/sarah/100/100',
-        content: "Deploying the sovereign EFADO digital architecture with 100% end-to-end encryption protocols. Welcome to the Gist Hub! Express your thoughts freely, connect in specialized hubs, and explore creator monetization channels! 🛡️🚀",
+        content: "Deploying the sovereign EFADO digital architecture with 100% end-to-end encryption protocols. Welcome to EFADO Nexus Hub! Express your thoughts freely, connect in specialized hubs, and explore creator monetization channels! 🛡️🚀",
         likes: ['user-1'],
         comments: [],
         category: 'TECH',
@@ -1359,7 +1370,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </div>
                 <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight uppercase">Strategic Feed Guide</h2>
                 <p className="text-slate-300 font-bold mb-6 leading-relaxed uppercase tracking-[0.1em] text-xs">
-                  Social discourse protocols active. Here is how you navigate the EFADO Gist Hub:
+                  Social discourse protocols active. Here is how you navigate the EFADO Nexus Hub:
                 </p>
                 
                 <div className="space-y-4">
@@ -1431,19 +1442,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             <div className="hidden md:block">
               <div>
                 <h2 className="text-xl font-black bg-gradient-to-r from-white via-indigo-100 to-indigo-300 text-transparent bg-clip-text uppercase tracking-tight">
-                  EFADO <span className="text-indigo-400 font-black">NEXUS HUB</span>
+                  EFADO NEXUS HUB
                 </h2>
-                <div className="flex items-center gap-1 text-[9px] font-mono text-indigo-300/80 hover:text-white cursor-pointer mt-0.5" onClick={() => {
-                  navigator.clipboard.writeText('https://efado-nexus.com/hub');
-                  alert('Copied URL: https://efado-nexus.com/hub');
-                }}>
-                  <Globe className="w-2.5 h-2.5 text-indigo-400" />
-                  <span>efado-nexus.com/hub</span>
-                </div>
+                <p className="text-[9px] font-mono text-cyan-400 font-bold">efado-nexus.com/hub</p>
               </div>
               <button 
                 onClick={() => setShowGuide(true)}
-                className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-1 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
+                className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-0.5 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
               >
                 <HelpCircle className="w-3 h-3" /> Tactical Guide
               </button>
@@ -1531,18 +1536,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               </button>
 
               <h3 className="text-xs xs:text-sm sm:text-2xl font-bold text-white tracking-tight truncate">
-                {activeView === 'MONETIZATION' && 'Creator Monetization & Earnings'}
-                {activeView === 'LIVE' && 'EFADO Live Streaming'}
-                {activeView === 'COMMUNITIES' && 'Community Groups'}
-                {activeView === 'BLOG' && 'Knowledge Hub'}
-                {activeView === 'TOOLS' && 'Tactical Industry Tools'}
-                {activeView === 'FAQ' && 'Help & FAQ Desk'}
-                {activeView === 'FEED' && 'Social Gist Feed'}
-                {activeView === 'REELS' && 'Viral Video Reels'}
-                {activeView === 'CHAT' && 'Direct Messages & Audio'}
-                {activeView === 'CATEGORIES' && 'Explore Hubs'}
-                {activeView === 'ADS' && 'Advertise on EFADO'}
-                {activeView === 'PROFILE' && 'My Social Space'}
+                {activeView === 'CHAT' && 'EFADO NEXUS HUB • Live Comms & 10 Action Bar'}
+                {activeView === 'FEED' && 'EFADO NEXUS HUB • Social Feed'}
+                {activeView === 'REELS' && 'EFADO NEXUS HUB • 500MB Video Reels'}
+                {activeView === 'MONETIZATION' && 'EFADO NEXUS HUB • Creator Monetization Fund'}
+                {activeView === 'LIVE' && 'EFADO NEXUS HUB • Live WebRTC Streaming'}
+                {activeView === 'COMMUNITIES' && 'EFADO NEXUS HUB • Community Groups'}
+                {activeView === 'BLOG' && 'EFADO NEXUS HUB • Strategic Briefings'}
+                {activeView === 'TOOLS' && 'EFADO NEXUS HUB • Tactical Industry Tools'}
+                {activeView === 'FAQ' && 'EFADO NEXUS HUB • Support & FAQ'}
+                {activeView === 'CATEGORIES' && 'EFADO NEXUS HUB • Explore Hubs'}
+                {activeView === 'ADS' && 'EFADO NEXUS HUB • Advertise & Monetize'}
+                {activeView === 'PROFILE' && 'EFADO NEXUS HUB • Creator Profile'}
               </h3>
             </div>
             
@@ -1622,9 +1627,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               <button 
                 onClick={() => {
                   const shareUrl = window.location.href;
-                  const text = "Check out the EFADO Gist Hub! Join the viral social conversation globally! 🚀🌍";
+                  const text = "Check out the EFADO Nexus Hub! Join the viral social conversation globally! 🚀🌍";
                   if (navigator.share) {
-                    navigator.share({ title: 'EFADO Gist Hub', text, url: shareUrl });
+                    navigator.share({ title: 'EFADO Nexus Hub', text, url: shareUrl });
                   } else {
                     navigator.clipboard.writeText(`${text} ${shareUrl}`);
                     alert("Viral invite link copied! Promote this hub across social media for global responses! 🚀");
@@ -1665,7 +1670,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     id: b.id,
                     title: b.title,
                     category: b.category || 'Technology',
-                    excerpt: b.excerpt || 'Read this full strategic briefing inside the Gist Hub platform.',
+                    excerpt: b.excerpt || 'Read this full strategic briefing inside the EFADO Nexus Hub platform.',
                     date: b.createdAt?.seconds 
                       ? new Date(b.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) 
                       : 'Just Now',
@@ -1887,7 +1892,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 >
                   <div className="text-center">
                     <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4">Help & Strategic FAQ</h2>
-                    <p className="text-gray-950 text-lg font-black uppercase tracking-tight">Resolving objections and providing tactical clarity for Gist Hub users.</p>
+                    <p className="text-gray-950 text-lg font-black uppercase tracking-tight">Resolving objections and providing tactical clarity for EFADO Nexus Hub users.</p>
                   </div>
 
                   <div className="space-y-4">
@@ -2013,17 +2018,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] font-bold">₦100 / 1K Qualified Views</span>
                           </div>
                           <p className="text-xs text-slate-300 mt-0.5">
-                            Earned: <span className="font-extrabold text-[#06B6D4] text-sm">₦{creatorStats.earnings.toFixed(2)}</span> • {creatorStats.qualifiedViews.toLocaleString()} 5s+ views
+                            Earned: <span className="font-extrabold text-[#06B6D4] text-sm">₦{(Number(creatorStats?.earnings ?? creatorStats?.totalEarnings ?? 1840)).toFixed(2)}</span> • {(Number(creatorStats?.qualifiedViews ?? 18400)).toLocaleString()} 5s+ views
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            if (creatorStats.earnings < 500) {
-                              alert(`Your current earnings are ₦${creatorStats.earnings.toFixed(2)}. Minimum withdrawal threshold is ₦500. Keep posting viral reels and videos!`);
+                            const curEarned = Number(creatorStats?.earnings ?? creatorStats?.totalEarnings ?? 0);
+                            if (curEarned < 500) {
+                              alert(`Your current earnings are ₦${curEarned.toFixed(2)}. Minimum withdrawal threshold is ₦500. Keep posting viral reels and videos!`);
                             } else {
-                              alert(`Withdrawal request of ₦${creatorStats.earnings.toFixed(2)} submitted to your linked Nigerian bank account! Processing via EFADO Escrow.`);
+                              alert(`Withdrawal request of ₦${curEarned.toFixed(2)} submitted to your linked Nigerian bank account! Processing via EFADO Escrow.`);
                             }
                           }}
                           className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
@@ -2494,7 +2500,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                   Boost Your Business Reach
                                 </h5>
                                 <p className="text-[10px] sm:text-xs text-slate-300 line-clamp-2 my-1 leading-snug">
-                                  Advertise across EFADO Gist Hub & reach millions of verified social members globally.
+                                  Advertise across EFADO Nexus Hub & reach millions of verified social members globally.
                                 </p>
                                 <button 
                                   onClick={() => onNavigate?.('ADVERTISING', 'ADVERT')}
@@ -2542,49 +2548,47 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
               {activeView === 'CHAT' && (
                 useNexusHubMode ? (
                   <div className="h-full w-full relative flex flex-col">
-                    <div className="px-4 py-1.5 bg-indigo-950/90 border-b border-indigo-500/30 flex items-center justify-between z-30">
+                    <div className="px-4 py-1.5 bg-indigo-950/90 border-b border-indigo-500/30 flex items-center justify-between z-20 shrink-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase text-indigo-300">Hub Engine:</span>
-                        <span className="text-[10px] font-bold text-white px-2 py-0.5 rounded-full bg-indigo-600/80 border border-indigo-400/40">
-                          EFADO NEXUS HUB v2.0
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase text-indigo-300 tracking-wider">
+                          EFADO NEXUS HUB • 10 Action Bar Active
                         </span>
-                        <button
-                          onClick={() => setUseNexusHubMode(false)}
-                          className="text-[9px] font-bold px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-slate-300 transition-colors"
-                          title="Switch to legacy Gist Hub chat"
-                        >
-                          Toggle Classic View
-                        </button>
                       </div>
-                      <span className="text-[9px] font-mono text-cyan-300 hidden sm:inline">
-                        efado-nexus.com/hub • 10 Buttons • WebRTC • 500MB
-                      </span>
+                      <button
+                        onClick={() => setUseNexusHubMode(false)}
+                        className="text-[9px] font-bold text-slate-400 hover:text-white px-2 py-0.5 rounded bg-white/5 border border-white/10"
+                      >
+                        Switch to Classic Chat
+                      </button>
                     </div>
-                    <div className="flex-grow relative">
-                      <EfadoNexusHub
+                    <div className="flex-grow min-h-0 overflow-hidden">
+                      <EfadoNexusHubView
                         user={user}
-                        onClose={() => setActiveView('FEED')}
+                        onClose={onClose}
                         onNavigate={onNavigate}
                         bargainContext={bargainContext}
+                        creatorStats={creatorStats}
+                        onUpdateCreatorStats={setCreatorStats}
                       />
                     </div>
                   </div>
                 ) : (
-                <motion.div 
-                  key="chat"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="h-full flex flex-col md:flex-row relative"
-                >
-                  <div className="absolute top-2 right-4 z-40">
-                    <button
-                      onClick={() => setUseNexusHubMode(true)}
-                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-[10px] shadow-lg"
-                    >
-                      🚀 Open EFADO NEXUS HUB
-                    </button>
-                  </div>
+                  <motion.div 
+                    key="chat"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="h-full flex flex-col md:flex-row relative"
+                  >
+                    <div className="absolute top-2 right-2 z-40">
+                      <button
+                        onClick={() => setUseNexusHubMode(true)}
+                        className="text-[9px] font-bold text-indigo-300 hover:text-white px-3 py-1 rounded-xl bg-indigo-600/40 border border-indigo-500/50 shadow-md backdrop-blur-md"
+                      >
+                        ⚡ Switch to EFADO NEXUS HUB Mode
+                      </button>
+                    </div>
                   {/* Chat List - Style Tabs */}
                   {(() => {
                     const defaultRooms = [
@@ -2646,7 +2650,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           id: 'init-global',
                           senderId: 'global',
                           senderName: 'Global Chat',
-                          content: 'Welcome to the Live Global Chat Room! Anyone on any phone or computer can chat here in real-time. Try sending a message and have your colleague open Gist Hub -> Messages -> Global Chat on their phone!',
+                          content: 'Welcome to the Live Global Chat Room! Anyone on any phone or computer can chat here in real-time. Try sending a message and have your colleague open EFADO Nexus Hub -> Messages -> Global Chat on their phone!',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else if (activeChatRoomId === 'bishop') {
@@ -3700,7 +3704,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
                       </div>
                       <p className="mt-8 text-slate-400 max-w-2xl leading-relaxed font-semibold">
-                        {user.bio || "Welcome to my social space on EFADO Gist Hub! I'm here to connect, share gists, and explore the future of community discussions."}
+                        {user.bio || "Welcome to my social space on EFADO Nexus Hub! I'm here to connect, share updates, and explore the future of community discussions."}
                       </p>
                       <div className="flex items-center gap-12 mt-10">
                         <div className="text-center">
@@ -3794,15 +3798,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       ) : (
                         <div className="text-center py-12 p-8 bg-white/5 border border-white/10 rounded-3xl space-y-3">
                           <MessageSquare className="w-10 h-10 text-[#8B5CF6] mx-auto" />
-                          <h4 className="text-sm font-bold text-white">No Gists Published Yet</h4>
+                          <h4 className="text-sm font-bold text-white">No Posts Published Yet</h4>
                           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                            Share what's happening around you on EFADO Gist Hub! Earn monetization rewards on views and engagements.
+                            Share what's happening around you on EFADO Nexus Hub! Earn monetization rewards on views and engagements.
                           </p>
                           <button 
                             onClick={() => setActiveView('FEED')}
                             className="px-5 py-2.5 bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white text-xs font-bold rounded-xl shadow-lg hover:brightness-110 transition-all"
                           >
-                            Create First Gist Post
+                            Create First Post
                           </button>
                         </div>
                       )}
@@ -5206,7 +5210,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 <div className="text-center">
                   <span className="text-[9px] font-black tracking-[0.3em] text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-full uppercase">Tactical Setup</span>
                   <h4 className="text-2xl font-black text-white uppercase tracking-tighter italic mt-3">Refine Social Profile</h4>
-                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mt-1">Customize your Gist Hub identity across all channels</p>
+                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mt-1">Customize your EFADO Nexus Hub identity across all channels</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -5526,7 +5530,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   {/* Share Reel Button */}
                   <button
                     onClick={() => {
-                      const shareText = `Check out this viral Reel on EFADO Gist Hub! 🚀 "${selectedReelForModal.caption}"`;
+                      const shareText = `Check out this viral Reel on EFADO Nexus Hub! 🚀 "${selectedReelForModal.caption}"`;
                       if (navigator.share) {
                         navigator.share({ title: 'EFADO Reel', text: shareText, url: window.location.href });
                       } else {

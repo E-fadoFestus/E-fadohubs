@@ -296,7 +296,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
         dueDate.setMonth(dueDate.getMonth() + index + 1);
         return {
           installmentNumber: index + 1,
-          amount: Number(monthlyAmount.toFixed(2)),
+          amount: Number((monthlyAmount || 0).toFixed(2)),
           dueDate: dueDate.toISOString().split('T')[0],
           status: 'pending' as const
         };
@@ -596,7 +596,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                         step: '2',
                         title: 'Play the Lucky Spin using your **Player Wallet**.',
                         what: 'Activate your interactive experience.',
-                        how: 'Move funds from your Deposit Wallet to your Player Wallet via the internal transfer bridge. Navigate to the Gist or Game hub to deploy your spins.',
+                        how: 'Move funds from your Deposit Wallet to your Player Wallet via the internal transfer bridge. Navigate to the Game hub to deploy your spins.',
                         benefits: 'Access to exclusive high-multiplier multipliers and early-bird raffle entries.'
                       },
                       {

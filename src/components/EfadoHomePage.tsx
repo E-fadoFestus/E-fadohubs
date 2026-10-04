@@ -84,12 +84,12 @@ const HUBS_DATA = [
   },
   {
     id: 'GIST',
-    title: 'Gist Hub',
-    description: 'Community discussions, mentorship, careers, and technology. Stay connected and informed.',
+    title: 'EFADO Nexus Hub',
+    description: '10 Action Buttons, WebRTC Video/Voice, Voice Masks, Deep Linking, 500MB Reels, and Creator Fund.',
     icon: MessageSquare,
-    color: 'from-blue-600 to-cyan-700',
-    tag: 'Social',
-    stats: '2k+ Topics'
+    color: 'from-indigo-600 via-purple-600 to-cyan-700',
+    tag: 'Nexus Social',
+    stats: '10k+ Members'
   },
   {
     id: 'SERVICE_CORPS',

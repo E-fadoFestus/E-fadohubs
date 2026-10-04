@@ -166,7 +166,7 @@ export const MultiplayerPanel: React.FC<MultiplayerPanelProps> = ({
                   {pilot.status === 'cashed_out' ? (
                     <div className="flex flex-col items-end">
                       <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-black">
-                        {pilot.cashoutMultiplier?.toFixed(2)}x
+                        {(pilot.cashoutMultiplier ?? 1.0).toFixed(2)}x
                       </span>
                       <span className="text-[11px] font-mono font-bold text-emerald-400">
                         +{currencySymbol}{(pilot.profit || 0).toLocaleString()}

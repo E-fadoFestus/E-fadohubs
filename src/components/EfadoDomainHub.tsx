@@ -4102,7 +4102,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                       <div className="flex items-end justify-between w-full pt-2">
                                         <div>
                                           <p className="text-sm font-black text-slate-900">₦{plan.priceNGN.toLocaleString()}</p>
-                                          <p className="text-[8px] font-mono font-semibold text-slate-400">~${plan.priceUSD.toFixed(2)} Flat</p>
+                                          <p className="text-[8px] font-mono font-semibold text-slate-400">~${(plan.priceUSD ?? (plan.priceNGN ? plan.priceNGN / 1500 : 0)).toFixed(2)} Flat</p>
                                         </div>
                                         <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md uppercase tracking-wider">
                                           {plan.validity}

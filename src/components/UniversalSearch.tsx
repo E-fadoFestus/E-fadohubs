@@ -34,7 +34,7 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
     { id: '1', title: 'Fairly Used Market', category: 'hubs', description: 'Trade quality pre-owned assets in the strategic marketplace.', icon: ShoppingBag },
     { id: '2', title: 'Service Corps Hub', category: 'hubs', description: 'Connect with verified strategic service providers globally.', icon: Briefcase },
     { id: '3', title: 'Education Hub', category: 'hubs', description: 'Access industrial knowledge and strategic learning patterns.', icon: GraduationCap },
-    { id: '4', title: 'Gist Hub', category: 'hubs', description: 'Join high-intellect community discussions and strategic news.', icon: MessageSquare },
+    { id: '4', title: 'EFADO Nexus Hub', category: 'hubs', description: 'Join high-intellect community discussions, 10 action buttons, viral reels, and strategic news.', icon: MessageSquare },
   ];
 
   const EXTERNAL_ENGINES = [

@@ -638,7 +638,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                         <g>
                           <rect x={width - 80} y={y - 12} width={80} height={24} rx={4} fill={activeTrades.length > 0 ? (isWinning ? '#22c55e' : '#ef4444') : '#3b82f6'} />
                           <text x={width - 40} y={y + 5} textAnchor="middle" fill="white" fontSize={10} fontWeight="black">
-                            ${currentPrice.toFixed(2)}
+                            ${(currentPrice ?? 24500).toFixed(2)}
                           </text>
                           {activeTrades.length > 0 && (
                             <text x={width - 40} y={y - 20} textAnchor="middle" fill={isWinning ? '#22c55e' : '#ef4444'} fontSize={10} fontWeight="black">

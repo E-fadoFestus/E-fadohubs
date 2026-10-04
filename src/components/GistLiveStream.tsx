@@ -125,7 +125,7 @@ export const GistLiveStream: React.FC<GistLiveStreamProps> = ({ user, onClose, o
     { id: '1', user: 'Blessing', text: 'Welcome everyone to the stream! 🔥' },
     { id: '2', user: 'Tunde_NG', text: 'Audio is super clear today 👍' },
     { id: '3', user: 'Chioma99', text: 'Big love from Abuja! ❤️' },
-    { id: '4', user: 'Amara_Tech', text: 'Watching on EFADO Gist Hub!' }
+    { id: '4', user: 'Amara_Tech', text: 'Watching on EFADO Nexus Hub!' }
   ]);
   const [newComment, setNewComment] = useState('');
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -425,7 +425,7 @@ export const GistLiveStream: React.FC<GistLiveStreamProps> = ({ user, onClose, o
             <button 
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({ title: 'EFADO Live Stream', text: `Watch ${activeChannel.hostName} live on EFADO Gist Hub!`, url: window.location.href });
+                  navigator.share({ title: 'EFADO Live Stream', text: `Watch ${activeChannel.hostName} live on EFADO Nexus Hub!`, url: window.location.href });
                 } else {
                   navigator.clipboard.writeText(window.location.href);
                   alert("Live stream link copied to clipboard!");

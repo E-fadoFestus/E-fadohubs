@@ -738,7 +738,7 @@ export const DeepSeaCanvas: React.FC<DeepSeaCanvasProps> = ({
       if (!multEl) return;
 
       if (currentState === 'diving' || currentState === 'flying') {
-        multEl.innerText = `${currentMult.toFixed(2)}x`;
+        multEl.innerText = `${(currentMult ?? 1.0).toFixed(2)}x`;
         multEl.className =
           'text-white text-6xl sm:text-7xl md:text-8xl font-black drop-shadow-[0_0_40px_rgba(56,189,248,0.95)] tracking-tight text-center select-none font-mono';
 
@@ -749,12 +749,12 @@ export const DeepSeaCanvas: React.FC<DeepSeaCanvasProps> = ({
         }
 
         if (depthEl) {
-          const depthMeters = Math.floor(currentMult * 145);
-          const knots = Math.floor(currentMult * 42);
+          const depthMeters = Math.floor((currentMult ?? 1.0) * 145);
+          const knots = Math.floor((currentMult ?? 1.0) * 42);
           depthEl.innerText = `DEPTH: -${depthMeters}M • VELOCITY: ${knots} KTS`;
         }
       } else if (currentState === 'crashed') {
-        multEl.innerText = `FLEW AWAY AT ${crashMult.toFixed(2)}x`;
+        multEl.innerText = `FLEW AWAY AT ${(crashMult ?? 1.0).toFixed(2)}x`;
         multEl.className =
           'text-rose-500 text-3xl sm:text-5xl md:text-6xl font-black drop-shadow-[0_0_45px_rgba(244,63,94,0.95)] tracking-tight text-center select-none font-mono animate-pulse';
 
@@ -765,10 +765,10 @@ export const DeepSeaCanvas: React.FC<DeepSeaCanvasProps> = ({
         }
 
         if (depthEl) {
-          depthEl.innerText = `IMPLOSION DEPTH: -${Math.floor(crashMult * 145)}M`;
+          depthEl.innerText = `IMPLOSION DEPTH: -${Math.floor((crashMult ?? 1.0) * 145)}M`;
         }
       } else if (currentState === 'betting') {
-        multEl.innerText = `${Math.max(0, countdown).toFixed(1)}s`;
+        multEl.innerText = `${Math.max(0, countdown || 0).toFixed(1)}s`;
         multEl.className =
           'text-cyan-300 text-5xl sm:text-6xl md:text-7xl font-black drop-shadow-[0_0_35px_rgba(6,182,212,0.9)] tracking-tight text-center select-none font-mono';
 

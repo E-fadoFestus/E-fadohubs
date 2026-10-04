@@ -504,8 +504,8 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
         {/* WhatsApp Direct Share Button */}
         <button 
           onClick={() => {
-            const text = `🔥 Watch this viral reel on EFADO Gist Hub: "${currentReel.caption || 'EFADO Reel'}"`;
-            const url = window.location.origin + '/hub/gist-hub';
+            const text = `🔥 Watch this viral reel on EFADO Nexus Hub: "${currentReel.caption || 'EFADO Reel'}"`;
+            const url = window.location.origin + '/hub/nexus-hub';
             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text + '\n' + url)}`, '_blank', 'noopener,noreferrer');
           }}
           className="flex flex-col items-center gap-1 group active:scale-90 transition-transform cursor-pointer"

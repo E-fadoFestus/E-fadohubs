@@ -3647,7 +3647,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                                 </span>
                                 {fee > 0 && (
                                   <span className="text-[10px] text-slate-400 font-mono">
-                                    Gross: ${originalAmount.toLocaleString()} • 3% Fee: ${fee.toFixed(2)}
+                                    Gross: ${(originalAmount || 0).toLocaleString()} • 3% Fee: ${(fee || 0).toFixed(2)}
                                   </span>
                                 )}
                               </div>
@@ -3804,8 +3804,8 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 {/* 2. Live Standard Monetization Statistics Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: "Google AdSense Impressions", val: `${monStats.adsImpressions.toLocaleString()} views`, detail: `$${(monStats.adsImpressions * 0.012).toFixed(2)} USD Ad-Match` },
-                    { label: "Active Affiliate Clicks", val: `${monStats.affiliateClicks} redirected`, detail: `Approx. $${(monStats.affiliateClicks * 5.50).toFixed(2)} CPA Commission` },
+                    { label: "Google AdSense Impressions", val: `${(monStats?.adsImpressions || 0).toLocaleString()} views`, detail: `$${(((monStats?.adsImpressions || 0) * 0.012)).toFixed(2)} USD Ad-Match` },
+                    { label: "Active Affiliate Clicks", val: `${(monStats?.affiliateClicks || 0)} redirected`, detail: `Approx. $${(((monStats?.affiliateClicks || 0) * 5.50)).toFixed(2)} CPA Commission` },
                     { label: "Course & Seminar Accesses", val: `${monStats.seminarsAccessed} payments`, detail: `₦${(monStats.seminarsAccessed * 1500).toLocaleString()} direct NGN` },
                     { label: "Coins Extracted Value", val: `${monStats.coinsMined.toLocaleString()} EM`, detail: `₦${(monStats.coinsMined * 25).toLocaleString()} Token equivalent` }
                   ].map((tile, i) => (

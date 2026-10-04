@@ -74,7 +74,18 @@ export const CreatorProfileWallet: React.FC<CreatorProfileWalletProps> = ({
   // Load initial stats
   useEffect(() => {
     loadCreatorStats(userId).then((res) => {
-      setStats(res);
+      if (res) {
+        setStats((prev) => ({
+          ...prev,
+          ...res,
+          availableBalance: res.availableBalance ?? prev.availableBalance ?? 0,
+          pendingBalance: res.pendingBalance ?? prev.pendingBalance ?? 0,
+          todayEarnings: res.todayEarnings ?? prev.todayEarnings ?? 0,
+          todayViews: res.todayViews ?? prev.todayViews ?? 0,
+          totalViews: res.totalViews ?? prev.totalViews ?? 0,
+          inviteBonus: res.inviteBonus ?? prev.inviteBonus ?? 0,
+        }));
+      }
     });
 
     // Listen for real-time qualified view increments
@@ -82,10 +93,10 @@ export const CreatorProfileWallet: React.FC<CreatorProfileWalletProps> = ({
       const detail = e.detail;
       setStats((prev) => ({
         ...prev,
-        pendingBalance: detail.pendingBalance ?? +(prev.pendingBalance + 0.2).toFixed(2),
-        todayEarnings: detail.todayEarnings ?? +(prev.todayEarnings + 0.2).toFixed(2),
-        todayViews: detail.todayViews ?? prev.todayViews + 1,
-        totalViews: detail.totalViews ?? prev.totalViews + 1
+        pendingBalance: detail?.pendingBalance ?? +((prev?.pendingBalance ?? 0) + 0.2).toFixed(2),
+        todayEarnings: detail?.todayEarnings ?? +((prev?.todayEarnings ?? 0) + 0.2).toFixed(2),
+        todayViews: detail?.todayViews ?? (prev?.todayViews ?? 0) + 1,
+        totalViews: detail?.totalViews ?? (prev?.totalViews ?? 0) + 1
       }));
       setAnimatedPendingPing(true);
       setTimeout(() => setAnimatedPendingPing(false), 2000);
@@ -185,13 +196,13 @@ export const CreatorProfileWallet: React.FC<CreatorProfileWalletProps> = ({
     return null;
   }
 
-  const availableBalance = stats.availableBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const pendingBalance = stats.pendingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const todayEarnings = stats.todayEarnings.toFixed(2);
-  const todayViews = stats.todayViews.toLocaleString();
-  const totalViews = stats.totalViews.toLocaleString();
-  const inviteBonus = stats.inviteBonus.toLocaleString();
-  const followers = followersCount.toLocaleString();
+  const availableBalance = (stats?.availableBalance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pendingBalance = (stats?.pendingBalance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const todayEarnings = Number(stats?.todayEarnings ?? 0).toFixed(2);
+  const todayViews = (stats?.todayViews ?? 0).toLocaleString();
+  const totalViews = (stats?.totalViews ?? 0).toLocaleString();
+  const inviteBonus = (stats?.inviteBonus ?? 0).toLocaleString();
+  const followers = (followersCount ?? 0).toLocaleString();
 
   return (
     <div className="w-full">

@@ -1549,7 +1549,7 @@ export const ScreeningRequirementsChecker: React.FC = () => {
     // Simulated Post-UTME screening test (weighted out of 30) - assume a model test score of 22/30 (approx 73%)
     const postUtmeWeighted = 22;
 
-    return (jambWeighted + oLevelWeighted + postUtmeWeighted).toFixed(2);
+    return ((jambWeighted || 0) + (oLevelWeighted || 0) + (postUtmeWeighted || 0)).toFixed(2);
   }, [jambScore, mathGrade, engGrade, phyGrade, chmGrade, bioGrade]);
 
   const screeningDocs = [

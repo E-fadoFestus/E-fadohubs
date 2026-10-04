@@ -298,7 +298,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
             }`}
           >
             <Radio className="w-4 h-4 text-rose-400" />
-            Gist Hub & Live Video ({liveRooms.length} Live)
+            EFADO Nexus Hub & Live Video ({liveRooms.length} Live)
           </button>
 
           <button
@@ -412,7 +412,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
                 </span>
               </div>
               <div>
-                <h4 className="text-sm font-black text-white uppercase group-hover:text-rose-300 transition-colors">2. Gist Hub & Live Rooms</h4>
+                <h4 className="text-sm font-black text-white uppercase group-hover:text-rose-300 transition-colors">2. EFADO Nexus Hub & Live Rooms</h4>
                 <p className="text-[10px] text-slate-400">Video reels, audio gists & gifts</p>
               </div>
               <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
@@ -963,7 +963,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
                 </div>
                 <div>
                   <h4 className="text-base font-black text-white uppercase tracking-wider">
-                    Gist Hub Live Video Broadcast Rooms ({liveRooms.length})
+                    EFADO Nexus Hub Live Video Broadcast Rooms ({liveRooms.length})
                   </h4>
                   <p className="text-xs text-slate-400">Live audience telemetry, gifts & 80/20 creator-house revenue split</p>
                 </div>
@@ -1012,7 +1012,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
           <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-6 space-y-4">
             <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-purple-400" />
-              Gist Hub Video Reels & Short Form Content ({reels.length} Published)
+              EFADO Nexus Hub Video Reels & Short Form Content ({reels.length} Published)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {reels.slice(0, 8).map(reel => (

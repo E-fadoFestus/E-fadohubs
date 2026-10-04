@@ -1688,7 +1688,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                     className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-red-100 hover:bg-red-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Banknote className="w-4 h-4" />
-                    Pay Penalty ({(selectedGroup.contributionAmount * 0.03).toFixed(2)} {selectedGroup.currency})
+                    Pay Penalty ({(((selectedGroup.contributionAmount || 0) * 0.03)).toFixed(2)} {selectedGroup.currency})
                   </button>
                 ) : (
                   <button 
@@ -1826,7 +1826,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 <div>
                   <p className="text-xs font-bold text-gray-500 uppercase">Total Pool</p>
                   <p className="text-3xl font-black text-indigo-400">
-                    {(selectedGroup.contributionAmount * selectedGroup.maxMembers).toFixed(2)} {selectedGroup.currency}
+                    {(((selectedGroup.contributionAmount || 0) * (selectedGroup.maxMembers || 0))).toFixed(2)} {selectedGroup.currency}
                   </p>
                 </div>
                 <div className="pt-6 border-t border-gray-800">

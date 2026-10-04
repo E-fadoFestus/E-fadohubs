@@ -133,8 +133,8 @@ const HUBS_LIST: HubCardItem[] = [
   },
   {
     id: 'gist',
-    name: 'Gist Hub',
-    sub: 'News & Discussions',
+    name: 'EFADO Nexus Hub',
+    sub: 'Social & Viral Reels',
     hubKey: 'GIST',
     color: '#facc15',
     borderColor: 'border-yellow-400/50 hover:border-yellow-300',

@@ -169,13 +169,13 @@ export const ProvablyFairModal: React.FC<ProvablyFairModalProps> = ({
             </button>
           </div>
 
-          {calculatedMultiplier !== null && (
+          {typeof calculatedMultiplier === 'number' && !isNaN(calculatedMultiplier) && (
             <div className="p-4 bg-slate-950 border border-emerald-500/40 rounded-2xl text-center space-y-1">
               <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                 Validated Crash Point
               </div>
               <div className="text-3xl font-black text-emerald-400 tracking-tight">
-                {calculatedMultiplier.toFixed(2)}x
+                {(calculatedMultiplier || 0).toFixed(2)}x
               </div>
               <div className="text-[11px] text-emerald-400/80 font-bold">
                 ✓ Cryptographically Proven Match

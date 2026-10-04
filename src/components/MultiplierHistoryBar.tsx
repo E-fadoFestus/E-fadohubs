@@ -36,11 +36,11 @@ export const MultiplierHistoryBar: React.FC<MultiplierHistoryBarProps> = ({
             key={`${item.roundId || 'round'}-${idx}`}
             onClick={() => onSelectRound(item)}
             className={`px-3 py-1 rounded-xl text-xs font-black border transition-all duration-200 shrink-0 transform active:scale-95 ${getBadgeStyle(
-              item.crashMultiplier
+              item?.crashMultiplier ?? 1.0
             )}`}
-            title={`Round #${item.roundId.slice(0, 8)} • Click to verify Provably Fair`}
+            title={`Round #${(item.roundId || '').slice(0, 8)} • Click to verify Provably Fair`}
           >
-            {item.crashMultiplier.toFixed(2)}x
+            {(item?.crashMultiplier ?? 1.0).toFixed(2)}x
           </button>
         ))}
       </div>

@@ -122,11 +122,11 @@ export const HUBS: HubConfig[] = [
     accent: "#0ea5e9"
   },
   { 
-    name: "EFADO NEXUS HUB", 
+    name: "EFADO Nexus Hub", 
     slug: "nexus-hub", 
     tag: "NEXUS v2.0", 
     desc: "EFADO NEXUS HUB: 10 Action Buttons, Deep Linking, WebRTC Video/Voice Calls, Voice Masks, Buzz, 500MB Reels, Creator Fund.", 
-    color: "from-indigo-600 via-purple-600 to-cyan-600",
+    color: "from-indigo-600 via-purple-600 to-cyan-500",
     route: "/hub/nexus-hub",
     category: "SOCIAL",
     iconName: "MessageSquare",
@@ -197,8 +197,8 @@ export function getHubBySlug(slug: string): HubConfig | undefined {
   if (clean === 'tech' || clean === 'tech_hub' || clean === 'techhub' || clean === 'technology') {
     return HUBS.find(h => h.slug === 'tech');
   }
-  if (clean === 'gist' || clean === 'gisthub' || clean === 'gist-hub' || clean === 'gist_hub' || clean === 'social') {
-    return HUBS.find(h => h.slug === 'gist');
+  if (clean === 'gist' || clean === 'gisthub' || clean === 'gist-hub' || clean === 'gist_hub' || clean === 'social' || clean === 'nexus' || clean === 'nexus-hub' || clean === 'nexushub') {
+    return HUBS.find(h => h.slug === 'nexus-hub' || h.slug === 'gist');
   }
   if (clean === 'community' || clean === 'community_hubs' || clean === 'cscc' || clean === 'thrift' || clean === 'unityhubs') {
     return HUBS.find(h => h.slug === 'community');

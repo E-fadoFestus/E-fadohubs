@@ -98,7 +98,7 @@ export const ContentCard: React.FC<ContentCardProps> = ({ content, onAction }) =
           
           <div className="flex items-center gap-1 text-slate-500">
             <Eye className="w-3 h-3" />
-            <span className="text-[10px] font-mono">{(content.views / 1000).toFixed(1)}k</span>
+            <span className="text-[10px] font-mono">{((content?.views || 0) / 1000).toFixed(1)}k</span>
           </div>
         </div>
 

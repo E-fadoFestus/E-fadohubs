@@ -749,7 +749,7 @@ function AppContent() {
     setHubItemId(null);
     setShowVerticalHubsDirectory(false);
     // Reset overlay modal flags when switching hubs
-    setShowGistHub(hub === 'GIST' || hub === 'NEXUS' || hub === 'NEXUS_HUB');
+    setShowGistHub(hub === 'GIST');
     setShowAdvertisingHub(hub === 'ADVERTISING');
     setShowDomainHub(hub === 'DOMAIN_HUB');
     setShowZoomPlans(hub === 'ZOOM');
@@ -784,21 +784,10 @@ function AppContent() {
       return;
     }
 
-    if (hub === 'GIST' || hub === 'NEXUS' || hub === 'NEXUS_HUB') {
+    if (hub === 'GIST') {
       setGistInitialView(subview || 'FEED');
       setGistAutoStartLive(false);
-      if (extraProps?.bargainItem) {
-        setGistBargainContext({
-          productId: extraProps.bargainItem.id,
-          productTitle: extraProps.bargainItem.title || extraProps.bargainItem.name,
-          productPrice: extraProps.bargainItem.price,
-          sellerName: extraProps.seller || extraProps.bargainItem.sellerName,
-          sellerAvatar: extraProps.bargainItem.imageUrl
-        });
-        setGistInitialView('CHAT');
-      } else {
-        setGistBargainContext(null);
-      }
+      setGistBargainContext(extraProps?.bargain ? extraProps.product : null);
       setShowGistHub(true);
       return;
     }
@@ -2619,7 +2608,7 @@ function AppContent() {
               { id: 'MARKET', label: 'ModernMarket', icon: ShoppingBag, gradient: 'from-amber-400 via-amber-500 to-amber-600', border: 'border-amber-700/80', ring: 'ring-amber-400/40' },
               { id: 'FAIRLY_USED', label: 'FairlyUsed', icon: Package, gradient: 'from-lime-500 via-lime-600 to-lime-700', border: 'border-lime-700/80', ring: 'ring-lime-400/40' },
               { id: 'ADVERTISING', label: 'Advertise', icon: Megaphone, gradient: 'from-red-500 via-red-600 to-red-700', border: 'border-red-800/80', ring: 'ring-red-400/40' },
-              { id: 'GIST', label: 'GistHub', icon: MessageSquare, gradient: 'from-blue-500 via-blue-600 to-blue-700', border: 'border-blue-800/80', ring: 'ring-blue-400/40' },
+              { id: 'GIST', label: 'EFADO Nexus Hub', icon: MessageSquare, gradient: 'from-blue-500 via-blue-600 to-blue-700', border: 'border-blue-800/80', ring: 'ring-blue-400/40' },
               { id: 'ZOOM', label: 'ZoomLive', icon: Video, gradient: 'from-violet-500 via-violet-600 to-violet-700', border: 'border-violet-800/80', ring: 'ring-violet-400/40' },
               { id: 'SERVICE_CORPS', label: 'ServiceCorps', icon: HardHat, gradient: 'from-slate-500 via-slate-600 to-slate-700', border: 'border-slate-800/80', ring: 'ring-slate-400/40' },
               { id: 'COMMUNITY_HUBS', label: 'UnityHubs', icon: Users, gradient: 'from-cyan-500 via-cyan-600 to-cyan-700', border: 'border-cyan-800/80', ring: 'ring-cyan-400/40' },
@@ -2940,8 +2929,8 @@ function AppContent() {
                       <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-500 transition-all">
                         <MessageSquare className="w-7 h-7 text-indigo-500 group-hover:text-white" />
                       </div>
-                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Gist Intelligence</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Synchronize with the community for mentorship and career intel.</p>
+                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">EFADO Nexus Hub</h3>
+                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Encrypted social discourse, 10 action buttons, viral reels, and creator monetization fund.</p>
                     </button>
 
                     <button 
@@ -3167,7 +3156,7 @@ function AppContent() {
                 <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
                   <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
                     <MessageSquare className="w-6 h-6 text-indigo-500" />
-                    Sovereign Intelligence Network
+                    EFADO NEXUS HUB
                   </h2>
                 </div>
 
@@ -3179,10 +3168,10 @@ function AppContent() {
                         <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                           <MessageSquare className="w-5 h-5 text-indigo-400" />
                         </div>
-                        <h4 className="text-sm font-black text-white uppercase tracking-wider">What is Synchronise Now?</h4>
+                        <h4 className="text-sm font-black text-white uppercase tracking-wider">What is EFADO Nexus Hub?</h4>
                       </div>
                       <p className="text-xs text-slate-300 leading-relaxed uppercase tracking-wide">
-                        The <span className="text-indigo-400 font-extrabold">Synchronise Now</span> node establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, and user profiles across all systems with 100% data integrity.
+                        The <span className="text-indigo-400 font-extrabold">EFADO Nexus Hub</span> establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, 10 action buttons, viral reels, and creator monetization profiles with 100% data integrity.
                       </p>
                     </div>
                     <div className="pt-4 border-t border-white/5 mt-4 flex items-center justify-between">
@@ -3196,8 +3185,8 @@ function AppContent() {
                     <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4">
                       <MessageSquare className="w-6 h-6 text-indigo-400" />
                     </div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect Gist Hub</h4>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats & reels</p>
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect EFADO Nexus Hub</h4>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats, reels & 10 action buttons</p>
                     <button 
                       onClick={() => setShowGistHub(true)}
                       className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[9px] border border-indigo-500/30"
@@ -3441,10 +3430,7 @@ function AppContent() {
             {showGistHub && user && (
               <EfadoGistHub 
                 user={user}
-                onClose={() => {
-                  setShowGistHub(false);
-                  setGistBargainContext(null);
-                }} 
+                onClose={() => setShowGistHub(false)} 
                 initialView={gistInitialView}
                 autoStartLive={gistAutoStartLive}
                 onOpenMining={() => setShowEfadoMining(true)}
@@ -4412,13 +4398,13 @@ function AppContent() {
                 <div className="space-y-6">
                   <div>
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Ecosystem Revenue</span>
-                    <p className="text-4xl font-black text-indigo-400 mt-1">${(adminStats.totalHouseGain || 0).toFixed(2)}</p>
+                    <p className="text-4xl font-black text-indigo-400 mt-1">${(adminStats?.totalHouseGain || 0).toFixed(2)}</p>
                   </div>
                   
                   <div className="pt-6 border-t border-gray-800">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-400">Admin Wallet</span>
-                      <span className="text-lg font-bold text-white">${(adminStats.adminWallet || 0).toFixed(2)}</span>
+                      <span className="text-lg font-bold text-white">${(adminStats?.adminWallet || 0).toFixed(2)}</span>
                     </div>
                     <div className="w-full bg-gray-800 rounded-full h-2">
                       <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '70%' }}></div>

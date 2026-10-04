@@ -54,7 +54,16 @@ export async function loadCreatorStats(userId: string): Promise<CreatorStats> {
     const snap = await getDoc(ref);
     if (snap.exists()) {
       const data = snap.data() as CreatorStats;
-      stats = { ...stats, ...data };
+      stats = {
+        ...stats,
+        ...data,
+        availableBalance: Number(data.availableBalance ?? stats.availableBalance ?? 0),
+        pendingBalance: Number(data.pendingBalance ?? stats.pendingBalance ?? 0),
+        todayEarnings: Number(data.todayEarnings ?? stats.todayEarnings ?? 0),
+        todayViews: Number(data.todayViews ?? stats.todayViews ?? 0),
+        totalViews: Number(data.totalViews ?? stats.totalViews ?? 0),
+        inviteBonus: Number(data.inviteBonus ?? stats.inviteBonus ?? 0)
+      };
       localStorage.setItem(localKey, JSON.stringify(stats));
     } else {
       // Initialize in Firestore
@@ -125,8 +134,8 @@ export async function recordQualifiedView(userId: string): Promise<{
   } catch {}
 
   const added = QUALIFIED_VIEW_REWARD;
-  const newPending = +(stats.pendingBalance + added).toFixed(2);
-  const newTodayEarnings = +(stats.todayEarnings + added).toFixed(2);
+  const newPending = +((stats.pendingBalance || 0) + added).toFixed(2);
+  const newTodayEarnings = +((stats.todayEarnings || 0) + added).toFixed(2);
   const newTodayViews = (stats.todayViews || 0) + 1;
   const newTotalViews = (stats.totalViews || 0) + 1;
   const newQualifiedViews = (stats.qualifiedViews || 0) + 1;
@@ -212,8 +221,8 @@ export async function releasePendingFunds(userId: string): Promise<CreatorStats>
 
   if (stats.pendingBalance <= 0) return stats;
 
-  const released = stats.pendingBalance;
-  const newAvailable = +(stats.availableBalance + released).toFixed(2);
+  const released = stats.pendingBalance || 0;
+  const newAvailable = +((stats.availableBalance || 0) + released).toFixed(2);
   const newPending = 0;
 
   const updated: CreatorStats = {
@@ -275,7 +284,7 @@ export async function withdrawCreatorFunds(
     };
   }
 
-  const newAvailable = +(stats.availableBalance - amount).toFixed(2);
+  const newAvailable = +((stats.availableBalance || 0) - amount).toFixed(2);
   const updated: CreatorStats = {
     ...stats,
     availableBalance: newAvailable,
@@ -295,7 +304,7 @@ export async function withdrawCreatorFunds(
     setDoc(walletRef, {
       creatorWallet: {
         available: newAvailable,
-        pending: stats.pendingBalance
+        pending: stats.pendingBalance || 0
       },
       lastUpdated: serverTimestamp()
     }, { merge: true }).catch(() => {});
@@ -316,7 +325,7 @@ export async function withdrawCreatorFunds(
  * Add live gift earning: Creator gets 80% of coin value
  */
 export async function addLiveGiftToCreatorWallet(userId: string, coinValue: number): Promise<number> {
-  const creatorShare = +(coinValue * 0.8).toFixed(2);
+  const creatorShare = +((coinValue || 0) * 0.8).toFixed(2);
   const localKey = `efado_creator_stats_${userId}`;
   let stats: CreatorStats = { ...INITIAL_CREATOR_STATS };
   try {
@@ -324,11 +333,11 @@ export async function addLiveGiftToCreatorWallet(userId: string, coinValue: numb
     if (raw) stats = { ...stats, ...JSON.parse(raw) };
   } catch {}
 
-  const newPending = +(stats.pendingBalance + creatorShare).toFixed(2);
+  const newPending = +((stats.pendingBalance || 0) + creatorShare).toFixed(2);
   const updated: CreatorStats = {
     ...stats,
     pendingBalance: newPending,
-    todayEarnings: +(stats.todayEarnings + creatorShare).toFixed(2)
+    todayEarnings: +((stats.todayEarnings || 0) + creatorShare).toFixed(2)
   };
 
   try {
@@ -356,7 +365,7 @@ export async function creditInviteBonus(userId: string): Promise<number> {
   } catch {}
 
   const newBonus = (stats.inviteBonus || 0) + INVITE_BONUS_AMOUNT;
-  const newAvailable = +(stats.availableBalance + INVITE_BONUS_AMOUNT).toFixed(2);
+  const newAvailable = +((stats.availableBalance || 0) + INVITE_BONUS_AMOUNT).toFixed(2);
   const updated: CreatorStats = {
     ...stats,
     inviteBonus: newBonus,
