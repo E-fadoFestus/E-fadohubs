@@ -271,7 +271,98 @@ app.get('/api/health', (_req: Request, res: Response) => {
   return res.json({ status: 'ok', timestamp: Date.now(), service: 'efado-games-engine' });
 });
 
-// 8. ANTI-CHEAT SOCKET DEFENSE
+// 8. FLUTTERWAVE PAYMENT GATEWAY INITIALIZATION
+app.post('/api/payments/flutterwave', async (req: Request, res: Response) => {
+  try {
+    const { amount, email, name } = req.body;
+    if (!amount || !email) {
+      return res.status(400).json({ error: 'MISSING_PAYMENT_DETAILS' });
+    }
+
+    const flwSecret = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.APP_URL || 'http://localhost:3000';
+
+    const response = await fetch('https://api.flutterwave.com/v3/payments', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${flwSecret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        tx_ref: `efado-${Date.now()}`,
+        amount,
+        currency: 'NGN',
+        redirect_url: `${baseUrl}/payment-success`,
+        customer: { email, name: name || 'E-Fado Member' },
+        customizations: { title: 'E-Fado Hubs Payment' }
+      }),
+    });
+
+    const data = await response.json();
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ error: 'PAYMENT_GATEWAY_ERROR', message: error?.message });
+  }
+});
+
+// App Router / Web standard route handler export for Next.js / edge compatibility
+export async function POST(req: globalThis.Request) {
+  const { amount, email, name } = await req.json();
+  const flwSecret = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.APP_URL || 'http://localhost:3000';
+
+  const response = await fetch('https://api.flutterwave.com/v3/payments', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${flwSecret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      tx_ref: `efado-${Date.now()}`,
+      amount,
+      currency: 'NGN',
+      redirect_url: `${baseUrl}/payment-success`,
+      customer: { email, name },
+      customizations: { title: 'E-Fado Hubs Payment' }
+    }),
+  });
+
+  const data = await response.json();
+  return globalThis.Response.json(data);
+}
+
+// Verification endpoint for Express
+app.get(['/api/payments/verify', '/api/payments/verify/:id'], async (req: Request, res: Response) => {
+  try {
+    const transactionId = req.query.transaction_id || req.params.id;
+    if (!transactionId) {
+      return res.status(400).json({ error: 'MISSING_TRANSACTION_ID' });
+    }
+    const flwSecret = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+    const flwRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transactionId}/verify`, {
+      headers: { Authorization: `Bearer ${flwSecret}` }
+    });
+    const data = await flwRes.json();
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(500).json({ error: 'VERIFICATION_FAILED', message: error?.message });
+  }
+});
+
+// App Router GET verification export
+export async function GET(req: globalThis.Request) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('transaction_id');
+  const flwSecret = process.env.FLW_SECRET_KEY || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+
+  const res = await fetch(`https://api.flutterwave.com/v3/transactions/${id}/verify`, {
+    headers: { Authorization: `Bearer ${flwSecret}` }
+  });
+  const data = await res.json();
+  return globalThis.Response.json(data);
+}
+
+// 9. ANTI-CHEAT SOCKET DEFENSE
 export function setupSecureSockets(ioInstance: SocketIOServer) {
   ioInstance.on('connection', (socket) => {
     const blockedEvents = ['win', 'jackpot', 'bigWin', 'cashout', 'bonus', 'forceWin', 'setBalance'];
