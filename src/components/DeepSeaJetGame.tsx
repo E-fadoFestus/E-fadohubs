@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { UserProfile, DeepSeaBet, DeepSeaCurrency, DeepSeaRoundOutcome, SubmarinePilot } from '../types';
+import { getBackendUrl } from '../config/backend';
 import { DeepSeaCanvas } from './DeepSeaCanvas';
 import { BettingConsole } from './BettingConsole';
 import { MultiplierHistoryBar } from './MultiplierHistoryBar';
@@ -226,9 +227,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       setTargetBet((prev) => ({ ...prev, status: 'placed' }));
 
       // Call backend /game/bet endpoint asynchronously
-      fetch('/game/bet', {
+      fetch(getBackendUrl('/api/game/bet'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           userId: user.uid,
           betAmount: targetBet.betAmount,
@@ -289,9 +294,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
       );
 
       // Call backend /game/cashout API
-      fetch('/game/cashout', {
+      fetch(getBackendUrl('/api/game/cashout'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           userId: userRef.current.uid,
           betAmount: targetBet.betAmount,
@@ -343,9 +352,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     setCurrentNonce((prev) => prev + 1);
 
     // Notify backend /game/crash
-    fetch('/game/crash', {
+    fetch(getBackendUrl('/api/game/crash'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         roundId: currentRoundIdRef.current,
         crashMultiplier: finalCrash,
@@ -416,9 +429,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     accumulatedMultiplierRef.current = 1.0;
 
     // Background call to backend /game/start
-    fetch('/game/start', {
+    fetch(getBackendUrl('/api/game/start'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         clientSeed: currentClientSeed,
         nonce: currentNonce,

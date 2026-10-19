@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
+import { getBackendUrl } from '../config/backend';
 import { 
   MessageSquare, 
   ChevronRight, 
@@ -442,9 +443,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   // 1. Deep Link API Call
   const handleGenerateDeepLink = async () => {
     try {
-      const res = await fetch('/api/deep-link/create', {
+      const res = await fetch(getBackendUrl('/api/deep-link/create'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           type: deepLinkType,
           id: deepLinkIdInput || 'trending-01',
@@ -466,9 +471,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   const handleShareClick = async () => {
     const shareUrl = `https://efado-nexus.com/hub?room=${activeRoomId}&ref=${user.uid}`;
     try {
-      await fetch('/api/share/generate', {
+      await fetch(getBackendUrl('/api/share/generate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           title: 'EFADO NEXUS HUB',
           text: 'Join me on EFADO NEXUS HUB for real-time WebRTC chat, video & 500MB reels!',
@@ -499,9 +508,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
     if (!inviteUsername && !invitePhone) return;
 
     try {
-      const res = await fetch('/api/users/add', {
+      const res = await fetch(getBackendUrl('/api/users/add'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           username: inviteUsername,
           phone: invitePhone,
@@ -599,9 +612,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
 
     // Post to API
     try {
-      await fetch('/api/chat/buzz', {
+      await fetch(getBackendUrl('/api/chat/buzz'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           senderId: user.uid,
           senderName: user.displayName || 'Alex',
@@ -658,9 +675,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       setScreenshotPreview(imgUrl);
 
       // Call API
-      fetch('/api/chat/screenshot', {
+      fetch(getBackendUrl('/api/chat/screenshot'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           page: 'EFADO NEXUS HUB',
           userId: user.uid,
@@ -680,9 +701,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
     setShowVideoCallModal(true);
     playChime();
     try {
-      await fetch('/api/call/video', {
+      await fetch(getBackendUrl('/api/call/video'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           roomId: activeRoomId,
           hostId: user.uid,
@@ -698,9 +723,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
     setShowVoiceCallModal(true);
     playChime();
     try {
-      await fetch('/api/call/voice', {
+      await fetch(getBackendUrl('/api/call/voice'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           roomId: activeRoomId,
           callerId: user.uid,
@@ -714,9 +743,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   // 9. Reels API Call (15-60s Short Video, up to 500MB)
   const handlePublishReel = async () => {
     try {
-      await fetch('/api/reels/create', {
+      await fetch(getBackendUrl('/api/reels/create'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           title: `Nexus Reel by ${user.displayName || 'Creator'}`,
           duration: reelsDuration,
@@ -760,9 +793,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   const handleCreateStatus = async () => {
     if (!statusCaption) return;
     try {
-      await fetch('/api/status/create', {
+      await fetch(getBackendUrl('/api/status/create'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           userId: user.uid,
           userName: user.displayName || 'You',
@@ -795,9 +832,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   const handleTranslateMessage = async (msgId: string, text: string, targetLang: string) => {
     setTranslatingMsgId(msgId);
     try {
-      const res = await fetch('/api/chat/translate', {
+      const res = await fetch(getBackendUrl('/api/chat/translate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ text, targetLang })
       });
       const data = await res.json();

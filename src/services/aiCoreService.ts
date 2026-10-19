@@ -9,6 +9,8 @@
  * - Video generation (Veo 3): strictly locked with inactive monetization logic.
  */
 
+import { getBackendUrl } from '../config/backend';
+
 export interface DailyUsage {
   used: number;
   max: number;
@@ -142,9 +144,13 @@ export async function generateImage(
   }
 
   try {
-    const res = await fetch('/api/ai/generate-image', {
+    const res = await fetch(getBackendUrl('/api/ai/generate-image'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         prompt,
         aspectRatio: options?.aspectRatio || '1:1'
@@ -196,9 +202,13 @@ export async function editImage(
   try {
     const cleanBase64 = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
 
-    const res = await fetch('/api/ai/edit-image', {
+    const res = await fetch(getBackendUrl('/api/ai/edit-image'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         prompt,
         image: cleanBase64,
@@ -249,9 +259,13 @@ export async function searchWithGrounding(query: string): Promise<SearchGroundin
   }
 
   try {
-    const res = await fetch('/api/ai/search-grounding', {
+    const res = await fetch(getBackendUrl('/api/ai/search-grounding'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({ query: query.trim() })
     });
 
@@ -334,9 +348,13 @@ export function startVoiceChat(options?: {
 
   const sendMessage = async (text: string): Promise<{ reply: string; audioBase64?: string }> => {
     try {
-      const res = await fetch('/api/ai/voice-chat', {
+      const res = await fetch(getBackendUrl('/api/ai/voice-chat'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           message: text,
           systemInstruction
@@ -405,9 +423,13 @@ export async function animateImageToVideo(
 export async function generateReelCaption(concept: string, userName: string = 'Creator'): Promise<string> {
   const cleanConcept = concept.trim() || 'Manifesting greatness';
   try {
-    const res = await fetch('/api/ai/voice-chat', {
+    const res = await fetch(getBackendUrl('/api/ai/voice-chat'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
         message: `Create a catchy, high-engagement viral caption with trending hashtags and emojis for an EFADO video reel by ${userName}. Concept: "${cleanConcept}". Keep it under 140 characters.`,
         systemInstruction: 'You are EFADO AI Social Copywriter. Create catchy, authentic, viral social captions with 2-3 hashtags and emojis. Return only the caption text.'

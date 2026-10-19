@@ -1,4 +1,5 @@
 import { functions, httpsCallable } from '../firebase';
+import { getBackendUrl } from '../config/backend';
 
 export interface FlutterwavePaymentParams {
   amount: number;
@@ -97,8 +98,9 @@ export async function createFlutterwavePaymentLink(params: FlutterwavePaymentPar
 
   // 1. Primary: Server Backend API initialize endpoint
   try {
-    const response = await fetch('/api/flutterwave/initialize', {
+    const response = await fetch(getBackendUrl('/api/flutterwave/initialize'), {
       method: 'POST',
+      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'

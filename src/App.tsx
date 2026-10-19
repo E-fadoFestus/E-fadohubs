@@ -70,7 +70,9 @@ import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
+import { DiagnosticModal } from './components/DiagnosticModal';
 import { GameManualPayment } from './components/GameManualPayment';
+import { getBackendUrl } from './config/backend';
 import { AdSenseBanner } from './components/AdSenseBanner';
 import { 
   Info,  Wallet, Lock,
@@ -524,6 +526,7 @@ function AppContent() {
   const [showAdvertisingHub, setShowAdvertisingHub] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [showAboutCeo, setShowAboutCeo] = useState(false);
+  const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [adInitialType, setAdInitialType] = useState<'ADVERT' | 'SELL'>('ADVERT');
   const [globalAdListings, setGlobalAdListings] = useState<any[]>([]);
   const [showBrowserAddonModal, setShowBrowserAddonModal] = useState(false);
@@ -1097,8 +1100,11 @@ function AppContent() {
           console.log('💳 Paystack Return Reference detected in URL:', reference);
           const currentUserId = user?.uid || simUserId || '';
           
-          const verifyUrl = `/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`;
-          const res = await fetch(verifyUrl);
+          const verifyUrl = getBackendUrl(`/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`);
+          const res = await fetch(verifyUrl, {
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
           const data = await res.json();
 
           if (data.status && (data.data?.status === 'success' || data.already_processed)) {
@@ -1133,8 +1139,11 @@ function AppContent() {
           console.log('🌐 Flutterwave Return Reference detected in URL:', txRef || transactionId, 'Status:', status);
           const currentUserId = user?.uid || simUserId || '';
           
-          const verifyUrl = `/api/flutterwave/verify/${encodeURIComponent(txRef || '')}?transaction_id=${encodeURIComponent(transactionId || '')}&userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`;
-          const res = await fetch(verifyUrl);
+          const verifyUrl = getBackendUrl(`/api/flutterwave/verify/${encodeURIComponent(txRef || '')}?transaction_id=${encodeURIComponent(transactionId || '')}&userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`);
+          const res = await fetch(verifyUrl, {
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
           const data = await res.json();
 
           if (data.status && (data.data?.status === 'success' || data.already_processed)) {
@@ -1169,8 +1178,11 @@ function AppContent() {
           console.log('🟢 OPay Return Reference detected in URL:', opayRef, 'Status:', status);
           const currentUserId = user?.uid || simUserId || '';
           
-          const verifyUrl = `/api/opay/status/${encodeURIComponent(opayRef)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}${status ? `&status=${status}` : ''}${isSimulated ? `&simulated=${isSimulated}` : ''}`;
-          const res = await fetch(verifyUrl);
+          const verifyUrl = getBackendUrl(`/api/opay/status/${encodeURIComponent(opayRef)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}${status ? `&status=${status}` : ''}${isSimulated ? `&simulated=${isSimulated}` : ''}`);
+          const res = await fetch(verifyUrl, {
+            mode: 'cors',
+            headers: { 'Accept': 'application/json' }
+          });
           const data = await res.json();
 
           if (data.status && (data.verified || data.already_processed)) {
@@ -2498,6 +2510,16 @@ function AppContent() {
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              {/* Temporary Diagnosis Button */}
+              <button 
+                onClick={() => setShowDiagnosis(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/25 text-amber-300 rounded-xl text-[9px] sm:text-[10px] font-black tracking-widest hover:bg-amber-500/40 transition-all shadow-lg border border-amber-500/60 uppercase"
+                title="System Diagnosis & Environment Info"
+              >
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>DIAGNOSIS</span>
+              </button>
+
               {/* PWA Install Button */}
               {(isInstallable || isIOS) && (
                 <button 
@@ -3776,6 +3798,11 @@ function AppContent() {
               <IosInstallGuideModal 
                 isOpen={showIosInstallGuide}
                 onClose={() => setShowIosInstallGuide(false)}
+              />
+
+              <DiagnosticModal 
+                isOpen={showDiagnosis}
+                onClose={() => setShowDiagnosis(false)}
               />
             </AnimatePresence>
 

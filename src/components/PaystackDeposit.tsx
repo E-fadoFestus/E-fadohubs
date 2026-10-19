@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, CreditCard, Shield, CheckCircle, RefreshCw, AlertCircle, Info, Smartphone, Building2 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { getBackendUrl } from '../config/backend';
 
 interface PaystackDepositProps {
   user: UserProfile;
@@ -102,7 +103,10 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
             const returnedReference = response.reference || reference;
             
             // Watchdog: Timeout after 4 seconds to never keep rolling indefinitely
-            const verifyPromise = fetch(`/api/paystack/verify/${returnedReference}?userId=${encodeURIComponent(user.uid)}&amount=${numericAmount}`)
+            const verifyPromise = fetch(getBackendUrl(`/api/paystack/verify/${returnedReference}?userId=${encodeURIComponent(user.uid)}&amount=${numericAmount}`), {
+              mode: 'cors',
+              headers: { 'Accept': 'application/json' }
+            })
               .then(res => res.json())
               .catch(err => ({ status: true, already_processed: true, error: err }));
 
@@ -147,9 +151,13 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
     // Fallback: Hosted Checkout Session via Server API
     try {
-      const response = await fetch('/api/paystack/initialize', {
+      const response = await fetch(getBackendUrl('/api/paystack/initialize'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           email: user.email || 'customer@e-fado.com',
           amount: numericAmount,
@@ -207,7 +215,10 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
     try {
       const cleanRef = manualReference.trim();
-      const res = await fetch(`/api/paystack/verify/${encodeURIComponent(cleanRef)}?userId=${encodeURIComponent(user.uid)}`);
+      const res = await fetch(getBackendUrl(`/api/paystack/verify/${encodeURIComponent(cleanRef)}?userId=${encodeURIComponent(user.uid)}`), {
+        mode: 'cors',
+        headers: { 'Accept': 'application/json' }
+      });
       const data = await res.json();
 
       if (data.status && (data.data?.status === 'success' || data.already_processed)) {

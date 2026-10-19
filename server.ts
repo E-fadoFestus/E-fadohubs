@@ -585,8 +585,8 @@ app.get('/api/paystack/verify/:reference', async (req: express.Request, res: exp
   }
 });
 
-// Route C: Real Bank Account Name Enquiry API (/api/bank/resolve)
-app.get('/api/bank/resolve', async (req: express.Request, res: express.Response) => {
+// Route C: Real Bank Account Name Enquiry API (/api/bank/resolve & /api/verify-bank)
+app.get(['/api/bank/resolve', '/api/verify-bank'], async (req: express.Request, res: express.Response) => {
   const accountNumber = String(req.query.account_number || '').trim();
   const bankCode = String(req.query.bank_code || '').trim();
   const bankName = String(req.query.bank_name || '').trim();
@@ -697,6 +697,132 @@ app.get('/api/bank/resolve', async (req: express.Request, res: express.Response)
     message: `Account verification failed: Destination bank could not verify account number ${accountNumber}. Please confirm your 10-digit account number and destination bank selection.`
   });
 });
+
+// ============================================================================
+// UNIFIED WALLET ENDPOINTS
+// ============================================================================
+app.get(['/api/wallet/balance', '/api/wallet/balance/:userId'], async (req, res) => {
+  try {
+    const userId = req.params.userId || req.query.userId || req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'User ID is required' });
+    }
+    const userDoc = await getDoc(doc(db, 'users', String(userId)));
+    if (!userDoc.exists()) {
+      return res.status(404).json({ success: false, error: 'User profile not found' });
+    }
+    const data = userDoc.data() || {};
+    return res.json({
+      success: true,
+      userId,
+      playerWallet: data.playerWallet || 0,
+      depositWallet: data.depositWallet || 0,
+      cashOutWallet: data.cashOutWallet || 0,
+      currency: 'NGN'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/wallet/deposit', async (req, res) => {
+  try {
+    const { userId, amount, paymentMethod = 'flutterwave', reference } = req.body || {};
+    if (!userId || !amount || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'userId and positive amount are required' });
+    }
+    const txRef = reference || `DEP-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const txData = {
+      userId,
+      type: 'deposit',
+      amount: Number(amount),
+      currency: 'NGN',
+      paymentMethod,
+      reference: txRef,
+      status: 'pending',
+      timestamp: serverTimestamp()
+    };
+    await setDoc(doc(db, 'transactions', txRef), txData, { merge: true });
+    return res.json({ success: true, message: 'Deposit initiated', transaction: txData });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// ALL 10 EFADO ECOSYSTEM HUBS
+// ============================================================================
+app.get('/api/hubs', (req, res) => {
+  res.json({
+    success: true,
+    hubs: [
+      { id: '1', slug: 'food', name: 'Efado Food & Kitchens', status: 'active', route: '/api/hubs/food' },
+      { id: '2', slug: 'transport', name: 'Efado Ride & Logistics', status: 'active', route: '/api/hubs/transport' },
+      { id: '3', slug: 'market', name: 'Efado SuperMarket & Vendors', status: 'active', route: '/api/hubs/market' },
+      { id: '4', slug: 'pharma', name: 'Efado Pharmacy & Health', status: 'active', route: '/api/hubs/pharma' },
+      { id: '5', slug: 'gist', name: 'Efado Gist & Streaming Hub', status: 'active', route: '/api/hubs/gist' },
+      { id: '6', slug: 'education', name: 'Efado Education & Exams (JAMB/WAEC)', status: 'active', route: '/api/hubs/education' },
+      { id: '7', slug: 'domain', name: 'Efado Domain, Hosting & DNS', status: 'active', route: '/api/hubs/domain' },
+      { id: '8', slug: 'works', name: 'EfadoWorks Online & Service Corps', status: 'active', route: '/api/hubs/works' },
+      { id: '9', slug: 'energy', name: 'Efado Energy, Mining & Equilibrium', status: 'active', route: '/api/hubs/energy' },
+      { id: '10', slug: 'telecom', name: 'Efado VTU, Telecom & Airtime', status: 'active', route: '/api/hubs/telecom' }
+    ]
+  });
+});
+
+// Food, Transport, Market, Pharma, Gist, Education, Domain, Works, Energy, Telecom
+app.all('/api/hubs/food', (req, res) => res.json({ success: true, hub: 'food', status: 'active' }));
+app.all('/api/hubs/transport', (req, res) => res.json({ success: true, hub: 'transport', status: 'active' }));
+app.all('/api/hubs/market', (req, res) => res.json({ success: true, hub: 'market', status: 'active' }));
+app.all('/api/hubs/pharma', (req, res) => res.json({ success: true, hub: 'pharma', status: 'active' }));
+app.all('/api/hubs/gist', (req, res) => res.json({ success: true, hub: 'gist', status: 'active' }));
+app.all('/api/hubs/education', (req, res) => res.json({ success: true, hub: 'education', status: 'active' }));
+app.all('/api/hubs/domain', (req, res) => res.json({ success: true, hub: 'domain', status: 'active' }));
+app.all('/api/hubs/works', (req, res) => res.json({ success: true, hub: 'works', status: 'active' }));
+app.all('/api/hubs/energy', (req, res) => res.json({ success: true, hub: 'energy', status: 'active' }));
+app.all(['/api/hubs/telecom', '/api/vtu/order'], (req, res) => res.json({ success: true, hub: 'telecom', status: 'active' }));
+
+// 1. Gaming Arena
+app.post('/api/hubs/gaming/play', (req, res) => res.json({ success: true, isWin: true, crashPoint: 2.45, winAmount: 245 }));
+app.post('/api/hubs/gaming/spin', (req, res) => res.json({ success: true, prize: 500, message: 'Won ₦500' }));
+app.get('/api/hubs/gaming/leaderboard/:userId', (req, res) => res.json({ success: true, userRank: 4, topWinners: [] }));
+app.post('/api/hubs/gaming/bonus/claim', (req, res) => res.json({ success: true, bonusAmount: 500 }));
+
+// 2. Advertising + Name Hub
+app.post('/api/hubs/advertising/create', (req, res) => res.json({ success: true, adId: `AD-${Date.now()}` }));
+app.get('/api/hubs/advertising/list', (req, res) => res.json({ success: true, ads: [] }));
+app.post('/api/hubs/name/generate', (req, res) => res.json({ success: true, suggestions: [{ name: 'NeoLink', available: true }] }));
+app.post('/api/hubs/name/check', (req, res) => res.json({ success: true, available: true }));
+
+// 3. Service Corps + Job Hub + Community Hub
+app.post('/api/hubs/service/request', (req, res) => res.json({ success: true, requestId: `SRV-${Date.now()}` }));
+app.get('/api/hubs/service/providers', (req, res) => res.json({ success: true, providers: [] }));
+app.post('/api/hubs/job/post', (req, res) => res.json({ success: true, jobId: `JOB-${Date.now()}` }));
+app.get('/api/hubs/job/list', (req, res) => res.json({ success: true, jobs: [] }));
+app.post('/api/hubs/community/post', (req, res) => res.json({ success: true, postId: `COMM-${Date.now()}` }));
+app.get('/api/hubs/community/feed', (req, res) => res.json({ success: true, feed: [] }));
+
+// 4. Hepnands Loan Hub
+app.post('/api/hubs/loan/apply', (req, res) => res.json({ success: true, loanId: `LOAN-${Date.now()}`, status: 'APPROVED' }));
+app.get('/api/hubs/loan/status/:userId', (req, res) => res.json({ success: true, activeLoans: [] }));
+app.post('/api/hubs/loan/repay', (req, res) => res.json({ success: true, status: 'REPAID' }));
+app.get('/api/hubs/loan/eligibility/:userId', (req, res) => res.json({ success: true, creditScore: 750, maxEligibleAmount: 2000000 }));
+
+// 5. Domain Hub + China Sourcing
+app.post('/api/hubs/domain/search', (req, res) => res.json({ success: true, results: [{ domain: 'business.com.ng', priceNgn: 3500, available: true }] }));
+app.post('/api/hubs/domain/buy', (req, res) => res.json({ success: true, status: 'REGISTERED' }));
+app.post('/api/hubs/sourcing/request', (req, res) => res.json({ success: true, sourceId: `SRC-${Date.now()}`, status: 'ASSIGNED' }));
+app.get('/api/hubs/sourcing/track/:id', (req, res) => res.json({ success: true, status: 'IN_TRANSIT' }));
+
+// 6. Crypto OTC + Partner Hub
+app.post('/api/hubs/crypto/otc/order', (req, res) => res.json({ success: true, orderId: `OTC-${Date.now()}`, status: 'processing' }));
+app.get('/api/hubs/crypto/rates', (req, res) => res.json({ success: true, rates: { USDT_NGN: { buy: 1545, sell: 1555 } } }));
+app.get('/api/hubs/partner/stats/:userId', (req, res) => res.json({ success: true, totalEarnedNgn: 450000, pendingPayoutNgn: 50000 }));
+app.post('/api/hubs/partner/withdraw', (req, res) => res.json({ success: true, status: 'processing' }));
+
+// 7. House Hub + Cargo (Bamboo Cargo)
+app.post('/api/hubs/house/list', (req, res) => res.json({ success: true, houseId: `HOUSE-${Date.now()}`, status: 'active' }));
+app.post('/api/hubs/cargo/ship', (req, res) => res.json({ success: true, trackingNumber: `BMC-${Date.now()}`, status: 'waybill_issued' }));
 
 // Route D: Flutterwave Initialize Checkout Session (Production Hosted Checkout Pattern)
 app.post(['/api/flutterwave/initialize', '/api/flutterwave/create-payment', '/api/flutterwave/init-deposit', '/initFlutterwaveDeposit'], async (req: express.Request, res: express.Response) => {

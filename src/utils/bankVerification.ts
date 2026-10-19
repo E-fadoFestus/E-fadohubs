@@ -1,3 +1,5 @@
+import { getBackendUrl } from '../config/backend';
+
 export interface BankItem {
   code: string;
   name: string;
@@ -43,8 +45,13 @@ export async function resolveBankAccount(
   }
 
   try {
-    const url = `/api/bank/resolve?account_number=${encodeURIComponent(cleanNumber)}&bank_code=${encodeURIComponent(bankCode)}&bank_name=${encodeURIComponent(bankName)}`;
-    const res = await fetch(url);
+    const url = getBackendUrl(`/api/bank/resolve?account_number=${encodeURIComponent(cleanNumber)}&bank_code=${encodeURIComponent(bankCode)}&bank_name=${encodeURIComponent(bankName)}`);
+    const res = await fetch(url, {
+      mode: 'cors',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
     const data = await res.json();
 
     if (data.status && data.account_name) {

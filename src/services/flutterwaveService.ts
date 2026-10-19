@@ -51,6 +51,8 @@ export interface CheckoutPaymentRequest {
   };
 }
 
+import { getBackendUrl } from '../config/backend';
+
 export const flutterwaveService = {
   /**
    * Step A: Create a Subaccount on Flutterwave
@@ -58,10 +60,12 @@ export const flutterwaveService = {
    */
   async createSubaccount(payload: CreateSubaccountRequest): Promise<SubaccountResponse> {
     try {
-      const response = await fetch('/api/flutterwave/subaccount', {
+      const response = await fetch(getBackendUrl('/api/flutterwave/subaccount'), {
         method: 'POST',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           account_bank: payload.account_bank,

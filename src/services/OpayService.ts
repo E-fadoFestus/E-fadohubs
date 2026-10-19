@@ -5,6 +5,8 @@
  * Note: Secret keys are strictly handled on the backend (Express server / Cloud Function).
  */
 
+import { getBackendUrl } from '../config/backend';
+
 export interface OpayInitResponse {
   status: boolean;
   cashierUrl?: string;
@@ -40,10 +42,12 @@ export class OpayService {
     const domain = typeof window !== 'undefined' ? window.location.origin : 'https://e-fado.com';
 
     try {
-      const response = await fetch('/api/opay/initialize', {
+      const response = await fetch(getBackendUrl('/api/opay/initialize'), {
         method: 'POST',
+        mode: 'cors',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           amount,
@@ -94,8 +98,13 @@ export class OpayService {
       if (status) params.set('status', status);
       if (simulated) params.set('simulated', 'true');
 
-      const url = `/api/opay/status/${encodeURIComponent(reference)}?${params.toString()}`;
-      const response = await fetch(url);
+      const url = getBackendUrl(`/api/opay/status/${encodeURIComponent(reference)}?${params.toString()}`);
+      const response = await fetch(url, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
       const data = await response.json();
       return data;
     } catch (err: any) {
