@@ -431,6 +431,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
     const q = query(collection(db, 'market_orders'), where('userId', '==', user.uid));
     const unsub = onSnapshot(q, (snap) => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketOrder)));
+    }, (err) => {
+      console.warn('Market orders listener notice:', err.message);
     });
 
     const unsubAds = onSnapshot(collection(db, 'ad_listings'), (snap) => {

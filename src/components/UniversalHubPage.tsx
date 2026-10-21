@@ -18,7 +18,8 @@ import {
   ArrowRight,
   ArrowLeft,
   LogIn,
-  Home
+  Home,
+  MessageSquare
 } from 'lucide-react';
 import { HUBS, getHubBySlug, HubConfig } from '../config/hubs';
 import { UserProfile } from '../types';
@@ -34,6 +35,7 @@ import { EfadoDomainHub } from './EfadoDomainHub';
 import { EfadoEducationHub } from './EfadoEducationHub';
 import { EfadoTechHub } from './tech/EfadoTechHub';
 import { EfadoGistHub } from './EfadoGistHub';
+import { EfadoNexusHubView } from './EfadoNexusHubView';
 import { EfadoServiceCorps } from './EfadoServiceCorps';
 import { UserWallet } from './UserWallet';
 import { EfadoPartnerHub } from './EfadoPartnerHub';
@@ -67,7 +69,8 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
   onUpdateBalance
 }) => {
   const [marketView, setMarketView] = useState<'new' | 'used'>('new');
-  const hubConfig = getHubBySlug(slug) || HUBS[0];
+  const [isNexusSynced, setIsNexusSynced] = useState(false);
+  const hubConfig = getHubBySlug(slug) || (slug === 'home' ? { name: 'Home', slug: 'home', tag: 'HOME', desc: 'Home', color: 'from-emerald-600 to-teal-600', route: '/home' } : (HUBS.find(h => h.slug === 'nexus-hub') || HUBS[0]));
 
   // Helper guest mock profile so guest users can preview hub interfaces cleanly without crashes
   const effectiveUser: UserProfile = user || {
@@ -240,6 +243,68 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
           />
         );
 
+      case 'home':
+        onNavigateHome();
+        return null;
+
+      case 'nexus-hub':
+      case 'nexus':
+      case 'gist':
+        if (isNexusSynced) {
+          return (
+            <EfadoNexusHubView
+              user={effectiveUser}
+              onClose={() => setIsNexusSynced(false)}
+            />
+          );
+        }
+        return (
+          <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+            <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+              <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
+                <MessageSquare className="w-6 h-6 text-indigo-500" />
+                EFADO NEXUS HUB
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left explanation card */}
+              <div className="md:col-span-2 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-between">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                      <MessageSquare className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">What is EFADO Nexus Hub?</h4>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed uppercase tracking-wide">
+                    The <span className="text-indigo-400 font-extrabold">EFADO Nexus Hub</span> establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, 10 action buttons, viral reels, and creator monetization profiles with 100% data integrity.
+                  </p>
+                </div>
+                <div className="pt-4 border-t border-white/5 mt-4 flex items-center justify-between">
+                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">● System Status: Secure & Encrypted</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Protocol: V3.4</span>
+                </div>
+              </div>
+
+              {/* Right small, strategic Action card */}
+              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-center items-center text-center">
+                <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4">
+                  <MessageSquare className="w-6 h-6 text-indigo-400" />
+                </div>
+                <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect EFADO Nexus Hub</h4>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats, reels & 10 action buttons</p>
+                <button 
+                  onClick={() => setIsNexusSynced(true)}
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[9px] border border-indigo-500/30"
+                >
+                  Synchronize Now
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'partners':
         return (
           <EfadoPartnerHub
@@ -259,14 +324,16 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
 
       default:
         return (
-          <ArenaHubView
-            user={user}
-            wallet={wallet}
-            onResult={onResult}
-            onStakeDeduction={onStakeDeduction}
-            onOpenCashier={onOpenCashier}
-            onLogin={onLogin}
-          />
+          <div className="text-center py-24 px-4 max-w-lg mx-auto">
+            <h3 className="text-xl font-bold mb-3 text-white">Hub View</h3>
+            <p className="text-slate-400 text-sm mb-6">Return to the EFADO home dashboard to explore the ecosystem.</p>
+            <button
+              onClick={onNavigateHome}
+              className="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider"
+            >
+              ← Return to Home
+            </button>
+          </div>
         );
     }
   };

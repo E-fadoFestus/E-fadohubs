@@ -194,14 +194,16 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
       (snapshot) => {
         setActiveLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Loan)));
         setLoading(false);
-      }
+      },
+      (err) => console.warn('Loans listener notice:', err.message)
     );
 
     const unsubApps = onSnapshot(
       query(collection(db, 'loan_applications'), where('userId', '==', user.uid)),
       (snapshot) => {
         setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanApplication)));
-      }
+      },
+      (err) => console.warn('Loan applications listener notice:', err.message)
     );
 
     return () => {
@@ -217,7 +219,8 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
         if (!snapshot.empty) {
           setMyVendorProfile({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as LoanVendor);
         }
-      }
+      },
+      (err) => console.warn('Loan vendor profile listener notice:', err.message)
     );
     return () => unsubVendor();
   }, [user.uid]);
@@ -244,7 +247,8 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
             .map(doc => ({ id: doc.id, ...doc.data() } as LoanApplication))
             .filter(app => app.userId !== user.uid)
         );
-      }
+      },
+      (err) => console.warn('All loan applications listener notice:', err.message)
     );
     return () => unsubAllApps();
   }, [myVendorProfile, user.uid]);

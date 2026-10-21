@@ -7,50 +7,192 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      return isAuthenticated() && (
+        request.auth.token.email == 'efado226@gmail.com' ||
+        request.auth.token.email == 'efadofestus@gmail.com' ||
+        request.auth.token.email == 'festdanemh@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
     }
 
-    // OLD RULES - KEEP
-    match /test/{docId} {
+    // Public or semi-public system feeds
+    match /adminStats/{docId} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if isAdmin();
     }
-    
-    match /subscribers/{subscriberId} {
+
+    match /announcements/{id} {
       allow read: if true;
-      allow create: if true;
+      allow write: if isAdmin();
+    }
+
+    match /subscribers/{subscriberId} {
+      allow read, create: if true;
       allow update, delete: if isAdmin();
     }
 
-    // NEW RULES FOR FLUTTERWAVE
+    // User profiles & auth
     match /users/{userId} {
-      allow read, update: if isAuthenticated() && request.auth.uid == userId;
-      allow create: if isAuthenticated();
-    }
-    
-    match /transactions/{txId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow write: if false;
-    }
-    
-    match /vtu_orders/{orderId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      allow read: if true;
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
 
-    // === 15 HUBS COLLECTIONS ===
+    match /transactions/{txId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated();
+    }
+
+    match /deposits/{depId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /withdrawals/{wId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /vtu_orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated();
+    }
+
+    // Marketplace, listings, products, & orders
+    match /ad_listings/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /ads/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /marketProducts/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /market_orders/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /vendors/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Media, reels, & social
+    match /reels/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /posts/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /social_posts/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /gist_live_rooms/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /gist_communities/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // HepiHands Loans
+    match /loans/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /loan_applications/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /loan_vendors/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // Efadoworks Freelancing
+    match /efado_jobs/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /efado_freelancers/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /efado_clients/{id} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /efado_notifications/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /efado_bids/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /efado_contracts/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /efado_milestones/{id} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 15 Hubs Collections
     match /gamingPlays/{id} { allow read, write: if isAuthenticated(); }
-    match /ads/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /brandNames/{id} { allow read, write: if isAuthenticated(); }
     match /serviceRequests/{id} { allow read, write: if isAuthenticated(); }
+    match /service_requests/{id} { allow read, write: if isAuthenticated(); }
+    match /service_providers/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /jobPosts/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /communityPosts/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /loanApplications/{id} { allow read, write: if isAuthenticated(); }
-    match /domains/{id} { allow read, write: if isAuthenticated(); }
+    match /domains/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /domain_sellers/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /domain_orders/{id} { allow read, write: if isAuthenticated(); }
     match /sourcingOrders/{id} { allow read, write: if isAuthenticated(); }
+    match /sourcing_requests/{id} { allow read, write: if isAuthenticated(); }
     match /cryptoOrders/{id} { allow read, write: if isAuthenticated(); }
+    match /crypto_conversions/{id} { allow read, write: if isAuthenticated(); }
     match /partnerEarnings/{id} { allow read, write: if isAuthenticated(); }
+    match /partner_applications/{id} { allow read, write: if isAuthenticated(); }
     match /houseListings/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /cargoShipments/{id} { allow read, write: if isAuthenticated(); }
+    match /help_requests/{id} { allow read, write: if isAuthenticated(); }
+    match /manual_game_pins/{id} { allow read, write: if isAuthenticated(); }
+    match /admin_logs/{id} { allow read, write: if isAdmin(); }
+    match /cscc_groups/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /quiz_sessions/{id} { allow read, write: if isAuthenticated(); }
+    match /email_accounts/{id} { allow read, write: if isAuthenticated(); }
+    match /incubator_ideas/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /live_classes/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /creator_stats/{id} { allow read: if true; allow write: if isAuthenticated(); }
+    match /wallets/{id} { allow read, write: if isAuthenticated(); }
+    match /vending_purchases/{id} { allow read, write: if isAuthenticated(); }
+    match /zoom_subscriptions/{id} { allow read, write: if isAuthenticated(); }
+    match /jamb_candidates/{id} { allow read, write: if isAuthenticated(); }
+    match /waec_scratch_cards/{id} { allow read, write: if isAuthenticated(); }
+
+    // Fallback safe catch-all
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
   }
 }

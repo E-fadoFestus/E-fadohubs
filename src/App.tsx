@@ -736,8 +736,19 @@ function AppContent() {
   };
 
   const handleNavigate = (hub: any, subview?: any, extraProps?: any) => {
-    if (hub === 'HOME') {
+    if (hub === 'HOME' || hub === 'home') {
       handleNavigateHome();
+      return;
+    }
+
+    if (hub === 'GIST' || hub === 'nexus' || hub === 'nexus-hub' || hub === 'nexushub') {
+      setVerticalHubSlug(null);
+      setHubItemId(null);
+      setShowVerticalHubsDirectory(false);
+      setShowGistHub(false);
+      setActiveHub('GIST');
+      navigate('/home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -2671,6 +2682,20 @@ function AppContent() {
                   onClick={(e) => {
                     if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) {
                       e.preventDefault();
+                      if (item.id === 'HOME') {
+                        handleNavigateHome();
+                        return;
+                      }
+                      if (item.id === 'GIST') {
+                        setVerticalHubSlug(null);
+                        setHubItemId(null);
+                        setShowVerticalHubsDirectory(false);
+                        setShowGistHub(false);
+                        setActiveHub('GIST');
+                        navigate('/home');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return;
+                      }
                       navigateToVerticalHub(itemSlug);
                     }
                   }}

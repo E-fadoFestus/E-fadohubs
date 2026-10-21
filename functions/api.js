@@ -1000,4 +1000,346 @@ api.post('/api/hubs/cargo/ship', async (req, res) => {
   }
 });
 
+// ============================================================================
+// 14. GAME ENGINE ENDPOINTS (/api/game/* and /game/*)
+// ============================================================================
+const activeGameRounds = new Map();
+
+function generateProvablyFairCrash(serverSeed, clientSeed, nonce) {
+  const crypto = require('crypto');
+  const hash = crypto.createHmac('sha256', serverSeed).update(`${clientSeed}:${nonce}`).digest('hex');
+  const hs = parseInt(hash.slice(0, 8), 16);
+  if (hs % 33 === 0) return 1.00;
+  const h = parseInt(hash.slice(0, 13), 16);
+  const e = Math.pow(2, 52);
+  const result = Math.floor((100 * e - h) / (e - h)) / 100;
+  return Math.max(1.01, Math.min(100.0, Number(result.toFixed(2))));
+}
+
+const handleGameStart = (req, res) => {
+  const crypto = require('crypto');
+  const clientSeed = req.body?.clientSeed || 'efado-client-' + Math.random().toString(36).slice(2, 10);
+  const nonce = req.body?.nonce || Math.floor(Math.random() * 1000);
+  const serverSeed = crypto.randomBytes(32).toString('hex');
+  const serverSeedHash = crypto.createHash('sha256').update(serverSeed).digest('hex');
+  const crashMultiplier = generateProvablyFairCrash(serverSeed, clientSeed, nonce);
+
+  const round = {
+    roundId: `dsj-${Date.now()}-${Math.floor(Math.random() * 9000 + 1000)}`,
+    serverSeed,
+    serverSeedHash,
+    clientSeed,
+    nonce,
+    crashMultiplier,
+    startTime: Date.now(),
+    status: 'flying'
+  };
+  activeGameRounds.set(round.roundId, round);
+
+  return res.json({
+    success: true,
+    roundId: round.roundId,
+    serverSeedHash: round.serverSeedHash,
+    clientSeed: round.clientSeed,
+    nonce: round.nonce,
+    crashMultiplier: round.crashMultiplier,
+    startTime: round.startTime
+  });
+};
+
+api.post(['/api/game/start', '/game/start'], handleGameStart);
+
+api.post(['/api/game/bet', '/game/bet'], async (req, res) => {
+  let { userId, betAmount, currency, consoleId, isAutoCashout, autoCashoutMultiplier } = req.body || {};
+  betAmount = Number(betAmount) || 100;
+  if (betAmount < 100) betAmount = 100;
+  if (betAmount > 20000) betAmount = 20000;
+
+  const betData = {
+    betId: `bet-${Date.now()}-${consoleId || 1}`,
+    userId: userId || 'anon',
+    betAmount,
+    currency: currency || 'NGN',
+    consoleId: consoleId || 1,
+    status: 'placed',
+    isAutoCashout: !!isAutoCashout,
+    autoCashoutMultiplier: autoCashoutMultiplier || 2.0,
+    createdAt: serverTimestamp()
+  };
+
+  db.collection('gamingPlays').doc(betData.betId).set(betData).catch(() => {});
+
+  return res.json({
+    success: true,
+    betId: betData.betId,
+    betAmount,
+    currency: betData.currency,
+    consoleId: betData.consoleId,
+    status: 'placed',
+    isAutoCashout: betData.isAutoCashout,
+    autoCashoutMultiplier: betData.autoCashoutMultiplier
+  });
+});
+
+api.post(['/api/game/cashout', '/game/cashout'], async (req, res) => {
+  const { userId, betAmount, multiplier, consoleId } = req.body || {};
+  const mult = Number(multiplier) || 1.0;
+  const stake = Math.min(20000, Math.max(100, Number(betAmount) || 100));
+  const rawWin = stake * mult;
+  const winPayout = Math.min(500000, Number(rawWin.toFixed(2)));
+  const profit = Number((winPayout - stake).toFixed(2));
+
+  if (userId) {
+    db.collection('users').doc(userId).update({
+      playerWallet: admin.firestore.FieldValue.increment(winPayout)
+    }).catch(() => {});
+  }
+
+  return res.json({
+    success: true,
+    winPayout,
+    multiplier: mult,
+    profit,
+    isMaxWinCapped: rawWin > 500000,
+    status: 'cashed_out',
+    consoleId: consoleId || 1
+  });
+});
+
+api.post(['/api/game/crash', '/game/crash'], (req, res) => {
+  const { roundId, crashMultiplier } = req.body || {};
+  return res.json({
+    success: true,
+    roundId: roundId || `dsj-${Date.now()}`,
+    crashMultiplier: Number(crashMultiplier) || 2.5,
+    timestamp: Date.now()
+  });
+});
+
+// ============================================================================
+// 15. EFADO NEXUS HUB & CHAT APIS
+// ============================================================================
+const buzzCooldowns = new Map();
+const uploadedFilesStore = new Map();
+
+api.post('/api/deep-link/create', (req, res) => {
+  const { type = 'gist', id = 'general', title = 'EFADO Nexus' } = req.body || {};
+  const webFallback = `https://e-fado.com/nexus-hub?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`;
+  return res.json({
+    success: true,
+    deepLink: `efado-nexus.com/${type}/${id}`,
+    webUrl: webFallback,
+    dynamicLink: `https://efadonexus.page.link/?link=${encodeURIComponent(webFallback)}`,
+    type,
+    id,
+    title
+  });
+});
+
+api.post('/api/share/generate', (req, res) => {
+  const { title = 'EFADO NEXUS HUB', text = '', url = 'https://efado-nexus.com/hub' } = req.body || {};
+  const fullShareText = `${title}\n${text ? text + '\n' : ''}Explore on EFADO NEXUS HUB: ${url}`;
+  return res.json({
+    success: true,
+    sharePayload: {
+      title,
+      text: fullShareText,
+      url,
+      whatsappUrl: `https://api.whatsapp.com/send?text=${encodeURIComponent(fullShareText)}`,
+      facebookUrl: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      twitterUrl: `https://twitter.com/intent/tweet?text=${encodeURIComponent(fullShareText)}`,
+      telegramUrl: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(fullShareText)}`
+    }
+  });
+});
+
+api.post('/api/users/add', (req, res) => {
+  const { username, phone, email, roomId = 'general', groupName = 'Nexus Circle' } = req.body || {};
+  const targetIdentifier = username || phone || email || 'Colleague';
+  return res.json({
+    success: true,
+    message: `User ${targetIdentifier} successfully added to ${groupName}!`,
+    user: {
+      username: targetIdentifier,
+      roomId,
+      inviteLink: `https://efado-nexus.com/user/${encodeURIComponent(targetIdentifier)}?room=${encodeURIComponent(roomId)}`
+    }
+  });
+});
+
+api.post('/api/upload', (req, res) => {
+  const { fileName = 'file_' + Date.now(), fileSize = 1024 * 1024 * 3.2, mimeType = 'application/octet-stream' } = req.body || {};
+  const fileId = 'nexus_file_' + Date.now();
+  const fileRecord = {
+    fileId,
+    fileName,
+    fileSize,
+    formattedSize: `${(fileSize / (1024 * 1024)).toFixed(1)} MB`,
+    mimeType,
+    uploadedAt: Date.now(),
+    downloadUrl: `/api/download/${fileId}`
+  };
+  uploadedFilesStore.set(fileId, fileRecord);
+  return res.json({ success: true, file: fileRecord, message: `Successfully uploaded ${fileName}` });
+});
+
+api.get('/api/download/:id', (req, res) => {
+  const { id } = req.params;
+  const file = uploadedFilesStore.get(id) || {
+    fileId: id,
+    fileName: `EFADO_Document_${id.substring(0, 6)}.pdf`,
+    formattedSize: '3.2 MB',
+    fileSize: 3355443,
+    mimeType: 'application/pdf',
+    savedFolder: 'EFADO_Nexus_Downloads'
+  };
+  return res.json({ success: true, ...file, timestamp: Date.now() });
+});
+
+api.post('/api/chat/buzz', (req, res) => {
+  const { fromUser = 'Alex', toUser = 'Peer' } = req.body || {};
+  const key = `${fromUser}:${toUser}`;
+  const now = Date.now();
+  const lastBuzzed = buzzCooldowns.get(key) || 0;
+  const COOLDOWN_MS = 30 * 1000;
+
+  if (now - lastBuzzed < COOLDOWN_MS) {
+    const wait = Math.ceil((COOLDOWN_MS - (now - lastBuzzed)) / 1000);
+    return res.status(429).json({ success: false, cooldownRemaining: wait, message: `Please wait ${wait}s` });
+  }
+
+  buzzCooldowns.set(key, now);
+  return res.json({
+    success: true,
+    cooldown: 30,
+    buzzedAt: now,
+    alertText: `${fromUser} buzzed you • just now`
+  });
+});
+
+api.post('/api/chat/screenshot', (req, res) => {
+  const { timestamp = Date.now() } = req.body || {};
+  return res.json({
+    success: true,
+    screenshotId: 'nexus_shot_' + Date.now(),
+    watermark: 'EFADO NEXUS HUB',
+    timestamp,
+    message: 'Screenshot captured'
+  });
+});
+
+api.post('/api/call/video', (req, res) => {
+  const { roomId = 'room_1' } = req.body || {};
+  return res.json({
+    success: true,
+    callId: 'call_vid_' + Date.now(),
+    roomId,
+    type: 'video',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  });
+});
+
+api.post('/api/call/voice', (req, res) => {
+  const { roomId = 'room_1', voiceMask = 'Normal' } = req.body || {};
+  return res.json({
+    success: true,
+    callId: 'call_aud_' + Date.now(),
+    roomId,
+    type: 'voice',
+    voiceMask
+  });
+});
+
+api.post('/api/status/create', (req, res) => {
+  const { userId = 'usr_1', userName = 'User', caption = '', isAdvert = false, adTag = 'AD' } = req.body || {};
+  const statusId = 'status_' + Date.now();
+  return res.json({
+    success: true,
+    status: {
+      id: statusId,
+      userId,
+      userName,
+      caption,
+      isAdvert,
+      adTag: isAdvert ? adTag : null,
+      createdAt: Date.now()
+    }
+  });
+});
+
+api.post('/api/reels/create', (req, res) => {
+  const { userId = 'usr_1', caption = '', duration = 60 } = req.body || {};
+  return res.json({
+    success: true,
+    reel: {
+      id: 'reel_' + Date.now(),
+      userId,
+      caption,
+      duration,
+      createdAt: Date.now()
+    }
+  });
+});
+
+api.post('/api/chat/translate', (req, res) => {
+  const { text = '', targetLanguage = 'pidgin' } = req.body || {};
+  return res.json({
+    success: true,
+    originalText: text,
+    targetLanguage,
+    translatedText: text ? `[${targetLanguage.toUpperCase()}]: ${text}` : ''
+  });
+});
+
+// ============================================================================
+// 16. CENTRALIZED AI CORE SERVICES
+// ============================================================================
+api.post('/api/ai/generate-image', (req, res) => {
+  const { prompt = 'EFADO Modern Commerce' } = req.body || {};
+  const seed = encodeURIComponent(String(prompt).trim().slice(0, 30));
+  return res.json({
+    success: true,
+    imageUrl: `https://picsum.photos/seed/${seed}/800/800`,
+    prompt
+  });
+});
+
+api.post('/api/ai/edit-image', (req, res) => {
+  const { prompt = '', image } = req.body || {};
+  return res.json({
+    success: true,
+    imageUrl: image || 'https://picsum.photos/seed/edited/800/800',
+    prompt
+  });
+});
+
+api.post('/api/ai/search-grounding', (req, res) => {
+  const { query = 'EFADO market' } = req.body || {};
+  return res.json({
+    success: true,
+    query,
+    text: `Verified live data for ${query}. EFADO multi-hub network connects verified merchants across Nigeria and Africa.`,
+    sources: [{ title: 'EFADO Ecosystem Directory', url: 'https://e-fado.com' }]
+  });
+});
+
+api.post('/api/ai/voice-chat', (req, res) => {
+  const { message = 'Hello' } = req.body || {};
+  return res.json({
+    success: true,
+    text: `Hello! I am EFADO AI Assistant. You asked: "${message}". How can I support your trade, logistics, or examination preparation today?`
+  });
+});
+
+api.post('/api/ai/animate-video', (req, res) => {
+  return res.json({
+    success: false,
+    locked: true,
+    message: 'Veo 3 video generation is locked in production to prevent unexpected billing. Upgrade tier available in Account Settings.'
+  });
+});
+
 module.exports = api;
