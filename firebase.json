@@ -24,6 +24,10 @@
     ],
     "rewrites": [
       {
+        "source": "/uploadReelChunk",
+        "function": "uploadReelChunk"
+      },
+      {
         "source": "/api/**",
         "function": "api"
       },

@@ -41,6 +41,19 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: Date.now(), uptime: process.uptime() });
 });
 
+// Enable CORS for all domains, specifically efado.app, *.efado.app, and localhost
+app.use((req, res, next) => {
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
+
 // Capture raw body for secure Paystack signature verification
 app.use(express.json({
   limit: '50mb',
@@ -2237,6 +2250,145 @@ app.post('/api/reels/create', (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// 10.B Resumable Video Chunk Upload & Stream Endpoints (/uploadReelChunk & /api/uploadReelChunk)
+const serverReelUploadSessions = new Map<string, any>();
+
+const handleServerReelChunk = (req: any, res: any) => {
+  try {
+    const {
+      uploadId,
+      chunkIndex,
+      totalChunks,
+      chunkData,
+      chunk,
+      fileName = 'reel.mp4',
+      mimeType = 'video/mp4',
+      userId = 'user',
+      caption = ''
+    } = req.body || {};
+
+    const rawChunk = chunkData || chunk;
+
+    if (!uploadId || chunkIndex === undefined || !totalChunks || !rawChunk) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required chunk fields: uploadId, chunkIndex, totalChunks, chunkData'
+      });
+    }
+
+    let session = serverReelUploadSessions.get(uploadId);
+    if (!session) {
+      session = {
+        uploadId,
+        fileName,
+        mimeType,
+        totalChunks: Number(totalChunks),
+        chunks: new Array(Number(totalChunks)),
+        receivedCount: 0,
+        createdAt: Date.now(),
+        userId,
+        caption
+      };
+      serverReelUploadSessions.set(uploadId, session);
+    }
+
+    const cleanBase64 = String(rawChunk).replace(/^data:[^;]+;base64,/, '');
+    const chunkBuffer = Buffer.from(cleanBase64, 'base64');
+    const idx = Number(chunkIndex);
+
+    if (!session.chunks[idx]) {
+      session.chunks[idx] = chunkBuffer;
+      session.receivedCount++;
+    }
+
+    const progress = Math.min(100, Math.round((session.receivedCount / session.totalChunks) * 100));
+
+    if (session.receivedCount >= session.totalChunks) {
+      const fullBuffer = Buffer.concat(session.chunks);
+      const reelId = `reel_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      session.fullBuffer = fullBuffer;
+      session.completed = true;
+      session.completedAt = Date.now();
+      session.reelId = reelId;
+      session.chunks = null; // free memory
+
+      // Clean up after 2 hours
+      setTimeout(() => {
+        serverReelUploadSessions.delete(uploadId);
+      }, 2 * 60 * 60 * 1000);
+
+      return res.status(200).json({
+        success: true,
+        completed: true,
+        progress: 100,
+        uploadId,
+        reelId,
+        videoUrl: `/api/reels/stream/${uploadId}`,
+        sizeBytes: fullBuffer.length,
+        formattedSize: `${(fullBuffer.length / (1024 * 1024)).toFixed(2)} MB`,
+        message: 'Reel successfully reassembled and ready for streaming'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      completed: false,
+      progress,
+      chunkIndex: idx,
+      totalChunks: session.totalChunks,
+      receivedCount: session.receivedCount,
+      message: `Chunk ${idx + 1} of ${session.totalChunks} received (${progress}%)`
+    });
+  } catch (err: any) {
+    console.error('[server/uploadReelChunk] Error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Chunk processing error' });
+  }
+};
+
+app.post('/uploadReelChunk', handleServerReelChunk);
+app.post('/api/uploadReelChunk', handleServerReelChunk);
+
+const handleServerReelStream = (req: any, res: any) => {
+  const { uploadId } = req.params;
+  const session = serverReelUploadSessions.get(uploadId);
+
+  if (!session || !session.fullBuffer) {
+    return res.status(404).json({ success: false, error: 'Reel stream not found or expired' });
+  }
+
+  const videoBuffer = session.fullBuffer;
+  const videoSize = videoBuffer.length;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : videoSize - 1;
+    const chunksize = (end - start) + 1;
+    const head = {
+      'Content-Range': `bytes ${start}-${end}/${videoSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': session.mimeType || 'video/mp4',
+      'Access-Control-Allow-Origin': '*'
+    };
+    res.writeHead(206, head);
+    res.end(videoBuffer.subarray(start, end + 1));
+  } else {
+    const head = {
+      'Content-Length': videoSize,
+      'Content-Type': session.mimeType || 'video/mp4',
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*'
+    };
+    res.writeHead(200, head);
+    res.end(videoBuffer);
+  }
+};
+
+app.get('/reels/stream/:uploadId', handleServerReelStream);
+app.get('/api/reels/stream/:uploadId', handleServerReelStream);
 
 // 11. AI Translation Endpoint (Nigerian Pidgin, Chinese, French, Italian, local Nigerian languages)
 app.post('/api/chat/translate', async (req, res) => {

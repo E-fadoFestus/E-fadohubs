@@ -395,4 +395,120 @@ exports.vtuAirtimeOrder = functions.https.onCall(async (request) => {
   return { success: true, vtuRef: `VTU-${Date.now()}`, status: 'delivered' };
 });
 
+// ============================================================================
+// CHUNKED REEL UPLOAD ENDPOINT (/uploadReelChunk)
+// Accepts video chunks and reassembles with CORS enabled for efado.app & all origins
+// ============================================================================
+const cors = require('cors');
+const corsHandler = cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+});
+
+const reelSessions = new Map();
+
+exports.uploadReelChunk = functions.https.onRequest((req, res) => {
+  return corsHandler(req, res, () => {
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Method not allowed. Use POST.' });
+    }
+
+    try {
+      const {
+        uploadId,
+        chunkIndex,
+        totalChunks,
+        chunkData,
+        chunk,
+        fileName = 'reel.mp4',
+        mimeType = 'video/mp4',
+        userId = 'user',
+        caption = ''
+      } = req.body || {};
+
+      const rawChunk = chunkData || chunk;
+
+      if (!uploadId || chunkIndex === undefined || !totalChunks || !rawChunk) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required chunk fields: uploadId, chunkIndex, totalChunks, chunkData'
+        });
+      }
+
+      let session = reelSessions.get(uploadId);
+      if (!session) {
+        session = {
+          uploadId,
+          fileName,
+          mimeType,
+          totalChunks: Number(totalChunks),
+          chunks: new Array(Number(totalChunks)),
+          receivedCount: 0,
+          createdAt: Date.now(),
+          userId,
+          caption
+        };
+        reelSessions.set(uploadId, session);
+      }
+
+      const cleanBase64 = String(rawChunk).replace(/^data:[^;]+;base64,/, '');
+      const chunkBuffer = Buffer.from(cleanBase64, 'base64');
+      const idx = Number(chunkIndex);
+
+      if (!session.chunks[idx]) {
+        session.chunks[idx] = chunkBuffer;
+        session.receivedCount++;
+      }
+
+      const progress = Math.min(100, Math.round((session.receivedCount / session.totalChunks) * 100));
+
+      if (session.receivedCount >= session.totalChunks) {
+        const fullBuffer = Buffer.concat(session.chunks);
+        const reelId = `reel_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        session.fullBuffer = fullBuffer;
+        session.completed = true;
+        session.completedAt = Date.now();
+        session.reelId = reelId;
+        session.chunks = null; // free memory
+
+        setTimeout(() => {
+          reelSessions.delete(uploadId);
+        }, 2 * 60 * 60 * 1000);
+
+        return res.status(200).json({
+          success: true,
+          completed: true,
+          progress: 100,
+          uploadId,
+          reelId,
+          videoUrl: `/api/reels/stream/${uploadId}`,
+          sizeBytes: fullBuffer.length,
+          formattedSize: `${(fullBuffer.length / (1024 * 1024)).toFixed(2)} MB`,
+          message: 'Reel successfully reassembled and ready for streaming'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        completed: false,
+        progress,
+        chunkIndex: idx,
+        totalChunks: session.totalChunks,
+        receivedCount: session.receivedCount,
+        message: `Chunk ${idx + 1} of ${session.totalChunks} received (${progress}%)`
+      });
+    } catch (err) {
+      console.error('[uploadReelChunk] Error processing chunk:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Chunk processing failed' });
+    }
+  });
+});
+
+
 

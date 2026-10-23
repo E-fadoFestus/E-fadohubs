@@ -1342,4 +1342,151 @@ api.post('/api/ai/animate-video', (req, res) => {
   });
 });
 
+// ============================================================================
+// 17. CHUNKED REEL UPLOADS & STREAMING (/api/uploadReelChunk & /uploadReelChunk)
+// ============================================================================
+const apiReelSessions = new Map();
+
+api.post(['/api/uploadReelChunk', '/uploadReelChunk'], (req, res) => {
+  try {
+    const {
+      uploadId,
+      chunkIndex,
+      totalChunks,
+      chunkData,
+      chunk,
+      fileName = 'reel.mp4',
+      mimeType = 'video/mp4',
+      userId = 'user',
+      caption = ''
+    } = req.body || {};
+
+    const rawChunk = chunkData || chunk;
+
+    if (!uploadId || chunkIndex === undefined || !totalChunks || !rawChunk) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required chunk fields: uploadId, chunkIndex, totalChunks, chunkData'
+      });
+    }
+
+    let session = apiReelSessions.get(uploadId);
+    if (!session) {
+      session = {
+        uploadId,
+        fileName,
+        mimeType,
+        totalChunks: Number(totalChunks),
+        chunks: new Array(Number(totalChunks)),
+        receivedCount: 0,
+        createdAt: Date.now(),
+        userId,
+        caption
+      };
+      apiReelSessions.set(uploadId, session);
+    }
+
+    const cleanBase64 = String(rawChunk).replace(/^data:[^;]+;base64,/, '');
+    const chunkBuffer = Buffer.from(cleanBase64, 'base64');
+    const idx = Number(chunkIndex);
+
+    if (!session.chunks[idx]) {
+      session.chunks[idx] = chunkBuffer;
+      session.receivedCount++;
+    }
+
+    const progress = Math.min(100, Math.round((session.receivedCount / session.totalChunks) * 100));
+
+    if (session.receivedCount >= session.totalChunks) {
+      const fullBuffer = Buffer.concat(session.chunks);
+      const reelId = `reel_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      session.fullBuffer = fullBuffer;
+      session.completed = true;
+      session.completedAt = Date.now();
+      session.reelId = reelId;
+      session.chunks = null; // free memory
+
+      // Also create a Firestore reel entry
+      db.collection('reels').doc(reelId).set({
+        id: reelId,
+        authorId: userId,
+        caption,
+        videoUrl: `/api/reels/stream/${uploadId}`,
+        createdAt: serverTimestamp(),
+        likes: [],
+        comments: [],
+        shares: 0,
+        tags: ['#Viral', '#EFADO', '#Reels']
+      }).catch(() => {});
+
+      setTimeout(() => {
+        apiReelSessions.delete(uploadId);
+      }, 2 * 60 * 60 * 1000);
+
+      return res.status(200).json({
+        success: true,
+        completed: true,
+        progress: 100,
+        uploadId,
+        reelId,
+        videoUrl: `/api/reels/stream/${uploadId}`,
+        sizeBytes: fullBuffer.length,
+        formattedSize: `${(fullBuffer.length / (1024 * 1024)).toFixed(2)} MB`,
+        message: 'Reel successfully reassembled and ready for streaming'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      completed: false,
+      progress,
+      chunkIndex: idx,
+      totalChunks: session.totalChunks,
+      receivedCount: session.receivedCount,
+      message: `Chunk ${idx + 1} of ${session.totalChunks} received (${progress}%)`
+    });
+  } catch (err) {
+    console.error('[api/uploadReelChunk] Error processing chunk:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Chunk processing failed' });
+  }
+});
+
+api.get(['/api/reels/stream/:uploadId', '/reels/stream/:uploadId'], (req, res) => {
+  const { uploadId } = req.params;
+  const session = apiReelSessions.get(uploadId);
+
+  if (!session || !session.fullBuffer) {
+    return res.status(404).json({ success: false, error: 'Reel stream not found or expired' });
+  }
+
+  const videoBuffer = session.fullBuffer;
+  const videoSize = videoBuffer.length;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-");
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : videoSize - 1;
+    const chunksize = (end - start) + 1;
+    const head = {
+      'Content-Range': `bytes ${start}-${end}/${videoSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': session.mimeType || 'video/mp4',
+      'Access-Control-Allow-Origin': '*'
+    };
+    res.writeHead(206, head);
+    res.end(videoBuffer.subarray(start, end + 1));
+  } else {
+    const head = {
+      'Content-Length': videoSize,
+      'Content-Type': session.mimeType || 'video/mp4',
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*'
+    };
+    res.writeHead(200, head);
+    res.end(videoBuffer);
+  }
+});
+
 module.exports = api;
