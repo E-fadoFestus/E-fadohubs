@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -7,17 +7,24 @@ import {
   Rocket, 
   Megaphone, 
   Coins, 
-  Target, 
   Zap,
   CheckCircle2,
   HelpCircle,
-  Cpu,
   Globe,
   ArrowRight,
   Building2,
+  CreditCard,
+  MessageSquare,
+  Video,
+  Download,
+  Gamepad2,
   ArrowDownCircle,
-  User,
-  CreditCard
+  Wallet,
+  PlayCircle,
+  Sparkles,
+  Lock,
+  Compass,
+  Check
 } from 'lucide-react';
 
 interface UserGuideModalProps {
@@ -26,7 +33,20 @@ interface UserGuideModalProps {
   onOpenProfile?: () => void;
 }
 
+type GuideTab = 'overview' | 'nexus' | 'games' | 'deposits' | 'withdrawals' | 'advertising';
+
 export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose, onOpenProfile }) => {
+  const [activeTab, setActiveTab] = useState<GuideTab>('overview');
+
+  const tabs = [
+    { id: 'overview' as GuideTab, label: 'Quickstart', icon: Rocket, badge: 'Basics' },
+    { id: 'nexus' as GuideTab, label: 'Nexus Hub & Reels', icon: MessageSquare, badge: 'Social & Media' },
+    { id: 'games' as GuideTab, label: 'Gaming & Bets', icon: Gamepad2, badge: 'Fair Play' },
+    { id: 'deposits' as GuideTab, label: 'Deposit & Flutterwave', icon: CreditCard, badge: 'Instant' },
+    { id: 'withdrawals' as GuideTab, label: 'Cashouts & Bank', icon: ArrowDownCircle, badge: 'Payouts' },
+    { id: 'advertising' as GuideTab, label: 'Ads & Market', icon: Megaphone, badge: 'Growth' },
+  ];
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -34,253 +54,409 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl overflow-y-auto"
+          className="fixed inset-0 z-[3000] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/95 backdrop-blur-2xl overflow-y-auto"
         >
           <motion.div
-            initial={{ scale: 0.9, y: 20 }}
+            initial={{ scale: 0.95, y: 15 }}
             animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className="w-full max-w-5xl bg-slate-900 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl relative"
+            exit={{ scale: 0.95, y: 15 }}
+            className="w-full max-w-5xl bg-slate-900 border border-white/10 rounded-3xl md:rounded-[2.5rem] overflow-hidden shadow-2xl relative my-auto"
           >
-            {/* Close Button */}
+            {/* Top Close Button */}
             <button 
               onClick={onClose}
-              className="absolute top-6 right-6 p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all z-50 group"
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 sm:p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all z-50 text-slate-400 hover:text-white"
+              aria-label="Close Guide"
             >
-              <X className="w-6 h-6 text-slate-400 group-hover:text-white" />
+              <X className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[70vh]">
-              {/* Sidebar Info */}
-              <div className="lg:col-span-4 bg-indigo-600 p-10 text-white flex flex-col justify-between relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[75vh]">
+              {/* Sidebar Header & Tabs */}
+              <div className="lg:col-span-4 bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 p-6 sm:p-8 lg:p-10 text-white flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
                 
                 <div className="relative z-10">
-                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-8 backdrop-blur-md">
-                    <HelpCircle className="w-10 h-10" />
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-900/40">
+                      <HelpCircle className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">EFADO Ecosystem</span>
+                      <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">
+                        User Guide
+                      </h2>
+                    </div>
                   </div>
-                  <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-6 italic">
-                    Universal <br /> <span className="text-indigo-200">User Protocol</span>
-                  </h2>
-                  <p className="text-indigo-100 font-medium leading-relaxed uppercase tracking-tighter text-sm opacity-80">
-                    Your complete operational manual for the EFADO ecosystem. Master the neural grid and unlock sovereign equity.
+
+                  <p className="text-slate-300 font-medium text-xs leading-relaxed mb-6">
+                    Master the EFADO platform: Social feed, reels streaming, provably fair games, multi-currency wallet deposits & fast bank withdrawals.
                   </p>
+
+                  {/* Navigation Tab Selector (Scrollable on Mobile, List on Desktop) */}
+                  <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 custom-scrollbar">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all whitespace-nowrap lg:whitespace-normal shrink-0 lg:shrink text-xs font-black uppercase tracking-wider ${
+                            isActive 
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                              : 'bg-white/5 hover:bg-white/10 text-slate-300'
+                          }`}
+                        >
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-indigo-400'}`} />
+                          <span className="flex-1">{tab.label}</span>
+                          <span className={`text-[9px] px-2 py-0.5 rounded-md hidden sm:inline ${
+                            isActive ? 'bg-white/20 text-white' : 'bg-black/30 text-slate-400'
+                          }`}>
+                            {tab.badge}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="relative z-10 pt-12 space-y-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                       <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Identity Guard</p>
-                      <p className="text-xs font-bold">Encrypted Account Logic</p>
-                    </div>
+                <div className="relative z-10 pt-6 hidden lg:block border-t border-white/10 space-y-3">
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>256-Bit SSL & Sovereign Ledger</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                       <Zap className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Fast Propogation</p>
-                      <p className="text-xs font-bold">Instant Signal Delivery</p>
-                    </div>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span>Global Currency & Real Payouts</span>
                   </div>
                 </div>
               </div>
 
-              {/* Main Content Sections */}
-              <div className="lg:col-span-8 p-8 md:p-12 overflow-y-auto max-h-[85vh] custom-scrollbar space-y-16 bg-slate-900">
+              {/* Main Tab Content Area */}
+              <div className="lg:col-span-8 p-5 sm:p-8 md:p-10 overflow-y-auto max-h-[75vh] custom-scrollbar space-y-8 bg-slate-900/90 text-white">
                 
-                {/* 1. Account Creation */}
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 border-l-4 border-indigo-500 pl-6">
-                    <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-500">
-                      <UserPlus className="w-6 h-6" />
+                {/* TAB 1: OVERVIEW & QUICKSTART */}
+                {activeTab === 'overview' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-indigo-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Step 1 of 5</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">Getting Started on EFADO</h3>
+                      <p className="text-xs text-slate-400 mt-1">Free instant account creation, universal access, and profile identity verification.</p>
                     </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Establish Your Identity</h3>
-                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Protocol 01: Account Deployment</p>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                      <h4 className="text-sm font-black text-white uppercase tracking-widest">Free Registration</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed font-medium">Creating an account on EFADO is 100% free. Simply establish a connection using your Google identity to instantly synchronize with the grid.</p>
-                      <ul className="space-y-2">
-                        {['Single Sign-On (SSO)', 'Cloud Identity Sync', 'Zero Setup Cost'].map(f => (
-                          <li key={f} className="flex items-center gap-2 text-[10px] font-bold text-slate-300 uppercase">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500" /> {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-4">
-                      <h4 className="text-sm font-black text-white uppercase tracking-widest">Profile Synchronisation</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed font-medium">Your profile acts as your neural signature. Complete your details to unlock premium patronage and tactical community access.</p>
-                      <button 
-                        onClick={onOpenProfile} 
-                        className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 hover:translate-x-2 transition-all"
-                      >
-                        Update Profile <ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 2. User Benefits */}
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 border-l-4 border-amber-500 pl-6">
-                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500">
-                      <Rocket className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Strategic Benefits</h3>
-                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Protocol 02: Utility & Equity</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[
-                      { icon: Coins, title: "Sovereign Wealth", desc: "Access interactive skill arenas and mining cores to build capital." },
-                      { icon: Globe, title: "Global Marketplace", desc: "List products or services to reach international patrons." },
-                      { icon: Cpu, title: "Tech Integration", desc: "Deploy tactical tech solutions and digital assets effortlessly." }
-                    ].map((item, i) => (
-                      <div key={i} className="p-6 bg-slate-800/50 rounded-[2rem] border border-white/5 space-y-4 group hover:bg-slate-800 transition-all">
-                        <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-500 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                           <item.icon className="w-5 h-5" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                          1
                         </div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest leading-none">{item.title}</h4>
-                        <p className="text-[10px] font-bold text-slate-400 leading-normal uppercase">{item.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* 3. Advertising Hub Guide */}
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 border-l-4 border-rose-500 pl-6">
-                    <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-500">
-                      <Megaphone className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Advertising Protocol</h3>
-                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Protocol 03: Visibility Engine</p>
-                    </div>
-                  </div>
-
-                  <div className="p-8 bg-rose-500/5 border border-rose-500/10 rounded-[2.5rem] space-y-8">
-                    <p className="text-sm font-medium text-slate-300 leading-relaxed uppercase tracking-tighter">The EFADO Advertising Hub is a tactical visibility engine designed to propagate your mission to the correct nodes.</p>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                       <div className="space-y-3">
-                         <div className="flex items-center gap-2 text-rose-400 font-black text-xs uppercase tracking-widest">
-                           <Target className="w-4 h-4" /> Targeted Listing
-                         </div>
-                         <p className="text-[11px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">Choose from 11 strategic categories: Hotels, Farm Lands, Housing, Machineries, etc. Each has specialized fields for high-fidelity data.</p>
-                       </div>
-                       <div className="space-y-3">
-                         <div className="flex items-center gap-2 text-rose-400 font-black text-xs uppercase tracking-widest">
-                           <Zap className="w-4 h-4" /> Strategic Placement
-                         </div>
-                         <p className="text-[11px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">Select an exposure plan ranging from Free Lite Protocol (3 days) to Universal Annual (365 days) for maximum neural grid presence.</p>
-                       </div>
-                    </div>
-
-                    <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-rose-600 rounded-full flex items-center justify-center">
-                          <CheckCircle2 className="w-5 h-5 text-white" />
-                        </div>
-                        <p className="text-[10px] font-black text-white uppercase tracking-widest italic">100% Secure Transaction Grid</p>
-                      </div>
-                      <button 
-                        onClick={onClose}
-                        className="px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-rose-600/20 active:scale-95"
-                      >
-                        Start Advertising Now
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                {/* 4. Wallet Funding & Cashout Protocol */}
-                <section className="space-y-8">
-                  <div className="flex items-center gap-4 border-l-4 border-emerald-500 pl-6">
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500">
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Wallet Funding & Profile</h3>
-                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Protocol 04: Real Bank Transfers & Fast Payouts</p>
-                    </div>
-                  </div>
-
-                  <div className="p-8 bg-emerald-500/5 border border-emerald-500/10 rounded-[2.5rem] space-y-8">
-                    <p className="text-sm font-medium text-slate-300 leading-relaxed uppercase tracking-tighter">
-                      To fund your EFADO Wallet to stake on games or buy services, follow these simple and 100% secure instructions:
-                    </p>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
-                        <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-xs uppercase tracking-wider">
-                          <span className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-400">1</span> Copy CEO Bank Accounts
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
-                          Open your EFADO Wallet and navigate to the <strong>Deposit</strong> page. You will see the authorized <strong>CEO Corporate Accounts</strong>. Select one, hit "Copy", and pay from your real bank app.
+                        <h4 className="text-sm font-black uppercase tracking-wider text-white">100% Free Registration</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Sign in instantly using your Google account or email. There are zero signup fees or hidden subscription costs.
                         </p>
+                        <ul className="space-y-1.5 pt-2 text-[11px] text-slate-300">
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> One-Click Google Authentication</li>
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-emerald-400" /> Immediate Multi-Currency Wallet Provisioning</li>
+                        </ul>
                       </div>
 
-                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
-                        <div className="flex items-center gap-2 text-indigo-400 font-extrabold text-xs uppercase tracking-wider">
-                          <span className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">2</span> Submit Sender details
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                          2
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
-                          After making the bank transfer, type your <strong>Sender Bank Name</strong>, <strong>Sender Account Number</strong>, and <strong>Sender Name</strong>. This is critical so the CEO can verify your payment and credit you!
+                        <h4 className="text-sm font-black uppercase tracking-wider text-white">Bank Account Binding</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Go to <strong>Wallet → Profile</strong> to bind your local or international bank details. This ensures instant withdrawals for any winnings or creator earnings.
                         </p>
+                        <button 
+                          onClick={onOpenProfile} 
+                          className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-all pt-2"
+                        >
+                          Bind Bank Profile <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       </div>
+                    </div>
 
-                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
-                        <div className="flex items-center gap-2 text-amber-400 font-extrabold text-xs uppercase tracking-wider">
-                          <span className="p-1.5 bg-amber-500/10 rounded-lg text-amber-400">3</span> Setup Account Profile
+                    <div className="p-5 bg-gradient-to-r from-indigo-950/60 to-purple-950/60 rounded-2xl border border-indigo-500/20 space-y-3">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-indigo-400" /> What Can You Do on EFADO?
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                        <div className="p-3 bg-black/30 rounded-xl">
+                          <MessageSquare className="w-5 h-5 mx-auto text-cyan-400 mb-1" />
+                          <span className="text-[10px] font-bold uppercase block text-white">Nexus Social</span>
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
-                          Go to <strong>My Acc. Profile</strong> and enter your own Bank Acc. Details once. This binds your profile so withdrawals can be sent directly back to your real bank account instantly!
+                        <div className="p-3 bg-black/30 rounded-xl">
+                          <Video className="w-5 h-5 mx-auto text-rose-400 mb-1" />
+                          <span className="text-[10px] font-bold uppercase block text-white">Reels Studio</span>
+                        </div>
+                        <div className="p-3 bg-black/30 rounded-xl">
+                          <Gamepad2 className="w-5 h-5 mx-auto text-emerald-400 mb-1" />
+                          <span className="text-[10px] font-bold uppercase block text-white">Games Arena</span>
+                        </div>
+                        <div className="p-3 bg-black/30 rounded-xl">
+                          <Wallet className="w-5 h-5 mx-auto text-amber-400 mb-1" />
+                          <span className="text-[10px] font-bold uppercase block text-white">Instant Payouts</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 2: NEXUS HUB (FEED, CHAT, REELS & DOWNLOADS) */}
+                {activeTab === 'nexus' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-cyan-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Step 2 of 5</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">EFADO Nexus Hub: Chat, Reels & Posts</h3>
+                      <p className="text-xs text-slate-400 mt-1">High-integrity social networking, real-time messaging, and high-speed video streaming.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Reels Studio */}
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-2">
+                            <Video className="w-4 h-4" /> 1. EFADO Reels Studio (Video Uploads)
+                          </span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 bg-rose-500/20 text-rose-300 rounded">0% → 100% Real Progress</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Upload videos of any size (including HD and 4MB+ videos). The studio uses direct Firebase Storage resumable upload (`uploadBytesResumable`) with automatic 1MB chunked fallback, ensuring no uploads get stuck at 0%.
                         </p>
+                        <div className="p-3 bg-slate-950/60 rounded-xl text-[11px] text-slate-400 space-y-1">
+                          <p><strong className="text-white">Instant Playback:</strong> Uploaded videos are served via HTTP 206 Partial Content byte-range streaming, so viewers can play instantly without downloading the whole file.</p>
+                          <p><strong className="text-white">Creator Earnings:</strong> Earn real funds (up to ₦100 per 1k views) credited directly to your sovereign wallet balance.</p>
+                        </div>
                       </div>
 
-                      <div className="p-6 bg-slate-800/40 rounded-3xl border border-white/5 space-y-4">
-                        <div className="flex items-center gap-2 text-rose-400 font-extrabold text-xs uppercase tracking-wider">
-                          <span className="p-1.5 bg-rose-500/10 rounded-lg text-rose-400">4</span> CEO Approval Check
-                        </div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase leading-relaxed">
-                          The CEO instantly receives a secure signal of your sending account details and verifies the payout against the live incoming feed, leading to sub-second manual clearances.
+                      {/* Chat Integrity */}
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4" /> 2. Real-Time Chat & Group Rooms
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Chat directly with other members or join specialized communities (Business, Talent, Marriage, Education).
+                        </p>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-300">
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-cyan-400" /> End-to-end secured socket & Firestore listeners</li>
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-cyan-400" /> Image, file, and voice message support</li>
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-cyan-400" /> Online presence & read receipt indicators</li>
+                          <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-cyan-400" /> Strict anti-spam & community moderation</li>
+                        </ul>
+                      </div>
+
+                      {/* Media Download & Upload Integrity */}
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                          <Download className="w-4 h-4" /> 3. Post Uploads & Media Download Integrity
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Posts support rich text, multiple photos, and downloadable attachments. Every downloadable asset preserves its original MIME type and binary checksum to guarantee files are never corrupted in transit.
                         </p>
                       </div>
                     </div>
+                  </div>
+                )}
 
-                    <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xs">
-                          ✓
+                {/* TAB 3: GAMING ARENA & PROVABLY FAIR */}
+                {activeTab === 'games' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-emerald-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Step 3 of 5</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">EFADO Gaming Arena & Provably Fair Play</h3>
+                      <p className="text-xs text-slate-400 mt-1">Multiplayer skill games, verified mathematical seeds, and automated instant wallet crediting.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Deep Sea Jet Crash */}
+                      <div className="p-5 bg-gradient-to-br from-cyan-950/40 to-slate-800 rounded-2xl border border-cyan-500/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                            <Compass className="w-4 h-4 text-cyan-400" /> Deep Sea Jet Game (Efado Crash)
+                          </span>
+                          <span className="text-[9px] font-black px-2 py-0.5 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/40">Game Hub Exclusive</span>
                         </div>
-                        <p className="text-[9px] font-black text-white uppercase tracking-widest italic">Fast & Direct Bank Settlements Active</p>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Place your stake, watch the submarine dive deeper, and cash out before the pressure wave collapses!
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center text-xs">
+                          <div className="p-2.5 bg-black/40 rounded-xl">
+                            <span className="text-[10px] text-slate-400 block uppercase">1. Set Stake</span>
+                            <strong className="text-cyan-300">Min ₦100 / $1</strong>
+                          </div>
+                          <div className="p-2.5 bg-black/40 rounded-xl">
+                            <span className="text-[10px] text-slate-400 block uppercase">2. Watch Multiplier</span>
+                            <strong className="text-amber-300">1.01x up to 100x+</strong>
+                          </div>
+                          <div className="p-2.5 bg-black/40 rounded-xl">
+                            <span className="text-[10px] text-slate-400 block uppercase">3. Hit Cashout</span>
+                            <strong className="text-emerald-300">Instant Wallet Credit</strong>
+                          </div>
+                        </div>
                       </div>
-                      <button 
-                        onClick={onOpenProfile}
-                        className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.15em] transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
-                      >
-                        Set Up Payment Profile Now
-                      </button>
+
+                      {/* Provably Fair Cryptographic Verification */}
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-white flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-amber-400" /> Provably Fair Verification
+                        </h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          All crash multipliers are generated using cryptographic SHA-256 server seeds combined with client seeds and nonces. Neither EFADO nor the player can alter the outcome once the round starts.
+                        </p>
+                      </div>
+
+                      {/* Other Games */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-1">
+                          <h5 className="text-xs font-bold text-white uppercase">Spin & Win / Fortune Wheel</h5>
+                          <p className="text-[11px] text-slate-400">Spin for instant multipliers, bonus tokens, and daily jackpots.</p>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-xl border border-white/5 space-y-1">
+                          <h5 className="text-xs font-bold text-white uppercase">Efado Money Quiz</h5>
+                          <p className="text-[11px] text-slate-400">Test academic, business, and general knowledge for real monetary rewards.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </section>
+                )}
 
-                <div className="bg-white/5 rounded-[2rem] p-8 text-center border border-white/5">
-                   <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] mb-4">Neural Ecosystem Integrity</p>
-                   <p className="text-xs font-bold text-slate-300 uppercase tracking-tighter leading-relaxed italic">EFADO is more than a website; it is an intelligent gateway to sovereign networking and financial equity. Master the tools, seize the mission.</p>
-                </div>
+                {/* TAB 4: DEPOSITS & FLUTTERWAVE */}
+                {activeTab === 'deposits' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-amber-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Step 4 of 5</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">How to Deposit Funds (Flutterwave & Bank)</h3>
+                      <p className="text-xs text-slate-400 mt-1">Multi-currency deposits via debit/credit cards, USSD, bank transfer, and direct CEO accounts.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Method 1: Flutterwave */}
+                      <div className="p-5 bg-indigo-950/40 rounded-2xl border border-indigo-500/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black uppercase tracking-wider text-indigo-300 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-indigo-400" /> Method A: Flutterwave Checkout (Instant & Automated)
+                          </span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded">Global & Local</span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Best for instant top-ups from anywhere in the world. Supports MasterCard, Visa, Verve, Bank USSD, Bank Transfer, Apple Pay, and Google Pay.
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-300">
+                          <li>Open your <strong>Wallet</strong> and click <strong>Deposit</strong>.</li>
+                          <li>Select the <strong>⚡ Flutterwave Checkout</strong> tab.</li>
+                          <li>Enter your deposit amount (e.g. ₦1,000, $10, etc.) and click <strong>Pay with Flutterwave</strong>.</li>
+                          <li>Complete payment in the secure popup. Your wallet balance is automatically credited in real time!</li>
+                        </ol>
+                      </div>
+
+                      {/* Method 2: Direct CEO Bank Transfer */}
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                          <Building2 className="w-4 h-4" /> Method B: Direct Bank Deposit (CEO Accounts)
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          For large sums or direct bank mobile app transfers:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div className="p-3 bg-black/30 rounded-xl space-y-1">
+                            <strong className="text-white block uppercase text-[10px]">1. Copy CEO Account</strong>
+                            <p className="text-slate-400 text-[11px]">Choose an authorized bank from the list and transfer via your banking app.</p>
+                          </div>
+                          <div className="p-3 bg-black/30 rounded-xl space-y-1">
+                            <strong className="text-white block uppercase text-[10px]">2. Enter Sender Details</strong>
+                            <p className="text-slate-400 text-[11px]">Type your Sender Bank, Account Number, and Name so admin can verify and credit you instantly.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 5: CASHOUTS & WITHDRAWALS */}
+                {activeTab === 'withdrawals' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-rose-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">Step 5 of 5</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">How to Withdraw Winnings & Balances</h3>
+                      <p className="text-xs text-slate-400 mt-1">Direct payouts straight to your local or international bank account.</p>
+                    </div>
+
+                    <div className="p-5 bg-white/5 rounded-2xl border border-white/10 space-y-4">
+                      <h4 className="text-sm font-black uppercase tracking-wider text-white flex items-center gap-2">
+                        <ArrowDownCircle className="w-4 h-4 text-rose-400" /> Easy 3-Step Withdrawal Process
+                      </h4>
+                      
+                      <div className="space-y-3 text-xs text-slate-300">
+                        <div className="flex gap-3 p-3 bg-slate-950/60 rounded-xl">
+                          <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">1</div>
+                          <div>
+                            <strong className="text-white uppercase block text-[11px]">Bind Your Bank Account in Profile</strong>
+                            <p className="text-slate-400 text-[11px] mt-0.5">Go to Wallet → Profile. Choose your bank from the dropdown and enter your 10-digit account number.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 p-3 bg-slate-950/60 rounded-xl">
+                          <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">2</div>
+                          <div>
+                            <strong className="text-white uppercase block text-[11px]">Initiate Withdrawal Request</strong>
+                            <p className="text-slate-400 text-[11px] mt-0.5">Go to Wallet → Withdraw. Enter the amount you wish to withdraw and confirm with your secure 4-digit PIN.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 p-3 bg-slate-950/60 rounded-xl">
+                          <div className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-xs shrink-0">3</div>
+                          <div>
+                            <strong className="text-white uppercase block text-[11px]">Fast Processing & Settlement</strong>
+                            <p className="text-slate-400 text-[11px] mt-0.5">Withdrawal requests are processed immediately through automated gateway settlement or CEO approval queue.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                        <button 
+                          onClick={onOpenProfile}
+                          className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                          Bind Bank Account Now
+                        </button>
+                        <button 
+                          onClick={onClose}
+                          className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all"
+                        >
+                          Got It
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 6: ADS & MARKETPLACE */}
+                {activeTab === 'advertising' && (
+                  <div className="space-y-6">
+                    <div className="border-l-4 border-purple-500 pl-4">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Bonus</span>
+                      <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight italic">Advertising & Marketplace Hubs</h3>
+                      <p className="text-xs text-slate-400 mt-1">Promote products, real estate, vehicles, and services to global EFADO users.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-white">Targeted Listings</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Post in 11 categories (Hotels, Farmland, Housing, Machinery, Electronics) with rich image galleries and instant WhatsApp/phone contacts.
+                        </p>
+                      </div>
+                      <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-2">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-white">Strategic Exposure</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                          Choose from Free Lite (3 days) to Featured Plans to place your adverts at the top of the Global Feed and Search results.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           </motion.div>

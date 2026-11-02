@@ -45,11 +45,11 @@ const app = initializeApp(firebaseConfig);
 
 const databaseId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
 
-// Initialize Firestore with auto-detect long polling to prevent WebChannel stream assertion failures
+// Initialize Firestore with forced long polling to prevent WebChannel stream 10s timeouts in iframe/proxy environments
 export const db = (() => {
   try {
     return initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
+      experimentalForceLongPolling: true,
     }, databaseId);
   } catch (e) {
     return getFirestore(app, databaseId);
@@ -63,15 +63,14 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Connection test
+// Robust non-blocking connection check
 async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection successful");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. The client is offline.");
-    }
+    await getDoc(doc(db, 'test', 'connection'));
+    console.log("Firestore connection active and operational.");
+  } catch (error: any) {
+    // Only warn if persistent; Firestore will automatically retry long-polling
+    console.warn("Firestore connection check note:", error?.message || error);
   }
 }
 testConnection();

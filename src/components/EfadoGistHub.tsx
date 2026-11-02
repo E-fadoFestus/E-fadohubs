@@ -1353,40 +1353,73 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
           >
-            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden text-white">
+            <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden text-white my-auto max-h-[88vh] overflow-y-auto custom-scrollbar">
               <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none" />
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-6 right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black z-20"
+                aria-label="Close Guide"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
               
               <div className="relative z-10">
-                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-900/40 mb-6">
-                  <MessageSquare className="w-8 h-8" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-900/40 shrink-0">
+                    <MessageSquare className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Tactical Manual</span>
+                    <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Nexus Hub User Guide</h2>
+                  </div>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight uppercase">Strategic Feed Guide</h2>
-                <p className="text-slate-300 font-bold mb-6 leading-relaxed uppercase tracking-[0.1em] text-xs">
-                  Social discourse protocols active. Here is how you navigate the EFADO Nexus Hub:
+
+                <p className="text-slate-300 font-medium text-xs leading-relaxed mb-6">
+                  Learn how to post, chat, create high-performance reels, and earn creator rewards across the global EFADO network.
                 </p>
                 
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                   {[
-                    { icon: MessageSquare, title: "Global Feed", desc: "Participate in diverse discussions across religious, social, and professional categories." },
-                    { icon: Video, title: "EFADO Reels", desc: "Short-form tactical video content. Swipe and engage with the global community." },
-                    { icon: Users, title: "Specialized Groups", desc: "Join vetted groups focused on marriage, business, and talent development." },
-                    { icon: Shield, title: "Secure Discourse", desc: "All communication is encrypted and verified to ensure high-fidelity interactions." }
+                    { 
+                      icon: MessageSquare, 
+                      color: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30",
+                      title: "1. Global Feed & Post Integrity", 
+                      desc: "Share thoughts, photos, and updates with zero latency. Every image and download maintains checksum integrity to prevent media corruption." 
+                    },
+                    { 
+                      icon: Video, 
+                      color: "text-rose-400 bg-rose-500/15 border-rose-500/30",
+                      title: "2. Reels Studio & 206 Streaming", 
+                      desc: "Record or upload videos (>4MB supported). Tracks true 0% → 100% upload progress via Firebase Storage resumable upload + chunked fallback, with instant playback via HTTP 206 Partial Content." 
+                    },
+                    { 
+                      icon: MessageCircle, 
+                      color: "text-blue-400 bg-blue-500/15 border-blue-500/30",
+                      title: "3. Direct Messaging & Communities", 
+                      desc: "Encrypted 1-on-1 private messaging and verified special forums (Business, Marriage, Tech, Wives Forum) with real-time delivery and online status." 
+                    },
+                    { 
+                      icon: Coins, 
+                      color: "text-amber-400 bg-amber-500/15 border-amber-500/30",
+                      title: "4. Creator Earnings & Monetization", 
+                      desc: "Earn ₦100 per 1k views on popular reels. Earnings credit automatically to your sovereign wallet, withdrawable anytime to your bound bank account." 
+                    },
+                    { 
+                      icon: Shield, 
+                      color: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
+                      title: "5. Trust & Account Security", 
+                      desc: "Sovereign authentication with Google identity, strict community moderation, and encrypted transport protocols guarantee full data safety." 
+                    }
                   ].map((item, i) => (
-                    <div key={i} className="flex gap-4 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-                      <div className="w-10 h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-xl flex items-center justify-center shrink-0">
-                        <item.icon className="w-5 h-5 text-indigo-400" />
+                    <div key={i} className="flex gap-3.5 p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800/90 transition-all">
+                      <div className={`w-9 h-9 border rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
+                        <item.icon className="w-4 h-4" />
                       </div>
                       <div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest mb-0.5">{item.title}</h4>
-                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">{item.desc}</p>
+                        <h4 className="text-xs font-black text-white uppercase tracking-wider mb-0.5">{item.title}</h4>
+                        <p className="text-[11px] text-slate-300 leading-relaxed font-normal">{item.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -1394,9 +1427,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 
                 <button 
                   onClick={() => setShowGuide(false)}
-                  className="w-full mt-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all"
+                  className="w-full mt-6 py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600 hover:brightness-110 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all active:scale-[0.98]"
                 >
-                  Initiate Discourse
+                  Explore Nexus Hub
                 </button>
               </div>
             </div>
@@ -1435,10 +1468,20 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         
         {/* Left Sidebar - Navigation */}
         <div className="w-20 md:w-72 flex-shrink-0 bg-[#070a16]/85 backdrop-blur-2xl border-r border-white/10 flex flex-col z-30">
-          <div className="p-4 md:p-6 flex items-center gap-3 border-b border-white/10">
+          <div className="p-3 md:p-6 flex flex-col md:flex-row items-center gap-2 md:gap-3 border-b border-white/10">
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-[#8B5CF6] to-[#06B6D4] flex items-center justify-center shadow-lg shadow-[#8B5CF6]/30 flex-shrink-0">
               <Zap className="w-6 h-6 text-white" />
             </div>
+            
+            {/* Mobile Guide Button */}
+            <button 
+              onClick={() => setShowGuide(true)}
+              className="md:hidden p-1.5 rounded-lg bg-[#06B6D4]/15 border border-[#06B6D4]/30 text-[#06B6D4] hover:text-white flex items-center justify-center text-[9px] font-bold"
+              title="Nexus Hub Guide"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+
             <div className="hidden md:block">
               <div>
                 <h2 className="text-xl font-black bg-gradient-to-r from-white via-indigo-100 to-indigo-300 text-transparent bg-clip-text uppercase tracking-tight">

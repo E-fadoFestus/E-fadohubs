@@ -2544,11 +2544,11 @@ function AppContent() {
 
               <button 
                 onClick={() => setShowUserGuide(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-slate-700 transition-all shadow-lg border border-white/5"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-900/60 to-indigo-800/80 hover:from-indigo-800 hover:to-indigo-700 text-indigo-200 hover:text-white rounded-xl text-[10px] sm:text-[11px] font-black tracking-widest transition-all shadow-lg border border-indigo-500/30 active:scale-95 group"
+                title="Open EFADO User Guide"
               >
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="hidden sm:inline uppercase">Guide</span>
-                <span className="sm:hidden">?</span>
+                <HelpCircle className="w-3.5 h-3.5 text-indigo-400 group-hover:text-white transition-colors animate-pulse" />
+                <span className="uppercase tracking-wider">Guide</span>
               </button>
 
               <button 
