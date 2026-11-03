@@ -841,73 +841,51 @@ app.post('/api/hubs/cargo/ship', (req, res) => res.json({ success: true, trackin
 // FLUTTERWAVE CENTRAL PROCESSOR APIS (EFADO WALLET DEPOSIT)
 // ============================================================================
 
-// 1. /api/payments/initialize - Input: amount, email, userId, channel=ALL. Create tx_ref EFADO+Date.now(), save pendingPayments
+// 1. /api/payments/initialize - Input: amount, email, userId, channel=ALL
 app.post(['/api/payments/initialize', '/api/payments/init'], async (req: express.Request, res: express.Response) => {
   try {
-    const { amount, email, userId, channel = 'ALL', name, phone } = req.body || {};
-    const numAmount = Number(amount);
-
-    if (!numAmount || numAmount <= 0) {
-      return res.status(400).json({ success: false, message: 'A positive numeric amount is required' });
+    const { amount, email, userId, channel } = req.body || {};
+    
+    if (!amount || !userId) {
+      return res.status(400).json({ success: false, message: 'amount and userId required' });
     }
 
-    const tx_ref = req.body.tx_ref || `EFADO+${Date.now()}`;
-    const userEmail = (email || 'customer@efado.com').trim();
-    const targetUserId = (userId || userEmail).trim();
+    const tx_ref = `EFADO_${Date.now()}_${String(userId).substring(0, 6)}`;
 
     // Save to pendingPayments in Firestore
-    const pendingPaymentRef = doc(db, 'pendingPayments', tx_ref);
-    await setDoc(pendingPaymentRef, {
-      tx_ref,
-      amount: numAmount,
-      email: userEmail,
-      userId: targetUserId,
-      name: name || '',
-      phone: phone || '',
-      channel: (channel || 'ALL').toUpperCase(),
-      currency: 'NGN',
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
-    // Also pre-record in deposits collection for system compatibility
     try {
-      const depositRef = doc(db, 'deposits', tx_ref);
-      await setDoc(depositRef, {
+      const pendingPaymentRef = doc(db, 'pendingPayments', tx_ref);
+      await setDoc(pendingPaymentRef, {
         tx_ref,
-        amount: numAmount,
-        email: userEmail,
-        userId: targetUserId,
-        channel: 'ALL',
+        amount: Number(amount),
+        email: email || 'user@efado.com',
+        userId: String(userId),
+        channel: channel || 'ALL',
         currency: 'NGN',
         status: 'pending',
         createdAt: serverTimestamp()
       }, { merge: true });
-    } catch (_) {}
-
-    const publicKey = (
-      process.env.VITE_FLUTTERWAVE_PUBLIC_KEY || 
-      process.env.VITE_FLUTTERWAVE_CLIENT_ID || 
-      process.env.FLUTTERWAVE_CLIENT_ID || 
-      'FLWPUBK_TEST-9382f7e028b171f11e998c7602058ba3-X'
-    ).trim();
+    } catch (e) {
+      console.warn('[Payments Init] Firestore write warning:', e);
+    }
 
     return res.status(200).json({
       success: true,
-      status: 'success',
-      message: 'Payment initialized successfully',
       tx_ref,
-      amount: numAmount,
+      amount: Number(amount),
       currency: 'NGN',
-      email: userEmail,
-      userId: targetUserId,
-      channel: (channel || 'ALL').toUpperCase(),
-      publicKey
+      email: email || 'user@efado.com',
+      publicKey: process.env.VITE_FLUTTERWAVE_PUBLIC_KEY || '',
+      channels: ['card', 'banktransfer', 'opay', 'ussd', 'account', 'qr'],
+      message: 'Transaction initialized'
     });
   } catch (err: any) {
     console.error('[API payments/initialize Error]:', err);
-    return res.status(500).json({ success: false, message: err.message || 'Initialization error' });
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message || 'Server error in initialize',
+      error: String(err)
+    });
   }
 });
 
@@ -1065,6 +1043,7 @@ app.all(['/api/payments/verify', '/api/payments/verify/:txRef'], async (req: exp
 
     return res.status(200).json({
       success: true,
+      credited: true,
       status: 'successful',
       message: `Payment verified and credited to wallets/${finalUserId}/NGN/depositWallet`,
       tx_ref,
@@ -1073,7 +1052,7 @@ app.all(['/api/payments/verify', '/api/payments/verify/:txRef'], async (req: exp
     });
   } catch (err: any) {
     console.error('[API payments/verify Error]:', err);
-    return res.status(500).json({ success: false, message: err.message || 'Verification error' });
+    return res.status(500).json({ success: false, credited: false, message: err.message || 'Verification error' });
   }
 });
 
@@ -1479,7 +1458,7 @@ app.post(['/webhook/flutterwave', '/api/webhook/flutterwave', '/flutterwaveWebho
     }
   }
 
-  return res.status(200).send('EVENT_RECEIVED');
+  return res.status(200).json({ success: true, message: 'EVENT_RECEIVED' });
 });
 
 // Route D.3: Flutterwave Banks Directory Provider (/api/flutterwave/banks)
