@@ -34,18 +34,15 @@ service cloud.firestore {
 
     // User profiles & auth
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if true;
     }
 
     match /transactions/{txId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /deposits/{depId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /withdrawals/{wId} {
@@ -183,7 +180,9 @@ service cloud.firestore {
     match /incubator_ideas/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /live_classes/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /creator_stats/{id} { allow read: if true; allow write: if isAuthenticated(); }
-    match /wallets/{id} { allow read, write: if isAuthenticated(); }
+    match /wallets/{id} { allow read, write: if true; }
+    match /wallets/{walletId}/{document=**} { allow read, write: if true; }
+    match /pendingPayments/{paymentId} { allow read, write: if true; }
     match /vending_purchases/{id} { allow read, write: if isAuthenticated(); }
     match /zoom_subscriptions/{id} { allow read, write: if isAuthenticated(); }
     match /jamb_candidates/{id} { allow read, write: if isAuthenticated(); }
