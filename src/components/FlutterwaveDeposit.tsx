@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, CreditCard, ShieldCheck, AlertCircle, CheckCircle, Wallet, ArrowUpRight, Check, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Loader2, CreditCard, ShieldCheck, AlertCircle, CheckCircle, Wallet, ArrowUpRight, Check, Zap, ExternalLink, X, RefreshCw } from 'lucide-react';
 import { UserProfile } from '../types';
 import { db, doc, onSnapshot } from '../firebase';
 
@@ -12,8 +12,17 @@ interface FlutterwaveDepositProps {
 
 declare global {
   interface Window {
-    FlutterwaveCheckout?: (options: any) => void;
+    FlutterwaveCheckout?: (options: any) => any;
   }
+}
+
+// Declared for direct FlutterwaveCheckout({ public_key: ... }) call
+declare function FlutterwaveCheckout(options: any): any;
+
+interface ActiveHostedPayState {
+  url: string;
+  tx_ref: string;
+  amount: number;
 }
 
 export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
@@ -28,6 +37,9 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [depositBalance, setDepositBalance] = useState<number | null>(null);
+  const [activeHostedPay, setActiveHostedPay] = useState<ActiveHostedPayState | null>(null);
+
+  const verificationPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Quick amount buttons: N1k to N50k
   const quickAmountOptions = [
@@ -39,11 +51,10 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
     { label: '₦50k', value: 50000 },
   ];
 
-  // 1. Live Balance listener from wallets/{userId}/NGN (and subdoc depositWallet)
+  // 1. Live Balance listener from wallets/{userId}/NGN/depositWallet
   useEffect(() => {
     if (!user?.uid) return;
 
-    // Listen to subcollection doc: wallets/{userId}/NGN/depositWallet
     const unsubSub = onSnapshot(
       doc(db, 'wallets', user.uid, 'NGN', 'depositWallet'),
       (snap) => {
@@ -53,6 +64,10 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
             setDepositBalance(data.balance);
             return;
           }
+          if (typeof data.depositWallet === 'number') {
+            setDepositBalance(data.depositWallet);
+            return;
+          }
         }
       },
       (err) => {
@@ -60,7 +75,6 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       }
     );
 
-    // Fallback listener: wallets/{userId} (NGN.depositWallet or depositWallet)
     const unsubMain = onSnapshot(
       doc(db, 'wallets', user.uid),
       (snap) => {
@@ -80,18 +94,72 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
     return () => {
       unsubSub();
       unsubMain();
+      if (verificationPollingRef.current) {
+        clearInterval(verificationPollingRef.current);
+      }
     };
   }, [user?.uid]);
 
-  // 2. Dynamically load Flutterwave Inline JS SDK
+  // 2. Ensure Flutterwave Checkout script is loaded
   useEffect(() => {
-    if (window.FlutterwaveCheckout) return;
-
-    const script = document.createElement('script');
-    script.src = 'https://checkout.flutterwave.com/v3.js';
-    script.async = true;
-    document.body.appendChild(script);
+    if (typeof window !== 'undefined' && !window.FlutterwaveCheckout) {
+      const existingScript = document.querySelector('script[src*="checkout.flutterwave.com"]');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.flutterwave.com/v3.js';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+    }
   }, []);
+
+  // Central payment verification routine
+  const verifyPayment = async (txRef: string, transactionId?: string | number, numAmount?: number) => {
+    setIsVerifying(true);
+    setStatusMessage('Verifying payment and crediting your deposit wallet...');
+    setErrorMessage(null);
+
+    const targetAmount = numAmount || parseFloat(amount) || 1000;
+
+    try {
+      const verifyRes = await fetch('/api/payments/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tx_ref: txRef,
+          transaction_id: transactionId,
+          amount: targetAmount,
+          userId: user.uid,
+        }),
+      });
+
+      const verifyData = await verifyRes.json();
+      if (verifyRes.ok && verifyData.success) {
+        setStatusMessage(`Deposit verified successfully! ₦${targetAmount.toLocaleString()} credited.`);
+        setActiveHostedPay(null);
+
+        if (typeof verifyData.newBalance === 'number') {
+          setDepositBalance(verifyData.newBalance);
+        }
+
+        setTimeout(() => {
+          setIsVerifying(false);
+          onSuccess({
+            reference: txRef,
+            amount: targetAmount,
+          });
+        }, 800);
+      } else {
+        throw new Error(verifyData.message || 'Payment not yet confirmed by gateway. Please check back in a moment.');
+      }
+    } catch (err: any) {
+      console.warn('[Payments Verify Notice]:', err);
+      setIsVerifying(false);
+      setErrorMessage(err.message || 'Verification could not confirm gateway status yet.');
+    }
+  };
 
   const handleFundCheckout = async () => {
     setErrorMessage(null);
@@ -104,10 +172,10 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
     }
 
     setIsInitializing(true);
-    setStatusMessage('Initializing transaction on EFADO central processor...');
+    setStatusMessage('Initializing transaction on EFADO central processor (V4 Gateway)...');
 
     try {
-      // Step 1: Call /api/payments/initialize
+      // Step 1: Initialize transaction (Calls /api/payments/initialize which invokes Flutterwave V4 with Bearer FLWSECK_LIVE)
       const initRes = await fetch('/api/payments/initialize', {
         method: 'POST',
         headers: {
@@ -118,6 +186,8 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           email: user.email || 'customer@efado.com',
           userId: user.uid,
           channel: 'ALL',
+          name: user.displayName || user.fullName || 'EFADO Valued Customer',
+          phone: user.phoneNumber || ''
         }),
       });
 
@@ -127,92 +197,107 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       }
 
       const txRef = initData.tx_ref;
-      const publicKey = initData.publicKey || (
-        import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || 
-        'FLWPUBK_TEST-9382f7e028b171f11e998c7602058ba3-X'
+      const publicKey = (
+        import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
+        initData.publicKey ||
+        import.meta.env.VITE_FLUTTERWAVE_CLIENT_ID ||
+        ''
       ).trim();
 
-      setStatusMessage('Launching Flutterwave central checkout...');
+      setStatusMessage('Launching Flutterwave V4 checkout...');
 
-      // Step 2: Open Flutterwave Checkout with ALL channels
-      if (typeof window.FlutterwaveCheckout === 'function') {
-        window.FlutterwaveCheckout({
-          public_key: publicKey,
+      const checkoutConfig = {
+        public_key: publicKey,
+        tx_ref: txRef,
+        amount: numericAmount,
+        currency: 'NGN',
+        payment_options: 'card,banktransfer,opay,ussd,account,qr',
+        customer: {
+          email: user.email || 'customer@efado.com',
+          phone_number: user.phoneNumber || '08000000000',
+          name: user.displayName || user.fullName || 'EFADO Valued Customer',
+        },
+        customizations: {
+          title: 'EFADO Market Hubs Central Processor',
+          description: `Fund ₦${numericAmount.toLocaleString()} to EFADO Sovereign Wallet`,
+          logo: 'https://e-fado.com/logo.png',
+        },
+        callback: async (response: any) => {
+          setIsInitializing(false);
+          await verifyPayment(response.tx_ref || txRef, response.transaction_id, numericAmount);
+        },
+        onclose: () => {
+          setIsInitializing(false);
+          setIsVerifying(false);
+          if (onCancel) onCancel();
+        },
+      };
+
+      let checkoutLaunched = false;
+
+      // Method 1: Use FlutterwaveCheckout({ public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY })
+      try {
+        if (typeof FlutterwaveCheckout === 'function') {
+          FlutterwaveCheckout({
+            public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || publicKey,
+            ...checkoutConfig
+          });
+          checkoutLaunched = true;
+          setIsInitializing(false);
+        }
+      } catch (err: any) {
+        console.warn('[Flutterwave V4] Direct FlutterwaveCheckout failed with key, switching to new method:', err?.message || err);
+        checkoutLaunched = false;
+      }
+
+      // Method 2: If that fails with invalid key, switch to new method: use window.FlutterwaveCheckout
+      if (!checkoutLaunched) {
+        try {
+          if (typeof window !== 'undefined' && typeof window.FlutterwaveCheckout === 'function') {
+            window.FlutterwaveCheckout({
+              public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || publicKey,
+              ...checkoutConfig
+            });
+            checkoutLaunched = true;
+            setIsInitializing(false);
+          }
+        } catch (winErr: any) {
+          console.warn('[Flutterwave V4] window.FlutterwaveCheckout failed with invalid key:', winErr?.message || winErr);
+          checkoutLaunched = false;
+        }
+      }
+
+      // Method 3: If that fails with invalid key / V4 Client ID, switch to flutterwave v4 inline JS / hosted pay: https://checkout.flutterwave.com/v3/hosted/pay
+      if (!checkoutLaunched) {
+        const hostedPayUrl = initData.link || `https://checkout.flutterwave.com/v3/hosted/pay?tx_ref=${encodeURIComponent(txRef)}&amount=${numericAmount}&currency=NGN&email=${encodeURIComponent(user.email || 'customer@efado.com')}&public_key=${encodeURIComponent(publicKey)}`;
+
+        console.info('[Flutterwave V4] Switching to Flutterwave V4 Hosted Checkout:', hostedPayUrl);
+        setStatusMessage('Opening Flutterwave V4 Hosted Checkout...');
+        
+        setActiveHostedPay({
+          url: hostedPayUrl,
           tx_ref: txRef,
           amount: numericAmount,
-          currency: 'NGN',
-          // ALL payment methods enabled: card, bank, OPay, USSD, transfer, QR
-          payment_options: 'card,banktransfer,opay,ussd,account,qr',
-          customer: {
-            email: user.email || 'customer@efado.com',
-            phone_number: user.phoneNumber || '08000000000',
-            name: user.displayName || user.fullName || 'EFADO Valued Customer',
-          },
-          customizations: {
-            title: 'EFADO Market Hubs Central Processor',
-            description: `Fund ₦${numericAmount.toLocaleString()} to EFADO Sovereign Wallet`,
-            logo: 'https://e-fado.com/logo.png',
-          },
-          callback: async (response: any) => {
-            setIsInitializing(false);
-            setIsVerifying(true);
-            setStatusMessage('Verifying payment and crediting your deposit wallet...');
-
-            try {
-              // Step 3: Verify via /api/payments/verify
-              const verifyRes = await fetch('/api/payments/verify', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  tx_ref: response.tx_ref || txRef,
-                  transaction_id: response.transaction_id,
-                  amount: numericAmount,
-                  userId: user.uid,
-                }),
-              });
-
-              const verifyData = await verifyRes.json();
-              if (verifyRes.ok && verifyData.success) {
-                setStatusMessage('Deposit verified successfully! ₦' + numericAmount.toLocaleString() + ' credited.');
-                if (typeof verifyData.newBalance === 'number') {
-                  setDepositBalance(verifyData.newBalance);
-                }
-                setTimeout(() => {
-                  setIsVerifying(false);
-                  onSuccess({
-                    reference: response.tx_ref || txRef,
-                    amount: numericAmount,
-                  });
-                }, 800);
-              } else {
-                throw new Error(verifyData.message || 'Verification failed. Checking webhook status...');
-              }
-            } catch (vErr: any) {
-              console.warn('Verification endpoint notice:', vErr);
-              // Fallback completion so user is not stuck
-              setIsVerifying(false);
-              setStatusMessage('Payment processed. Balance is updating via real-time sync.');
-              onSuccess({
-                reference: response.tx_ref || txRef,
-                amount: numericAmount,
-              });
-            }
-          },
-          onclose: () => {
-            setIsInitializing(false);
-            setIsVerifying(false);
-            if (onCancel) onCancel();
-          },
         });
-      } else {
-        throw new Error('Flutterwave SDK not loaded. Please check your internet connection.');
+
+        setIsInitializing(false);
+
+        // Try opening directly in window / tab
+        try {
+          const popup = window.open(hostedPayUrl, '_blank', 'noopener,noreferrer');
+          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+            // Popup blocked by browser policy, user will click Launch button in UI
+            setStatusMessage('Please click the Launch button below to complete Flutterwave V4 payment.');
+          }
+        } catch {
+          // Handled via UI
+        }
       }
+
     } catch (err: any) {
       setIsInitializing(false);
       setIsVerifying(false);
-      setErrorMessage(err.message || 'Failed to initialize payment. Please try again.');
+      setErrorMessage(err.message || 'Failed to initialize Flutterwave V4 payment. Please try again.');
     }
   };
 
@@ -229,7 +314,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
 
   return (
     <div id="flutterwave-deposit-screen" className="space-y-6">
-      {/* Live Balance Card from wallets/{userId}/NGN */}
+      {/* Live Balance Card from wallets/{userId}/NGN/depositWallet */}
       <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 p-5 rounded-2xl text-white shadow-xl relative overflow-hidden border border-indigo-700/50">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <Wallet className="w-32 h-32 text-indigo-400" />
@@ -302,15 +387,15 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         </div>
       </div>
 
-      {/* Payment Channels Indicator - ALL channels supported */}
+      {/* Payment Channels Indicator - ALL channels supported in V4 */}
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-amber-500" />
-            Central Processor Payment Channels
+            Flutterwave V4 Payment Channels
           </span>
           <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-150">
-            ALL Channels Active
+            Client ID Active
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-bold">
@@ -332,6 +417,72 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Active Flutterwave V4 Hosted Checkout Card */}
+      {activeHostedPay && (
+        <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-2 border-indigo-500 rounded-2xl p-5 shadow-lg space-y-4 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 bg-indigo-600 text-white rounded-lg">
+                <Zap className="w-4 h-4" />
+              </span>
+              <div>
+                <h4 className="text-sm font-black text-slate-900">Flutterwave V4 Gateway Checkout</h4>
+                <p className="text-[11px] text-slate-500 font-mono">Ref: {activeHostedPay.tx_ref}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveHostedPay(null)}
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-600 space-y-1">
+            <p>
+              Your transaction of <strong className="text-slate-900 font-black">₦{activeHostedPay.amount.toLocaleString()}</strong> is ready on the secure Flutterwave V4 gateway.
+            </p>
+            <p className="text-[11px] text-slate-500">
+              If the payment tab did not open automatically, click <strong>Open Flutterwave Checkout</strong> below:
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <a
+              id="flw-v4-open-checkout-link"
+              href={activeHostedPay.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-center"
+            >
+              <span>Open Flutterwave Checkout</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+
+            <button
+              id="flw-v4-verify-button"
+              type="button"
+              disabled={isVerifying}
+              onClick={() => verifyPayment(activeHostedPay.tx_ref, undefined, activeHostedPay.amount)}
+              className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Checking Status...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>I Have Completed Payment</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status & Messages */}
       {statusMessage && (
@@ -360,7 +511,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           {isInitializing ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Connecting Central Gateway...</span>
+              <span>Connecting V4 Gateway...</span>
             </>
           ) : isVerifying ? (
             <>
@@ -378,7 +529,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
 
       <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-        <span>Secured by Flutterwave Central Processor (Card, Bank, OPay, USSD, Transfer)</span>
+        <span>Secured by Flutterwave V4 Gateway (Card, Bank, OPay, USSD, Transfer)</span>
       </div>
     </div>
   );
