@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
     // 3. HOLISTIC: GET SECRETS SAFELY - Never crash
     const cleanKey = (k) => (k || '').trim().replace(/['";`\s]/g, '').split('=').pop().trim();
-    const FLW_SECRET = cleanKey(process.env.FLWSECK_LIVE || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY);
+    const FLW_SECRET = cleanKey(process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLWSECK_LIVE || process.env.FLUTTERWAVE_SECRET_KEY || process.env.FLW_SECRET_KEY);
     const PAYSTACK_SECRET = cleanKey(process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_LIVE);
 
     // 4. TRY FLUTTERWAVE V3 (Primary)

@@ -172,10 +172,13 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
     }
 
     setIsInitializing(true);
-    setStatusMessage('Initializing transaction on EFADO central processor (V4 Gateway)...');
+    setStatusMessage('Connecting Flutterwave V4 Gateway...');
+
+    const controller = new AbortController();
+    const timeoutTimer = setTimeout(() => controller.abort(), 15000);
 
     try {
-      // Step 1: Initialize transaction (Calls /api/payments/initialize which invokes Flutterwave V4 with Bearer FLWSECK_LIVE)
+      // Step 1: Initialize transaction with backend (calls api.flutterwave.com with FLUTTERWAVE_CLIENT_SECRET)
       const initRes = await fetch('/api/payments/initialize', {
         method: 'POST',
         headers: {
@@ -189,115 +192,47 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           name: user.displayName || user.fullName || 'EFADO Valued Customer',
           phone: user.phoneNumber || ''
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutTimer);
 
       const initData = await initRes.json();
       if (!initRes.ok || !initData.success) {
-        throw new Error(initData.message || 'Payment initialization failed.');
+        throw new Error(initData.message || 'Payment initialization failed. Please try again.');
+      }
+
+      if (!initData.link || typeof initData.link !== 'string') {
+        throw new Error('Flutterwave did not return a valid checkout link. Please verify API keys in Vercel.');
       }
 
       const txRef = initData.tx_ref;
-      const publicKey = (
-        import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
-        initData.publicKey ||
-        import.meta.env.VITE_FLUTTERWAVE_CLIENT_ID ||
-        ''
-      ).trim();
+      const paymentLink = initData.link;
 
-      setStatusMessage('Launching Flutterwave V4 checkout...');
+      setStatusMessage('Redirecting to Flutterwave checkout...');
 
-      const checkoutConfig = {
-        public_key: publicKey,
+      // Store active checkout session in state so user can also open manually or verify if return is blocked
+      setActiveHostedPay({
+        url: paymentLink,
         tx_ref: txRef,
         amount: numericAmount,
-        currency: 'NGN',
-        payment_options: 'card,banktransfer,opay,ussd,account,qr',
-        customer: {
-          email: user.email || 'customer@efado.com',
-          phone_number: user.phoneNumber || '08000000000',
-          name: user.displayName || user.fullName || 'EFADO Valued Customer',
-        },
-        customizations: {
-          title: 'EFADO Market Hubs Central Processor',
-          description: `Fund ₦${numericAmount.toLocaleString()} to EFADO Sovereign Wallet`,
-          logo: 'https://e-fado.com/logo.png',
-        },
-        callback: async (response: any) => {
-          setIsInitializing(false);
-          await verifyPayment(response.tx_ref || txRef, response.transaction_id, numericAmount);
-        },
-        onclose: () => {
-          setIsInitializing(false);
-          setIsVerifying(false);
-          if (onCancel) onCancel();
-        },
-      };
+      });
 
-      let checkoutLaunched = false;
+      setIsInitializing(false);
 
-      // Method 1: Use FlutterwaveCheckout({ public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY })
-      try {
-        if (typeof FlutterwaveCheckout === 'function') {
-          FlutterwaveCheckout({
-            public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || publicKey,
-            ...checkoutConfig
-          });
-          checkoutLaunched = true;
-          setIsInitializing(false);
-        }
-      } catch (err: any) {
-        console.warn('[Flutterwave V4] Direct FlutterwaveCheckout failed with key, switching to new method:', err?.message || err);
-        checkoutLaunched = false;
-      }
-
-      // Method 2: If that fails with invalid key, switch to new method: use window.FlutterwaveCheckout
-      if (!checkoutLaunched) {
-        try {
-          if (typeof window !== 'undefined' && typeof window.FlutterwaveCheckout === 'function') {
-            window.FlutterwaveCheckout({
-              public_key: import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY || publicKey,
-              ...checkoutConfig
-            });
-            checkoutLaunched = true;
-            setIsInitializing(false);
-          }
-        } catch (winErr: any) {
-          console.warn('[Flutterwave V4] window.FlutterwaveCheckout failed with invalid key:', winErr?.message || winErr);
-          checkoutLaunched = false;
-        }
-      }
-
-      // Method 3: If that fails with invalid key / V4 Client ID, switch to flutterwave v4 inline JS / hosted pay: https://checkout.flutterwave.com/v3/hosted/pay
-      if (!checkoutLaunched) {
-        const hostedPayUrl = initData.link || `https://checkout.flutterwave.com/v3/hosted/pay?tx_ref=${encodeURIComponent(txRef)}&amount=${numericAmount}&currency=NGN&email=${encodeURIComponent(user.email || 'customer@efado.com')}&public_key=${encodeURIComponent(publicKey)}`;
-
-        console.info('[Flutterwave V4] Switching to Flutterwave V4 Hosted Checkout:', hostedPayUrl);
-        setStatusMessage('Opening Flutterwave V4 Hosted Checkout...');
-        
-        setActiveHostedPay({
-          url: hostedPayUrl,
-          tx_ref: txRef,
-          amount: numericAmount,
-        });
-
-        setIsInitializing(false);
-
-        // Try opening directly in window / tab
-        try {
-          const popup = window.open(hostedPayUrl, '_blank', 'noopener,noreferrer');
-          if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-            // Popup blocked by browser policy, user will click Launch button in UI
-            setStatusMessage('Please click the Launch button below to complete Flutterwave V4 payment.');
-          }
-        } catch {
-          // Handled via UI
-        }
-      }
+      // Direct redirection to the real Flutterwave checkout session
+      window.location.href = paymentLink;
 
     } catch (err: any) {
+      clearTimeout(timeoutTimer);
       setIsInitializing(false);
       setIsVerifying(false);
-      setErrorMessage(err.message || 'Failed to initialize Flutterwave V4 payment. Please try again.');
+      setStatusMessage(null);
+      if (err.name === 'AbortError') {
+        setErrorMessage('Connection timed out after 15 seconds. Please try again.');
+      } else {
+        setErrorMessage(err.message || 'Failed to initialize payment. Please try again.');
+      }
     }
   };
 

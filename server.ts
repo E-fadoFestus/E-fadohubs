@@ -842,7 +842,19 @@ app.post('/api/hubs/cargo/ship', (req, res) => res.json({ success: true, trackin
 // ============================================================================
 
 // 1. /api/payments/initialize - Input: amount, email, userId, channel=ALL (Flutterwave V4 Gateway)
-app.post(['/api/payments/initialize', '/api/payments/init'], async (req: express.Request, res: express.Response) => {
+app.all(['/api/payments/initialize', '/api/payments/init'], async (req: express.Request, res: express.Response) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, verif-hash');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  }
+
   try {
     const { amount, email, userId, channel, name, phone } = req.body || {};
     

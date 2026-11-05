@@ -21,8 +21,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let flwSecret = (
+      process.env.FLUTTERWAVE_CLIENT_SECRET ||
       process.env.FLWSECK_LIVE ||
       process.env.FLUTTERWAVE_SECRET_KEY ||
+      process.env.FLW_SECRET_KEY ||
       ''
     ).trim();
     flwSecret = flwSecret.replace(/['";]/g, '').trim();
