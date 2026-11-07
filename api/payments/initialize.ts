@@ -29,43 +29,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const userEmail = (email || 'user@efado.com').trim();
     const targetUserId = String(userId).trim();
 
-    // Clean and normalize keys
+    // Clean and validate V4 credentials
     const cleanKey = (k?: string) => (k || '').trim().replace(/['";`\s]/g, '').split('=').pop()?.trim() || '';
 
-    const flwSecret = cleanKey(
-      process.env.FLUTTERWAVE_CLIENT_SECRET ||
-      process.env.FLWSECK_LIVE ||
-      process.env.FLUTTERWAVE_SECRET_KEY ||
-      process.env.FLW_SECRET_KEY ||
-      process.env.FLWSECK ||
-      ''
-    );
+    const clientId = cleanKey(process.env.FLUTTERWAVE_CLIENT_ID);
+    const clientSecret = cleanKey(process.env.FLUTTERWAVE_CLIENT_SECRET);
 
-    const clientId = cleanKey(
-      process.env.FLUTTERWAVE_CLIENT_ID ||
-      process.env.VITE_FLUTTERWAVE_CLIENT_ID ||
-      process.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
-      process.env.VITE_FLW_PUBLIC_KEY ||
-      ''
-    );
+    if (!clientId || !clientSecret) {
+      console.error('[Flutterwave V4 Init] Missing FLUTTERWAVE_CLIENT_ID or FLUTTERWAVE_CLIENT_SECRET');
+      return res.status(500).json({
+        success: false,
+        message: 'FLUTTERWAVE_CLIENT_ID or FLUTTERWAVE_CLIENT_SECRET missing in server environment. Please configure both in Vercel settings.'
+      });
+    }
 
     const appUrl = (process.env.APP_URL || 'https://www.e-fado.com').replace(/\/$/, '');
     const redirectUrl = `${appUrl}/payment/flutterwave-callback?tx_ref=${encodeURIComponent(tx_ref)}&userId=${encodeURIComponent(targetUserId)}&amount=${numAmount}`;
 
-    if (!flwSecret) {
-      console.error('[Flutterwave V4 Init] Missing FLUTTERWAVE_CLIENT_SECRET in server environment');
-      return res.status(500).json({
-        success: false,
-        message: 'FLUTTERWAVE_CLIENT_SECRET is missing in server environment. Please configure it in Vercel settings.',
-        hint: 'Add FLUTTERWAVE_CLIENT_SECRET or FLWSECK_LIVE in Vercel Environment Variables'
+    // Step 1: Obtain V4 OAuth2 Access Token
+    const tokenController = new AbortController();
+    const tokenTimeout = setTimeout(() => tokenController.abort(), 10000);
+
+    let tokenData: any;
+    try {
+      const tokenBody = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials'
+      }).toString();
+
+      const tokenRes = await fetch('https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: tokenBody,
+        signal: tokenController.signal
       });
+
+      tokenData = await tokenRes.json();
+
+      if (!tokenRes.ok || !tokenData?.access_token) {
+        console.error('[Flutterwave V4 Token Error]:', tokenData);
+        return res.status(502).json({
+          success: false,
+          message: tokenData?.error_description || tokenData?.error || 'Failed to obtain Flutterwave V4 access token. Check Client ID and Client Secret.',
+          details: tokenData
+        });
+      }
+    } catch (tokenErr: any) {
+      console.error('[Flutterwave V4 Token Fetch Failed]:', tokenErr);
+      return res.status(502).json({
+        success: false,
+        message: tokenErr.name === 'AbortError' ? 'Timeout connecting to Flutterwave V4 Token IDP' : (tokenErr.message || 'Could not connect to Flutterwave V4 Token IDP')
+      });
+    } finally {
+      clearTimeout(tokenTimeout);
     }
 
-    console.info(`[Flutterwave V4 Init] Initiating payment call to api.flutterwave.com: Amount=₦${numAmount}, Ref=${tx_ref}, User=${targetUserId}`);
+    const accessToken = tokenData.access_token;
 
-    // Call Flutterwave V4 / V3 Standard Payments API
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 14000);
+    // Step 2: Initialize Payment with Bearer Access Token
+    const payController = new AbortController();
+    const payTimeout = setTimeout(() => payController.abort(), 14000);
 
     let flwRes: Response;
     let flwData: any;
@@ -74,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       flwRes = await fetch('https://api.flutterwave.com/v3/payments', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${flwSecret}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -100,13 +126,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             channel: channel || 'ALL'
           }
         }),
-        signal: controller.signal
+        signal: payController.signal
       });
 
       flwData = await flwRes.json();
     } catch (fetchErr: any) {
       if (fetchErr.name === 'AbortError') {
-        console.error('[Flutterwave V4 Init] Timeout after 14s connecting to api.flutterwave.com');
+        console.error('[Flutterwave Payments Init Timeout]');
         return res.status(504).json({
           success: false,
           message: 'Flutterwave API connection timed out. Please try again.'
@@ -114,14 +140,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       throw fetchErr;
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(payTimeout);
     }
 
-    console.info(`[Flutterwave V4 Init] Response status=${flwRes.status}:`, JSON.stringify(flwData));
+    console.info(`[Flutterwave V4 Init] Payments response status=${flwRes.status}:`, JSON.stringify(flwData));
 
     if (flwData?.status === 'success' && flwData?.data?.link) {
-      const paymentLink = flwData.data.link;
-
       return res.status(200).json({
         success: true,
         tx_ref,
@@ -129,17 +153,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         currency: 'NGN',
         email: userEmail,
         publicKey: clientId,
-        link: paymentLink,
+        link: flwData.data.link,
         channels: ['card', 'banktransfer', 'opay', 'ussd', 'account', 'qr'],
         message: 'Payment link generated successfully'
       });
     }
 
-    // Flutterwave rejected the request or returned an error
-    console.error('[Flutterwave V4 Init] Flutterwave returned non-success:', flwData);
+    console.error('[Flutterwave V4 Payments Error]:', flwData);
     return res.status(400).json({
       success: false,
-      message: flwData?.message || 'Flutterwave failed to generate payment link. Please check your credentials.',
+      message: flwData?.message || 'Flutterwave failed to generate payment link.',
       details: flwData
     });
 
