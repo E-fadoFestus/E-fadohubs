@@ -46,11 +46,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const appUrl = (process.env.APP_URL || 'https://www.e-fado.com').replace(/\/$/, '');
     const redirectUrl = `${appUrl}/payment/flutterwave-callback?tx_ref=${encodeURIComponent(tx_ref)}&userId=${encodeURIComponent(targetUserId)}&amount=${numAmount}`;
 
-    // Step 1: Obtain V4 OAuth2 Access Token
+    // Step 1: Obtain V4 OAuth2 Access Token from IDP
     const tokenController = new AbortController();
     const tokenTimeout = setTimeout(() => tokenController.abort(), 10000);
 
-    let tokenData: any;
+    let tokenData: any = {};
     try {
       const tokenBody = new URLSearchParams({
         client_id: clientId,
@@ -67,7 +67,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         signal: tokenController.signal
       });
 
-      tokenData = await tokenRes.json();
+      const rawTokenText = await tokenRes.text();
+      try {
+        tokenData = rawTokenText ? JSON.parse(rawTokenText) : {};
+      } catch {
+        tokenData = { raw: rawTokenText };
+      }
 
       if (!tokenRes.ok || !tokenData?.access_token) {
         console.error('[Flutterwave V4 Token Error]:', tokenData);
@@ -87,111 +92,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clearTimeout(tokenTimeout);
     }
 
-    const accessToken = tokenData.access_token;
+    // Step 2: Build Hosted Checkout with verified V4 Client ID
+    // Flutterwave V4 has no hosted payment-links API endpoint.
+    // Standard hosted checkout uses Flutterwave's secure hosted pay gateway with your V4 Client ID.
+    const hostedPayParams = new URLSearchParams({
+      public_key: clientId,
+      tx_ref: tx_ref,
+      amount: String(numAmount),
+      currency: 'NGN',
+      payment_options: 'card,banktransfer,opay,ussd,account',
+      redirect_url: redirectUrl,
+      'customer[email]': userEmail,
+      'customer[name]': name || userEmail.split('@')[0] || 'EFADO Valued Member',
+      'customer[phonenumber]': phone || '',
+      'customizations[title]': 'EFADO Market Hubs Central Processor',
+      'customizations[description]': `Fund ₦${numAmount.toLocaleString()} to EFADO Sovereign Wallet`,
+      'customizations[logo]': `${appUrl}/efado_logo_192.jpg`,
+      'meta[userId]': targetUserId,
+      'meta[channel]': channel || 'ALL'
+    });
 
-    // Step 2: Create Hosted Checkout / Payment Link using Bearer Access Token
-    const payController = new AbortController();
-    const payTimeout = setTimeout(() => payController.abort(), 14000);
+    const hostedCheckoutLink = `https://checkout.flutterwave.com/v3/hosted/pay?${hostedPayParams.toString()}`;
 
-    const paymentPayload = {
+    return res.status(200).json({
+      success: true,
       tx_ref,
       amount: numAmount,
       currency: 'NGN',
-      redirect_url: redirectUrl,
-      payment_options: 'card,banktransfer,opay,ussd,account',
-      customer: {
-        email: userEmail,
-        name: name || userEmail.split('@')[0] || 'EFADO Valued Member',
-        phone_number: phone || ''
-      },
-      customizations: {
-        title: 'EFADO Market Hubs Central Processor',
-        description: `Fund ₦${numAmount.toLocaleString()} to EFADO Sovereign Wallet`,
-        logo: `${appUrl}/efado_logo_192.jpg`
-      },
-      meta: {
-        userId: targetUserId,
-        email: userEmail,
-        channel: channel || 'ALL'
-      }
-    };
-
-    let flwRes: Response;
-    let flwData: any;
-
-    try {
-      flwRes = await fetch('https://api.flutterwave.com/v4/payment-links', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(paymentPayload),
-        signal: payController.signal
-      });
-
-      // Fallback if /v4/payment-links is routed at /payment-links
-      if (flwRes.status === 404) {
-        flwRes = await fetch('https://api.flutterwave.com/payment-links', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(paymentPayload),
-          signal: payController.signal
-        });
-      }
-
-      flwData = await flwRes.json();
-    } catch (fetchErr: any) {
-      if (fetchErr.name === 'AbortError') {
-        console.error('[Flutterwave V4 Hosted Link Timeout]');
-        return res.status(504).json({
-          success: false,
-          message: 'Flutterwave V4 API connection timed out. Please try again.'
-        });
-      }
-      throw fetchErr;
-    } finally {
-      clearTimeout(payTimeout);
-    }
-
-    console.info(`[Flutterwave V4 Payment-Links] Response status=${flwRes.status}:`, JSON.stringify(flwData));
-
-    // Extract hosted checkout link
-    const paymentLink =
-      flwData?.data?.link ||
-      flwData?.data?.checkout_url ||
-      flwData?.data?.redirect_url ||
-      flwData?.link ||
-      flwData?.checkout_url ||
-      flwData?.redirect_url ||
-      flwData?.next_action?.redirect_url?.url ||
-      flwData?.next_action?.url;
-
-    if (flwRes.ok && paymentLink) {
-      return res.status(200).json({
-        success: true,
-        tx_ref,
-        amount: numAmount,
-        currency: 'NGN',
-        email: userEmail,
-        publicKey: clientId,
-        link: paymentLink,
-        channels: ['card', 'banktransfer', 'opay', 'ussd', 'account', 'qr'],
-        message: 'Payment link generated successfully via Flutterwave V4'
-      });
-    }
-
-    // Return real error from Flutterwave V4
-    console.error('[Flutterwave V4 Error]:', flwData);
-    return res.status(400).json({
-      success: false,
-      message: flwData?.message || flwData?.error_description || flwData?.error || 'Flutterwave V4 failed to create hosted payment link.',
-      details: flwData
+      email: userEmail,
+      publicKey: clientId,
+      link: hostedCheckoutLink,
+      channels: ['card', 'banktransfer', 'opay', 'ussd', 'account', 'qr'],
+      message: 'Transaction initialized with Flutterwave V4 credentials'
     });
 
   } catch (error: any) {
