@@ -89,53 +89,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const accessToken = tokenData.access_token;
 
-    // Step 2: Initialize Payment with Bearer Access Token
+    // Step 2: Create Hosted Checkout / Payment Link using Bearer Access Token
     const payController = new AbortController();
     const payTimeout = setTimeout(() => payController.abort(), 14000);
+
+    const paymentPayload = {
+      tx_ref,
+      amount: numAmount,
+      currency: 'NGN',
+      redirect_url: redirectUrl,
+      payment_options: 'card,banktransfer,opay,ussd,account',
+      customer: {
+        email: userEmail,
+        name: name || userEmail.split('@')[0] || 'EFADO Valued Member',
+        phone_number: phone || ''
+      },
+      customizations: {
+        title: 'EFADO Market Hubs Central Processor',
+        description: `Fund ₦${numAmount.toLocaleString()} to EFADO Sovereign Wallet`,
+        logo: `${appUrl}/efado_logo_192.jpg`
+      },
+      meta: {
+        userId: targetUserId,
+        email: userEmail,
+        channel: channel || 'ALL'
+      }
+    };
 
     let flwRes: Response;
     let flwData: any;
 
     try {
-      flwRes = await fetch('https://api.flutterwave.com/v3/payments', {
+      flwRes = await fetch('https://api.flutterwave.com/v4/payment-links', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          tx_ref,
-          amount: String(numAmount),
-          currency: 'NGN',
-          redirect_url: redirectUrl,
-          payment_options: 'card,banktransfer,opay,ussd,account,qr',
-          customer: {
-            email: userEmail,
-            name: name || userEmail.split('@')[0] || 'EFADO Valued Member',
-            phonenumber: phone || ''
-          },
-          customizations: {
-            title: 'EFADO Market Hubs Central Processor',
-            description: `Fund ₦${numAmount.toLocaleString()} to EFADO Sovereign Wallet`,
-            logo: `${appUrl}/efado_logo_192.jpg`
-          },
-          meta: {
-            userId: targetUserId,
-            email: userEmail,
-            channel: channel || 'ALL'
-          }
-        }),
+        body: JSON.stringify(paymentPayload),
         signal: payController.signal
       });
+
+      // Fallback if /v4/payment-links is routed at /payment-links
+      if (flwRes.status === 404) {
+        flwRes = await fetch('https://api.flutterwave.com/payment-links', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(paymentPayload),
+          signal: payController.signal
+        });
+      }
 
       flwData = await flwRes.json();
     } catch (fetchErr: any) {
       if (fetchErr.name === 'AbortError') {
-        console.error('[Flutterwave Payments Init Timeout]');
+        console.error('[Flutterwave V4 Hosted Link Timeout]');
         return res.status(504).json({
           success: false,
-          message: 'Flutterwave API connection timed out. Please try again.'
+          message: 'Flutterwave V4 API connection timed out. Please try again.'
         });
       }
       throw fetchErr;
@@ -143,9 +159,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       clearTimeout(payTimeout);
     }
 
-    console.info(`[Flutterwave V4 Init] Payments response status=${flwRes.status}:`, JSON.stringify(flwData));
+    console.info(`[Flutterwave V4 Payment-Links] Response status=${flwRes.status}:`, JSON.stringify(flwData));
 
-    if (flwData?.status === 'success' && flwData?.data?.link) {
+    // Extract hosted checkout link
+    const paymentLink =
+      flwData?.data?.link ||
+      flwData?.data?.checkout_url ||
+      flwData?.data?.redirect_url ||
+      flwData?.link ||
+      flwData?.checkout_url ||
+      flwData?.redirect_url ||
+      flwData?.next_action?.redirect_url?.url ||
+      flwData?.next_action?.url;
+
+    if (flwRes.ok && paymentLink) {
       return res.status(200).json({
         success: true,
         tx_ref,
@@ -153,16 +180,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         currency: 'NGN',
         email: userEmail,
         publicKey: clientId,
-        link: flwData.data.link,
+        link: paymentLink,
         channels: ['card', 'banktransfer', 'opay', 'ussd', 'account', 'qr'],
-        message: 'Payment link generated successfully'
+        message: 'Payment link generated successfully via Flutterwave V4'
       });
     }
 
-    console.error('[Flutterwave V4 Payments Error]:', flwData);
+    // Return real error from Flutterwave V4
+    console.error('[Flutterwave V4 Error]:', flwData);
     return res.status(400).json({
       success: false,
-      message: flwData?.message || 'Flutterwave failed to generate payment link.',
+      message: flwData?.message || flwData?.error_description || flwData?.error || 'Flutterwave V4 failed to create hosted payment link.',
       details: flwData
     });
 
