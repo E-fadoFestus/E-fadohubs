@@ -228,13 +228,18 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         }));
         setVerificationError(null);
       } else {
+        console.error('Paystack verify account error:', data);
+        const rawErr = data?.error;
+        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
+        const message = errStr || data?.message || 'Account number not found. Check number and bank and try again.';
         setVerifiedAccountName(null);
-        setVerificationError(data.error || data.message || 'Account number not found. Check number and bank and try again.');
+        setVerificationError(message);
       }
     } catch (err: any) {
-      console.error('Account verification error:', err);
+      console.error('Paystack verify account error:', err);
       setVerifiedAccountName(null);
-      setVerificationError('Bank verification service unavailable. Please check details and try again.');
+      const message = (typeof err?.message === 'string' ? err.message : null) || 'Bank verification service unavailable. Please check details and try again.';
+      setVerificationError(message);
     } finally {
       setIsVerifyingAccount(false);
     }
@@ -316,15 +321,20 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         setAmount('');
         setVerifiedAccountName(null);
       } else {
+        console.error('Paystack withdraw error:', data);
+        const rawErr = data?.error;
+        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
+        const message = errStr || data?.message || 'Withdrawal failed, please try again';
         setWithdrawStatusMessage({
-          text: `❌ ${data.error || 'Withdrawal failed. Your funds remain safe in your wallet.'}`,
+          text: `❌ ${message}`,
           type: 'error'
         });
       }
     } catch (err: any) {
-      console.error('Paystack withdrawal initiation error:', err);
+      console.error('Paystack withdraw error:', err);
+      const message = (typeof err?.message === 'string' ? err.message : null) || 'Please try again later';
       setWithdrawStatusMessage({
-        text: `❌ Network error processing withdrawal: ${err.message || 'Please try again later'}`,
+        text: `❌ ${message}`,
         type: 'error'
       });
     } finally {

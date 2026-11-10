@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     if (!paystackResponse?.status || !authUrl) {
       return Response.json({
         success: false,
-        error: 'Failed to initialize payment with Paystack',
+        error: paystackResponse?.message || 'Failed to initialize payment with Paystack',
         details: paystackResponse
       }, { status: 500 });
     }

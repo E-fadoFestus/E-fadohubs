@@ -1137,12 +1137,12 @@ function AppContent() {
               ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             }
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => null);
 
-          if (data.status && (data.data?.status === 'success' || data.already_processed)) {
+          if (data?.status && (data.data?.status === 'success' || data.already_processed)) {
             alert(`✅ PAYSTACK DEPOSIT VERIFIED!\n\nReference: ${reference}\nYour deposit wallet has been successfully credited.`);
           } else {
-            console.warn('Paystack return verification status:', data);
+            console.error('Paystack return verification error:', data);
           }
 
           const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;

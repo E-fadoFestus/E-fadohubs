@@ -44,21 +44,27 @@ function CallbackContent() {
           }
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
 
         if (!isMounted) return;
 
-        if (res.ok && data.success) {
+        if (res.ok && data?.success) {
           setSuccess(true);
           setAmount(data.amount || null);
         } else {
+          console.error('Paystack verify error:', data);
           setSuccess(false);
-          setErrorMessage(data.message || data.error || 'Payment verification could not be confirmed.');
+          const rawErr = data?.error;
+          const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
+          const message = errStr || data?.message || 'Payment verification could not be confirmed.';
+          setErrorMessage(message);
         }
       } catch (err: any) {
         if (!isMounted) return;
+        console.error('Paystack verify error:', err);
         setSuccess(false);
-        setErrorMessage(err.message || 'Network error verifying payment.');
+        const message = (typeof err?.message === 'string' ? err.message : null) || 'Network error verifying payment.';
+        setErrorMessage(message);
       } finally {
         if (isMounted) setLoading(false);
       }

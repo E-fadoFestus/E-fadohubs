@@ -58,10 +58,17 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok || !data.success || !data.authorization_url) {
-        throw new Error(data.error || data.message || 'Failed to initialize Paystack payment session.');
+      if (!response.ok || !data?.success || !data?.authorization_url) {
+        console.error('Paystack initialize error:', data);
+        const rawErr = data?.error;
+        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
+        const message = errStr || data?.message || 'Payment failed, please try again';
+        setIsRedirecting(false);
+        setStatusMessage(null);
+        setErrorMessage(message);
+        return;
       }
 
       setStatusMessage('Redirecting to Paystack secure checkout...');
@@ -69,10 +76,11 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       window.location.href = data.authorization_url;
 
     } catch (err: any) {
-      console.error('[Paystack Fund Error]:', err);
+      console.error('Paystack initialize error:', err);
       setIsRedirecting(false);
       setStatusMessage(null);
-      setErrorMessage(err.message || 'Could not connect to Paystack payment gateway. Please try again.');
+      const message = (typeof err?.message === 'string' ? err.message : null) || 'Payment failed, please try again';
+      setErrorMessage(message);
     }
   };
 
@@ -164,7 +172,9 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       {errorMessage && (
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs animate-in fade-in">
           <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-          <div className="font-bold flex-1">{errorMessage}</div>
+          <div className="font-bold flex-1">
+            {typeof errorMessage === 'string' ? errorMessage : ((errorMessage as any)?.message || 'Payment failed, please try again')}
+          </div>
         </div>
       )}
 
