@@ -5,6 +5,58 @@ import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { db } from './src/firebase';
 import { doc, updateDoc, increment, addDoc, collection, serverTimestamp, getDoc, setDoc } from 'firebase/firestore';
+import { POST as paystackInitializeRoute } from './src/app/api/paystack/initialize/route';
+import { GET as paystackVerifyGetRoute, POST as paystackVerifyPostRoute } from './src/app/api/paystack/verify/route';
+import { GET as paystackBanksRoute } from './src/app/api/paystack/banks/route';
+import { POST as paystackVerifyAccountRoute } from './src/app/api/paystack/verify-account/route';
+import { POST as paystackWithdrawRoute } from './src/app/api/paystack/withdraw/route';
+import { GET as paystackWithdrawStatusRoute } from './src/app/api/paystack/withdraw/status/route';
+import { POST as paystackWebhookRoute } from './src/app/api/webhook/paystack/route';
+
+async function handleAppRoute(handler: (req: Request) => Promise<Response>, req: express.Request, res: express.Response) {
+  try {
+    const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+    const headers = new Headers();
+    for (const [key, val] of Object.entries(req.headers)) {
+      if (val) {
+        if (Array.isArray(val)) {
+          val.forEach(v => headers.append(key, v));
+        } else {
+          headers.set(key, val);
+        }
+      }
+    }
+
+    const init: RequestInit = {
+      method: req.method,
+      headers,
+    };
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      if ((req as any).rawBody) {
+        init.body = (req as any).rawBody;
+      } else if (typeof req.body === 'string') {
+        init.body = req.body;
+      } else if (req.body && Object.keys(req.body).length > 0) {
+        init.body = JSON.stringify(req.body);
+      }
+    }
+
+    const webReq = new Request(url, init);
+    const webRes = await handler(webReq);
+
+    res.status(webRes.status);
+    webRes.headers.forEach((val, key) => {
+      res.setHeader(key, val);
+    });
+
+    const bodyText = await webRes.text();
+    return res.send(bodyText);
+  } catch (err: any) {
+    console.error('[AppRoute Adapter Error]:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Server error' });
+  }
+}
 
 // Ensure public logo assets exist safely on startup
 try {
@@ -485,118 +537,25 @@ const handlePaystackInitialize = async (req: express.Request, res: express.Respo
   }
 };
 
-app.post('/api/paystack/initialize', handlePaystackInitialize);
-app.post('/pay', handlePaystackInitialize);
-
-// Route C: Paystack Live Verification API (Proxy & Fallback Credit)
-app.get('/api/paystack/verify/:reference', async (req: express.Request, res: express.Response) => {
-  const { reference } = req.params;
-  const userIdQuery = String(req.query.userId || '').trim();
-  const secretKey = process.env.PAYSTACK_SECRET_KEY || '';
-
-  try {
-    const txId = `PAYSTACK-${reference}`;
-    const transactionRef = doc(db, 'transactions', txId);
-    const txSnap = await getDoc(transactionRef);
-
-    if (txSnap.exists()) {
-      console.info(`[Paystack Verify API] Transaction ${txId} already processed. Returning success.`);
-      return res.json({ status: true, already_processed: true, message: 'Transaction already credited to wallet', data: { status: 'success', reference } });
-    }
-
-    if (!secretKey || reference.startsWith('EFD_PST_SIM_')) {
-      const simAmount = Number(req.query.amount) || 1000;
-      const targetUserId = userIdQuery;
-
-      if (targetUserId) {
-        const userRef = doc(db, 'users', targetUserId);
-        await updateDoc(userRef, {
-          depositWallet: increment(simAmount),
-          playerWallet: increment(simAmount)
-        });
-
-        await setDoc(transactionRef, {
-          userId: targetUserId,
-          type: 'deposit',
-          amount: simAmount,
-          currency: 'NGN',
-          status: 'completed',
-          reference,
-          timestamp: serverTimestamp(),
-          metadata: {
-            gateway: 'paystack_sandbox_verify',
-            purpose: 'EFADO Wallet Topup',
-            method: 'Paystack Sandbox Verification'
-          }
-        });
-      }
-
-      return res.json({
-        status: true,
-        data: {
-          status: 'success',
-          reference,
-          amount: simAmount * 100,
-          gateway_response: 'Successful (Sandbox Verified)'
-        }
-      });
-    }
-
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    const body = await response.json();
-    
-    if (body.status && body.data?.status === 'success') {
-      const data = body.data;
-      const amountKobo = data.amount;
-      const amountNGN = amountKobo / 100;
-      const customerEmail = data.customer?.email;
-      const metadata = data.metadata || {};
-      const userId = metadata.userId || metadata.user_id || userIdQuery;
-      const purpose = metadata.purpose || metadata.service || 'EFADO Wallet Topup';
-
-      if (userId) {
-        const finalSnap = await getDoc(transactionRef);
-        if (!finalSnap.exists()) {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, {
-            depositWallet: increment(amountNGN),
-            playerWallet: increment(amountNGN)
-          });
-
-          await setDoc(transactionRef, {
-            userId,
-            type: 'deposit',
-            amount: amountNGN,
-            currency: 'NGN',
-            status: 'completed',
-            reference,
-            timestamp: serverTimestamp(),
-            metadata: {
-              gateway: 'paystack_verify_api',
-              purpose,
-              email: customerEmail,
-              method: 'Paystack Secure Verification API Proxy'
-            }
-          });
-
-          console.info(`[Paystack Verify API] Securely credited User ${userId} with ₦${amountNGN.toLocaleString()} (Ref: ${reference})`);
-        }
-      }
-    }
-
-    return res.status(response.status).json(body);
-  } catch (err: any) {
-    console.error(`[Paystack Verify API] Verification request failed for reference ${reference}:`, err);
-    return res.status(500).json({ status: false, message: err.message || 'Internal verification failure' });
-  }
+app.post(['/api/paystack/initialize', '/pay'], async (req: express.Request, res: express.Response) => {
+  return handleAppRoute(paystackInitializeRoute, req, res);
 });
+
+app.get('/api/paystack/banks', (req: express.Request, res: express.Response) => handleAppRoute(paystackBanksRoute, req, res));
+app.post('/api/paystack/verify-account', (req: express.Request, res: express.Response) => handleAppRoute(paystackVerifyAccountRoute, req, res));
+app.post('/api/paystack/withdraw', (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawRoute, req, res));
+app.get(['/api/paystack/withdraw/status', '/api/paystack/withdraw-status'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawStatusRoute, req, res));
+app.all('/api/paystack/verify', (req: express.Request, res: express.Response) => {
+  if (req.method === 'POST') {
+    return handleAppRoute(paystackVerifyPostRoute, req, res);
+  }
+  return handleAppRoute(paystackVerifyGetRoute, req, res);
+});
+app.get('/api/paystack/verify/:reference', (req: express.Request, res: express.Response) => {
+  req.query.reference = req.params.reference;
+  return handleAppRoute(paystackVerifyGetRoute, req, res);
+});
+app.post(['/api/webhook/paystack', '/webhook/paystack'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWebhookRoute, req, res));
 
 // Route C: Real Bank Account Name Enquiry API (/api/bank/resolve & /api/verify-bank)
 app.get(['/api/bank/resolve', '/api/verify-bank'], async (req: express.Request, res: express.Response) => {

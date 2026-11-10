@@ -44,7 +44,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
-import { db, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
+import { db, auth, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { resolveBankAccount } from '../utils/bankVerification';
 import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
@@ -68,7 +68,7 @@ interface UserWalletProps {
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
   const { selectedCurrency, setCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
-  const [depositMethod, setDepositMethod] = useState<'opay' | 'paystack' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('bank_transfer');
+  const [depositMethod, setDepositMethod] = useState<'paystack' | 'opay' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('paystack');
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
   const [amount, setAmount] = useState('');
@@ -154,6 +154,183 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   useEffect(() => {
     localStorage.setItem('efado_payment_shield', shieldActive.toString());
   }, [shieldActive]);
+
+  // Paystack Withdraw States & Bank Directory
+  const [paystackBanks, setPaystackBanks] = useState<{ name: string; code: string }[]>([]);
+  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
+  const [selectedBankCode, setSelectedBankCode] = useState((user as any).routingNumber || '');
+  const [accountNumberInput, setAccountNumberInput] = useState(user.accountNumber || '');
+  const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
+  const [verifiedAccountName, setVerifiedAccountName] = useState<string | null>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [withdrawStatusMessage, setWithdrawStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isExecutingWithdraw, setIsExecutingWithdraw] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoadingBanks(true);
+    const fetchBanks = async () => {
+      try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
+        const res = await fetch('/api/paystack/banks', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        const data = await res.json();
+        if (isMounted && data.success && Array.isArray(data.banks) && data.banks.length > 0) {
+          setPaystackBanks(data.banks);
+        }
+      } catch (err) {
+        console.warn('Paystack banks fetch error:', err);
+      } finally {
+        if (isMounted) setIsLoadingBanks(false);
+      }
+    };
+    fetchBanks();
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleVerifyAccount = async () => {
+    if (!selectedBankCode) {
+      setVerificationError('Please select your destination bank from the dropdown.');
+      return;
+    }
+    if (!accountNumberInput || accountNumberInput.length !== 10) {
+      setVerificationError('Account number must be exactly 10 digits.');
+      return;
+    }
+
+    setIsVerifyingAccount(true);
+    setVerificationError(null);
+    setVerifiedAccountName(null);
+
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
+      const res = await fetch('/api/paystack/verify-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          account_number: accountNumberInput,
+          bank_code: selectedBankCode
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.account_name) {
+        setVerifiedAccountName(data.account_name);
+        setAccountDetails(prev => ({
+          ...prev,
+          accountNumber: accountNumberInput,
+          routingNumber: selectedBankCode,
+          accountName: data.account_name
+        }));
+        setVerificationError(null);
+      } else {
+        setVerifiedAccountName(null);
+        setVerificationError(data.error || data.message || 'Account number not found. Check number and bank and try again.');
+      }
+    } catch (err: any) {
+      console.error('Account verification error:', err);
+      setVerifiedAccountName(null);
+      setVerificationError('Bank verification service unavailable. Please check details and try again.');
+    } finally {
+      setIsVerifyingAccount(false);
+    }
+  };
+
+  const handleConfirmWithdraw = async () => {
+    const numAmount = Number(amount);
+    const availableBalance = withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
+
+    if (!numAmount || isNaN(numAmount) || numAmount < 100) {
+      setWithdrawStatusMessage({ text: 'Minimum withdrawal amount is ₦100', type: 'error' });
+      return;
+    }
+    if (numAmount > 1000000) {
+      setWithdrawStatusMessage({ text: 'Maximum withdrawal amount is ₦1,000,000 per transaction', type: 'error' });
+      return;
+    }
+    if (numAmount > availableBalance) {
+      setWithdrawStatusMessage({ text: 'Insufficient wallet balance', type: 'error' });
+      return;
+    }
+    if (!verifiedAccountName) {
+      setWithdrawStatusMessage({ text: 'Please verify destination bank account before withdrawing', type: 'error' });
+      return;
+    }
+
+    setIsExecutingWithdraw(true);
+    setWithdrawStatusMessage(null);
+
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
+      const res = await fetch('/api/paystack/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: numAmount,
+          account_number: accountNumberInput,
+          bank_code: selectedBankCode,
+          account_name: verifiedAccountName
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setWithdrawStatusMessage({
+          text: `✅ ${data.message || 'Withdrawal processing, you will receive in bank shortly'}`,
+          type: 'success'
+        });
+
+        await onUpdateBalance(numAmount, 'withdrawal', {
+          accountNumber: accountNumberInput,
+          bankCode: selectedBankCode,
+          accountName: verifiedAccountName,
+          bankName: accountDetails.bankName,
+          sourceWallet: withdrawSource
+        });
+
+        const txReference = data.reference || `WD-${Date.now()}`;
+        const newTx: Transaction = {
+          id: txReference,
+          userId: user.uid,
+          type: 'withdrawal',
+          amount: numAmount,
+          currency: 'NGN',
+          status: 'pending',
+          method: 'Paystack Bank Transfer',
+          hub: 'WALLET',
+          purpose: 'Paystack Cash Out',
+          reference: txReference,
+          timestamp: new Date()
+        };
+        setLastTransaction(newTx);
+        setSelectedReceiptTx(newTx);
+
+        setAmount('');
+        setVerifiedAccountName(null);
+      } else {
+        setWithdrawStatusMessage({
+          text: `❌ ${data.error || 'Withdrawal failed. Your funds remain safe in your wallet.'}`,
+          type: 'error'
+        });
+      }
+    } catch (err: any) {
+      console.error('Paystack withdrawal initiation error:', err);
+      setWithdrawStatusMessage({
+        text: `❌ Network error processing withdrawal: ${err.message || 'Please try again later'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsExecutingWithdraw(false);
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('efado_night_guide', nightGuideActive.toString());
@@ -1472,6 +1649,17 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   <div className="flex flex-wrap gap-3 border-b border-gray-150 justify-center">
                     <button 
                       type="button"
+                      onClick={() => setDepositMethod('paystack')}
+                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
+                        depositMethod === 'paystack' 
+                          ? 'border-b-4 border-emerald-600 text-emerald-600 font-extrabold' 
+                          : 'text-gray-400 hover:text-gray-650'
+                      }`}
+                    >
+                      💳 Paystack (Cards/Transfer/USSD) (DEFAULT)
+                    </button>
+                    <button 
+                      type="button"
                       onClick={() => setDepositMethod('bank_transfer')}
                       className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
                         depositMethod === 'bank_transfer' 
@@ -1479,7 +1667,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           : 'text-gray-400 hover:text-gray-650'
                       }`}
                     >
-                      🏦 Direct Bank Deposit (DEFAULT)
+                      🏦 Direct Bank Deposit
                     </button>
                     <button 
                       type="button"
@@ -1491,17 +1679,6 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       }`}
                     >
                       ⚡ OPay Pay-In (Instant)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('paystack')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'paystack' 
-                          ? 'border-b-4 border-indigo-600 text-indigo-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      💳 Paystack (Cards/Transfer/USSD)
                     </button>
                     <button 
                       type="button"
@@ -1907,199 +2084,125 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
                   <div className="space-y-6">
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest">2. SELECT DESTINATION BANK</label>
-                        {!manualBankMode && (
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setManualBankMode(true);
-                              setAccountDetails({
-                                ...accountDetails,
-                                bankName: bankSearch
-                              });
-                            }}
-                            className="px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-sans font-black uppercase tracking-wider text-[9px] rounded-full border border-indigo-100 transition-all shadow-sm"
-                          >
-                            Type Manually
-                          </button>
-                        )}
-                      </div>
-                      
-                      {manualBankMode ? (
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-                            <input 
-                              placeholder="Type Your Bank Name (e.g. Lotus Bank, Signature Bank)..."
-                              className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
-                              value={accountDetails.bankName}
-                              onChange={e => {
-                                setAccountDetails({...accountDetails, bankName: e.target.value});
-                                setBankSearch(e.target.value);
-                              }}
-                            />
-                          </div>
-                          
-                          <div className="relative">
-                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-                            <input 
-                              placeholder="Bank Code / Sort Code (e.g. 057, 101) - Optional"
-                              className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
-                              value={accountDetails.routingNumber}
-                              onChange={e => {
-                                setAccountDetails({...accountDetails, routingNumber: e.target.value});
-                              }}
-                            />
-                          </div>
-
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setManualBankMode(false);
-                              setBankSearch('');
-                              setAccountDetails({...accountDetails, bankName: '', routingNumber: ''});
-                            }}
-                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-black uppercase tracking-wider text-[9px] rounded-full border border-slate-200 flex items-center gap-1.5 transition-all shadow-sm"
-                          >
-                            ← Use Bank Directory Search
-                          </button>
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest">
+                            2. SELECT DESTINATION BANK
+                          </label>
+                          {isLoadingBanks && (
+                            <span className="text-[9px] font-bold text-emerald-600 animate-pulse uppercase tracking-wider">
+                              Loading Banks...
+                            </span>
+                          )}
                         </div>
-                      ) : (
+
                         <div className="relative">
-                          <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-                          <input 
-                            placeholder="Search Your Bank (Local / Int'l)"
-                            className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-950"
-                            value={bankSearch}
+                          <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                          <select
+                            value={selectedBankCode}
                             onChange={e => {
-                              setBankSearch(e.target.value);
-                              setShowBankDropdown(true);
+                              const code = e.target.value;
+                              setSelectedBankCode(code);
+                              const bList = paystackBanks.length > 0 ? paystackBanks : globalAndLocalBanks;
+                              const b = bList.find(x => x.code === code);
+                              setAccountDetails(prev => ({
+                                ...prev,
+                                routingNumber: code,
+                                bankName: b ? b.name : prev.bankName
+                              }));
+                              setVerifiedAccountName(null);
+                              setVerificationError(null);
                             }}
-                            onFocus={() => setShowBankDropdown(true)}
+                            className="w-full pl-12 pr-8 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 cursor-pointer appearance-none"
+                          >
+                            <option value="">
+                              -- Select Destination Bank ({paystackBanks.length > 0 ? `${paystackBanks.length} Banks` : 'Paystack Directory'}) --
+                            </option>
+                            {(paystackBanks.length > 0 ? paystackBanks : globalAndLocalBanks).map(b => (
+                              <option key={`ps-bank-${b.code}`} value={b.code}>
+                                {b.name} ({b.code})
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">
+                          3. 10-DIGIT ACCOUNT NUMBER
+                        </label>
+                        <div className="relative">
+                          <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
+                          <input 
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={10}
+                            placeholder="Enter 10-Digit NUBAN Number"
+                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-400 text-gray-900"
+                            value={accountNumberInput}
+                            onChange={e => {
+                              const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setAccountNumberInput(clean);
+                              setAccountDetails(prev => ({ ...prev, accountNumber: clean }));
+                              setVerifiedAccountName(null);
+                              setVerificationError(null);
+                            }}
                           />
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
+                        </div>
+                      </div>
 
-                          <AnimatePresence>
-                            {showBankDropdown && (
-                              <motion.div 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className="absolute z-50 left-0 right-0 top-[110%] bg-slate-900 border-2 border-indigo-500/50 rounded-2xl shadow-2xl max-h-64 overflow-y-auto no-scrollbar p-2 space-y-1"
-                              >
-                                {filteredBanks.length > 0 ? (
-                                  <>
-                                    {filteredBanks.map(bank => (
-                                      <button
-                                        key={`withdraw-${bank.code}`}
-                                        type="button"
-                                        onClick={() => {
-                                          setAccountDetails({...accountDetails, bankName: bank.name, routingNumber: bank.code});
-                                          setBankSearch(bank.name);
-                                          setShowBankDropdown(false);
-                                        }}
-                                        className="w-full text-left p-3.5 bg-slate-800/90 hover:bg-emerald-600 rounded-xl transition-all flex items-center justify-between group border border-slate-700/60 mb-1"
-                                      >
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-slate-100 group-hover:text-white">{bank.name}</span>
-                                        <span className="text-[10px] font-mono font-black text-amber-400 group-hover:text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-700">{bank.code}</span>
-                                      </button>
-                                    ))}
-                                    <div className="border-t border-slate-800 mt-2 pt-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setManualBankMode(true);
-                                          setShowBankDropdown(false);
-                                          setAccountDetails({...accountDetails, bankName: bankSearch});
-                                        }}
-                                        className="w-full text-center p-3 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/60 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all border border-indigo-500/30"
-                                      >
-                                        + Enter Custom Bank Name Manually
-                                      </button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="p-4 text-center space-y-2 bg-slate-900 rounded-xl">
-                                    <div className="text-[10px] font-black text-slate-200 uppercase tracking-widest">Bank Not Found</div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setManualBankMode(true);
-                                        setShowBankDropdown(false);
-                                        setAccountDetails({...accountDetails, bankName: bankSearch});
-                                      }}
-                                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-[9px] rounded-full transition-all"
-                                    >
-                                      Use "{bankSearch}" as Custom Bank Name
-                                    </button>
-                                  </div>
-                                )}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
+                      {/* Verify Account Button */}
+                      <button
+                        type="button"
+                        onClick={handleVerifyAccount}
+                        disabled={isVerifyingAccount || !selectedBankCode || accountNumberInput.length !== 10}
+                        className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        {isVerifyingAccount ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Verifying Account with Bank...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                            <span>Verify Account</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Verified Account Name in Green */}
+                      {verifiedAccountName && (
+                        <div className="p-4 bg-emerald-950/40 border-2 border-emerald-500/60 rounded-2xl flex items-center gap-2.5 text-emerald-300 font-black text-xs uppercase tracking-wider animate-in fade-in">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                          <span>✅ Account Name: {verifiedAccountName}</span>
                         </div>
                       )}
 
-                      <div className="relative">
-                        <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950" />
-                        <input 
-                          placeholder="10-Digit Account Number"
-                          maxLength={10}
-                          className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-900"
-                          value={accountDetails.accountNumber}
-                          onChange={e => {
-                            const digitsOnly = e.target.value.replace(/\D/g, '');
-                            setAccountDetails({...accountDetails, accountNumber: digitsOnly});
-                          }}
-                        />
-                      </div>
-
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-950 pointer-events-none" />
-                        <input 
-                          placeholder={isResolvingName ? "Resolving Beneficiary Name..." : "Account Holder Name"}
-                          className={`w-full pl-12 pr-10 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-gray-400 ${
-                            isResolvingName ? 'text-indigo-600 animate-pulse bg-indigo-50/30' : 'text-gray-900'
-                          }`}
-                          value={accountDetails.accountName}
-                          onChange={e => setAccountDetails({...accountDetails, accountName: e.target.value})}
-                          disabled={isResolvingName}
-                        />
-                        {isResolvingName && (
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                        )}
-                        {!isResolvingName && resolvedStatusMessage && accountDetails.accountName && (
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 text-xs font-black">
-                            ✓
-                          </div>
-                        )}
-                      </div>
-
-                      {resolvedStatusMessage && (
-                        <div className={`text-[10px] font-black uppercase tracking-widest ml-1 ${
-                          isResolvingName ? 'text-indigo-600 animate-pulse' : 'text-emerald-600 flex items-center gap-1'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isResolvingName ? 'bg-indigo-600 animate-ping' : 'bg-emerald-500'}`} />
-                          {resolvedStatusMessage}
+                      {/* Verification Error in Red */}
+                      {verificationError && (
+                        <div className="p-4 bg-rose-950/40 border border-rose-500/60 rounded-2xl flex items-center gap-2.5 text-rose-300 font-bold text-xs animate-in fade-in">
+                          <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                          <span>❌ {verificationError}</span>
                         </div>
                       )}
 
-                      {/* Dynamic Beneficiary Details Live Card */}
+                      {/* Dynamic Beneficiary Preview Card */}
                       <div className="p-6 bg-slate-900 text-white rounded-[2rem] border border-white/10 relative overflow-hidden shadow-2xl space-y-4">
-                        {/* Card background/glow theme */}
                         <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/10 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl -ml-6 -mb-6 pointer-events-none" />
 
                         <div className="flex justify-between items-center pb-2 border-b border-white/5">
                           <div className="flex items-center gap-1.5">
                             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY DETAILS PREVIEW</span>
+                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY PREVIEW</span>
                           </div>
                           <span className={`text-[8px] font-sans font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                            isResolvingName ? 'bg-indigo-500/20 text-indigo-300 animate-pulse' : 'bg-emerald-500/20 text-emerald-300'
+                            verifiedAccountName ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
                           }`}>
-                            {isResolvingName ? 'ENQUIRING GATEWAY...' : 'ACTIVE TACTICAL PATH'}
+                            {verifiedAccountName ? 'ACCOUNT VERIFIED ✓' : 'VERIFICATION REQUIRED'}
                           </span>
                         </div>
 
@@ -2107,70 +2210,79 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           <div className="space-y-0.5">
                             <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK OF SETTLEMENT</span>
                             <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
-                              {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SPECIFIED</span>}
+                              {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SELECTED</span>}
                             </p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">SETTLEMENT CODE / ID</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
                             <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
-                              {accountDetails.routingNumber || <span className="text-slate-500">NO CODE</span>}
+                              {selectedBankCode || <span className="text-slate-500">NO CODE</span>}
                             </p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY DIGIT NUMBER</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
                             <p className="text-[11px] font-mono font-black text-indigo-400 uppercase tracking-widest truncate">
-                              {accountDetails.accountNumber || <span className="text-rose-400 italic font-medium">NOT PROVIDED</span>}
+                              {accountNumberInput || <span className="text-rose-400 italic font-medium">NOT ENTERED</span>}
                             </p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY ACCOUNT NAME</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY NAME</span>
                             <p className="text-[10px] font-black uppercase tracking-wider truncate">
-                              {isResolvingName ? (
-                                <span className="text-indigo-400 animate-pulse italic">Retrieving...</span>
-                              ) : accountDetails.accountName ? (
+                              {verifiedAccountName ? (
                                 <span className="text-emerald-400 font-extrabold flex items-center gap-1 text-[10.5px]">
-                                  {accountDetails.accountName} ✓
+                                  {verifiedAccountName} ✓
                                 </span>
                               ) : (
-                                <span className="text-rose-400 italic font-medium">PENDING NAME</span>
+                                <span className="text-amber-400 italic font-medium">PENDING VERIFY</span>
                               )}
                             </p>
                           </div>
                         </div>
                       </div>
+
+                      {/* Withdrawal Processing Status Message */}
+                      {withdrawStatusMessage && (
+                        <div className={`p-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+                          withdrawStatusMessage.type === 'success' ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-500/60' : 'bg-rose-950/50 text-rose-300 border border-rose-500/60'
+                        }`}>
+                          <span>{withdrawStatusMessage.text}</span>
+                        </div>
+                      )}
                     </div>
 
+                    {/* Confirm Withdraw Button - Green when verified, grey when disabled */}
                     <button 
-                      onClick={handleWithdraw}
+                      type="button"
+                      onClick={handleConfirmWithdraw}
                       disabled={
-                        isProcessing || 
-                        isResolvingName || 
+                        isExecutingWithdraw || 
+                        !verifiedAccountName || 
                         !amount || 
-                        parseFloat(amount) <= 0 || 
-                        parseFloat(amount) > (withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)) ||
-                        !accountDetails.accountNumber ||
-                        accountDetails.accountNumber.length !== 10 ||
-                        !accountDetails.bankName ||
-                        !accountDetails.accountName
+                        Number(amount) < 100 || 
+                        Number(amount) > (withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0))
                       }
-                      className="w-full py-5 bg-emerald-600 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-emerald-200/50 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30"
+                      className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl transition-all flex items-center justify-center gap-3 ${
+                        verifiedAccountName && Number(amount) >= 100 && Number(amount) <= (withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0))
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40 cursor-pointer active:scale-95'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                      }`}
                     >
-                      {isProcessing ? (
+                      {isExecutingWithdraw ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Processing Vault Exit...
+                          <span>Initiating Paystack Transfer...</span>
                         </>
                       ) : (
                         <>
                           <Banknote className="w-5 h-5" />
-                          Finalize Tactical Withdrawal
+                          <span>Confirm Withdraw {amount ? `₦${Number(amount).toLocaleString()}` : ''}</span>
                         </>
                       )}
                     </button>
                     
                     <div className="flex items-center justify-center gap-2">
                       <Lock className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">End-to-End Encryption Enabled</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">End-to-End Encryption Enabled • Paystack Payout Gateway</span>
                     </div>
                   </div>
                 </div>

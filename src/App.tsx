@@ -72,6 +72,7 @@ import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
 import { DiagnosticModal } from './components/DiagnosticModal';
 import { GameManualPayment } from './components/GameManualPayment';
+import { PaymentCallback } from './components/PaymentCallback';
 import { getBackendUrl } from './config/backend';
 import { AdSenseBanner } from './components/AdSenseBanner';
 import { 
@@ -521,6 +522,15 @@ function AppContent() {
     setWalletInitialTab(tab);
     setShowWallet(true);
   };
+
+  const [isPaymentCallback, setIsPaymentCallback] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      const h = window.location.hash.toLowerCase();
+      return p.startsWith('/payment/callback') || h.startsWith('#/payment/callback') || h.startsWith('#payment/callback');
+    }
+    return false;
+  });
 
   const [showEfadoMining, setShowEfadoMining] = useState(false);
   const [showAdvertisingHub, setShowAdvertisingHub] = useState(false);
@@ -1109,12 +1119,23 @@ function AppContent() {
 
         if (reference) {
           console.log('💳 Paystack Return Reference detected in URL:', reference);
-          const currentUserId = user?.uid || simUserId || '';
+          let token = '';
+          if (auth.currentUser) {
+            token = await auth.currentUser.getIdToken();
+          } else if (auth.authStateReady) {
+            await auth.authStateReady();
+            if (auth.currentUser) {
+              token = await auth.currentUser.getIdToken();
+            }
+          }
           
-          const verifyUrl = getBackendUrl(`/api/paystack/verify/${encodeURIComponent(reference)}?userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`);
+          const verifyUrl = getBackendUrl(`/api/paystack/verify?reference=${encodeURIComponent(reference)}`);
           const res = await fetch(verifyUrl, {
             mode: 'cors',
-            headers: { 'Accept': 'application/json' }
+            headers: {
+              'Accept': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
           });
           const data = await res.json();
 
@@ -2229,6 +2250,19 @@ function AppContent() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // Paystack Dedicated Payment Return & Verification Callback Route
+  if (isPaymentCallback) {
+    return (
+      <PaymentCallback
+        onGoToWallet={() => {
+          setIsPaymentCallback(false);
+          window.history.replaceState({}, document.title, '/');
+          openWalletWithTab('overview');
+        }}
+      />
     );
   }
 
