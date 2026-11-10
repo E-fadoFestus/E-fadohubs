@@ -537,15 +537,15 @@ const handlePaystackInitialize = async (req: express.Request, res: express.Respo
   }
 };
 
-app.post(['/api/paystack/initialize', '/pay'], async (req: express.Request, res: express.Response) => {
+app.post(['/api/paystack/initialize', '/api/paystack/initialize/', '/pay'], async (req: express.Request, res: express.Response) => {
   return handleAppRoute(paystackInitializeRoute, req, res);
 });
 
-app.get('/api/paystack/banks', (req: express.Request, res: express.Response) => handleAppRoute(paystackBanksRoute, req, res));
-app.post('/api/paystack/verify-account', (req: express.Request, res: express.Response) => handleAppRoute(paystackVerifyAccountRoute, req, res));
-app.post('/api/paystack/withdraw', (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawRoute, req, res));
-app.get(['/api/paystack/withdraw/status', '/api/paystack/withdraw-status'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawStatusRoute, req, res));
-app.all('/api/paystack/verify', (req: express.Request, res: express.Response) => {
+app.get(['/api/paystack/banks', '/api/paystack/banks/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackBanksRoute, req, res));
+app.post(['/api/paystack/verify-account', '/api/paystack/verify-account/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackVerifyAccountRoute, req, res));
+app.post(['/api/paystack/withdraw', '/api/paystack/withdraw/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawRoute, req, res));
+app.get(['/api/paystack/withdraw/status', '/api/paystack/withdraw/status/', '/api/paystack/withdraw-status'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawStatusRoute, req, res));
+app.all(['/api/paystack/verify', '/api/paystack/verify/'], (req: express.Request, res: express.Response) => {
   if (req.method === 'POST') {
     return handleAppRoute(paystackVerifyPostRoute, req, res);
   }
