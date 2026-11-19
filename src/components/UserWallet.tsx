@@ -171,12 +171,18 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     setIsLoadingBanks(true);
     const fetchBanks = async () => {
       try {
+        if (typeof (auth as any).authStateReady === 'function') {
+          await Promise.race([
+            (auth as any).authStateReady(),
+            new Promise((resolve) => setTimeout(resolve, 4000))
+          ]);
+        }
         const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
         const res = await fetch('/api/paystack/banks', {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
-        const data = await res.json();
-        if (isMounted && data.success && Array.isArray(data.banks) && data.banks.length > 0) {
+        const data = await res.json().catch(() => null);
+        if (isMounted && data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
           setPaystackBanks(data.banks);
         }
       } catch (err) {
@@ -281,25 +287,28 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           amount: numAmount,
           account_number: accountNumberInput,
           bank_code: selectedBankCode,
-          account_name: verifiedAccountName
+          account_name: verifiedAccountName,
+          source_wallet: withdrawSource
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
-      if (res.ok && data.success) {
+      if (res.ok && data?.success) {
         setWithdrawStatusMessage({
           text: `✅ ${data.message || 'Withdrawal processing, you will receive in bank shortly'}`,
           type: 'success'
         });
 
-        await onUpdateBalance(numAmount, 'withdrawal', {
-          accountNumber: accountNumberInput,
-          bankCode: selectedBankCode,
-          accountName: verifiedAccountName,
-          bankName: accountDetails.bankName,
-          sourceWallet: withdrawSource
-        });
+        if (!data.debitedOnServer) {
+          await onUpdateBalance(numAmount, 'withdrawal', {
+            accountNumber: accountNumberInput,
+            bankCode: selectedBankCode,
+            accountName: verifiedAccountName,
+            bankName: accountDetails.bankName,
+            sourceWallet: withdrawSource
+          });
+        }
 
         const txReference = data.reference || `WD-${Date.now()}`;
         const newTx: Transaction = {
@@ -1766,10 +1775,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       <PaystackDeposit 
                         user={user} 
                         defaultAmount={1000}
-                        onSuccess={async ({ reference, amount: amt }) => {
+                        onSuccess={async ({ reference, amount: amt, alreadyCreditedByServer }) => {
                           try {
-                            await onUpdateBalance(amt, 'deposit');
-                            
                             const txData: any = {
                               userId: user.uid,
                               type: 'deposit',
@@ -1787,7 +1794,11 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                 gateway: 'paystack'
                               }
                             };
-                            await TransactionService.recordTransaction(txData);
+
+                            if (!alreadyCreditedByServer) {
+                              await onUpdateBalance(amt, 'deposit');
+                              await TransactionService.recordTransaction(txData);
+                            }
 
                             setSelectedReceiptTx({
                               ...txData,
@@ -1814,12 +1825,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       <FlutterwaveDeposit 
                         user={user} 
                         defaultAmount={1000}
-                        onSuccess={async ({ reference, amount: amt }) => {
+                        onSuccess={async ({ reference, amount: amt, alreadyCreditedByServer }) => {
                           try {
-                            // Update balance
-                            await onUpdateBalance(amt, 'deposit');
-                            
-                            // Generate transaction ledger log
                             const txData: any = {
                               userId: user.uid,
                               type: 'deposit',
@@ -1837,9 +1844,12 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                 gateway: 'flutterwave'
                               }
                             };
-                            await TransactionService.recordTransaction(txData);
 
-                            // Instantly pop receipt modal as requested by user
+                            if (!alreadyCreditedByServer) {
+                              await onUpdateBalance(amt, 'deposit');
+                              await TransactionService.recordTransaction(txData);
+                            }
+
                             setSelectedReceiptTx({
                               ...txData,
                               timestamp: { seconds: Math.floor(Date.now() / 1000) }

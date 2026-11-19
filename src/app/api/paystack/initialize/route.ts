@@ -19,15 +19,20 @@ export async function POST(req: Request) {
     const userId = decoded.uid;
     const userEmail = (decoded.email || `${userId}@efado.com`).trim().toLowerCase();
     const body = await req.json().catch(() => ({}));
-    const { amount } = body || {};
+    const { amount, amount_in_kobo } = body || {};
 
-    const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount < 100 || numAmount > 1000000) {
+    const numAmount = amount !== undefined && amount !== null
+      ? Number(amount)
+      : (amount_in_kobo !== undefined && amount_in_kobo !== null ? Number(amount_in_kobo) / 100 : NaN);
+
+    if (!Number.isFinite(numAmount) || numAmount < 100 || numAmount > 1000000) {
       return Response.json({ success: false, error: 'Invalid amount: Must be between ₦100 and ₦1,000,000' }, { status: 400 });
     }
 
     const reference = `EFADO-FUND-${userId.substring(0, 8)}-${Date.now()}`;
-    const callbackUrl = `${(process.env.NEXT_PUBLIC_APP_URL || 'https://www.e-fado.com').replace(/\/$/, '')}/payment/callback`;
+    const originHeader = req.headers.get('origin');
+    const baseAppUrl = (originHeader || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://www.e-fado.com').replace(/\/$/, '');
+    const callbackUrl = `${baseAppUrl}/payment/callback`;
 
     const db = getServerDb();
     if (db) {

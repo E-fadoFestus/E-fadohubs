@@ -1139,7 +1139,7 @@ function AppContent() {
           });
           const data = await res.json().catch(() => null);
 
-          if (data?.status && (data.data?.status === 'success' || data.already_processed)) {
+          if ((data?.success || data?.status) && (data.data?.status === 'success' || data.already_processed || data.alreadyCredited)) {
             alert(`✅ PAYSTACK DEPOSIT VERIFIED!\n\nReference: ${reference}\nYour deposit wallet has been successfully credited.`);
           } else {
             console.error('Paystack return verification error:', data);
@@ -1169,17 +1169,31 @@ function AppContent() {
 
         if (txRef || transactionId) {
           console.log('🌐 Flutterwave Return Reference detected in URL:', txRef || transactionId, 'Status:', status);
-          const currentUserId = user?.uid || simUserId || '';
-          
-          const verifyUrl = getBackendUrl(`/api/flutterwave/verify/${encodeURIComponent(txRef || '')}?transaction_id=${encodeURIComponent(transactionId || '')}&userId=${encodeURIComponent(currentUserId)}${simAmount ? `&amount=${simAmount}` : ''}`);
-          const res = await fetch(verifyUrl, {
-            mode: 'cors',
-            headers: { 'Accept': 'application/json' }
-          });
-          const data = await res.json();
+          if (status === 'cancelled') {
+            const cleanUrl = window.location.origin + window.location.pathname + window.location.hash;
+            window.history.replaceState({}, document.title, cleanUrl);
+            return;
+          }
 
-          if (data.status && (data.data?.status === 'success' || data.already_processed)) {
-            alert(`✅ FLUTTERWAVE PAYMENT VERIFIED!\n\nReference: ${txRef || transactionId}\nStatus: Successful\nYour account/order has been updated.`);
+          const currentUserId = user?.uid || simUserId || auth.currentUser?.uid || '';
+          const verifyUrl = getBackendUrl('/api/payments/verify');
+          const res = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              tx_ref: txRef || '',
+              transaction_id: transactionId || '',
+              userId: currentUserId,
+              amount: simAmount ? Number(simAmount) : undefined
+            })
+          });
+          const data = await res.json().catch(() => null);
+
+          if ((data?.success || data?.status) && (data?.verified || data?.credited || data?.data?.status === 'success' || data?.already_processed || data?.alreadyCredited)) {
+            alert(`✅ FLUTTERWAVE PAYMENT VERIFIED!\n\nReference: ${txRef || transactionId}\nStatus: Successful\nYour account/wallet has been credited.`);
           } else {
             console.warn('Flutterwave return verification status:', data);
           }

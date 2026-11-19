@@ -18,7 +18,13 @@ export async function POST(req: Request) {
 
     const userId = decoded.uid;
     const body = await req.json().catch(() => ({}));
-    const { amount, account_number, bank_code, account_name } = body || {};
+    const { amount, account_number, bank_code, account_name, source_wallet } = body || {};
+    const targetWalletField =
+      source_wallet === 'playerWallet'
+        ? 'playerWallet'
+        : source_wallet === 'depositWallet'
+          ? 'depositWallet'
+          : 'cashOutWallet';
 
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount < 100 || numAmount > 1000000) {
@@ -40,11 +46,17 @@ export async function POST(req: Request) {
 
     const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
     const userRef = db.doc(`users/${userId}`);
-    const walletSnap = await walletRef.get();
-    const currentBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
+    const [walletSnap, userSnap] = await Promise.all([walletRef.get(), userRef.get()]);
+    const subBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
+    const userFieldBalance = userSnap.exists ? Number(userSnap.data()?.[targetWalletField] || 0) : 0;
+    const currentBalance =
+      targetWalletField === 'depositWallet' ? Math.max(subBalance, userFieldBalance) : userFieldBalance;
 
     if (numAmount > currentBalance) {
-      return Response.json({ success: false, error: 'Insufficient wallet balance' }, { status: 400 });
+      return Response.json({
+        success: false,
+        error: `Insufficient balance in ${targetWalletField} (Available: ₦${currentBalance.toLocaleString()})`
+      }, { status: 400 });
     }
 
     try {
@@ -101,8 +113,18 @@ export async function POST(req: Request) {
     let debitedBalance = 0;
 
     await db.runTransaction(async (transaction: any) => {
-      const freshSnap = await transaction.get(walletRef);
-      const balance = freshSnap.exists ? Number(freshSnap.data()?.balance || freshSnap.data()?.depositWallet || 0) : 0;
+      const [freshWalletSnap, freshUserSnap] = await Promise.all([
+        transaction.get(walletRef),
+        transaction.get(userRef)
+      ]);
+      const freshSub = freshWalletSnap.exists
+        ? Number(freshWalletSnap.data()?.balance || freshWalletSnap.data()?.depositWallet || 0)
+        : 0;
+      const freshUserBal = freshUserSnap.exists
+        ? Number(freshUserSnap.data()?.[targetWalletField] || 0)
+        : 0;
+      const balance =
+        targetWalletField === 'depositWallet' ? Math.max(freshSub, freshUserBal) : freshUserBal;
 
       if (numAmount > balance) {
         throw new Error('Insufficient wallet balance');
@@ -110,14 +132,16 @@ export async function POST(req: Request) {
 
       debitedBalance = balance - numAmount;
 
-      transaction.set(walletRef, {
-        balance: debitedBalance,
-        depositWallet: debitedBalance,
-        updatedAt: serverTime
-      }, { merge: true });
+      if (targetWalletField === 'depositWallet') {
+        transaction.set(walletRef, {
+          balance: debitedBalance,
+          depositWallet: debitedBalance,
+          updatedAt: serverTime
+        }, { merge: true });
+      }
 
       transaction.set(userRef, {
-        depositWallet: debitedBalance,
+        [targetWalletField]: debitedBalance,
         updatedAt: serverTime
       }, { merge: true });
 
@@ -126,6 +150,7 @@ export async function POST(req: Request) {
         status: 'pending',
         amount: numAmount,
         currency: 'NGN',
+        sourceWallet: targetWalletField,
         account_number: cleanAccount,
         bank_code: cleanBank,
         account_name: providedName,
@@ -162,6 +187,7 @@ export async function POST(req: Request) {
 
       return Response.json({
         success: true,
+        debitedOnServer: true,
         message: 'Withdrawal processing, you will receive in bank shortly',
         reference,
         transfer_code: transferCode,
@@ -174,18 +200,30 @@ export async function POST(req: Request) {
 
       try {
         await db.runTransaction(async (transaction: any) => {
-          const freshSnap = await transaction.get(walletRef);
-          const currentBal = freshSnap.exists ? Number(freshSnap.data()?.balance || freshSnap.data()?.depositWallet || 0) : 0;
-          const refundedBal = currentBal + numAmount;
+          const [freshWalletSnap, freshUserSnap] = await Promise.all([
+            transaction.get(walletRef),
+            transaction.get(userRef)
+          ]);
+          const currentSub = freshWalletSnap.exists
+            ? Number(freshWalletSnap.data()?.balance || freshWalletSnap.data()?.depositWallet || 0)
+            : 0;
+          const currentUserBal = freshUserSnap.exists
+            ? Number(freshUserSnap.data()?.[targetWalletField] || 0)
+            : 0;
+          const baseBal =
+            targetWalletField === 'depositWallet' ? Math.max(currentSub, currentUserBal) : currentUserBal;
+          const refundedBal = baseBal + numAmount;
 
-          transaction.set(walletRef, {
-            balance: refundedBal,
-            depositWallet: refundedBal,
-            updatedAt: getServerTimestamp()
-          }, { merge: true });
+          if (targetWalletField === 'depositWallet') {
+            transaction.set(walletRef, {
+              balance: refundedBal,
+              depositWallet: refundedBal,
+              updatedAt: getServerTimestamp()
+            }, { merge: true });
+          }
 
           transaction.set(userRef, {
-            depositWallet: refundedBal,
+            [targetWalletField]: refundedBal,
             updatedAt: getServerTimestamp()
           }, { merge: true });
 
@@ -205,7 +243,9 @@ export async function POST(req: Request) {
 
       return Response.json({
         success: false,
-        error: 'Transfer failed, money refunded to wallet'
+        error: transferErr?.message
+          ? `Transfer failed (${transferErr.message}). Balance has been refunded to your wallet.`
+          : 'Transfer failed, money refunded to wallet'
       }, { status: 500 });
     }
 

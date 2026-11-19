@@ -1,4 +1,4 @@
-import { functions, httpsCallable } from '../firebase';
+import { auth, functions, httpsCallable } from '../firebase';
 import { getBackendUrl } from '../config/backend';
 
 export interface FlutterwavePaymentParams {
@@ -11,6 +11,7 @@ export interface FlutterwavePaymentParams {
   purpose?: string;
   redirectBase?: string;
   redirect_url?: string;
+  userId?: string;
   meta?: Record<string, any>;
   customizations?: {
     title?: string;
@@ -43,7 +44,7 @@ export function sanitizeKey(rawKey: string): string {
 export function getFlutterwavePublicKey(): string {
   const rawEnvKey = (
     import.meta.env.VITE_FLUTTERWAVE_CLIENT_ID ||
-    import.meta.env.VITE_FLW_PUBLIC_KEY || 
+    import.meta.env.VITE_FLW_PUBLIC_KEY ||
     import.meta.env.VITE_FLW_CLIENT_ID ||
     import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
     ''
@@ -56,14 +57,14 @@ export function getFlutterwavePublicKey(): string {
     }
   }
 
-  const localKey = localStorage.getItem('efado_flw_public_key');
+  const localKey = typeof localStorage !== 'undefined' ? localStorage.getItem('efado_flw_public_key') : null;
   if (localKey && localKey.trim()) {
     const sanitizedLocal = sanitizeKey(localKey);
     if (sanitizedLocal) {
       return sanitizedLocal;
     }
   }
-  
+
   return '';
 }
 
@@ -81,43 +82,51 @@ export function clearFlutterwaveKeys(): void {
 }
 
 /**
- * Creates a Flutterwave Checkout session via Backend API or Firebase Function.
- * Handles non-JSON / HTML responses gracefully so it never crashes.
+ * Creates a Flutterwave Checkout session via the Vercel/Express `/api/payments/initialize` backend.
+ * Uses the deployment's configured Flutterwave V3 or V4 environment secrets.
  */
-export async function createFlutterwavePaymentLink(params: FlutterwavePaymentParams): Promise<FlutterwavePaymentResult> {
+export async function createFlutterwavePaymentLink(
+  params: FlutterwavePaymentParams
+): Promise<FlutterwavePaymentResult> {
   const publicKey = getFlutterwavePublicKey();
   const txRef = params.tx_ref || `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
   const redirectBase = params.redirectBase || window.location.origin;
+  const resolvedUserId = params.userId || params.meta?.userId || auth.currentUser?.uid || 'guest';
 
   const payload = {
     ...params,
+    userId: resolvedUserId,
     tx_ref: txRef,
     publicKey,
     redirectBase
   };
 
-  // 1. Primary: Server Backend API initialize endpoint
+  let lastErrorMsg = 'Failed to initialize Flutterwave payment session.';
+
+  // 1. Primary: Unified Vercel / Express backend (`/api/payments/initialize`)
   try {
-    const response = await fetch(getBackendUrl('/api/flutterwave/initialize'), {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 14000);
+    const response = await fetch(getBackendUrl('/api/payments/initialize'), {
       method: 'POST',
-      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        Accept: 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
+    clearTimeout(timer);
 
     const responseText = await response.text();
     let data: any = null;
-
     try {
-      data = JSON.parse(responseText);
+      data = responseText ? JSON.parse(responseText) : null;
     } catch {
-      console.warn('[Flutterwave] Backend returned non-JSON response text:', responseText.substring(0, 100));
+      console.warn('[Flutterwave] Backend returned non-JSON response:', responseText.substring(0, 120));
     }
 
-    if (data && data.status && data.link) {
+    if (response.ok && data && (data.status || data.success) && data.link) {
       return {
         status: true,
         link: data.link,
@@ -126,17 +135,18 @@ export async function createFlutterwavePaymentLink(params: FlutterwavePaymentPar
       };
     }
 
-    if (data && data.message) {
-      return {
-        status: false,
-        message: data.message
-      };
+    if (data?.message || data?.error) {
+      lastErrorMsg = data.message || data.error;
     }
   } catch (err: any) {
-    console.warn('[Flutterwave] Backend API route encountered a network issue:', err?.message || err);
+    lastErrorMsg =
+      err?.name === 'AbortError'
+        ? 'Connection to Flutterwave timed out. Please try again.'
+        : err?.message || lastErrorMsg;
+    console.warn('[Flutterwave] Primary /api/payments/initialize error:', lastErrorMsg);
   }
 
-  // 2. Secondary: Firebase Callable Function fallback if available
+  // 2. Secondary: Firebase Callable Function fallback if deployed
   try {
     if (functions) {
       const createPaymentFn = httpsCallable<any, any>(functions, 'createFlutterwavePayment');
@@ -154,13 +164,9 @@ export async function createFlutterwavePaymentLink(params: FlutterwavePaymentPar
     console.warn('[Flutterwave] Firebase Function fallback error:', fnErr?.message || fnErr);
   }
 
-  // 3. Fallback seamless payment redirection URL (Ensures the user is NEVER blocked)
-  const returnUrl = `${redirectBase}/payment/flutterwave-callback?tx_ref=${encodeURIComponent(txRef)}&status=successful&amount=${params.amount}`;
   return {
-    status: true,
-    link: returnUrl,
-    tx_ref: txRef,
-    isSandbox: true
+    status: false,
+    message: lastErrorMsg
   };
 }
 

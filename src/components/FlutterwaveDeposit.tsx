@@ -5,7 +5,7 @@ import { db, doc, onSnapshot } from '../firebase';
 
 interface FlutterwaveDepositProps {
   user: UserProfile;
-  onSuccess: (paymentInfo: { reference: string; amount: number }) => void;
+  onSuccess: (paymentInfo: { reference: string; amount: number; alreadyCreditedByServer?: boolean }) => void | Promise<void>;
   onCancel?: () => void;
   defaultAmount?: number;
 }
@@ -135,7 +135,14 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         }),
       });
 
-      const verifyData = await verifyRes.json();
+      const verifyText = await verifyRes.text();
+      let verifyData: any = {};
+      try {
+        verifyData = verifyText ? JSON.parse(verifyText) : {};
+      } catch {
+        throw new Error('Verification endpoint returned invalid response.');
+      }
+
       if (verifyRes.ok && verifyData.success) {
         setStatusMessage(`Deposit verified successfully! ₦${targetAmount.toLocaleString()} credited.`);
         setActiveHostedPay(null);
@@ -149,6 +156,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
           onSuccess({
             reference: txRef,
             amount: targetAmount,
+            alreadyCreditedByServer: Boolean(verifyData.credited || verifyData.alreadyCredited)
           });
         }, 800);
       } else {
@@ -197,7 +205,13 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
 
       clearTimeout(timeoutTimer);
 
-      const initData = await initRes.json();
+      const initText = await initRes.text();
+      let initData: any = {};
+      try {
+        initData = initText ? JSON.parse(initText) : {};
+      } catch {
+        throw new Error('Flutterwave initialization endpoint returned an invalid response.');
+      }
       if (!initRes.ok || !initData.success) {
         throw new Error(initData.message || 'Payment initialization failed. Please try again.');
       }

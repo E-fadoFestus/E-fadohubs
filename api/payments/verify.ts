@@ -1,216 +1,258 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import admin from 'firebase-admin';
+import { getServerDb, getServerTimestamp } from '../../src/lib/server-firestore';
 
-// Initialize Firebase Admin with credentials
-function getDb() {
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccountKey) {
-    return null;
-  }
+const cleanKey = (k?: string) =>
+  (k || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/[;\s]/g, '');
 
-  const adminApp: any = admin;
-  try {
-    const apps = adminApp.apps || (adminApp.getApps ? adminApp.getApps() : []);
-    if (!apps.length) {
-      let serviceAccount: any;
-      const trimmed = serviceAccountKey.trim();
-      if (trimmed.startsWith('{')) {
-        serviceAccount = JSON.parse(trimmed);
-      } else {
-        try {
-          const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
-          serviceAccount = JSON.parse(decoded);
-        } catch {
-          serviceAccount = JSON.parse(serviceAccountKey || '{}');
+async function getFlutterwaveBearerToken(): Promise<string> {
+  const v3Secret = cleanKey(
+    process.env.FLWSECK_LIVE ||
+      process.env.FLW_SECRET_KEY ||
+      process.env.FLUTTERWAVE_SECRET_KEY ||
+      process.env.FLWSECK
+  );
+  if (v3Secret) return v3Secret;
+
+  const clientId = cleanKey(
+    process.env.FLUTTERWAVE_CLIENT_ID ||
+      process.env.VITE_FLUTTERWAVE_CLIENT_ID ||
+      process.env.FLW_PUBLIC_KEY
+  );
+  const clientSecret = cleanKey(process.env.FLUTTERWAVE_CLIENT_SECRET);
+  if (clientId && clientSecret) {
+    try {
+      const tokenRes = await fetch(
+        'https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'client_credentials'
+          }).toString()
         }
+      );
+      const tokenData = await tokenRes.json().catch(() => null);
+      if (tokenRes.ok && tokenData?.access_token) {
+        return tokenData.access_token;
       }
-
-      const certCred = adminApp.credential?.cert
-        ? adminApp.credential.cert(serviceAccount)
-        : (adminApp.cert ? adminApp.cert(serviceAccount) : null);
-
-      adminApp.initializeApp({
-        credential: certCred
-      });
+    } catch (err) {
+      console.warn('[Flutterwave Verify Token Fallback Error]:', err);
     }
-
-    if (typeof adminApp.firestore === 'function') {
-      return adminApp.firestore();
-    }
-    const { getFirestore } = require('firebase-admin/firestore');
-    return getFirestore();
-  } catch (err) {
-    console.error('Failed to initialize Firebase Admin:', err);
-    return null;
+    return clientSecret;
   }
+  return '';
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' });
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ success: false, status: false, message: 'Method not allowed' });
   }
 
   try {
-    const { tx_ref, transaction_id, userId, amount } = req.body || {};
+    const source = req.method === 'POST' ? req.body || {} : req.query || {};
+    const tx_ref = String(
+      source.tx_ref || source.txRef || source.reference || req.query?.tx_ref || ''
+    ).trim();
+    const transaction_id = String(
+      source.transaction_id || source.transactionId || source.id || req.query?.transaction_id || ''
+    ).trim();
+    const fallbackAmount = Number(source.amount || req.query?.amount) || 0;
+    const fallbackUserId = String(source.userId || source.user_id || req.query?.userId || '').trim();
 
-    // Strict input validation
-    if (!tx_ref || !transaction_id || !userId || amount === undefined || amount === null) {
+    if (!tx_ref && !transaction_id) {
       return res.status(400).json({
         success: false,
-        message: 'tx_ref, transaction_id, userId and amount required'
+        status: false,
+        message: 'tx_ref or transaction_id is required'
       });
     }
 
-    const expectedAmount = Number(amount);
-    if (isNaN(expectedAmount) || expectedAmount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid amount required'
-      });
-    }
-
-    // Flutterwave secret key resolution
-    const flwSecret = (
-      process.env.FLUTTERWAVE_CLIENT_SECRET ||
-      process.env.FLWSECK_LIVE ||
-      process.env.FLUTTERWAVE_SECRET_KEY ||
-      process.env.FLW_SECRET_KEY ||
-      ''
-    ).trim().replace(/['";]/g, '');
-
-    if (!flwSecret) {
+    const db = getServerDb();
+    if (!db) {
       return res.status(500).json({
         success: false,
-        message: 'Flutterwave secret missing'
+        status: false,
+        message: 'Server Firestore unavailable'
       });
     }
 
-    // Verify transaction with Flutterwave API
-    let flwData: any;
+    const flwBearer = await getFlutterwaveBearerToken();
+    if (!flwBearer) {
+      return res.status(500).json({
+        success: false,
+        status: false,
+        message: 'Flutterwave secret key missing in Vercel environment'
+      });
+    }
+
+    let flwData: any = null;
     try {
-      const flwRes = await fetch(`https://api.flutterwave.com/v3/transactions/${transaction_id}/verify`, {
+      const verifyEndpoint = transaction_id
+        ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(transaction_id)}/verify`
+        : `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(tx_ref)}`;
+
+      const flwRes = await fetch(verifyEndpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${flwSecret}`,
+          Authorization: `Bearer ${flwBearer}`,
           'Content-Type': 'application/json'
         }
       });
-      flwData = await flwRes.json();
+      flwData = await flwRes.json().catch(() => null);
     } catch (fetchErr: any) {
       console.error('Flutterwave verify fetch error:', fetchErr);
       return res.status(502).json({
         success: false,
-        message: 'Could not verify with Flutterwave'
+        status: false,
+        message: 'Could not verify transaction with Flutterwave'
       });
     }
 
-    // Strict verification checks
+    const verifiedStatus = String(flwData?.data?.status || '').toLowerCase();
     const verifiedAmount = Number(flwData?.data?.amount);
+    const verifiedRef = String(flwData?.data?.tx_ref || tx_ref || `FLW_TX_${transaction_id}`).trim();
+    const targetUserId = String(
+      fallbackUserId || flwData?.data?.meta?.userId || ''
+    ).trim();
 
     if (
       flwData?.status !== 'success' ||
-      flwData?.data?.status !== 'successful' ||
-      flwData?.data?.tx_ref !== tx_ref ||
-      flwData?.data?.currency !== 'NGN' ||
-      isNaN(verifiedAmount) ||
-      verifiedAmount < expectedAmount
+      (verifiedStatus !== 'successful' && verifiedStatus !== 'completed') ||
+      (tx_ref && flwData?.data?.tx_ref && flwData.data.tx_ref !== tx_ref) ||
+      !Number.isFinite(verifiedAmount) ||
+      verifiedAmount <= 0 ||
+      (fallbackAmount > 0 && verifiedAmount < fallbackAmount)
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Payment not successful or amount mismatch',
+        status: false,
+        message: flwData?.message || 'Payment not confirmed successful on Flutterwave',
         details: flwData
       });
     }
 
-    // Backend Firestore connection via firebase-admin
-    const db = getDb();
-    if (!db) {
-      console.error('FIREBASE_SERVICE_ACCOUNT_KEY missing or invalid in backend');
-      return res.status(500).json({
+    if (!targetUserId) {
+      return res.status(400).json({
         success: false,
-        message: 'Server Firestore not configured'
+        status: false,
+        message: 'Could not identify user account for this Flutterwave payment'
       });
     }
 
-    // Idempotency check: prevent duplicate crediting
-    const txRefDocPath = `wallets/${userId}/transactions/${tx_ref}`;
-    const txRefDoc = db.doc(txRefDocPath);
-    const existingTx = await txRefDoc.get();
+    const txRefDoc = db.doc(`wallets/${targetUserId}/transactions/${verifiedRef}`);
+    const globalTxDoc = db.doc(`transactions/${verifiedRef}`);
+    const pendingDoc = db.doc(`pendingPayments/${verifiedRef}`);
+    const walletRef = db.doc(`wallets/${targetUserId}/NGN/depositWallet`);
+    const userRef = db.doc(`users/${targetUserId}`);
 
-    if (existingTx.exists) {
-      const txData = existingTx.data();
-      if (txData?.status === 'successful' && txData?.credited === true) {
-        const walletDoc = await db.doc(`wallets/${userId}/NGN/depositWallet`).get();
-        const currentBalance = walletDoc.exists ? Number(walletDoc.data()?.balance || 0) : 0;
-        return res.status(200).json({
-          success: true,
-          newBalance: currentBalance,
-          alreadyCredited: true,
-          message: 'Already credited'
-        });
-      }
+    const existingTx = await txRefDoc.get();
+    if (existingTx.exists && existingTx.data()?.credited === true) {
+      const walletDoc = await walletRef.get();
+      const currentBalance = walletDoc.exists
+        ? Number(walletDoc.data()?.balance ?? walletDoc.data()?.depositWallet ?? 0)
+        : 0;
+      return res.status(200).json({
+        success: true,
+        status: true,
+        alreadyCredited: true,
+        already_processed: true,
+        tx_ref: verifiedRef,
+        amount: verifiedAmount,
+        newBalance: currentBalance,
+        data: { status: 'success', amount: verifiedAmount, tx_ref: verifiedRef },
+        message: 'Already credited'
+      });
     }
 
-    // Credit in backend using Firestore transaction
-    const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
-    const userRef = db.doc(`users/${userId}`);
-    const adminApp: any = admin;
-    const serverTimestamp = adminApp.firestore?.FieldValue?.serverTimestamp
-      ? adminApp.firestore.FieldValue.serverTimestamp()
-      : require('firebase-admin/firestore').FieldValue.serverTimestamp();
-
+    const serverTime = getServerTimestamp();
     let updatedBalance = 0;
 
     await db.runTransaction(async (t: any) => {
       const walletSnapshot = await t.get(walletRef);
-      const oldBalance = walletSnapshot.exists ? Number(walletSnapshot.data()?.balance || 0) : 0;
+      const userSnapshot = await t.get(userRef);
+
+      const subBal = walletSnapshot.exists
+        ? Number(walletSnapshot.data()?.balance ?? walletSnapshot.data()?.depositWallet ?? 0)
+        : 0;
+      const userBal = userSnapshot.exists
+        ? Number(userSnapshot.data()?.depositWallet ?? 0)
+        : 0;
+      const oldBalance = Math.max(subBal, userBal);
       updatedBalance = oldBalance + verifiedAmount;
 
-      t.set(walletRef, {
-        balance: updatedBalance,
-        updatedAt: serverTimestamp
-      }, { merge: true });
+      t.set(
+        walletRef,
+        {
+          balance: updatedBalance,
+          depositWallet: updatedBalance,
+          updatedAt: serverTime
+        },
+        { merge: true }
+      );
 
-      t.set(txRefDoc, {
-        tx_ref,
-        transaction_id: String(transaction_id),
-        userId: String(userId),
+      t.set(
+        userRef,
+        {
+          depositWallet: updatedBalance,
+          updatedAt: serverTime
+        },
+        { merge: true }
+      );
+
+      const txRecord = {
+        type: 'deposit',
+        tx_ref: verifiedRef,
+        reference: verifiedRef,
+        transaction_id: String(transaction_id || flwData?.data?.id || ''),
+        userId: targetUserId,
         amount: verifiedAmount,
-        currency: 'NGN',
+        currency: flwData?.data?.currency || 'NGN',
         gateway: 'flutterwave',
-        status: 'successful',
+        method: 'Flutterwave Gateway',
+        status: 'completed',
         credited: true,
-        createdAt: serverTimestamp
-      }, { merge: true });
+        createdAt: serverTime,
+        updatedAt: serverTime
+      };
 
-      t.set(userRef, {
-        depositWallet: updatedBalance,
-        updatedAt: serverTimestamp
-      }, { merge: true });
+      t.set(txRefDoc, txRecord, { merge: true });
+      t.set(globalTxDoc, txRecord, { merge: true });
+      t.set(pendingDoc, { status: 'completed', credited: true, updatedAt: serverTime }, { merge: true });
     });
 
     return res.status(200).json({
       success: true,
+      status: true,
       verified: true,
       credited: true,
-      tx_ref,
+      tx_ref: verifiedRef,
       amount: verifiedAmount,
-      newBalance: updatedBalance
+      newBalance: updatedBalance,
+      data: {
+        status: 'success',
+        amount: verifiedAmount,
+        tx_ref: verifiedRef
+      }
     });
-
   } catch (error: any) {
-    console.error('Verify error:', error);
+    console.error('[Vercel Flutterwave Verify Crash]:', error);
     return res.status(500).json({
       success: false,
-      message: error.message || 'Server error in verify'
+      status: false,
+      message: error?.message || 'Server error verifying Flutterwave payment'
     });
   }
 }

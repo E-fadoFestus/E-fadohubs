@@ -7,11 +7,15 @@ export const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
  * Helper to ensure secret key is available in server environment
  */
 function getSecret(): string {
-  const secret = process.env.PAYSTACK_SECRET_KEY || paystackSecret;
-  if (!secret) {
-    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
-  }
-  return secret.trim();
+  const raw =
+    process.env.PAYSTACK_SECRET_KEY ||
+    process.env.PAYSTACK_LIVE ||
+    process.env.PAYSTACK_LIVE_SECRET_KEY ||
+    process.env.PAYSTACK_SECRET ||
+    process.env.VITE_PAYSTACK_SECRET_KEY ||
+    paystackSecret ||
+    '';
+  return raw.trim().replace(/^['"]|['"]$/g, '').replace(/[;\s]/g, '');
 }
 
 /**
@@ -19,6 +23,10 @@ function getSecret(): string {
  */
 async function paystackRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
+
   const url = endpoint.startsWith('http') ? endpoint : `https://api.paystack.co${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
   const headers: Record<string, string> = {
@@ -53,6 +61,34 @@ async function paystackRequest<T = any>(endpoint: string, options: RequestInit =
 }
 
 /**
+ * Standard Nigerian bank directory fallback list
+ */
+const FALLBACK_NIGERIAN_BANKS = [
+  { name: 'Access Bank', code: '044' },
+  { name: 'Guaranty Trust Bank (GTBank / GTCO)', code: '058' },
+  { name: 'Zenith Bank', code: '057' },
+  { name: 'First Bank of Nigeria', code: '011' },
+  { name: 'United Bank for Africa (UBA)', code: '033' },
+  { name: 'Moniepoint Microfinance Bank', code: '50515' },
+  { name: 'OPay Digital Services Limited', code: '999992' },
+  { name: 'PalmPay Limited', code: '999991' },
+  { name: 'Kuda Microfinance Bank', code: '50211' },
+  { name: 'Fidelity Bank', code: '070' },
+  { name: 'First City Monument Bank (FCMB)', code: '214' },
+  { name: 'Sterling Bank', code: '232' },
+  { name: 'Wema Bank (ALAT)', code: '035' },
+  { name: 'Stanbic IBTC Bank', code: '221' },
+  { name: 'Ecobank Nigeria', code: '050' },
+  { name: 'Union Bank of Nigeria', code: '032' },
+  { name: 'Polaris Bank', code: '076' },
+  { name: 'Keystone Bank', code: '082' },
+  { name: 'Providus Bank', code: '101' },
+  { name: 'FairMoney Microfinance Bank', code: '50971' },
+  { name: 'Rubies Microfinance Bank', code: '125' },
+  { name: 'VFD Microfinance Bank (VBank)', code: '566' }
+];
+
+/**
  * 1. Initialize Paystack Payment
  * Converts amount in Naira to Kobo (amountInNaira * 100)
  */
@@ -67,7 +103,15 @@ export async function initializePaystackPayment(
     throw new Error('email, positive amountInNaira, and reference are required to initialize Paystack payment.');
   }
 
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
+
   const amountInKobo = Math.round(amountInNaira * 100);
+  if (!Number.isInteger(amountInKobo) || amountInKobo <= 0) {
+    throw new Error('Invalid payment amount in kobo.');
+  }
 
   const payload = {
     email: email.trim().toLowerCase(),
@@ -96,8 +140,13 @@ export async function verifyPaystackPayment(reference: string) {
   if (!reference || !reference.trim()) {
     throw new Error('reference is required to verify Paystack payment.');
   }
-  const cleanRef = encodeURIComponent(reference.trim());
-  return await paystackRequest(`/transaction/verify/${cleanRef}`, {
+  const cleanRef = reference.trim();
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
+
+  return await paystackRequest(`/transaction/verify/${encodeURIComponent(cleanRef)}`, {
     method: 'GET'
   });
 }
@@ -109,6 +158,7 @@ export function verifyPaystackSignature(rawBody: string | Buffer, signature: str
   if (!signature || !rawBody) return false;
   try {
     const secret = getSecret();
+    if (!secret) return false;
     const hash = crypto
       .createHmac('sha512', secret)
       .update(typeof rawBody === 'string' ? rawBody : Buffer.from(rawBody))
@@ -124,9 +174,24 @@ export function verifyPaystackSignature(rawBody: string | Buffer, signature: str
  * 4. Get List of Nigerian Banks
  */
 export async function getPaystackBanks(country: string = 'nigeria', perPage: number = 100) {
-  return await paystackRequest(`/bank?country=${encodeURIComponent(country)}&perPage=${perPage}`, {
-    method: 'GET'
-  });
+  const secret = getSecret();
+  if (!secret) {
+    return {
+      status: true,
+      data: FALLBACK_NIGERIAN_BANKS
+    };
+  }
+  try {
+    return await paystackRequest(`/bank?country=${encodeURIComponent(country)}&perPage=${perPage}`, {
+      method: 'GET'
+    });
+  } catch (err) {
+    console.warn('[Paystack Banks Request Warning] Falling back to standard bank list:', err);
+    return {
+      status: true,
+      data: FALLBACK_NIGERIAN_BANKS
+    };
+  }
 }
 
 /**
@@ -138,6 +203,10 @@ export async function resolveAccountNumber(account_number: string, bank_code: st
   }
   const cleanAccount = account_number.trim();
   const cleanBank = bank_code.trim();
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   return await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(cleanAccount)}&bank_code=${encodeURIComponent(cleanBank)}`, {
     method: 'GET'
   });
@@ -147,6 +216,10 @@ export async function resolveAccountNumber(account_number: string, bank_code: st
  * 6. Check Paystack Balance (in Kobo)
  */
 export async function getPaystackBalance() {
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   return await paystackRequest('/balance', {
     method: 'GET'
   });
@@ -156,6 +229,10 @@ export async function getPaystackBalance() {
  * 7. Create or Retrieve Transfer Recipient
  */
 export async function createTransferRecipient(name: string, account_number: string, bank_code: string) {
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   const payload = {
     type: 'nuban',
     name: name.trim(),
@@ -179,6 +256,10 @@ export async function initiateTransfer(
   reference: string,
   reason: string = 'EFADO Wallet Withdrawal'
 ) {
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   const amountInKobo = Math.round(amountInNaira * 100);
 
   const payload = {
@@ -199,6 +280,10 @@ export async function initiateTransfer(
  * 9. Get Transfer Status by transfer code or reference
  */
 export async function getTransferStatus(transfer_code: string) {
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   return await paystackRequest(`/transfer/${encodeURIComponent(transfer_code.trim())}`, {
     method: 'GET'
   });
@@ -208,6 +293,10 @@ export async function getTransferStatus(transfer_code: string) {
  * 10. Verify Transfer by reference
  */
 export async function verifyTransfer(reference: string) {
+  const secret = getSecret();
+  if (!secret) {
+    throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
+  }
   return await paystackRequest(`/transfer/verify/${encodeURIComponent(reference.trim())}`, {
     method: 'GET'
   });

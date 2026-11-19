@@ -28,7 +28,7 @@ import { TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
-import { db, doc, updateDoc, collection, setDoc, serverTimestamp } from '../firebase';
+import { auth, db, doc, updateDoc, collection, setDoc, serverTimestamp } from '../firebase';
 import { resolveBankAccount, NIGERIAN_BANKS } from '../utils/bankVerification';
 
 export interface EasyPaymentPlatformProps {
@@ -133,103 +133,207 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
   // Paystack Script Loader & Checkout
   const loadPaystackScript = () => {
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve, reject) => {
       if ((window as any).PaystackPop) return resolve(true);
+      const timer = setTimeout(() => reject(new Error('Timed out loading Paystack SDK.')), 10000);
+      const existing = document.querySelector('script[src*="js.paystack.co/v1/inline.js"]') as HTMLScriptElement | null;
+      if (existing) {
+        const poll = setInterval(() => {
+          if ((window as any).PaystackPop) {
+            clearInterval(poll);
+            clearTimeout(timer);
+            resolve(true);
+          }
+        }, 100);
+        existing.addEventListener('error', () => {
+          clearInterval(poll);
+          clearTimeout(timer);
+          reject(new Error('Failed to load Paystack SDK.'));
+        }, { once: true });
+        return;
+      }
       const script = document.createElement('script');
       script.src = 'https://js.paystack.co/v1/inline.js';
       script.async = true;
-      script.onload = () => resolve(true);
-      document.body.appendChild(script);
+      script.onload = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      script.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error('Failed to load Paystack SDK.'));
+      };
+      document.head.appendChild(script);
     });
   };
 
   const handlePaystackCheckout = async () => {
+    setError(null);
     const parsedAmt = Number(amount);
-    if (!amount || isNaN(parsedAmt) || parsedAmt <= 0) {
-      setError('Please enter a valid amount.');
+    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < 100) {
+      setError('Please enter a valid amount of at least ₦100.');
+      return;
+    }
+
+    const amountInKobo = Math.round(parsedAmt * 100);
+    if (!Number.isInteger(amountInKobo) || amountInKobo <= 0) {
+      setError('Invalid payment amount.');
+      return;
+    }
+
+    const rawEmail = (user?.email || auth.currentUser?.email || '').trim().toLowerCase();
+    const customerEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)
+      ? rawEmail
+      : (user?.uid ? `${user.uid}@efado.com` : '');
+    if (!customerEmail) {
+      setError('A valid email address is required for Paystack checkout.');
       return;
     }
 
     setIsProcessing(true);
     setStep('processing');
-    setProcessingProgress(30);
+    setProcessingProgress(25);
 
     try {
+      const rawKey = (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '').trim();
+      const pstKey = /^pk_(test|live)_[a-zA-Z0-9]+$/.test(rawKey) ? rawKey : '';
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+
+      // If frontend public key isn't set, use backend Paystack initialize redirect
+      if (!pstKey) {
+        if (!token) {
+          throw new Error('Please sign in with a valid account to pay with Paystack.');
+        }
+        setProcessingProgress(55);
+        const initRes = await fetch('/api/paystack/initialize', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            amount: parsedAmt,
+            amount_in_kobo: amountInKobo
+          })
+        });
+        const initData = await initRes.json().catch(() => null);
+        const authUrl = initData?.authorization_url || initData?.data?.authorization_url;
+        if (!initRes.ok || !authUrl) {
+          throw new Error(
+            initData?.error ||
+              initData?.message ||
+              'Paystack keys are not configured. Set VITE_PAYSTACK_PUBLIC_KEY or PAYSTACK_SECRET_KEY in Vercel.'
+          );
+        }
+        setProcessingProgress(100);
+        window.location.assign(authUrl);
+        return;
+      }
+
       await loadPaystackScript();
       setProcessingProgress(60);
 
-      const pstKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || 'pk_test_f35adbd6b3c304fda3645194017b9e388da5563a';
       const paymentRef = `EFD-PST-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
       if (typeof (window as any).PaystackPop !== 'undefined') {
         const handler = (window as any).PaystackPop.setup({
           key: pstKey,
-          email: user.email || 'customer@efado.com',
-          amount: parsedAmt * 100, // NGN kobo
+          email: customerEmail,
+          amount: amountInKobo,
           currency: 'NGN',
           ref: paymentRef,
           metadata: {
             userId: user.uid,
-            userName: user.displayName || user.email || 'EFADO Member',
+            userName: user.displayName || customerEmail,
             purpose: intentPurpose || 'Wallet Funding'
           },
-          callback: async (response: any) => {
-            setProcessingProgress(90);
-            const returnedRef = response.reference || paymentRef;
-            
-            const txData = {
-              userId: user.uid,
-              userEmail: user.email,
-              type: 'deposit' as 'deposit',
-              amount: parsedAmt,
-              fee: 0,
-              currency: 'NGN',
-              status: 'completed' as 'completed',
-              method: 'Paystack Instant Gateway',
-              hub: hub as any,
-              purpose: intentPurpose || 'Wallet Funding',
-              reference: returnedRef,
-              description: `Automated Deposit via Paystack Gateway [Ref: ${returnedRef}]`,
-              skipWalletUpdate: false,
-              metadata: {
-                paymentChannel: 'Paystack Pop-Up',
-                transactionRef: returnedRef,
-                gateway: 'paystack'
+          callback: (response: any) => {
+            void (async () => {
+              try {
+                setProcessingProgress(85);
+                const returnedRef = response?.reference || paymentRef;
+                let serverCredited = false;
+
+                if (token) {
+                  const verifyRes = await fetch(`/api/paystack/verify?reference=${encodeURIComponent(returnedRef)}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                  const verifyData = await verifyRes.json().catch(() => null);
+                  if (verifyRes.ok && verifyData?.success) {
+                    serverCredited = true;
+                  } else if (verifyRes.status === 400 || verifyRes.status === 403) {
+                    throw new Error(verifyData?.error || verifyData?.message || 'Paystack verification failed.');
+                  }
+                }
+
+                const txData = {
+                  userId: user.uid,
+                  userEmail: customerEmail,
+                  type: 'deposit' as 'deposit',
+                  amount: parsedAmt,
+                  fee: 0,
+                  currency: 'NGN',
+                  status: 'completed' as 'completed',
+                  method: 'Paystack Instant Gateway',
+                  hub: hub as any,
+                  purpose: intentPurpose || 'Wallet Funding',
+                  reference: returnedRef,
+                  description: `Automated Deposit via Paystack Gateway [Ref: ${returnedRef}]`,
+                  skipWalletUpdate: serverCredited || !!onComplete,
+                  metadata: {
+                    paymentChannel: 'Paystack Pop-Up',
+                    transactionRef: returnedRef,
+                    gateway: 'paystack'
+                  }
+                };
+
+                const txId = serverCredited
+                  ? returnedRef
+                  : await TransactionService.recordTransaction(txData);
+                setCreatedTx({
+                  id: txId,
+                  ...txData,
+                  timestamp: new Date().toISOString()
+                } as any);
+
+                setProcessingProgress(100);
+                setIsProcessing(false);
+                setStep('success');
+
+                if (onSuccess) onSuccess();
+                if (onComplete) onComplete(parsedAmt, 'Paystack Instant');
+              } catch (cbErr: any) {
+                console.error('Paystack callback verification error:', cbErr);
+                setError(cbErr?.message || 'Payment verification failed.');
+                setStep('form');
+                setIsProcessing(false);
               }
-            };
-
-            const txId = await TransactionService.recordTransaction(txData);
-            setCreatedTx({
-              id: txId,
-              ...txData,
-              timestamp: new Date().toISOString()
-            } as any);
-
-            setProcessingProgress(100);
-            setStep('success');
-
-            if (onSuccess) onSuccess();
-            if (onComplete) onComplete(parsedAmt, 'Paystack Instant');
+            })();
           },
           onClose: () => {
             setStep('form');
             setIsProcessing(false);
+            setError('Checkout window closed before payment completion.');
           }
         });
         handler.openIframe();
       } else {
-        throw new Error('Paystack script library missing');
+        throw new Error('Paystack SDK failed to load.');
       }
     } catch (err: any) {
-      console.warn('Paystack inline modal error, attempting server endpoint fallback:', err);
-      executeFallbackSuccess('Paystack Gateway');
+      console.error('Paystack checkout initialization error:', err);
+      setError(err?.message || 'Could not initialize Paystack checkout.');
+      setStep('form');
+      setIsProcessing(false);
     }
   };
 
   const handleFlutterwaveCheckout = async () => {
+    setError(null);
     const parsedAmt = Number(amount);
-    if (!amount || isNaN(parsedAmt) || parsedAmt <= 0) {
-      setError('Please enter a valid amount.');
+    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < 100) {
+      setError('Please enter a valid amount of at least ₦100.');
       return;
     }
 
@@ -242,8 +346,9 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     try {
       setProcessingProgress(65);
       const result = await createFlutterwavePaymentLink({
-        email: user.email || 'customer@efado.com',
+        email: user.email || `${user.uid}@efado.com`,
         name: user.displayName || 'EFADO Member',
+        userId: user.uid,
         amount: parsedAmt,
         currency: 'NGN',
         tx_ref: paymentRef,
@@ -255,54 +360,23 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         customizations: {
           title: 'EFADO Wallet Checkout',
           description: intentPurpose || 'Instant Wallet Funding',
-          logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=120&h=120&fit=crop'
+          logo: `${window.location.origin}/efado_logo_192.jpg`
         }
       });
 
       if (result.status && result.link) {
         setProcessingProgress(100);
-        // Direct redirection to official Flutterwave V4 hosted checkout
-        window.location.href = result.link;
+        window.location.assign(result.link);
         return;
       }
 
-      throw new Error(result.message || 'Could not generate payment link');
+      throw new Error(result.message || 'Could not generate Flutterwave checkout link.');
     } catch (err: any) {
-      console.warn('Flutterwave hosted link initialization error, switching to safe record fallback:', err);
-      executeFallbackSuccess('Flutterwave Gateway');
+      console.error('Flutterwave checkout initialization error:', err);
+      setError(err?.message || 'Unable to connect to Flutterwave gateway. Please try again.');
+      setStep('form');
+      setIsProcessing(false);
     }
-  };
-
-  // Fallback transaction simulation for offline/sandbox testing
-  const executeFallbackSuccess = async (gatewayName: string) => {
-    const parsedAmt = Number(amount) || 5000;
-    const txData = {
-      userId: user.uid,
-      userEmail: user.email,
-      type: 'deposit' as 'deposit',
-      amount: parsedAmt,
-      fee: 0,
-      currency: 'NGN',
-      status: 'completed' as 'completed',
-      method: gatewayName,
-      hub: hub as any,
-      purpose: intentPurpose || 'Wallet Funding',
-      reference,
-      description: `Instant Deposit processed via ${gatewayName} [Ref: ${reference}]`,
-      skipWalletUpdate: false,
-    };
-
-    const txId = await TransactionService.recordTransaction(txData);
-    setCreatedTx({
-      id: txId,
-      ...txData,
-      timestamp: new Date().toISOString()
-    } as any);
-
-    setProcessingProgress(100);
-    setStep('success');
-    if (onSuccess) onSuccess();
-    if (onComplete) onComplete(parsedAmt, gatewayName);
   };
 
   // Handle Submit for Direct Bank Transfer & Withdrawal

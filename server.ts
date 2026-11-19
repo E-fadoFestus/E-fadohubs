@@ -558,14 +558,14 @@ app.get('/api/paystack/verify/:reference', (req: express.Request, res: express.R
 app.post(['/api/webhook/paystack', '/webhook/paystack'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWebhookRoute, req, res));
 
 // Route C: Real Bank Account Name Enquiry API (/api/bank/resolve & /api/verify-bank)
-app.get(['/api/bank/resolve', '/api/verify-bank'], async (req: express.Request, res: express.Response) => {
-  const accountNumber = String(req.query.account_number || '').trim();
-  const bankCode = String(req.query.bank_code || '').trim();
-  const bankName = String(req.query.bank_name || '').trim();
+app.all(['/api/bank/resolve', '/api/verify-bank'], async (req: express.Request, res: express.Response) => {
+  const accountNumber = String(req.query.account_number || req.body?.account_number || req.body?.accountNumber || '').trim().replace(/\D/g, '');
+  const bankCode = String(req.query.bank_code || req.body?.bank_code || req.body?.bankCode || '').trim();
+  const bankName = String(req.query.bank_name || req.body?.bank_name || req.body?.bankName || '').trim();
   const clientSecretKey = String(req.query.secret_key || req.headers['x-secret-key'] || '').trim();
 
   if (!accountNumber || accountNumber.length < 10) {
-    return res.status(400).json({ status: false, message: 'Account number must be at least 10 digits.' });
+    return res.status(400).json({ status: false, success: false, message: 'Account number must be at least 10 digits.' });
   }
 
   // Determine active keys (Server env or client provided secret key)

@@ -74,6 +74,7 @@ export default defineConfig(({mode}) => {
       'import.meta.env.VITE_FLW_SECRET_KEY': JSON.stringify(env.VITE_FLW_SECRET_KEY || ''),
       'import.meta.env.VITE_PAYPAL_HOSTED_BUTTON_ID': JSON.stringify(env.VITE_PAYPAL_HOSTED_BUTTON_ID || ''),
       'import.meta.env.VITE_PAYPAL_CLIENT_ID': JSON.stringify(env.VITE_PAYPAL_CLIENT_ID || ''),
+      'import.meta.env.VITE_PAYSTACK_PUBLIC_KEY': JSON.stringify(env.VITE_PAYSTACK_PUBLIC_KEY || env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ''),
     },
     resolve: {
       alias: {

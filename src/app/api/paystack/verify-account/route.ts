@@ -54,11 +54,11 @@ export async function POST(req: Request) {
         account_name: data.account_name,
         account_number: data.account_number || cleanAccount
       });
-    } catch {
+    } catch (resolveErr: any) {
       return Response.json({
         success: false,
-        error: 'Account number not found. Check number and bank and try again.'
-      }, { status: 400 });
+        error: resolveErr?.message || 'Account number not found. Check number and bank and try again.'
+      }, { status: resolveErr?.message?.includes('PAYSTACK_SECRET_KEY') ? 500 : 400 });
     }
 
   } catch (error: any) {
