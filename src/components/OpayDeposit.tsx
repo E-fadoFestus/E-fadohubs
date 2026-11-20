@@ -3,7 +3,6 @@ import { UserProfile } from '../types';
 import { OpayService } from '../services/OpayService';
 import { Zap, AlertCircle, Wallet, CheckCircle2 } from 'lucide-react';
 import { soundManager } from '../services/sound';
-import { db, doc, updateDoc, increment } from '../firebase';
 import { TransactionService } from '../services/TransactionService';
 
 interface OpayDepositProps {
@@ -47,13 +46,7 @@ export const OpayDeposit: React.FC<OpayDepositProps> = ({
           const url = new URL(initData.cashierUrl, window.location.origin);
           const reference = url.searchParams.get('verify') || initData.reference || `EFADO-${Date.now()}`;
 
-          // 1. Credit Firebase wallet
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, {
-            depositWallet: increment(amount)
-          });
-
-          // 2. Record transaction
+          // Atomically credit wallets/{uid}/NGN/depositWallet + record transaction together
           await TransactionService.recordTransaction({
             userId: user.uid,
             type: 'deposit',
@@ -64,13 +57,12 @@ export const OpayDeposit: React.FC<OpayDepositProps> = ({
             hub: 'WALLET',
             purpose: 'Wallet Top-up',
             reference: reference,
-            description: `OPay Test Funding ₦${amount}`,
-            skipWalletUpdate: true
+            description: `OPay Test Funding ₦${amount}`
           });
 
-          setSuccessMessage(`✅ SUCCESS! ₦${amount.toLocaleString()} added to your Deposit Wallet! Check Overview!`);
+          setSuccessMessage(`✅ SUCCESS! ₦${amount.toLocaleString()} added to your NGN Deposit Pocket! Check Overview!`);
           soundManager.playCashoutChime();
-          
+
           if (onSuccess) {
             onSuccess({ reference, amount });
           }

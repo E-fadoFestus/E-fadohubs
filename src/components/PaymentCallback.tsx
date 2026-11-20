@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, Loader2, ArrowRight, Wallet, RefreshCw } from 'lucide-react';
 import { auth } from '../firebase';
+import { formatCurrencyAmount } from '../constants/walletCurrencies';
 
 interface PaymentCallbackProps {
   onGoToWallet?: () => void;
@@ -11,6 +12,7 @@ export const PaymentCallback: React.FC<PaymentCallbackProps> = ({ onGoToWallet }
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [amount, setAmount] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<string>('NGN');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,9 +52,10 @@ export const PaymentCallback: React.FC<PaymentCallbackProps> = ({ onGoToWallet }
 
         if (!isMounted) return;
 
-        if (res.ok && data?.success) {
+        if (res.ok && data?.success && data?.credited !== false) {
           setSuccess(true);
           setAmount(data.amount || null);
+          setCurrency(data.currency || 'NGN');
         } else {
           console.error('Paystack verify error:', data);
           setSuccess(false);
@@ -114,10 +117,10 @@ export const PaymentCallback: React.FC<PaymentCallbackProps> = ({ onGoToWallet }
                 Payment Confirmed!
               </h2>
               <p className="text-3xl font-black text-emerald-400 font-mono">
-                {amount !== null ? `₦${amount.toLocaleString()}` : 'Funds'}
+                {amount !== null ? formatCurrencyAmount(amount, currency) : 'Funds'}
               </p>
               <p className="text-xs text-slate-300 font-medium">
-                added to your EFADO Sovereign Wallet.
+                added to your EFADO {currency} Deposit Pocket.
               </p>
             </div>
 

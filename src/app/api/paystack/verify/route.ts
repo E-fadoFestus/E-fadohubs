@@ -1,6 +1,8 @@
 import { verifyPaystackPayment } from '../../../../lib/paystack';
 import { getServerDb, getServerTimestamp, auth } from '../../../../lib/server-firestore';
 
+const ACTIVE_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
+
 async function verifyLogic(reference: string, userId: string) {
   if (!reference) {
     return Response.json({ success: false, error: 'reference parameter is required' }, { status: 400 });
@@ -17,6 +19,7 @@ async function verifyLogic(reference: string, userId: string) {
   if (!paystackResult?.status || data?.status !== 'success') {
     return Response.json({
       success: false,
+      error: data?.gateway_response || 'Payment not successful on Paystack',
       message: 'Payment not successful',
       status: data?.status || 'failed'
     }, { status: 400 });
@@ -35,11 +38,21 @@ async function verifyLogic(reference: string, userId: string) {
   const txSnapshot = await txRefDoc.get();
   const existingTx = txSnapshot.exists ? txSnapshot.data() : null;
 
+  const txCurrency = String(data.currency || existingTx?.currency || 'NGN').trim().toUpperCase();
+  if (txCurrency === 'SIRA' || !ACTIVE_CURRENCIES.includes(txCurrency)) {
+    return Response.json({
+      success: false,
+      error: `Unsupported transaction currency "${txCurrency}"`
+    }, { status: 400 });
+  }
+
   if (existingTx && (existingTx.status === 'success' || existingTx.status === 'completed') && existingTx.credited === true) {
     return Response.json({
       success: true,
+      credited: true,
       alreadyCredited: true,
       amount: existingTx.amount || paidAmount,
+      currency: existingTx.currency || txCurrency,
       reference,
       message: 'Transaction already credited'
     });
@@ -52,38 +65,52 @@ async function verifyLogic(reference: string, userId: string) {
     }, { status: 400 });
   }
 
-  const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
-  const userRef = db.doc(`users/${userId}`);
+  // Canonical single location per currency: wallets/{uid}/{currency}/depositWallet
+  const walletRef = db.doc(`wallets/${userId}/${txCurrency}/depositWallet`);
   const userTxRef = db.doc(`wallets/${userId}/transactions/${reference}`);
   const serverTime = getServerTimestamp();
 
   let updatedBalance = 0;
 
   await db.runTransaction(async (transaction: any) => {
+    const freshTxSnap = await transaction.get(txRefDoc);
+    if (freshTxSnap.exists && freshTxSnap.data()?.credited === true) {
+      const existingWalletSnap = await transaction.get(walletRef);
+      updatedBalance = existingWalletSnap.exists
+        ? Number(existingWalletSnap.data()?.balance ?? existingWalletSnap.data()?.depositWallet ?? 0)
+        : 0;
+      return;
+    }
+
     const walletSnap = await transaction.get(walletRef);
-    const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
+    const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance ?? walletSnap.data()?.depositWallet ?? 0) : 0;
     updatedBalance = oldBalance + paidAmount;
 
     transaction.set(walletRef, {
       balance: updatedBalance,
       depositWallet: updatedBalance,
-      updatedAt: serverTime
-    }, { merge: true });
-
-    transaction.set(userRef, {
-      depositWallet: updatedBalance,
+      currency: txCurrency,
+      userId,
+      lastFundedRef: reference,
+      createdAt: walletSnap.exists ? (walletSnap.data()?.createdAt || serverTime) : serverTime,
       updatedAt: serverTime
     }, { merge: true });
 
     const successRecord = {
-      type: 'fund',
-      status: 'success',
+      type: 'deposit',
+      status: 'completed',
       credited: true,
       amount: paidAmount,
-      currency: 'NGN',
+      currency: txCurrency,
       reference,
       userId,
       gateway: 'paystack',
+      method: 'Paystack Gateway',
+      purpose: 'Wallet Top-up',
+      description: `Verified Paystack Deposit (${txCurrency}) [Ref: ${reference}]`,
+      creditedPocket: `wallets/${userId}/${txCurrency}/depositWallet`,
+      timestamp: serverTime,
+      createdAt: existingTx?.createdAt || serverTime,
       updatedAt: serverTime
     };
 
@@ -93,9 +120,12 @@ async function verifyLogic(reference: string, userId: string) {
 
   return Response.json({
     success: true,
+    credited: true,
     amount: paidAmount,
+    currency: txCurrency,
     newBalance: updatedBalance,
     reference,
+    creditedPocket: `wallets/${userId}/${txCurrency}/depositWallet`,
     message: 'Payment verified and wallet credited successfully'
   });
 }

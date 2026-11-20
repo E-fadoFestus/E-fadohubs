@@ -13,6 +13,7 @@ import {
 } from '../firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { UserProfile } from '../types';
+import { ACTIVE_WALLET_CURRENCIES } from '../constants/walletCurrencies';
 
 export function useAppAuth() {
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -31,33 +32,79 @@ export function useAppAuth() {
 
   const [loading, setLoading] = useState(true);
 
-  // Compute 1 Unified Liquid Wallet
-  const depositWallet = user?.depositWallet || 0;
+  // Compute 1 Unified Liquid Wallet from canonical NGN pocket
+  const depositWallet = user?.walletPockets?.NGN ?? user?.depositWallet ?? 0;
   const playerWallet = user?.playerWallet || 0;
   const cashOutWallet = user?.cashOutWallet || 0;
   const wallet = depositWallet + playerWallet;
 
-  // Synchronize Auth and Firestore User Document in real-time across tabs
+  // Synchronize Auth, User Document, and all 9 canonical Currency Pockets in real-time
   useEffect(() => {
     let unsubscribeUserDoc: (() => void) | null = null;
+    let pocketUnsubs: (() => void)[] = [];
+
+    const cleanupPockets = () => {
+      pocketUnsubs.forEach((u) => {
+        try { u(); } catch {}
+      });
+      pocketUnsubs = [];
+    };
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+        unsubscribeUserDoc = null;
+      }
+      cleanupPockets();
+
       if (firebaseUser) {
         const userRef = doc(db, 'users', firebaseUser.uid);
-        
-        // Listen to Firestore doc updates in real-time
+        const livePockets: Record<string, number> = {};
+        ACTIVE_WALLET_CURRENCIES.forEach((c) => {
+          livePockets[c.code] = 0;
+        });
+
+        pocketUnsubs = ACTIVE_WALLET_CURRENCIES.map((cur) =>
+          onSnapshot(
+            doc(db, 'wallets', firebaseUser.uid, cur.code, 'depositWallet'),
+            (snap) => {
+              const bal = snap.exists()
+                ? Number(snap.data()?.balance ?? snap.data()?.depositWallet ?? 0) || 0
+                : 0;
+              livePockets[cur.code] = bal;
+              setUser((prev) => {
+                if (!prev || prev.uid !== firebaseUser.uid) return prev;
+                const nextPockets = { ...(prev.walletPockets || {}), ...livePockets };
+                const updated: UserProfile = {
+                  ...prev,
+                  walletPockets: nextPockets,
+                  depositWallet: nextPockets.NGN ?? 0
+                };
+                localStorage.setItem('efado_cached_user', JSON.stringify(updated));
+                return updated;
+              });
+            },
+            (err) => {
+              console.warn(`[useAppAuth] Pocket listener notice (${cur.code}):`, err?.message || err);
+            }
+          )
+        );
+
+        // Listen to Firestore user doc updates in real-time
         unsubscribeUserDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
+            const ngnBal = livePockets.NGN ?? 0;
             const profile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || '',
               displayName: data.displayName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
               photoURL: data.photoURL || firebaseUser.photoURL || '',
               playerWallet: data.playerWallet ?? 0,
-              depositWallet: data.depositWallet ?? 0,
+              depositWallet: ngnBal,
               cashOutWallet: data.cashOutWallet ?? 0,
               miningWallet: data.miningWallet ?? 0,
+              walletPockets: { ...livePockets },
               miningProgress: data.miningProgress || { stage: 'E', collectedInStage: 0 },
               role: (firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com' || data.role === 'admin') ? 'admin' : 'player',
               createdAt: data.createdAt || new Date().toISOString(),
@@ -78,9 +125,10 @@ export function useAppAuth() {
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
               photoURL: firebaseUser.photoURL || '',
               playerWallet: 0,
-              depositWallet: 0,
+              depositWallet: livePockets.NGN ?? 0,
               cashOutWallet: 0,
               miningWallet: 0,
+              walletPockets: { ...livePockets },
               miningProgress: { stage: 'E', collectedInStage: 0 },
               role: (firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com') ? 'admin' : 'player',
               createdAt: new Date().toISOString(),
@@ -96,10 +144,6 @@ export function useAppAuth() {
           setLoading(false);
         });
       } else {
-        if (unsubscribeUserDoc) {
-          unsubscribeUserDoc();
-          unsubscribeUserDoc = null;
-        }
         setUser(null);
         localStorage.removeItem('efado_cached_user');
         localStorage.removeItem('efado_user_session_exists');
@@ -112,6 +156,7 @@ export function useAppAuth() {
       if (unsubscribeUserDoc) {
         unsubscribeUserDoc();
       }
+      cleanupPockets();
     };
   }, []);
 

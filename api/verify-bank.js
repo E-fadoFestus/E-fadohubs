@@ -120,20 +120,35 @@ export default async function handler(req, res) {
         process.env.FLUTTERWAVE_CLIENT_SECRET
     );
 
-    // 1. Try Paystack NIBSS Account Resolution (Primary — most reliable across Nigerian commercial + fintech banks)
-    if (PAYSTACK_SECRET) {
+    // Helper fetch with strict 10s timeout
+    const fetchWithTimeout = async (url, init = {}, ms = 10000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        const resp = await fetch(url, { ...init, signal: controller.signal });
+        clearTimeout(timer);
+        return resp;
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
+      }
+    };
+
+    const preferredGateway = String(body.gateway || query.gateway || '').toLowerCase();
+    let sawTimeout = false;
+
+    const tryPaystack = async () => {
+      if (!PAYSTACK_SECRET) return null;
       let codeForPaystack = paystackBankCode;
-      // Convert Flutterwave fintech codes back to Paystack codes if needed
       if (codeForPaystack === '100004') codeForPaystack = '999992'; // OPay
       if (codeForPaystack === '100033') codeForPaystack = '999991'; // PalmPay
       if (codeForPaystack === '090267') codeForPaystack = '50211';  // Kuda
 
-      // If still no bank code, look up dynamically via Paystack bank directory by bank name
       if ((!codeForPaystack || codeForPaystack === '000') && bank_name_input) {
         try {
-          const listRes = await fetch('https://api.paystack.co/bank?country=nigeria&perPage=100', {
+          const listRes = await fetchWithTimeout('https://api.paystack.co/bank?country=nigeria&perPage=100', {
             headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
-          });
+          }, 8000);
           const listData = await listRes.json().catch(() => null);
           if (listData?.status && Array.isArray(listData.data)) {
             const target = bank_name_input.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -146,19 +161,20 @@ export default async function handler(req, res) {
             if (matched?.code) codeForPaystack = String(matched.code);
           }
         } catch (dirErr) {
-          console.warn('[verify-bank] Paystack bank lookup skipped:', dirErr.message);
+          if (dirErr?.name === 'AbortError') sawTimeout = true;
         }
       }
 
       if (codeForPaystack && codeForPaystack !== '000') {
         try {
-          const psRes = await fetch(
+          const psRes = await fetchWithTimeout(
             `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(account_number)}&bank_code=${encodeURIComponent(codeForPaystack)}`,
-            { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+            { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } },
+            10000
           );
           const psData = await psRes.json().catch(() => null);
           if (psData?.status && psData?.data?.account_name) {
-            return res.status(200).json({
+            return {
               success: true,
               status: true,
               account_name: psData.data.account_name,
@@ -167,17 +183,17 @@ export default async function handler(req, res) {
               bank_name: bank_name_input || codeForPaystack,
               source: 'paystack',
               message: 'Account verified'
-            });
+            };
           }
-          console.warn('[verify-bank] Paystack resolve returned non-match:', psData?.message || psData);
         } catch (e) {
-          console.warn('[verify-bank] Paystack error:', e.message);
+          if (e?.name === 'AbortError') sawTimeout = true;
         }
       }
-    }
+      return null;
+    };
 
-    // 2. Fallback to Flutterwave V3 NIBSS Account Resolution
-    if (FLW_SECRET && FLW_SECRET.length > 20) {
+    const tryFlutterwave = async () => {
+      if (!FLW_SECRET || FLW_SECRET.length <= 20) return null;
       let flwBankCode = paystackBankCode || bank_code_input;
       if (flwBankCode === '999992') flwBankCode = '100004'; // OPay in Flutterwave
       if (flwBankCode === '999991') flwBankCode = '100033'; // PalmPay in Flutterwave
@@ -185,7 +201,7 @@ export default async function handler(req, res) {
 
       if (flwBankCode && flwBankCode !== '000') {
         try {
-          const flwRes = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+          const flwRes = await fetchWithTimeout('https://api.flutterwave.com/v3/accounts/resolve', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${FLW_SECRET}`,
@@ -195,10 +211,10 @@ export default async function handler(req, res) {
               account_number,
               account_bank: String(flwBankCode)
             })
-          });
+          }, 10000);
           const flwData = await flwRes.json().catch(() => null);
           if (flwData?.status === 'success' && flwData?.data?.account_name) {
-            return res.status(200).json({
+            return {
               success: true,
               status: true,
               account_name: flwData.data.account_name,
@@ -207,22 +223,35 @@ export default async function handler(req, res) {
               bank_name: bank_name_input || flwBankCode,
               source: 'flutterwave',
               message: 'Account verified'
-            });
+            };
           }
-          console.warn('[verify-bank] Flutterwave resolve returned non-match:', flwData?.message || flwData);
         } catch (e) {
-          console.warn('[verify-bank] Flutterwave error:', e.message);
+          if (e?.name === 'AbortError') sawTimeout = true;
         }
+      }
+      return null;
+    };
+
+    const resolvers = preferredGateway === 'flutterwave'
+      ? [tryFlutterwave, tryPaystack]
+      : [tryPaystack, tryFlutterwave];
+
+    for (const resolveFn of resolvers) {
+      const resolved = await resolveFn();
+      if (resolved) {
+        return res.status(200).json(resolved);
       }
     }
 
     const keysConfigured = Boolean(PAYSTACK_SECRET || FLW_SECRET);
-    return res.status(keysConfigured ? 422 : 500).json({
+    return res.status(!keysConfigured ? 500 : sawTimeout ? 504 : 422).json({
       success: false,
       status: false,
-      message: keysConfigured
-        ? `Could not verify ${account_number}. Please confirm the 10-digit account number and destination bank (${bank_name_input || bank_code_input}).`
-        : 'Server payment secret keys (PAYSTACK_SECRET_KEY / FLW_SECRET_KEY) are not configured in Vercel environment.',
+      message: !keysConfigured
+        ? 'Server payment secret keys (PAYSTACK_SECRET_KEY / FLW_SECRET_KEY) are not configured in Vercel environment.'
+        : sawTimeout
+          ? 'Bank not responding. Please try again in a moment.'
+          : `Invalid account number (${account_number}) or bank (${bank_name_input || bank_code_input}). Check details and try again.`,
       account_number,
       bank_code: paystackBankCode
     });

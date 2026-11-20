@@ -19,14 +19,33 @@ export async function POST(req: Request) {
     const userId = decoded.uid;
     const userEmail = (decoded.email || `${userId}@efado.com`).trim().toLowerCase();
     const body = await req.json().catch(() => ({}));
-    const { amount, amount_in_kobo } = body || {};
+    const { amount, amount_in_kobo, currency: rawCurrency } = body || {};
+
+    const requestedCurrency = String(rawCurrency || 'NGN').trim().toUpperCase();
+    const ACTIVE_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
+    if (requestedCurrency === 'SIRA') {
+      return Response.json({
+        success: false,
+        error: 'SIRA is Coming Soon and not yet in circulation. Deposits in SIRA are disabled.'
+      }, { status: 400 });
+    }
+    if (!ACTIVE_CURRENCIES.includes(requestedCurrency)) {
+      return Response.json({
+        success: false,
+        error: `Unsupported currency "${requestedCurrency}". Supported currencies: ${ACTIVE_CURRENCIES.join(', ')}.`
+      }, { status: 400 });
+    }
 
     const numAmount = amount !== undefined && amount !== null
       ? Number(amount)
       : (amount_in_kobo !== undefined && amount_in_kobo !== null ? Number(amount_in_kobo) / 100 : NaN);
 
-    if (!Number.isFinite(numAmount) || numAmount < 100 || numAmount > 1000000) {
-      return Response.json({ success: false, error: 'Invalid amount: Must be between ₦100 and ₦1,000,000' }, { status: 400 });
+    const minAmount = requestedCurrency === 'NGN' ? 100 : requestedCurrency === 'XOF' ? 500 : 1;
+    if (!Number.isFinite(numAmount) || numAmount < minAmount || numAmount > 10000000) {
+      return Response.json({
+        success: false,
+        error: `Invalid amount: Must be at least ${minAmount} ${requestedCurrency}`
+      }, { status: 400 });
     }
 
     const reference = `EFADO-FUND-${userId.substring(0, 8)}-${Date.now()}`;
@@ -34,23 +53,27 @@ export async function POST(req: Request) {
     const baseAppUrl = (originHeader || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://www.e-fado.com').replace(/\/$/, '');
     const callbackUrl = `${baseAppUrl}/payment/callback`;
 
+    const serverTime = getServerTimestamp();
     const db = getServerDb();
     if (db) {
       try {
         const txDoc = db.doc(`transactions/${reference}`);
         const userTxDoc = db.doc(`wallets/${userId}/transactions/${reference}`);
         const txData = {
-          type: 'fund',
+          type: 'deposit',
           status: 'pending',
+          credited: false,
           amount: numAmount,
-          currency: 'NGN',
+          currency: requestedCurrency,
           reference,
           userId,
           email: userEmail,
           gateway: 'paystack',
-          purpose: 'wallet_funding',
-          createdAt: getServerTimestamp(),
-          updatedAt: getServerTimestamp()
+          method: 'Paystack Gateway',
+          purpose: 'Wallet Top-up',
+          timestamp: serverTime,
+          createdAt: serverTime,
+          updatedAt: serverTime
         };
 
         await Promise.all([
@@ -69,9 +92,11 @@ export async function POST(req: Request) {
       {
         userId,
         purpose: 'wallet_funding',
+        currency: requestedCurrency,
         reference
       },
-      callbackUrl
+      callbackUrl,
+      requestedCurrency
     );
 
     const authUrl = paystackResponse?.data?.authorization_url;
@@ -87,6 +112,7 @@ export async function POST(req: Request) {
       success: true,
       authorization_url: authUrl,
       reference,
+      currency: requestedCurrency,
       access_code: paystackResponse?.data?.access_code
     });
 

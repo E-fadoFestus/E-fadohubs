@@ -36,14 +36,15 @@ export const NIGERIAN_BANKS: BankItem[] = [
 export async function resolveBankAccount(
   accountNumber: string,
   bankCode: string,
-  bankName: string
-): Promise<{ success: boolean; accountName?: string; message?: string }> {
+  bankName: string,
+  gateway: 'paystack' | 'flutterwave' = 'paystack'
+): Promise<{ success: boolean; accountName?: string; message?: string; resolvedVia?: string }> {
   const cleanNumber = accountNumber.trim().replace(/\D/g, '');
 
   if (cleanNumber.length !== 10) {
     return {
       success: false,
-      message: 'Account number must be exactly 10 digits.'
+      message: 'Invalid account number: must be exactly 10 digits.'
     };
   }
 
@@ -61,10 +62,43 @@ export async function resolveBankAccount(
     }
   }
 
-  // 1. Primary: Unified /api/verify-bank (tries Paystack + Flutterwave with Vercel/Server keys)
+  // Try authenticated Paystack verify-account directly first when Paystack is chosen
+  if (gateway === 'paystack' && auth.currentUser && effectiveBankCode && effectiveBankCode !== '000') {
+    const psCtrl = new AbortController();
+    const psTimer = setTimeout(() => psCtrl.abort(), 10000);
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const psRes = await fetch(getBackendUrl('/api/paystack/verify-account'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          account_number: cleanNumber,
+          bank_code: effectiveBankCode
+        }),
+        signal: psCtrl.signal
+      });
+      clearTimeout(psTimer);
+      const psData = await psRes.json().catch(() => null);
+      if (psRes.ok && psData?.success && psData?.account_name) {
+        return {
+          success: true,
+          accountName: psData.account_name,
+          resolvedVia: 'Paystack Live Gateway'
+        };
+      }
+    } catch {
+      clearTimeout(psTimer);
+    }
+  }
+
+  // Unified /api/verify-bank (tries selected gateway first + automatic fallback with 10s timeout)
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
     const res = await fetch(getBackendUrl('/api/verify-bank'), {
       method: 'POST',
       headers: {
@@ -74,7 +108,8 @@ export async function resolveBankAccount(
       body: JSON.stringify({
         account_number: cleanNumber,
         bank_code: effectiveBankCode,
-        bank_name: bankName
+        bank_name: bankName,
+        gateway
       }),
       signal: controller.signal
     });
@@ -92,53 +127,33 @@ export async function resolveBankAccount(
     if ((data?.success || data?.status) && resolvedName) {
       return {
         success: true,
-        accountName: resolvedName
+        accountName: resolvedName,
+        resolvedVia: data?.resolved_via
       };
     }
 
-    // 2. Fallback: Authenticated Paystack verify-account route if user is logged in and bank code exists
-    if (auth.currentUser && effectiveBankCode && effectiveBankCode !== '000') {
-      try {
-        const token = await auth.currentUser.getIdToken();
-        const psRes = await fetch(getBackendUrl('/api/paystack/verify-account'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            account_number: cleanNumber,
-            bank_code: effectiveBankCode
-          })
-        });
-        const psData = await psRes.json().catch(() => null);
-        if (psRes.ok && psData?.success && psData?.account_name) {
-          return {
-            success: true,
-            accountName: psData.account_name
-          };
-        }
-      } catch (psErr) {
-        console.warn('Paystack verify-account fallback notice:', psErr);
-      }
+    const errMsg = data?.message || data?.error || '';
+    if (res.status >= 502) {
+      return {
+        success: false,
+        message: errMsg || 'Bank not responding. Please try again shortly.'
+      };
     }
 
     return {
       success: false,
       message:
-        data?.message ||
-        data?.error ||
-        'Account holder name could not be verified. Check the 10-digit account number and selected bank.'
+        errMsg ||
+        'Invalid account number or wrong bank selected. Please check your 10-digit account number.'
     };
   } catch (err: any) {
-    console.warn('Backend bank resolve API call failed:', err);
+    clearTimeout(timer);
     return {
       success: false,
       message:
         err?.name === 'AbortError'
-          ? 'Bank verification timed out. Please try again.'
-          : 'Bank verification service unavailable. Please check account details and try again.'
+          ? 'Bank not responding (request timed out after 10s). Please try again.'
+          : 'Bank not responding. Check your connection and try again.'
     };
   }
 }

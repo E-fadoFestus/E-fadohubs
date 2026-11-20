@@ -3,12 +3,14 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { CheckCircle2, XCircle, Loader2, ArrowRight, Wallet, RefreshCw } from 'lucide-react';
 import { auth } from '../../../firebase';
+import { formatCurrencyAmount } from '../../../constants/walletCurrencies';
 
 function CallbackContent() {
   const [reference, setReference] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [amount, setAmount] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<string>('NGN');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ function CallbackContent() {
           }
         }
 
-        const res = await fetch(`/api/paystack/verify?reference=${encodeURIComponent(reference)}`, {
+        const res = await fetch(`/api/paystack/verify?reference=${encodeURIComponent(ref)}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -48,9 +50,10 @@ function CallbackContent() {
 
         if (!isMounted) return;
 
-        if (res.ok && data?.success) {
+        if (res.ok && data?.success && data?.credited !== false) {
           setSuccess(true);
           setAmount(data.amount || null);
+          setCurrency(data.currency || 'NGN');
         } else {
           console.error('Paystack verify error:', data);
           setSuccess(false);
@@ -75,7 +78,7 @@ function CallbackContent() {
     return () => {
       isMounted = false;
     };
-  }, [reference]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
@@ -104,10 +107,10 @@ function CallbackContent() {
                 Payment Confirmed!
               </h2>
               <p className="text-3xl font-black text-emerald-400 font-mono">
-                {amount !== null ? `₦${amount.toLocaleString()}` : 'Funds'}
+                {amount !== null ? formatCurrencyAmount(amount, currency) : 'Funds'}
               </p>
               <p className="text-xs text-slate-300 font-medium">
-                added to your EFADO Sovereign Wallet.
+                added to your EFADO {currency} Deposit Pocket.
               </p>
             </div>
 

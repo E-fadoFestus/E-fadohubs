@@ -10,6 +10,7 @@ export interface UserProfile {
   playerWallet: number;
   depositWallet: number;
   cashOutWallet: number;
+  walletPockets?: Record<string, number>;
   usd_balance?: number;
   gbp_balance?: number;
   eur_balance?: number;

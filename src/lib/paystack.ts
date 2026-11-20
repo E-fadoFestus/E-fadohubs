@@ -21,7 +21,7 @@ function getSecret(): string {
 /**
  * Standard Paystack API Request Wrapper
  */
-async function paystackRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function paystackRequest<T = any>(endpoint: string, options: RequestInit = {}, timeoutMs: number = 10000): Promise<T> {
   const secret = getSecret();
   if (!secret) {
     throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
@@ -36,10 +36,26 @@ async function paystackRequest<T = any>(endpoint: string, options: RequestInit =
     ...(options.headers as Record<string, string> || {})
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      signal: options.signal || controller.signal
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === 'AbortError') {
+      const timeoutErr: any = new Error('Bank/Paystack gateway did not respond within 10 seconds. Please try again.');
+      timeoutErr.status = 504;
+      throw timeoutErr;
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
 
   const rawText = await response.text();
   let data: any = {};
@@ -90,17 +106,23 @@ const FALLBACK_NIGERIAN_BANKS = [
 
 /**
  * 1. Initialize Paystack Payment
- * Converts amount in Naira to Kobo (amountInNaira * 100)
+ * Converts amount in major units to minor units (kobo/cents/pesewas * 100)
  */
 export async function initializePaystackPayment(
   email: string,
-  amountInNaira: number,
+  amountInMajorUnits: number,
   reference: string,
   metadata: Record<string, any> = {},
-  callback_url: string = 'https://www.e-fado.com/payment/callback'
+  callback_url: string = 'https://www.e-fado.com/payment/callback',
+  currency: string = 'NGN'
 ) {
-  if (!email || !amountInNaira || amountInNaira <= 0 || !reference) {
-    throw new Error('email, positive amountInNaira, and reference are required to initialize Paystack payment.');
+  if (!email || !amountInMajorUnits || amountInMajorUnits <= 0 || !reference) {
+    throw new Error('email, positive amount, and reference are required to initialize Paystack payment.');
+  }
+
+  const normalizedCurrency = String(currency || 'NGN').trim().toUpperCase();
+  if (normalizedCurrency === 'SIRA') {
+    throw new Error('SIRA currency is coming soon and not yet enabled for payments.');
   }
 
   const secret = getSecret();
@@ -108,22 +130,23 @@ export async function initializePaystackPayment(
     throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
   }
 
-  const amountInKobo = Math.round(amountInNaira * 100);
-  if (!Number.isInteger(amountInKobo) || amountInKobo <= 0) {
-    throw new Error('Invalid payment amount in kobo.');
+  const amountInMinor = Math.round(amountInMajorUnits * 100);
+  if (!Number.isInteger(amountInMinor) || amountInMinor <= 0) {
+    throw new Error('Invalid payment amount.');
   }
 
   const payload = {
     email: email.trim().toLowerCase(),
-    amount: amountInKobo,
+    amount: amountInMinor,
     reference: reference.trim(),
     callback_url,
-    currency: 'NGN',
+    currency: normalizedCurrency,
     channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
     metadata: {
       ...metadata,
+      currency: normalizedCurrency,
       reference: reference.trim(),
-      amountInNaira
+      amountInMajorUnits
     }
   };
 
@@ -194,6 +217,14 @@ export async function getPaystackBanks(country: string = 'nigeria', perPage: num
   }
 }
 
+function normalizePaystackBankCode(code: string): string {
+  const clean = String(code || '').trim();
+  if (clean === '100004') return '999992'; // OPay
+  if (clean === '100033') return '999991'; // PalmPay
+  if (clean === '090267') return '50211';  // Kuda
+  return clean;
+}
+
 /**
  * 5. Resolve Bank Account Number to Account Name
  */
@@ -202,14 +233,14 @@ export async function resolveAccountNumber(account_number: string, bank_code: st
     throw new Error('account_number and bank_code are required to resolve bank account.');
   }
   const cleanAccount = account_number.trim();
-  const cleanBank = bank_code.trim();
+  const cleanBank = normalizePaystackBankCode(bank_code);
   const secret = getSecret();
   if (!secret) {
     throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
   }
   return await paystackRequest(`/bank/resolve?account_number=${encodeURIComponent(cleanAccount)}&bank_code=${encodeURIComponent(cleanBank)}`, {
     method: 'GET'
-  });
+  }, 10000);
 }
 
 /**
@@ -228,7 +259,7 @@ export async function getPaystackBalance() {
 /**
  * 7. Create or Retrieve Transfer Recipient
  */
-export async function createTransferRecipient(name: string, account_number: string, bank_code: string) {
+export async function createTransferRecipient(name: string, account_number: string, bank_code: string, currency: string = 'NGN') {
   const secret = getSecret();
   if (!secret) {
     throw new Error('PAYSTACK_SECRET_KEY is not configured in server environment.');
@@ -237,8 +268,8 @@ export async function createTransferRecipient(name: string, account_number: stri
     type: 'nuban',
     name: name.trim(),
     account_number: account_number.trim(),
-    bank_code: bank_code.trim(),
-    currency: 'NGN'
+    bank_code: normalizePaystackBankCode(bank_code),
+    currency: String(currency || 'NGN').toUpperCase()
   };
 
   return await paystackRequest('/transferrecipient', {

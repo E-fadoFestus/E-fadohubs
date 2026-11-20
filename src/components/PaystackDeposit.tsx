@@ -9,20 +9,32 @@ import {
   Check,
   CheckCircle2,
   ExternalLink,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { auth, db, doc, runTransaction, serverTimestamp } from '../firebase';
+import { auth } from '../firebase';
+import {
+  ACTIVE_WALLET_CURRENCIES,
+  FUTURE_WALLET_CURRENCIES,
+  formatCurrencyAmount,
+  getMinDepositForCurrency,
+  getWalletCurrencyMeta,
+  isDisabledFutureCurrency,
+  normalizeCurrencyCode
+} from '../constants/walletCurrencies';
 
 interface PaystackDepositProps {
   user: UserProfile;
   onSuccess?: (paymentInfo: {
     reference: string;
     amount: number;
+    currency: string;
     alreadyCreditedByServer?: boolean;
   }) => void | Promise<void>;
   onCancel?: () => void;
   defaultAmount?: number;
+  defaultCurrency?: string;
 }
 
 declare global {
@@ -117,8 +129,11 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   user,
   onSuccess,
   onCancel,
-  defaultAmount = 1000
+  defaultAmount = 1000,
+  defaultCurrency = 'NGN'
 }) => {
+  const initialCur = isDisabledFutureCurrency(defaultCurrency) ? 'NGN' : normalizeCurrencyCode(defaultCurrency);
+  const [currency, setCurrency] = useState<string>(initialCur);
   const [amount, setAmount] = useState<string>(defaultAmount.toString());
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -127,7 +142,21 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
-  const quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
+  useEffect(() => {
+    const clean = normalizeCurrencyCode(defaultCurrency);
+    if (clean && !isDisabledFutureCurrency(clean)) {
+      setCurrency(clean);
+    }
+  }, [defaultCurrency]);
+
+  const curMeta = getWalletCurrencyMeta(currency);
+  const minDeposit = getMinDepositForCurrency(currency);
+  const quickAmounts =
+    currency === 'NGN'
+      ? [1000, 2000, 5000, 10000, 20000, 50000]
+      : currency === 'XOF'
+        ? [1000, 2500, 5000, 10000, 25000, 50000]
+        : [10, 25, 50, 100, 250, 500];
 
   useEffect(() => {
     if (!toast) return;
@@ -183,102 +212,76 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
   const handlePaystackPaymentSuccess = async (
     paidRef: string,
-    paidNaira: number,
+    paidAmount: number,
+    paidCurrency: string,
     token: string
   ) => {
     try {
-      setStatusMessage('Verifying Paystack transaction & updating wallet...');
+      setStatusMessage('Verifying payment on Paystack server & crediting pocket...');
       setErrorMessage(null);
 
-      let alreadyCreditedByServer = false;
-
-      if (token) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
-        try {
-          const verifyRes = await fetch(
-            `/api/paystack/verify?reference=${encodeURIComponent(paidRef)}`,
-            {
-              method: 'GET',
-              headers: {
-                Accept: 'application/json',
-                Authorization: `Bearer ${token}`
-              },
-              signal: controller.signal
-            }
-          );
-          clearTimeout(timeoutId);
-          const verifyData = await verifyRes.json().catch(() => null);
-
-          if (verifyRes.ok && verifyData?.success) {
-            alreadyCreditedByServer = true;
-          } else if (verifyRes.status === 400 || verifyRes.status === 403) {
-            throw new Error(
-              verifyData?.error ||
-                verifyData?.message ||
-                'Payment verification failed on Paystack gateway.'
-            );
-          } else {
-            console.warn(
-              'Backend verify fallback (server verify unavailable):',
-              verifyData
-            );
-          }
-        } catch (verifyErr: any) {
-          clearTimeout(timeoutId);
-          if (verifyErr?.message?.includes('verification failed') || verifyErr?.message?.includes('mismatch')) {
-            throw verifyErr;
-          }
-          console.warn('Paystack backend verification notice:', verifyErr?.message || verifyErr);
-        }
+      if (!token) {
+        throw new Error('Authentication required to verify payment with server.');
       }
 
-      // If backend verify did not already credit the wallet subcollection, record safely in Firestore
-      if (!alreadyCreditedByServer && user?.uid) {
-        const walletRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
-        const txCheckRef = doc(db, 'transactions', paidRef);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 14000);
 
-        await runTransaction(db, async (tx) => {
-          const existingTxSnap = await tx.get(txCheckRef);
-          if (existingTxSnap.exists() && existingTxSnap.data()?.credited === true) {
-            alreadyCreditedByServer = true;
-            return;
-          }
-
-          const walletSnap = await tx.get(walletRef);
-          const oldBalance = walletSnap.exists()
-            ? Number(walletSnap.data()?.balance ?? walletSnap.data()?.depositWallet ?? 0)
-            : Number(user.depositWallet || 0);
-          const nextBalance = oldBalance + paidNaira;
-
-          tx.set(
-            walletRef,
-            {
-              balance: nextBalance,
-              depositWallet: nextBalance,
-              updatedAt: serverTimestamp()
+      let verifyRes: Response;
+      let verifyData: any = null;
+      try {
+        verifyRes = await fetch(
+          `/api/paystack/verify?reference=${encodeURIComponent(paidRef)}`,
+          {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`
             },
-            { merge: true }
-          );
-        });
+            signal: controller.signal
+          }
+        );
+        verifyData = await verifyRes.json().catch(() => null);
+      } finally {
+        clearTimeout(timeoutId);
       }
+
+      if (!verifyRes.ok || !verifyData?.success || verifyData?.credited === false) {
+        console.error('Paystack verify failed:', verifyData);
+        const rawErr = verifyData?.error;
+        const errStr =
+          typeof rawErr === 'string'
+            ? rawErr
+            : rawErr?.message || (typeof rawErr === 'object' && rawErr ? JSON.stringify(rawErr) : null);
+        throw new Error(
+          errStr ||
+            verifyData?.message ||
+            'Server could not verify and credit payment. Wallet was NOT credited.'
+        );
+      }
+
+      const verifiedAmount = Number(verifyData.amount || paidAmount);
+      const verifiedCurrency = normalizeCurrencyCode(verifyData.currency || paidCurrency);
 
       if (onSuccess) {
         await onSuccess({
           reference: paidRef,
-          amount: paidNaira,
-          alreadyCreditedByServer
+          amount: verifiedAmount,
+          currency: verifiedCurrency,
+          alreadyCreditedByServer: true
         });
       }
 
-      const msg = `Deposit successful! ₦${paidNaira.toLocaleString()} added to your EFADO Wallet (Ref: ${paidRef}).`;
+      const msg = `Deposit verified & credited! ${formatCurrencyAmount(verifiedAmount, verifiedCurrency)} added to your ${verifiedCurrency} Pocket (Ref: ${paidRef}).`;
       setIsRedirecting(false);
       setStatusMessage(null);
       setSuccessMessage(msg);
       setToast({ type: 'success', message: msg });
     } catch (err: any) {
       showError(
-        err?.message || 'Payment succeeded, but verification failed. Contact support with ref: ' + paidRef,
+        err?.name === 'AbortError'
+          ? `Verification timed out. Check wallet history or retry with ref: ${paidRef}`
+          : err?.message || `Payment verification failed for ref: ${paidRef}.`,
         err
       );
     }
@@ -290,24 +293,27 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     setSuccessMessage(null);
     setCheckoutUrl(null);
 
-    // 1. Validate amount & convert strictly to integer KOBO
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount < 100) {
-      showError('Please enter a valid deposit amount of at least ₦100.');
-      return;
-    }
-    if (numericAmount > 1000000) {
-      showError('Maximum single deposit limit is ₦1,000,000.');
+    if (isDisabledFutureCurrency(currency)) {
+      showError('SIRA (Burkina Faso) is Coming Soon — planned currency, not yet in circulation.');
       return;
     }
 
-    const amountInKobo = Math.round(numericAmount * 100);
-    if (!Number.isInteger(amountInKobo) || amountInKobo <= 0) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount < minDeposit) {
+      showError(`Please enter a valid deposit amount of at least ${formatCurrencyAmount(minDeposit, currency)}.`);
+      return;
+    }
+    if (numericAmount > 10000000) {
+      showError(`Maximum single deposit limit is ${formatCurrencyAmount(10000000, currency)}.`);
+      return;
+    }
+
+    const amountInMinorUnits = Math.round(numericAmount * 100);
+    if (!Number.isInteger(amountInMinorUnits) || amountInMinorUnits <= 0) {
       showError('Invalid deposit amount. Please enter a valid positive number.');
       return;
     }
 
-    // 2. Validate customer email (non-empty)
     const rawEmail = (user?.email || auth.currentUser?.email || '').trim().toLowerCase();
     const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail);
     const customerEmail = isValidEmail
@@ -322,43 +328,53 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     }
 
     setIsRedirecting(true);
-    setStatusMessage('Initializing Paystack checkout...');
+    setStatusMessage(`Initializing Paystack (${currency}) checkout...`);
 
     try {
-      const publicKey = getPaystackPublicKey();
       const token = await getAuthTokenSafely();
+      if (!token) {
+        throw new Error('Please log in to initialize payment.');
+      }
 
-      // Method 1: Paystack Inline Checkout (PaystackPop) when VITE_PAYSTACK_PUBLIC_KEY is configured
+      const publicKey = getPaystackPublicKey();
+
+      // Method 1: Paystack Inline Checkout (PaystackPop) when public key is configured
       if (publicKey) {
-        let activeRef = `EFADO-FUND-${(user?.uid || 'USR').substring(0, 8)}-${Date.now()}`;
-
-        // Best-effort backend pre-registration (does not block PaystackPop if server secret isn't set yet)
-        if (token) {
-          const initController = new AbortController();
-          const initTimer = setTimeout(() => initController.abort(), 6000);
-          try {
-            const initRes = await fetch('/api/paystack/initialize', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                amount: numericAmount,
-                amount_in_kobo: amountInKobo
-              }),
-              signal: initController.signal
-            });
-            clearTimeout(initTimer);
-            const initData = await initRes.json().catch(() => null);
-            if (initRes.ok && (initData?.reference || initData?.data?.reference)) {
-              activeRef = initData.reference || initData.data.reference;
-            }
-          } catch (preInitErr) {
-            clearTimeout(initTimer);
-            console.warn('Backend pre-init skipped, continuing with Paystack Inline:', preInitErr);
+        const initController = new AbortController();
+        const initTimer = setTimeout(() => initController.abort(), 10000);
+        let activeRef = '';
+        try {
+          const initRes = await fetch('/api/paystack/initialize', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              amount: numericAmount,
+              amount_in_kobo: amountInMinorUnits,
+              currency
+            }),
+            signal: initController.signal
+          });
+          clearTimeout(initTimer);
+          const initData = await initRes.json().catch(() => null);
+          if (!initRes.ok) {
+            throw new Error(initData?.error || initData?.message || 'Failed to pre-register transaction on server.');
           }
+          activeRef = initData?.reference || initData?.data?.reference || '';
+        } catch (preInitErr: any) {
+          clearTimeout(initTimer);
+          throw new Error(
+            preInitErr?.name === 'AbortError'
+              ? 'Server timed out initializing Paystack transaction. Please try again.'
+              : preInitErr?.message || 'Could not initialize Paystack transaction.'
+          );
+        }
+
+        if (!activeRef) {
+          activeRef = `EFADO-FUND-${(user?.uid || 'USR').substring(0, 8)}-${Date.now()}`;
         }
 
         await loadPaystackInlineScript();
@@ -370,10 +386,12 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         const handler = window.PaystackPop.setup({
           key: publicKey,
           email: customerEmail,
-          amount: amountInKobo,
-          currency: 'NGN',
+          amount: amountInMinorUnits,
+          currency,
           ref: activeRef,
           metadata: {
+            userId: user?.uid || auth.currentUser?.uid || '',
+            currency,
             custom_fields: [
               {
                 display_name: 'User ID',
@@ -381,15 +399,15 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
                 value: user?.uid || auth.currentUser?.uid || ''
               },
               {
-                display_name: 'Purpose',
-                variable_name: 'purpose',
-                value: 'EFADO Wallet Deposit'
+                display_name: 'Wallet Pocket',
+                variable_name: 'currency',
+                value: currency
               }
             ]
           },
           callback: (response) => {
             const verifiedRef = response?.reference || response?.trxref || activeRef;
-            void handlePaystackPaymentSuccess(verifiedRef, numericAmount, token);
+            void handlePaystackPaymentSuccess(verifiedRef, numericAmount, currency, token);
           },
           onClose: () => {
             setIsRedirecting(false);
@@ -404,12 +422,8 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         return;
       }
 
-      // Method 2: Backend Initialize & Redirect when public key isn't in frontend bundle
-      if (!token) {
-        throw new Error('Please log in to initialize payment.');
-      }
-
-      setStatusMessage('Redirecting to Paystack...');
+      // Method 2: Backend Initialize & Redirect
+      setStatusMessage(`Redirecting to Paystack (${currency})...`);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
 
@@ -422,7 +436,8 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         },
         body: JSON.stringify({
           amount: numericAmount,
-          amount_in_kobo: amountInKobo
+          amount_in_kobo: amountInMinorUnits,
+          currency
         }),
         signal: controller.signal
       });
@@ -442,7 +457,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
         const baseMsg = errStr || data?.message || 'Failed to initialize Paystack checkout.';
         const helpfulMsg = baseMsg.includes('PAYSTACK_SECRET_KEY')
-          ? 'Paystack keys are not configured. Set VITE_PAYSTACK_PUBLIC_KEY in .env (for Paystack Inline) or PAYSTACK_SECRET_KEY on the server.'
+          ? 'Paystack keys are not configured. Set PAYSTACK_SECRET_KEY in server environment.'
           : baseMsg;
 
         showError(helpfulMsg, data);
@@ -453,7 +468,6 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       setStatusMessage('Redirecting to Paystack secure checkout...');
       window.location.assign(authUrl);
 
-      // Clear spinner if browser blocks cross-origin navigation inside iframe
       setTimeout(() => {
         setIsRedirecting(false);
       }, 4000);
@@ -472,12 +486,11 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
   const parsedAmount = Number(amount);
   const formattedDisplay =
     Number.isFinite(parsedAmount) && parsedAmount > 0
-      ? `₦${parsedAmount.toLocaleString()}`
-      : '₦0';
+      ? formatCurrencyAmount(parsedAmount, currency)
+      : formatCurrencyAmount(0, currency);
 
   return (
     <div id="paystack-fund-card" className="space-y-6 relative">
-      {/* Visible Toast Alert */}
       {toast && (
         <div
           role="alert"
@@ -509,42 +522,99 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
               <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-              Paystack Sovereign Fund Terminal
+              Paystack Multi-Currency Fund Terminal
             </span>
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Live Gateway
+              {currency} Pocket
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Fund your EFADO Sovereign Wallet instantly with Nigerian Debit Cards, Bank Transfer, USSD, Bank Account, or OPay via Paystack.
+            Fund your <strong className="text-white">{curMeta.name} ({currency})</strong> pocket directly. Deposits are verified atomically on the server — never mixed with other currencies.
           </p>
+        </div>
+      </div>
+
+      {/* Pocket Currency Selector (9 Active + 1 Coming Soon Disabled) */}
+      <div className="space-y-2">
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+          Select Target Currency Pocket
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {ACTIVE_WALLET_CURRENCIES.map((c) => {
+            const isSelected = currency === c.code;
+            return (
+              <button
+                key={c.code}
+                type="button"
+                disabled={isRedirecting}
+                onClick={() => {
+                  setCurrency(c.code);
+                  setErrorMessage(null);
+                  const newMin = getMinDepositForCurrency(c.code);
+                  if (!Number(amount) || Number(amount) < newMin) {
+                    setAmount(String(newMin * 10));
+                  }
+                }}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  isSelected
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-md'
+                    : 'border-slate-200 bg-white text-slate-800 hover:border-emerald-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">{c.flag}</span>
+                  <span className={`text-[10px] font-black ${isSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                    {c.symbol}
+                  </span>
+                </div>
+                <p className="text-xs font-black mt-1">{c.code}</p>
+              </button>
+            );
+          })}
+
+          {FUTURE_WALLET_CURRENCIES.map((c) => (
+            <button
+              key={c.code}
+              type="button"
+              disabled
+              title={c.note}
+              className="p-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed text-left relative"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm grayscale">{c.flag}</span>
+                <Lock className="w-3 h-3 text-slate-400" />
+              </div>
+              <p className="text-xs font-black mt-1">{c.code}</p>
+              <span className="text-[9px] font-bold uppercase text-amber-600 block">Coming Soon</span>
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Amount Input */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-          Enter Deposit Amount (NGN)
+          Enter Deposit Amount ({currency}) — Min {formatCurrencyAmount(minDeposit, currency)}
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400">
-            ₦
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-base font-black text-slate-400">
+            {curMeta.symbol}
           </span>
           <input
             id="paystack-amount-input"
             type="number"
-            min="100"
-            max="1000000"
-            step="100"
-            placeholder="5,000"
+            min={minDeposit}
+            max="10000000"
+            step="any"
+            placeholder={String(minDeposit * 10)}
             value={amount}
             disabled={isRedirecting}
             onChange={(e) => {
               setAmount(e.target.value);
               if (errorMessage) setErrorMessage(null);
             }}
-            className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all"
+            className="w-full pl-14 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent transition-all"
           />
         </div>
 
@@ -567,7 +637,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
               }`}
             >
               {amount === val.toString() && <Check className="w-3 h-3 text-white" />}
-              ₦{val / 1000}k
+              {curMeta.symbol}{val >= 1000 ? `${val / 1000}k` : val}
             </button>
           ))}
         </div>
@@ -620,7 +690,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       <button
         id="paystack-fund-wallet-button"
         type="button"
-        disabled={isRedirecting}
+        disabled={isRedirecting || isDisabledFutureCurrency(currency)}
         onClick={handleFundWallet}
         className="w-full py-4 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 hover:from-emerald-700 hover:to-teal-900 active:scale-[0.99] text-white font-black uppercase text-base tracking-wider rounded-2xl transition-all shadow-xl hover:shadow-emerald-500/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
@@ -632,7 +702,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         ) : (
           <>
             <Zap className="w-5 h-5 fill-amber-300 text-amber-300" />
-            <span>Fund Wallet {formattedDisplay}</span>
+            <span>Fund {currency} Pocket {formattedDisplay}</span>
             <ArrowRight className="w-5 h-5 ml-1" />
           </>
         )}
@@ -640,7 +710,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
       <div className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center justify-center gap-2 pt-1">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-        <span>Secured 256-bit Encrypted Settlement via Paystack (PCI-DSS Level 1)</span>
+        <span>Atomic Verified Settlement • Pocket: wallets/{'{uid}'}/{currency}/depositWallet</span>
       </div>
     </div>
   );

@@ -944,24 +944,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                   user={user}
                   type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
                   onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  onComplete={async (amount, method) => {
-                    try {
-                      const userRef = doc(db, 'users', user.uid);
-                      if (showPaymentUI.type === 'deposit') {
-                        await updateDoc(userRef, {
-                          depositWallet: increment(amount),
-                          playerWallet: increment(amount)
-                        });
-                      } else {
-                        await updateDoc(userRef, {
-                          playerWallet: increment(-amount)
-                        });
-                      }
-                    } catch (err) {
-                      console.error('Wallet update failed during trading game payment complete', err);
-                      throw err;
-                    }
-                  }}
+                  onSuccess={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
                   hub="DMT_GAME"
                   purpose={showPaymentUI.type === 'deposit' ? "Tactical DMT Trading Account Funding" : "Tactical DMT Trading Profit Cashout"}
                 />

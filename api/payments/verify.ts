@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getServerDb, getServerTimestamp } from '../../src/lib/server-firestore';
 
+const ACTIVE_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
+
 const cleanKey = (k?: string) =>
   (k || '')
     .trim()
@@ -23,6 +25,8 @@ async function getFlutterwaveBearerToken(): Promise<string> {
   );
   const clientSecret = cleanKey(process.env.FLUTTERWAVE_CLIENT_SECRET);
   if (clientId && clientSecret) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
     try {
       const tokenRes = await fetch(
         'https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token',
@@ -33,14 +37,17 @@ async function getFlutterwaveBearerToken(): Promise<string> {
             client_id: clientId,
             client_secret: clientSecret,
             grant_type: 'client_credentials'
-          }).toString()
+          }).toString(),
+          signal: controller.signal
         }
       );
+      clearTimeout(timer);
       const tokenData = await tokenRes.json().catch(() => null);
       if (tokenRes.ok && tokenData?.access_token) {
         return tokenData.access_token;
       }
     } catch (err) {
+      clearTimeout(timer);
       console.warn('[Flutterwave Verify Token Fallback Error]:', err);
     }
     return clientSecret;
@@ -99,6 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let flwData: any = null;
+    const verifyController = new AbortController();
+    const verifyTimer = setTimeout(() => verifyController.abort(), 10000);
     try {
       const verifyEndpoint = transaction_id
         ? `https://api.flutterwave.com/v3/transactions/${encodeURIComponent(transaction_id)}/verify`
@@ -109,24 +118,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: {
           Authorization: `Bearer ${flwBearer}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: verifyController.signal
       });
+      clearTimeout(verifyTimer);
       flwData = await flwRes.json().catch(() => null);
     } catch (fetchErr: any) {
+      clearTimeout(verifyTimer);
       console.error('Flutterwave verify fetch error:', fetchErr);
-      return res.status(502).json({
+      return res.status(fetchErr?.name === 'AbortError' ? 504 : 502).json({
         success: false,
         status: false,
-        message: 'Could not verify transaction with Flutterwave'
+        message:
+          fetchErr?.name === 'AbortError'
+            ? 'Flutterwave gateway did not respond within 10 seconds. Please try again.'
+            : 'Could not verify transaction with Flutterwave'
       });
     }
 
     const verifiedStatus = String(flwData?.data?.status || '').toLowerCase();
     const verifiedAmount = Number(flwData?.data?.amount);
     const verifiedRef = String(flwData?.data?.tx_ref || tx_ref || `FLW_TX_${transaction_id}`).trim();
-    const targetUserId = String(
-      fallbackUserId || flwData?.data?.meta?.userId || ''
-    ).trim();
+    const txCurrency = String(flwData?.data?.currency || source.currency || 'NGN').trim().toUpperCase();
+
+    if (txCurrency === 'SIRA' || !ACTIVE_CURRENCIES.includes(txCurrency)) {
+      return res.status(400).json({
+        success: false,
+        status: false,
+        message: `Unsupported transaction currency "${txCurrency}"`
+      });
+    }
 
     if (
       flwData?.status !== 'success' ||
@@ -144,6 +165,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    const pendingDoc = db.doc(`pendingPayments/${verifiedRef}`);
+    const pendingSnap = await pendingDoc.get();
+    const targetUserId = String(
+      flwData?.data?.meta?.userId ||
+        (pendingSnap.exists ? pendingSnap.data()?.userId : '') ||
+        fallbackUserId ||
+        ''
+    ).trim();
+
     if (!targetUserId) {
       return res.status(400).json({
         success: false,
@@ -154,12 +184,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const txRefDoc = db.doc(`wallets/${targetUserId}/transactions/${verifiedRef}`);
     const globalTxDoc = db.doc(`transactions/${verifiedRef}`);
-    const pendingDoc = db.doc(`pendingPayments/${verifiedRef}`);
-    const walletRef = db.doc(`wallets/${targetUserId}/NGN/depositWallet`);
-    const userRef = db.doc(`users/${targetUserId}`);
+    // Canonical single pocket location per currency: wallets/{uid}/{currency}/depositWallet
+    const walletRef = db.doc(`wallets/${targetUserId}/${txCurrency}/depositWallet`);
 
-    const existingTx = await txRefDoc.get();
-    if (existingTx.exists && existingTx.data()?.credited === true) {
+    const existingTx = await globalTxDoc.get();
+    const existingSubTx = await txRefDoc.get();
+    if (
+      (existingTx.exists && existingTx.data()?.credited === true) ||
+      (existingSubTx.exists && existingSubTx.data()?.credited === true)
+    ) {
       const walletDoc = await walletRef.get();
       const currentBalance = walletDoc.exists
         ? Number(walletDoc.data()?.balance ?? walletDoc.data()?.depositWallet ?? 0)
@@ -167,12 +200,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         success: true,
         status: true,
+        credited: true,
         alreadyCredited: true,
         already_processed: true,
         tx_ref: verifiedRef,
         amount: verifiedAmount,
+        currency: txCurrency,
         newBalance: currentBalance,
-        data: { status: 'success', amount: verifiedAmount, tx_ref: verifiedRef },
+        creditedPocket: `wallets/${targetUserId}/${txCurrency}/depositWallet`,
+        data: { status: 'success', amount: verifiedAmount, currency: txCurrency, tx_ref: verifiedRef },
         message: 'Already credited'
       });
     }
@@ -181,16 +217,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let updatedBalance = 0;
 
     await db.runTransaction(async (t: any) => {
-      const walletSnapshot = await t.get(walletRef);
-      const userSnapshot = await t.get(userRef);
+      const freshTx = await t.get(globalTxDoc);
+      if (freshTx.exists && freshTx.data()?.credited === true) {
+        const wSnap = await t.get(walletRef);
+        updatedBalance = wSnap.exists ? Number(wSnap.data()?.balance ?? wSnap.data()?.depositWallet ?? 0) : 0;
+        return;
+      }
 
-      const subBal = walletSnapshot.exists
+      const walletSnapshot = await t.get(walletRef);
+      const oldBalance = walletSnapshot.exists
         ? Number(walletSnapshot.data()?.balance ?? walletSnapshot.data()?.depositWallet ?? 0)
         : 0;
-      const userBal = userSnapshot.exists
-        ? Number(userSnapshot.data()?.depositWallet ?? 0)
-        : 0;
-      const oldBalance = Math.max(subBal, userBal);
       updatedBalance = oldBalance + verifiedAmount;
 
       t.set(
@@ -198,15 +235,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           balance: updatedBalance,
           depositWallet: updatedBalance,
-          updatedAt: serverTime
-        },
-        { merge: true }
-      );
-
-      t.set(
-        userRef,
-        {
-          depositWallet: updatedBalance,
+          currency: txCurrency,
+          userId: targetUserId,
+          lastFundedRef: verifiedRef,
+          createdAt: walletSnapshot.exists ? (walletSnapshot.data()?.createdAt || serverTime) : serverTime,
           updatedAt: serverTime
         },
         { merge: true }
@@ -219,18 +251,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         transaction_id: String(transaction_id || flwData?.data?.id || ''),
         userId: targetUserId,
         amount: verifiedAmount,
-        currency: flwData?.data?.currency || 'NGN',
+        currency: txCurrency,
         gateway: 'flutterwave',
         method: 'Flutterwave Gateway',
+        purpose: 'Wallet Top-up',
+        description: `Verified Flutterwave Deposit (${txCurrency}) [Ref: ${verifiedRef}]`,
+        creditedPocket: `wallets/${targetUserId}/${txCurrency}/depositWallet`,
         status: 'completed',
         credited: true,
-        createdAt: serverTime,
+        timestamp: serverTime,
+        createdAt: existingTx.exists ? (existingTx.data()?.createdAt || serverTime) : serverTime,
         updatedAt: serverTime
       };
 
       t.set(txRefDoc, txRecord, { merge: true });
       t.set(globalTxDoc, txRecord, { merge: true });
-      t.set(pendingDoc, { status: 'completed', credited: true, updatedAt: serverTime }, { merge: true });
+      t.set(pendingDoc, { status: 'completed', credited: true, currency: txCurrency, updatedAt: serverTime }, { merge: true });
     });
 
     return res.status(200).json({
@@ -240,10 +276,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       credited: true,
       tx_ref: verifiedRef,
       amount: verifiedAmount,
+      currency: txCurrency,
       newBalance: updatedBalance,
+      creditedPocket: `wallets/${targetUserId}/${txCurrency}/depositWallet`,
       data: {
         status: 'success',
         amount: verifiedAmount,
+        currency: txCurrency,
         tx_ref: verifiedRef
       }
     });

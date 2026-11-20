@@ -1,9 +1,13 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getFirestore as getAdminFirestore, FieldValue as AdminFieldValue } from 'firebase-admin/firestore';
 import { db as clientDb } from '../firebase';
 import { doc, getDoc, setDoc, runTransaction, serverTimestamp as clientServerTimestamp } from 'firebase/firestore';
 import cfg from '../../firebase-applet-config.json';
+
+function hasServiceAccount(): boolean {
+  return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT);
+}
 
 function getAdminApp() {
   const apps = getApps();
@@ -90,24 +94,33 @@ function createClientDbAdapter() {
   };
 }
 
+let useAdminSdkFirestore = false;
+
 /**
  * Singleton Firestore access for backend routes
  */
 export function getServerDb(): any {
-  const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (serviceAccountRaw) {
+  if (hasServiceAccount()) {
     try {
       const adminApp = getAdminApp();
-      return getAdminFirestore(adminApp, cfg.firestoreDatabaseId);
+      const adminDb = cfg.firestoreDatabaseId
+        ? getAdminFirestore(adminApp, cfg.firestoreDatabaseId)
+        : getAdminFirestore(adminApp);
+      useAdminSdkFirestore = true;
+      return adminDb;
     } catch (err) {
       console.warn('[Server Firestore] Admin Firestore init failed, falling back to client adapter:', err);
     }
   }
+  useAdminSdkFirestore = false;
   return createClientDbAdapter();
 }
 
 export function getServerTimestamp() {
   try {
+    if (useAdminSdkFirestore || hasServiceAccount()) {
+      return AdminFieldValue.serverTimestamp();
+    }
     return clientServerTimestamp();
   } catch {
     return new Date();

@@ -85,9 +85,19 @@ export function clearFlutterwaveKeys(): void {
  * Creates a Flutterwave Checkout session via the Vercel/Express `/api/payments/initialize` backend.
  * Uses the deployment's configured Flutterwave V3 or V4 environment secrets.
  */
+import { isDisabledFutureCurrency, normalizeCurrencyCode } from '../constants/walletCurrencies';
+
 export async function createFlutterwavePaymentLink(
   params: FlutterwavePaymentParams
 ): Promise<FlutterwavePaymentResult> {
+  const currency = normalizeCurrencyCode(params.currency || 'NGN');
+  if (isDisabledFutureCurrency(currency)) {
+    return {
+      status: false,
+      message: 'SIRA (Burkina Faso) is Coming Soon — planned currency, not yet in circulation.'
+    };
+  }
+
   const publicKey = getFlutterwavePublicKey();
   const txRef = params.tx_ref || `EFD_FLW_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
   const redirectBase = params.redirectBase || window.location.origin;
@@ -95,6 +105,7 @@ export async function createFlutterwavePaymentLink(
 
   const payload = {
     ...params,
+    currency,
     userId: resolvedUserId,
     tx_ref: txRef,
     publicKey,
@@ -102,16 +113,18 @@ export async function createFlutterwavePaymentLink(
   };
 
   let lastErrorMsg = 'Failed to initialize Flutterwave payment session.';
+  const token = auth.currentUser ? await auth.currentUser.getIdToken().catch(() => '') : '';
 
   // 1. Primary: Unified Vercel / Express backend (`/api/payments/initialize`)
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 14000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 14000);
     const response = await fetch(getBackendUrl('/api/payments/initialize'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'application/json'
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify(payload),
       signal: controller.signal

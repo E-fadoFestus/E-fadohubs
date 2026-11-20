@@ -18,17 +18,22 @@ export async function POST(req: Request) {
 
     const userId = decoded.uid;
     const body = await req.json().catch(() => ({}));
-    const { amount, account_number, bank_code, account_name, source_wallet } = body || {};
+    const { amount, account_number, bank_code, account_name, source_wallet, currency: rawCurrency } = body || {};
+    const wdCurrency = String(rawCurrency || 'NGN').trim().toUpperCase();
+    if (wdCurrency === 'SIRA') {
+      return Response.json({ success: false, error: 'SIRA currency is Coming Soon and disabled for withdrawals.' }, { status: 400 });
+    }
+
     const targetWalletField =
       source_wallet === 'playerWallet'
         ? 'playerWallet'
-        : source_wallet === 'depositWallet'
-          ? 'depositWallet'
-          : 'cashOutWallet';
+        : source_wallet === 'cashOutWallet'
+          ? 'cashOutWallet'
+          : 'depositWallet';
 
     const numAmount = Number(amount);
-    if (isNaN(numAmount) || numAmount < 100 || numAmount > 1000000) {
-      return Response.json({ success: false, error: 'Invalid amount: Must be between ₦100 and ₦1,000,000' }, { status: 400 });
+    if (isNaN(numAmount) || numAmount < 100 || numAmount > 10000000) {
+      return Response.json({ success: false, error: `Invalid amount: Must be between 100 and 10,000,000 ${wdCurrency}` }, { status: 400 });
     }
 
     const cleanAccount = String(account_number || '').trim().replace(/\D/g, '');
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
     const providedName = String(account_name || '').trim();
 
     if (!cleanAccount || cleanAccount.length !== 10 || !cleanBank || !providedName) {
-      return Response.json({ success: false, error: 'Please verify account first with valid bank and 10-digit account number' }, { status: 400 });
+      return Response.json({ success: false, error: 'Please verify destination bank account first (10-digit account number & bank).' }, { status: 400 });
     }
 
     const db = getServerDb();
@@ -44,29 +49,29 @@ export async function POST(req: Request) {
       return Response.json({ success: false, error: 'Server Firestore not configured' }, { status: 500 });
     }
 
-    const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
+    const walletRef = db.doc(`wallets/${userId}/${wdCurrency}/depositWallet`);
     const userRef = db.doc(`users/${userId}`);
     const [walletSnap, userSnap] = await Promise.all([walletRef.get(), userRef.get()]);
-    const subBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
+    const pocketBalance = walletSnap.exists ? Number(walletSnap.data()?.balance ?? walletSnap.data()?.depositWallet ?? 0) : 0;
     const userFieldBalance = userSnap.exists ? Number(userSnap.data()?.[targetWalletField] || 0) : 0;
     const currentBalance =
-      targetWalletField === 'depositWallet' ? Math.max(subBalance, userFieldBalance) : userFieldBalance;
+      targetWalletField === 'depositWallet' ? pocketBalance : userFieldBalance;
 
     if (numAmount > currentBalance) {
       return Response.json({
         success: false,
-        error: `Insufficient balance in ${targetWalletField} (Available: ₦${currentBalance.toLocaleString()})`
+        error: `INSUFFICIENT FUNDS in ${targetWalletField === 'depositWallet' ? `${wdCurrency} Deposit Pocket` : targetWalletField} (Available: ${wdCurrency} ${currentBalance.toLocaleString()})`
       }, { status: 400 });
     }
 
     try {
       const balanceRes = await getPaystackBalance();
       const balances = balanceRes?.data || [];
-      const ngnBalanceObj = balances.find((b: any) => b.currency === 'NGN') || balances[0];
-      const paystackBalanceKobo = Number(ngnBalanceObj?.balance || 0);
+      const curBalanceObj = balances.find((b: any) => b.currency === wdCurrency) || balances[0];
+      const paystackBalanceKobo = Number(curBalanceObj?.balance || 0);
 
       if (paystackBalanceKobo < numAmount * 100) {
-        return Response.json({ success: false, error: 'Withdrawal temporarily unavailable, try later' }, { status: 400 });
+        return Response.json({ success: false, error: 'Gateway payout liquidity temporarily unavailable, try later or use Flutterwave.' }, { status: 400 });
       }
     } catch (e) {
       console.warn('[Next.js Balance Check Warning]:', e);
@@ -75,21 +80,25 @@ export async function POST(req: Request) {
     try {
       const resolveRes = await resolveAccountNumber(cleanAccount, cleanBank);
       if (!resolveRes?.data?.account_name) {
-        return Response.json({ success: false, error: 'Destination bank account could not be resolved' }, { status: 400 });
+        return Response.json({ success: false, error: 'Invalid account number: Destination bank account could not be resolved.' }, { status: 400 });
       }
-    } catch {
-      return Response.json({ success: false, error: 'Could not verify account with bank. Check details.' }, { status: 400 });
+    } catch (resErr: any) {
+      const isTimeout = resErr?.status === 504;
+      return Response.json({
+        success: false,
+        error: isTimeout ? 'Bank not responding. Please try again.' : (resErr?.message || 'Could not verify account with bank. Check details.')
+      }, { status: isTimeout ? 504 : 400 });
     }
 
     let recipientCode = '';
-    const recipientKey = `${cleanBank}_${cleanAccount}`;
+    const recipientKey = `${cleanBank}_${cleanAccount}_${wdCurrency}`;
     const userRecipientDoc = db.doc(`users/${userId}/recipients/${recipientKey}`);
     const recipientSnap = await userRecipientDoc.get();
 
     if (recipientSnap.exists && recipientSnap.data()?.recipient_code) {
       recipientCode = recipientSnap.data().recipient_code;
     } else {
-      const recipientRes = await createTransferRecipient(providedName, cleanAccount, cleanBank);
+      const recipientRes = await createTransferRecipient(providedName, cleanAccount, cleanBank, wdCurrency);
       recipientCode = recipientRes?.data?.recipient_code;
 
       if (!recipientCode) {
@@ -101,6 +110,7 @@ export async function POST(req: Request) {
         account_name: providedName,
         account_number: cleanAccount,
         bank_code: cleanBank,
+        currency: wdCurrency,
         createdAt: getServerTimestamp()
       }, { merge: true });
     }
@@ -112,58 +122,65 @@ export async function POST(req: Request) {
 
     let debitedBalance = 0;
 
-    await db.runTransaction(async (transaction: any) => {
-      const [freshWalletSnap, freshUserSnap] = await Promise.all([
-        transaction.get(walletRef),
-        transaction.get(userRef)
-      ]);
-      const freshSub = freshWalletSnap.exists
-        ? Number(freshWalletSnap.data()?.balance || freshWalletSnap.data()?.depositWallet || 0)
-        : 0;
-      const freshUserBal = freshUserSnap.exists
-        ? Number(freshUserSnap.data()?.[targetWalletField] || 0)
-        : 0;
-      const balance =
-        targetWalletField === 'depositWallet' ? Math.max(freshSub, freshUserBal) : freshUserBal;
+    try {
+      await db.runTransaction(async (transaction: any) => {
+        if (targetWalletField === 'depositWallet') {
+          const freshWalletSnap = await transaction.get(walletRef);
+          const balance = freshWalletSnap.exists
+            ? Number(freshWalletSnap.data()?.balance ?? freshWalletSnap.data()?.depositWallet ?? 0)
+            : 0;
+          if (numAmount > balance) {
+            throw new Error(`INSUFFICIENT FUNDS (Available: ${wdCurrency} ${balance.toLocaleString()})`);
+          }
+          debitedBalance = balance - numAmount;
+          transaction.set(walletRef, {
+            balance: debitedBalance,
+            depositWallet: debitedBalance,
+            currency: wdCurrency,
+            updatedAt: serverTime
+          }, { merge: true });
+        } else {
+          const freshUserSnap = await transaction.get(userRef);
+          const balance = freshUserSnap.exists ? Number(freshUserSnap.data()?.[targetWalletField] || 0) : 0;
+          if (numAmount > balance) {
+            throw new Error(`INSUFFICIENT FUNDS (Available: ${wdCurrency} ${balance.toLocaleString()})`);
+          }
+          debitedBalance = balance - numAmount;
+          transaction.set(userRef, {
+            [targetWalletField]: debitedBalance,
+            updatedAt: serverTime
+          }, { merge: true });
+        }
 
-      if (numAmount > balance) {
-        throw new Error('Insufficient wallet balance');
-      }
-
-      debitedBalance = balance - numAmount;
-
-      if (targetWalletField === 'depositWallet') {
-        transaction.set(walletRef, {
-          balance: debitedBalance,
-          depositWallet: debitedBalance,
+        const withdrawRecord = {
+          type: 'withdrawal',
+          status: 'pending',
+          amount: numAmount,
+          currency: wdCurrency,
+          sourceWallet: targetWalletField,
+          account_number: cleanAccount,
+          bank_code: cleanBank,
+          account_name: providedName,
+          reference,
+          userId,
+          gateway: 'paystack',
+          method: 'Paystack Bank Transfer',
+          purpose: 'Cash Out Request',
+          description: `Paystack Withdrawal to ${providedName} (${cleanAccount})`,
+          timestamp: serverTime,
+          createdAt: serverTime,
           updatedAt: serverTime
-        }, { merge: true });
+        };
+
+        transaction.set(txDoc, withdrawRecord, { merge: true });
+        transaction.set(userTxDoc, withdrawRecord, { merge: true });
+      });
+    } catch (txErr: any) {
+      if (String(txErr?.message || '').includes('INSUFFICIENT FUNDS')) {
+        return Response.json({ success: false, error: txErr.message }, { status: 400 });
       }
-
-      transaction.set(userRef, {
-        [targetWalletField]: debitedBalance,
-        updatedAt: serverTime
-      }, { merge: true });
-
-      const withdrawRecord = {
-        type: 'withdraw',
-        status: 'pending',
-        amount: numAmount,
-        currency: 'NGN',
-        sourceWallet: targetWalletField,
-        account_number: cleanAccount,
-        bank_code: cleanBank,
-        account_name: providedName,
-        reference,
-        userId,
-        gateway: 'paystack',
-        createdAt: serverTime,
-        updatedAt: serverTime
-      };
-
-      transaction.set(txDoc, withdrawRecord, { merge: true });
-      transaction.set(userTxDoc, withdrawRecord, { merge: true });
-    });
+      throw txErr;
+    }
 
     try {
       const transferRes = await initiateTransfer(
@@ -181,8 +198,8 @@ export async function POST(req: Request) {
       const transferCode = transferData.transfer_code;
 
       await Promise.all([
-        txDoc.set({ transfer_code: transferCode, transfer_status: transferData.status }, { merge: true }),
-        userTxDoc.set({ transfer_code: transferCode, transfer_status: transferData.status }, { merge: true })
+        txDoc.set({ transfer_code: transferCode, transfer_status: transferData.status, updatedAt: getServerTimestamp() }, { merge: true }),
+        userTxDoc.set({ transfer_code: transferCode, transfer_status: transferData.status, updatedAt: getServerTimestamp() }, { merge: true })
       ]);
 
       return Response.json({
@@ -192,6 +209,7 @@ export async function POST(req: Request) {
         reference,
         transfer_code: transferCode,
         amount: numAmount,
+        currency: wdCurrency,
         newBalance: debitedBalance
       });
 
@@ -200,38 +218,34 @@ export async function POST(req: Request) {
 
       try {
         await db.runTransaction(async (transaction: any) => {
-          const [freshWalletSnap, freshUserSnap] = await Promise.all([
-            transaction.get(walletRef),
-            transaction.get(userRef)
-          ]);
-          const currentSub = freshWalletSnap.exists
-            ? Number(freshWalletSnap.data()?.balance || freshWalletSnap.data()?.depositWallet || 0)
-            : 0;
-          const currentUserBal = freshUserSnap.exists
-            ? Number(freshUserSnap.data()?.[targetWalletField] || 0)
-            : 0;
-          const baseBal =
-            targetWalletField === 'depositWallet' ? Math.max(currentSub, currentUserBal) : currentUserBal;
-          const refundedBal = baseBal + numAmount;
-
+          const refundTime = getServerTimestamp();
           if (targetWalletField === 'depositWallet') {
+            const freshWalletSnap = await transaction.get(walletRef);
+            const currentSub = freshWalletSnap.exists
+              ? Number(freshWalletSnap.data()?.balance ?? freshWalletSnap.data()?.depositWallet ?? 0)
+              : 0;
+            const refundedBal = currentSub + numAmount;
             transaction.set(walletRef, {
               balance: refundedBal,
               depositWallet: refundedBal,
-              updatedAt: getServerTimestamp()
+              currency: wdCurrency,
+              updatedAt: refundTime
+            }, { merge: true });
+          } else {
+            const freshUserSnap = await transaction.get(userRef);
+            const currentUserBal = freshUserSnap.exists ? Number(freshUserSnap.data()?.[targetWalletField] || 0) : 0;
+            const refundedBal = currentUserBal + numAmount;
+            transaction.set(userRef, {
+              [targetWalletField]: refundedBal,
+              updatedAt: refundTime
             }, { merge: true });
           }
-
-          transaction.set(userRef, {
-            [targetWalletField]: refundedBal,
-            updatedAt: getServerTimestamp()
-          }, { merge: true });
 
           const failUpdate = {
             status: 'failed',
             refunded: true,
             error: transferErr?.message || 'Transfer failed, money refunded to wallet',
-            updatedAt: getServerTimestamp()
+            updatedAt: refundTime
           };
 
           transaction.set(txDoc, failUpdate, { merge: true });

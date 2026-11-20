@@ -37,6 +37,26 @@
       "destination": "/api/payments/verify"
     },
     {
+      "source": "/api/flutterwave/banks",
+      "destination": "/api/payments/banks"
+    },
+    {
+      "source": "/api/banks",
+      "destination": "/api/payments/banks"
+    },
+    {
+      "source": "/api/flutterwave/withdraw",
+      "destination": "/api/payments/withdraw"
+    },
+    {
+      "source": "/api/flutterwave/payout",
+      "destination": "/api/payments/withdraw"
+    },
+    {
+      "source": "/api/flutterwave/transfer",
+      "destination": "/api/payments/withdraw"
+    },
+    {
       "source": "/api/bank/resolve",
       "destination": "/api/verify-bank"
     },

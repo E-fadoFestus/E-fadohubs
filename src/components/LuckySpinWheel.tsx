@@ -950,24 +950,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                   user={user}
                   type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
                   onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  onComplete={async (amount, method) => {
-                    try {
-                      const userRef = doc(db, 'users', user.uid);
-                      if (showPaymentUI.type === 'deposit') {
-                        await updateDoc(userRef, {
-                          depositWallet: increment(amount),
-                          playerWallet: increment(amount)
-                        });
-                      } else {
-                        await updateDoc(userRef, {
-                          playerWallet: increment(-amount)
-                        });
-                      }
-                    } catch (err) {
-                      console.error('Wallet update failed during spin wheel payment complete', err);
-                      throw err;
-                    }
-                  }}
+                  onSuccess={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
                   hub="SPIN_GAME"
                   purpose={showPaymentUI.type === 'deposit' ? "EFADO Challenge Entry Refunding" : "EFADO Challenge Reward Redemption"}
                 />

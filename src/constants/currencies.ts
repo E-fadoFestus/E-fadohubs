@@ -66,6 +66,7 @@ export const CURRENCIES: Currency[] = [
   { code: 'SCR', name: 'Seychellois Rupee', symbol: '₨' },
   { code: 'SDG', name: 'Sudanese Pound', symbol: '£' },
   { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  { code: 'SIRA', name: 'Sira (Burkina Faso - Coming Soon)', symbol: 'SIRA' },
   { code: 'SLL', name: 'Sierra Leone Leone', symbol: 'Le' },
   { code: 'SOS', name: 'Somali Shilling', symbol: 'S' },
   { code: 'SSP', name: 'South Sudanese Pound', symbol: '£' },
@@ -82,6 +83,7 @@ export const CURRENCIES: Currency[] = [
   { code: 'VEF', name: 'Venezuelan Bolívar', symbol: 'Bs.' },
   { code: 'VND', name: 'Vietnamese Dong', symbol: '₫' },
   { code: 'XAF', name: 'Central African CFA Franc', symbol: 'FCFA' },
+  { code: 'XOF', name: 'West African CFA Franc', symbol: 'CFA' },
   { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
   { code: 'ZMW', name: 'Zambian Kwacha', symbol: 'ZK' },
   { code: 'ZWL', name: 'Zimbabwean Dollar', symbol: 'Z$' }

@@ -28,8 +28,18 @@ import { TransactionPinModal } from './SecurityGuard';
 import { TransactionService } from '../services/TransactionService';
 import { StrategicReceipt } from './StrategicReceipt';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
-import { auth, db, doc, updateDoc, collection, setDoc, serverTimestamp } from '../firebase';
-import { resolveBankAccount, NIGERIAN_BANKS } from '../utils/bankVerification';
+import { auth, db, doc, updateDoc } from '../firebase';
+import { resolveBankAccount, NIGERIAN_BANKS, BankItem } from '../utils/bankVerification';
+import { getBackendUrl } from '../config/backend';
+import {
+  ACTIVE_WALLET_CURRENCIES,
+  FUTURE_WALLET_CURRENCIES,
+  formatCurrencyAmount,
+  getMinDepositForCurrency,
+  getWalletCurrencyMeta,
+  isDisabledFutureCurrency,
+  normalizeCurrencyCode
+} from '../constants/walletCurrencies';
 
 export interface EasyPaymentPlatformProps {
   user: UserProfile;
@@ -45,32 +55,38 @@ export interface EasyPaymentPlatformProps {
 export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   user,
   type: initialType,
-  onComplete,
   onClose,
   amount: fixedAmount,
   onSuccess,
   purpose: intentPurpose,
   hub = 'WALLET'
 }) => {
-  const { formatPrice, selectedCurrency } = useCurrency();
+  useCurrency();
 
   // Active Tab Mode
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw'>(initialType);
   const [paymentMethod, setPaymentMethod] = useState<'paystack' | 'flutterwave' | 'bank_transfer' | 'crypto'>('paystack');
+  const [depositCurrency, setDepositCurrency] = useState<string>('NGN');
+  const [payoutGateway, setPayoutGateway] = useState<'paystack' | 'flutterwave'>('paystack');
+  const [withdrawSource, setWithdrawSource] = useState<'depositWallet' | 'playerWallet' | 'cashOutWallet'>('depositWallet');
+  const [withdrawCurrency, setWithdrawCurrency] = useState<string>('NGN');
 
   // Input States
   const [amount, setAmount] = useState<string>(fixedAmount ? fixedAmount.toString() : '5000');
   const [bankName, setBankName] = useState(user.bankName || 'Guaranty Trust Bank (GTBank)');
   const [bankCode, setBankCode] = useState('058');
   const [accountNumber, setAccountNumber] = useState(user.accountNumber || '');
-  const [accountName, setAccountName] = useState(user.accountName || user.displayName || '');
+  const [accountName, setAccountName] = useState(user.accountName || '');
   const [proofNote, setProofNote] = useState('');
-  
+
+  // Live Bank Directories
+  const [paystackBanks, setPaystackBanks] = useState<BankItem[]>(NIGERIAN_BANKS);
+  const [flutterwaveBanks, setFlutterwaveBanks] = useState<BankItem[]>(NIGERIAN_BANKS);
+
   // UI & Flow Control States
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
   const [step, setStep] = useState<'form' | 'processing' | 'success' | 'failed'>('form');
   const [createdTx, setCreatedTx] = useState<Transaction | null>(null);
@@ -79,50 +95,119 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
   // Live Bank Account Resolution State
   const [isResolvingName, setIsResolvingName] = useState(false);
-  const [resolvedStatusMessage, setResolvedStatusMessage] = useState<string | null>(null);
+  const [verifiedAccountName, setVerifiedAccountName] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   // Preset deposit amount choices
   const PRESET_AMOUNTS = [2000, 5000, 10000, 20000, 50000, 100000];
+
+  const activeCurrencyMeta = getWalletCurrencyMeta(depositCurrency);
+  const withdrawCurrencyMeta = getWalletCurrencyMeta(
+    withdrawSource === 'depositWallet' ? withdrawCurrency : 'NGN'
+  );
+
+  const availableWithdrawBalance =
+    withdrawSource === 'depositWallet'
+      ? Number(
+          user.walletPockets?.[withdrawCurrency] ??
+            (withdrawCurrency === 'NGN' ? user.depositWallet || 0 : 0)
+        )
+      : withdrawSource === 'playerWallet'
+        ? Number(user.playerWallet || 0)
+        : Number(user.cashOutWallet || 0);
+
+  const activeBankDirectory = payoutGateway === 'paystack' ? paystackBanks : flutterwaveBanks;
+  const parsedWithdrawAmount = Number(amount) || 0;
+  const isWithdrawInsufficient =
+    activeTab === 'withdraw' &&
+    parsedWithdrawAmount > 0 &&
+    parsedWithdrawAmount > availableWithdrawBalance;
 
   // Auto pre-populate user details
   useEffect(() => {
     if (user) {
       if (user.accountNumber) setAccountNumber(user.accountNumber);
-      if (user.accountName || user.displayName) setAccountName(user.accountName || user.displayName || '');
+      if (user.accountName) setAccountName(user.accountName);
       if (user.bankName) setBankName(user.bankName);
     }
   }, [user]);
 
-  // Real-time interbank resolution when 10-digit account number is typed
+  // Fetch live Paystack & Flutterwave bank lists
   useEffect(() => {
-    if (accountNumber && accountNumber.length === 10) {
-      setIsResolvingName(true);
-      setResolvedStatusMessage('Verifying account holder via NIBSS switch...');
-      
-      let isMounted = true;
-      resolveBankAccount(accountNumber, bankCode, bankName)
-        .then(res => {
-          if (!isMounted) return;
-          if (res.success && res.accountName) {
-            setAccountName(res.accountName);
-            setResolvedStatusMessage(`Verified Account: ${res.accountName}`);
-          } else {
-            setResolvedStatusMessage('Interbank lookup complete');
-          }
-          setIsResolvingName(false);
-        })
-        .catch(() => {
-          if (!isMounted) return;
-          setIsResolvingName(false);
-          setResolvedStatusMessage(null);
-        });
+    let mounted = true;
+    const loadBanks = async () => {
+      try {
+        const flwRes = await fetch(getBackendUrl('/api/payments/banks?country=NG'));
+        const flwData = await flwRes.json().catch(() => null);
+        if (mounted && flwRes.ok && Array.isArray(flwData?.banks) && flwData.banks.length > 0) {
+          setFlutterwaveBanks(
+            flwData.banks.map((b: any) => ({
+              code: String(b.code || ''),
+              name: String(b.name || '')
+            }))
+          );
+        }
+      } catch {
+        // Fallback to NIGERIAN_BANKS
+      }
 
-      return () => { isMounted = false; };
-    } else {
-      setIsResolvingName(false);
-      setResolvedStatusMessage(null);
+      try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+        if (!token) return;
+        const psRes = await fetch(getBackendUrl('/api/paystack/banks?currency=NGN'), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const psData = await psRes.json().catch(() => null);
+        if (mounted && psRes.ok && Array.isArray(psData?.banks) && psData.banks.length > 0) {
+          setPaystackBanks(
+            psData.banks.map((b: any) => ({
+              code: String(b.code || ''),
+              name: String(b.name || '')
+            }))
+          );
+        }
+      } catch {
+        // Fallback to NIGERIAN_BANKS
+      }
+    };
+    void loadBanks();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Explicitly resolve bank account — works EVEN at ₦0.00 balance, never hangs forever
+  const handleVerifyAccount = async (gatewayOverride?: 'paystack' | 'flutterwave') => {
+    const cleanAcct = accountNumber.replace(/\D/g, '');
+    const selectedGw = gatewayOverride || (activeTab === 'withdraw' ? payoutGateway : 'paystack');
+    if (cleanAcct.length !== 10) {
+      setVerifiedAccountName(null);
+      setVerifyError('Please enter a valid 10-digit account number first.');
+      return;
     }
-  }, [accountNumber, bankCode, bankName]);
+
+    setIsResolvingName(true);
+    setVerifyError(null);
+    setVerifiedAccountName(null);
+    setError(null);
+
+    try {
+      const res = await resolveBankAccount(cleanAcct, bankCode, bankName, selectedGw);
+      if (res.success && res.accountName) {
+        setVerifiedAccountName(res.accountName);
+        setAccountName(res.accountName);
+        setVerifyError(null);
+      } else {
+        setVerifiedAccountName(null);
+        setVerifyError(res.message || 'Invalid account number or bank not responding.');
+      }
+    } catch (err: any) {
+      setVerifiedAccountName(null);
+      setVerifyError(err?.message || 'Bank not responding. Please try again.');
+    } finally {
+      setIsResolvingName(false);
+    }
+  };
 
   // Copy helper
   const handleCopy = (text: string, id: string) => {
@@ -169,14 +254,21 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
 
   const handlePaystackCheckout = async () => {
     setError(null);
-    const parsedAmt = Number(amount);
-    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < 100) {
-      setError('Please enter a valid amount of at least ₦100.');
+    const chosenCurrency = normalizeCurrencyCode(depositCurrency);
+    if (isDisabledFutureCurrency(chosenCurrency)) {
+      setError(`${chosenCurrency} is Coming Soon and disabled for deposits.`);
       return;
     }
 
-    const amountInKobo = Math.round(parsedAmt * 100);
-    if (!Number.isInteger(amountInKobo) || amountInKobo <= 0) {
+    const minDeposit = getMinDepositForCurrency(chosenCurrency);
+    const parsedAmt = Number(amount);
+    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < minDeposit) {
+      setError(`Please enter a valid amount of at least ${formatCurrencyAmount(minDeposit, chosenCurrency)}.`);
+      return;
+    }
+
+    const amountInSmallestUnit = Math.round(parsedAmt * 100);
+    if (!Number.isInteger(amountInSmallestUnit) || amountInSmallestUnit <= 0) {
       setError('Invalid payment amount.');
       return;
     }
@@ -190,22 +282,23 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       return;
     }
 
-    setIsProcessing(true);
+    if (!auth.currentUser) {
+      setError('Please sign in with a valid account to pay with Paystack.');
+      return;
+    }
+
     setStep('processing');
     setProcessingProgress(25);
 
     try {
+      const token = await auth.currentUser.getIdToken();
       const rawKey = (import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '').trim();
       const pstKey = /^pk_(test|live)_[a-zA-Z0-9]+$/.test(rawKey) ? rawKey : '';
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
 
       // If frontend public key isn't set, use backend Paystack initialize redirect
       if (!pstKey) {
-        if (!token) {
-          throw new Error('Please sign in with a valid account to pay with Paystack.');
-        }
         setProcessingProgress(55);
-        const initRes = await fetch('/api/paystack/initialize', {
+        const initRes = await fetch(getBackendUrl('/api/paystack/initialize'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -214,7 +307,8 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
           },
           body: JSON.stringify({
             amount: parsedAmt,
-            amount_in_kobo: amountInKobo
+            amount_in_kobo: amountInSmallestUnit,
+            currency: chosenCurrency
           })
         });
         const initData = await initRes.json().catch(() => null);
@@ -240,12 +334,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         const handler = (window as any).PaystackPop.setup({
           key: pstKey,
           email: customerEmail,
-          amount: amountInKobo,
-          currency: 'NGN',
+          amount: amountInSmallestUnit,
+          currency: chosenCurrency,
           ref: paymentRef,
           metadata: {
             userId: user.uid,
             userName: user.displayName || customerEmail,
+            currency: chosenCurrency,
             purpose: intentPurpose || 'Wallet Funding'
           },
           callback: (response: any) => {
@@ -253,67 +348,54 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
               try {
                 setProcessingProgress(85);
                 const returnedRef = response?.reference || paymentRef;
-                let serverCredited = false;
-
-                if (token) {
-                  const verifyRes = await fetch(`/api/paystack/verify?reference=${encodeURIComponent(returnedRef)}`, {
+                const verifyRes = await fetch(
+                  getBackendUrl(`/api/paystack/verify?reference=${encodeURIComponent(returnedRef)}`),
+                  {
                     headers: { Authorization: `Bearer ${token}` }
-                  });
-                  const verifyData = await verifyRes.json().catch(() => null);
-                  if (verifyRes.ok && verifyData?.success) {
-                    serverCredited = true;
-                  } else if (verifyRes.status === 400 || verifyRes.status === 403) {
-                    throw new Error(verifyData?.error || verifyData?.message || 'Paystack verification failed.');
                   }
+                );
+                const verifyData = await verifyRes.json().catch(() => null);
+                if (!verifyRes.ok || !verifyData?.success || verifyData?.credited === false) {
+                  throw new Error(
+                    verifyData?.error ||
+                      verifyData?.message ||
+                      'Server verification did not credit wallet. Balance was NOT updated.'
+                  );
                 }
 
-                const txData = {
+                const verifiedCurrency = normalizeCurrencyCode(verifyData.currency || chosenCurrency);
+                const verifiedAmount = Number(verifyData.amount || parsedAmt);
+
+                setCreatedTx({
+                  id: returnedRef,
                   userId: user.uid,
                   userEmail: customerEmail,
-                  type: 'deposit' as 'deposit',
-                  amount: parsedAmt,
+                  type: 'deposit',
+                  amount: verifiedAmount,
                   fee: 0,
-                  currency: 'NGN',
-                  status: 'completed' as 'completed',
+                  currency: verifiedCurrency,
+                  status: 'completed',
                   method: 'Paystack Instant Gateway',
                   hub: hub as any,
                   purpose: intentPurpose || 'Wallet Funding',
                   reference: returnedRef,
-                  description: `Automated Deposit via Paystack Gateway [Ref: ${returnedRef}]`,
-                  skipWalletUpdate: serverCredited || !!onComplete,
-                  metadata: {
-                    paymentChannel: 'Paystack Pop-Up',
-                    transactionRef: returnedRef,
-                    gateway: 'paystack'
-                  }
-                };
-
-                const txId = serverCredited
-                  ? returnedRef
-                  : await TransactionService.recordTransaction(txData);
-                setCreatedTx({
-                  id: txId,
-                  ...txData,
+                  description: `Verified Deposit via Paystack Gateway (${verifiedCurrency}) [Ref: ${returnedRef}]`,
                   timestamp: new Date().toISOString()
                 } as any);
 
                 setProcessingProgress(100);
-                setIsProcessing(false);
                 setStep('success');
 
                 if (onSuccess) onSuccess();
-                if (onComplete) onComplete(parsedAmt, 'Paystack Instant');
               } catch (cbErr: any) {
                 console.error('Paystack callback verification error:', cbErr);
                 setError(cbErr?.message || 'Payment verification failed.');
                 setStep('form');
-                setIsProcessing(false);
               }
             })();
           },
           onClose: () => {
             setStep('form');
-            setIsProcessing(false);
             setError('Checkout window closed before payment completion.');
           }
         });
@@ -325,19 +407,24 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       console.error('Paystack checkout initialization error:', err);
       setError(err?.message || 'Could not initialize Paystack checkout.');
       setStep('form');
-      setIsProcessing(false);
     }
   };
 
   const handleFlutterwaveCheckout = async () => {
     setError(null);
-    const parsedAmt = Number(amount);
-    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < 100) {
-      setError('Please enter a valid amount of at least ₦100.');
+    const chosenCurrency = normalizeCurrencyCode(depositCurrency);
+    if (isDisabledFutureCurrency(chosenCurrency)) {
+      setError(`${chosenCurrency} is Coming Soon and disabled for deposits.`);
       return;
     }
 
-    setIsProcessing(true);
+    const minDeposit = getMinDepositForCurrency(chosenCurrency);
+    const parsedAmt = Number(amount);
+    if (!amount || !Number.isFinite(parsedAmt) || parsedAmt < minDeposit) {
+      setError(`Please enter a valid amount of at least ${formatCurrencyAmount(minDeposit, chosenCurrency)}.`);
+      return;
+    }
+
     setStep('processing');
     setProcessingProgress(35);
 
@@ -350,12 +437,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         name: user.displayName || 'EFADO Member',
         userId: user.uid,
         amount: parsedAmt,
-        currency: 'NGN',
+        currency: chosenCurrency,
         tx_ref: paymentRef,
         purpose: intentPurpose || 'Wallet Funding',
         meta: {
           userId: user.uid,
-          hub: hub || 'main'
+          hub: hub || 'main',
+          currency: chosenCurrency
         },
         customizations: {
           title: 'EFADO Wallet Checkout',
@@ -375,11 +463,10 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       console.error('Flutterwave checkout initialization error:', err);
       setError(err?.message || 'Unable to connect to Flutterwave gateway. Please try again.');
       setStep('form');
-      setIsProcessing(false);
     }
   };
 
-  // Handle Submit for Direct Bank Transfer & Withdrawal
+  // Handle Submit for Direct Bank Transfer & Real API Withdrawal
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -391,19 +478,27 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
     }
 
     if (activeTab === 'withdraw') {
-      if (parsedAmt > user.playerWallet) {
-        setError(`Insufficient Wallet Balance. Maximum available: ${formatPrice(user.playerWallet)}`);
-        return;
-      }
-      if (!accountNumber || accountNumber.length < 10) {
+      const cleanAcct = accountNumber.replace(/\D/g, '');
+      if (cleanAcct.length !== 10) {
         setError('Please enter a valid 10-digit receiving account number.');
         return;
       }
-      if (!accountName) {
-        setError('Please enter the beneficiary account name.');
+      if (!verifiedAccountName) {
+        setError('Please verify your bank account first and confirm the account holder name.');
+        return;
+      }
+      if (parsedAmt > availableWithdrawBalance) {
+        setError(
+          `INSUFFICIENT FUNDS: Requested ${formatCurrencyAmount(parsedAmt, withdrawCurrencyMeta.code)}, available ${formatCurrencyAmount(availableWithdrawBalance, withdrawCurrencyMeta.code)}.`
+        );
         return;
       }
     } else if (paymentMethod === 'bank_transfer') {
+      const chosenCurrency = normalizeCurrencyCode(depositCurrency);
+      if (isDisabledFutureCurrency(chosenCurrency)) {
+        setError(`${chosenCurrency} is Coming Soon and disabled.`);
+        return;
+      }
       if (!accountNumber || accountNumber.length < 8) {
         setError('Please enter your 10-digit sender account number.');
         return;
@@ -414,7 +509,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       }
     }
 
-    // Require PIN modal confirmation
     setShowPinModal(true);
   };
 
@@ -422,93 +516,149 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
   const handlePinConfirmed = () => {
     setShowPinModal(false);
     setStep('processing');
-    setProcessingProgress(10);
-
-    const interval = setInterval(() => {
-      setProcessingProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            processManualTransaction();
-          }, 300);
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 50);
+    setProcessingProgress(25);
+    void processConfirmedTransaction();
   };
 
-  // Execute Direct Bank Transfer or Withdrawal Request in Firebase
-  const processManualTransaction = async () => {
+  // Execute Real Paystack/Flutterwave Withdrawal OR Pending Direct Bank Transfer Proof
+  const processConfirmedTransaction = async () => {
     try {
       const parsedAmt = Number(amount);
       const isDeposit = activeTab === 'deposit';
 
-      if (onComplete) {
-        await onComplete(parsedAmt, isDeposit ? 'Bank Transfer' : 'Bank Payout');
+      if (!isDeposit) {
+        if (!auth.currentUser) {
+          throw new Error('Authentication required for withdrawals.');
+        }
+
+        const wdCurrency =
+          withdrawSource === 'depositWallet' ? normalizeCurrencyCode(withdrawCurrency) : 'NGN';
+        if (isDisabledFutureCurrency(wdCurrency)) {
+          throw new Error(`${wdCurrency} is Coming Soon and cannot be withdrawn.`);
+        }
+
+        const token = await auth.currentUser.getIdToken();
+        setProcessingProgress(60);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+
+        let endpoint = '/api/paystack/withdraw';
+        let body: Record<string, any> = {
+          amount: parsedAmt,
+          account_number: accountNumber.replace(/\D/g, ''),
+          bank_code: bankCode,
+          account_name: verifiedAccountName || accountName,
+          bank_name: bankName,
+          source_wallet: withdrawSource,
+          currency: wdCurrency
+        };
+
+        if (payoutGateway === 'flutterwave') {
+          endpoint = '/api/payments/withdraw';
+          body = {
+            amount: parsedAmt,
+            bankCode,
+            accountNumber: accountNumber.replace(/\D/g, ''),
+            accountName: verifiedAccountName || accountName,
+            bankName,
+            currency: wdCurrency,
+            sourceWallet: withdrawSource
+          };
+        }
+
+        const res = await fetch(getBackendUrl(endpoint), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || data?.message || 'Withdrawal failed.');
+        }
+
+        // Save preferred payout bank details
+        if (bankName !== user.bankName || accountNumber !== user.accountNumber || (verifiedAccountName || accountName) !== user.accountName) {
+          try {
+            await updateDoc(doc(db, 'users', user.uid), {
+              bankName,
+              accountNumber: accountNumber.replace(/\D/g, ''),
+              accountName: verifiedAccountName || accountName
+            });
+          } catch {
+            // non-fatal
+          }
+        }
+
+        setProcessingProgress(100);
+        setCreatedTx({
+          id: data.reference || reference,
+          userId: user.uid,
+          userEmail: user.email,
+          type: 'withdrawal',
+          amount: parsedAmt,
+          fee: 0,
+          currency: wdCurrency,
+          status: data.status || 'completed',
+          method: payoutGateway === 'paystack' ? 'Paystack Instant Transfer' : 'Flutterwave Bank Payout',
+          hub: hub as any,
+          purpose: intentPurpose || 'Wallet Withdrawal',
+          reference: data.reference || reference,
+          description: `Payout to ${verifiedAccountName || accountName} (${bankName})`,
+          timestamp: new Date().toISOString()
+        } as any);
+        setStep('success');
+        if (onSuccess) onSuccess();
+        return;
       }
 
-      // Save user default bank info to Firestore profile
+      // Direct Bank Transfer / Crypto manual proof (remains pending until CEO approval)
+      const chosenCurrency = normalizeCurrencyCode(depositCurrency);
       if (bankName !== user.bankName || accountNumber !== user.accountNumber || accountName !== user.accountName) {
         try {
-          const userRef = doc(db, 'users', user.uid);
-          await updateDoc(userRef, { bankName, accountNumber, accountName });
+          await updateDoc(doc(db, 'users', user.uid), { bankName, accountNumber, accountName });
         } catch (e) {
           console.warn('Bank detail sync warning:', e);
         }
       }
 
-      const txDescription = isDeposit
-        ? `Pending Bank Transfer Verification: Sender [${bankName} / ${accountNumber} / ${accountName}] ${proofNote ? `(${proofNote})` : ''}`
-        : `Pending Cashout Transfer: Destination [${bankName} / ${accountNumber} / ${accountName}]`;
+      setProcessingProgress(70);
+      const txDescription =
+        paymentMethod === 'crypto'
+          ? `Pending USDT / Wire Deposit [Ref: ${reference}]`
+          : `Pending Bank Transfer Verification: Sender [${bankName} / ${accountNumber} / ${accountName}] ${proofNote ? `(${proofNote})` : ''}`;
 
       const txData = {
         userId: user.uid,
         userEmail: user.email,
-        type: (isDeposit ? 'deposit' : 'withdrawal') as 'deposit' | 'withdrawal',
+        type: 'deposit' as const,
         amount: parsedAmt,
-        fee: isDeposit ? 0 : parsedAmt * 0.015,
-        currency: 'NGN',
-        status: 'pending' as 'pending',
-        method: isDeposit ? 'Direct Bank Transfer' : 'Direct Bank Payout',
+        fee: 0,
+        currency: chosenCurrency,
+        status: 'pending' as const,
+        method: paymentMethod === 'crypto' ? 'USDT / SWIFT Wire' : 'Direct Bank Transfer',
         hub: hub as any,
-        purpose: intentPurpose || (isDeposit ? 'Wallet Funding' : 'Win Earnings Cashout'),
+        purpose: intentPurpose || 'Wallet Funding',
         reference,
         description: txDescription,
-        skipWalletUpdate: !!onComplete,
+        ledgerOnly: true,
         metadata: {
           bankName,
           accountNumber,
           accountName,
+          currency: chosenCurrency,
           transactionRef: reference
         }
       };
 
       const txId = await TransactionService.recordTransaction(txData);
-
-      if (!isDeposit) {
-        try {
-          const withdrawalRef = doc(collection(db, 'withdrawals'), txId);
-          await setDoc(withdrawalRef, {
-            userId: user.uid,
-            userEmail: user.email,
-            amount: parsedAmt - (parsedAmt * 0.015),
-            originalAmount: parsedAmt,
-            fee: parsedAmt * 0.015,
-            status: 'pending',
-            timestamp: serverTimestamp(),
-            accountDetails: {
-              method: 'Direct Bank Transfer',
-              bankName,
-              accountNumber,
-              accountName
-            }
-          });
-        } catch (err) {
-          console.warn('Failed to mirror withdrawal record:', err);
-        }
-      }
-
+      setProcessingProgress(100);
       setCreatedTx({
         id: txId,
         ...txData,
@@ -519,8 +669,12 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Transaction execution failure:', err);
-      setError(err.message || 'Transaction submission failed. Please try again.');
-      setStep('failed');
+      setError(
+        err?.name === 'AbortError'
+          ? 'Payout gateway timed out. Check your transaction history before retrying.'
+          : err?.message || 'Transaction submission failed. Please try again.'
+      );
+      setStep('form');
     }
   };
 
@@ -600,65 +754,100 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
               </div>
             )}
 
-            {/* Withdraw Balance Header Display */}
-            {activeTab === 'withdraw' && (
-              <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between border border-slate-800 shadow-sm">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Available Earnings Balance</p>
-                  <p className="text-xl font-mono font-black text-emerald-400 mt-0.5">{formatPrice(user.playerWallet)}</p>
+            {/* Deposit Currency Selector (9 Active + 1 Coming Soon SIRA) */}
+            {activeTab === 'deposit' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700">Wallet Pocket Currency</label>
+                  <span className="text-[10px] font-bold text-emerald-700">
+                    Pocket: {formatCurrencyAmount(
+                      user.walletPockets?.[depositCurrency] ?? (depositCurrency === 'NGN' ? (user.depositWallet || 0) : 0),
+                      depositCurrency
+                    )}
+                  </span>
                 </div>
-                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold rounded-full">
-                  Instant Payout Ready
+                <div className="grid grid-cols-5 gap-1.5">
+                  {ACTIVE_WALLET_CURRENCIES.map((cur) => (
+                    <button
+                      key={cur.code}
+                      type="button"
+                      onClick={() => {
+                        setDepositCurrency(cur.code);
+                        setError(null);
+                      }}
+                      className={`py-2 px-1 rounded-xl text-[10px] font-black border transition-all flex items-center justify-center gap-1 ${
+                        depositCurrency === cur.code
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span>{cur.flag}</span>
+                      <span>{cur.code}</span>
+                    </button>
+                  ))}
+                  {FUTURE_WALLET_CURRENCIES.map((cur) => (
+                    <button
+                      key={cur.code}
+                      type="button"
+                      disabled
+                      title={cur.note}
+                      className="py-2 px-1 rounded-xl text-[10px] font-black border bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed flex flex-col items-center justify-center"
+                    >
+                      <span>{cur.code}</span>
+                      <span className="text-[7px] uppercase tracking-tight">Soon</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Amount Input Block */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">
-                {activeTab === 'deposit' ? 'Amount to Fund (NGN ₦)' : 'Amount to Withdraw (NGN ₦)'}
-              </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">₦</span>
-                <input
-                  type="text"
-                  pattern="[0-9]*"
-                  disabled={!!fixedAmount}
-                  placeholder="Enter amount (e.g. 5000)"
-                  className="w-full pl-9 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-base font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:opacity-60"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value.replace(/\D/g, ''))}
-                />
-              </div>
-
-              {/* Amount Quick Presets (For Deposits) */}
-              {activeTab === 'deposit' && !fixedAmount && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {PRESET_AMOUNTS.map(preset => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setAmount(preset.toString())}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold border transition-all ${
-                        amount === preset.toString()
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-                      }`}
-                    >
-                      ₦{preset.toLocaleString()}
-                    </button>
-                  ))}
+            {/* Deposit Amount Input Block (Withdraw puts Amount after Bank Verify) */}
+            {activeTab === 'deposit' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  Amount to Fund ({activeCurrencyMeta.code} {activeCurrencyMeta.symbol})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                    {activeCurrencyMeta.symbol}
+                  </span>
+                  <input
+                    type="text"
+                    pattern="[0-9.]*"
+                    disabled={!!fixedAmount}
+                    placeholder={`Min ${getMinDepositForCurrency(depositCurrency)}`}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-base font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all disabled:opacity-60"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                  />
                 </div>
-              )}
-            </div>
+
+                {!fixedAmount && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {PRESET_AMOUNTS.map(preset => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setAmount(preset.toString())}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold border transition-all ${
+                          amount === preset.toString()
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        {activeCurrencyMeta.symbol}{preset.toLocaleString()}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Deposit Payment Method Selector */}
             {activeTab === 'deposit' && (
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 block">Select Payment Method</label>
                 <div className="grid grid-cols-2 gap-2.5">
-                  
-                  {/* Paystack */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('paystack')}
@@ -678,7 +867,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     {paymentMethod === 'paystack' && <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />}
                   </button>
 
-                  {/* Flutterwave */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('flutterwave')}
@@ -698,7 +886,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     {paymentMethod === 'flutterwave' && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
                   </button>
 
-                  {/* Bank Transfer */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('bank_transfer')}
@@ -718,7 +905,6 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     {paymentMethod === 'bank_transfer' && <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />}
                   </button>
 
-                  {/* Crypto / Wire */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('crypto')}
@@ -745,40 +931,49 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
             {activeTab === 'deposit' && paymentMethod === 'bank_transfer' && (
               <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
                 <p className="text-xs font-bold text-slate-800">Transfer Funds To Official Bank Account:</p>
-                
-                {/* GTBank Corporate */}
+
                 <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">GTBANK PLC (Corporate)</span>
-                    <p className="text-xs font-mono font-black text-slate-900 mt-1">3001964082</p>
-                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">EFADO Technology Training & Services</p>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                      {CEO_BANK_ACCOUNTS.current?.[1]?.bank || 'GTBANK PLC (Corporate)'}
+                    </span>
+                    <p className="text-xs font-mono font-black text-slate-900 mt-1">
+                      {CEO_BANK_ACCOUNTS.current?.[1]?.accountNumber || '0424168563'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
+                      {CEO_BANK_ACCOUNTS.current?.[1]?.accountName || 'EFADO Technology'}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopy('3001964082', 'gtb')}
+                    onClick={() => handleCopy(CEO_BANK_ACCOUNTS.current?.[1]?.accountNumber || '0424168563', 'gtb')}
                     className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
                   >
                     {copySuccess === 'gtb' ? 'Copied ✓' : 'Copy'}
                   </button>
                 </div>
 
-                {/* OPay Business */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">OPAY DIGITAL MFB</span>
-                    <p className="text-xs font-mono font-black text-slate-900 mt-1">8072456836</p>
-                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">EFADO Technology</p>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                      {CEO_BANK_ACCOUNTS.business?.[0]?.bank || 'OPAY DIGITAL MFB'}
+                    </span>
+                    <p className="text-xs font-mono font-black text-slate-900 mt-1">
+                      {CEO_BANK_ACCOUNTS.business?.[0]?.accountNumber || '8072456836'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
+                      {CEO_BANK_ACCOUNTS.business?.[0]?.accountName || 'EFADO Technology'}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleCopy('8072456836', 'opay')}
+                    onClick={() => handleCopy(CEO_BANK_ACCOUNTS.business?.[0]?.accountNumber || '8072456836', 'opay')}
                     className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
                   >
                     {copySuccess === 'opay' ? 'Copied ✓' : 'Copy'}
                   </button>
                 </div>
 
-                {/* Form fields for sender verification */}
                 <div className="space-y-2.5 pt-2 border-t border-slate-200">
                   <p className="text-xs font-bold text-slate-800">Your Sender Proof Details:</p>
 
@@ -805,18 +1000,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ''))}
                   />
 
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder={isResolvingName ? "Resolving Account Name..." : "Sender Account Holder Name"}
-                      className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      value={accountName}
-                      onChange={e => setAccountName(e.target.value)}
-                    />
-                    {resolvedStatusMessage && (
-                      <p className="text-[10px] text-emerald-600 font-bold mt-1 pl-1">{resolvedStatusMessage}</p>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Sender Account Holder Name"
+                    className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={accountName}
+                    onChange={e => setAccountName(e.target.value)}
+                  />
 
                   <input
                     type="text"
@@ -852,51 +1042,199 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
               </div>
             )}
 
-            {/* Cashout / Withdrawal Bank Destination Form */}
+            {/* Ordered Withdrawal Flow: Gateway -> Bank -> 10-Digit Account -> Verify (works at ₦0) -> Account Name -> Source Pocket -> Amount & INSUFFICIENT FUNDS -> Confirm */}
             {activeTab === 'withdraw' && (
-              <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold text-slate-800">Receiving Bank Account Details:</p>
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <p className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    1. Gateway & Receiving Bank
+                  </p>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 font-bold block">Receiving Bank Name</label>
-                  <select
-                    className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={bankName}
-                    onChange={e => {
-                      setBankName(e.target.value);
-                      const matched = NIGERIAN_BANKS.find(b => b.name === e.target.value);
-                      if (matched) setBankCode(matched.code);
-                    }}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayoutGateway('paystack');
+                        setVerifiedAccountName(null);
+                        setVerifyError(null);
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black border transition-all ${
+                        payoutGateway === 'paystack'
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      Paystack Transfer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayoutGateway('flutterwave');
+                        setVerifiedAccountName(null);
+                        setVerifyError(null);
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black border transition-all ${
+                        payoutGateway === 'flutterwave'
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-white text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      Flutterwave Transfer
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold block">2. Select Bank</label>
+                    <select
+                      className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={bankCode}
+                      onChange={e => {
+                        const chosen = activeBankDirectory.find(b => b.code === e.target.value);
+                        setBankCode(e.target.value);
+                        if (chosen) setBankName(chosen.name);
+                        setVerifiedAccountName(null);
+                        setVerifyError(null);
+                      }}
+                    >
+                      {activeBankDirectory.map((b, idx) => (
+                        <option key={`${b.code}-${idx}`} value={b.code}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold block">3. 10-Digit Account Number</label>
+                    <input
+                      type="text"
+                      maxLength={10}
+                      placeholder="e.g. 0123456789"
+                      className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      value={accountNumber}
+                      onChange={e => {
+                        setAccountNumber(e.target.value.replace(/\D/g, ''));
+                        setVerifiedAccountName(null);
+                        setVerifyError(null);
+                      }}
+                    />
+                  </div>
+
+                  {/* Verify Bank Account Button — works EVEN when balance is ₦0.00 */}
+                  <button
+                    type="button"
+                    disabled={isResolvingName || accountNumber.replace(/\D/g, '').length !== 10}
+                    onClick={() => handleVerifyAccount(payoutGateway)}
+                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
                   >
-                    {NIGERIAN_BANKS.map(b => (
-                      <option key={b.code} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
+                    <RefreshCw className={`w-3.5 h-3.5 ${isResolvingName ? 'animate-spin' : ''}`} />
+                    <span>{isResolvingName ? 'Verifying Account with Bank...' : '4. Verify Bank Account'}</span>
+                  </button>
+
+                  {verifiedAccountName && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-emerald-700">Account Verified</p>
+                        <p className="text-xs font-black">{verifiedAccountName}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {verifyError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{verifyError}</span>
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 font-bold block">10-Digit Account Number</label>
-                  <input
-                    type="text"
-                    maxLength={10}
-                    placeholder="e.g. 0123456789"
-                    className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={accountNumber}
-                    onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ''))}
-                  />
-                </div>
+                {/* Source Pocket & Balance + Amount */}
+                <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 border border-slate-800">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      5. Source Pocket
+                    </span>
+                    <span className="text-xs font-mono font-black text-emerald-400">
+                      Avail: {formatCurrencyAmount(availableWithdrawBalance, withdrawCurrencyMeta.code)}
+                    </span>
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 font-bold block">Account Holder Name</label>
-                  <input
-                    type="text"
-                    placeholder={isResolvingName ? "Resolving via Interbank Switch..." : "Account Holder Full Name"}
-                    className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={accountName}
-                    onChange={e => setAccountName(e.target.value)}
-                  />
-                  {resolvedStatusMessage && (
-                    <p className="text-[10px] text-emerald-600 font-bold pl-1">{resolvedStatusMessage}</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawSource('depositWallet')}
+                      className={`py-2 px-2 rounded-xl text-[10px] font-black border transition-all ${
+                        withdrawSource === 'depositWallet'
+                          ? 'bg-emerald-600 text-white border-emerald-500'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      Deposit Pocket
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawSource('playerWallet')}
+                      className={`py-2 px-2 rounded-xl text-[10px] font-black border transition-all ${
+                        withdrawSource === 'playerWallet'
+                          ? 'bg-emerald-600 text-white border-emerald-500'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      Play Wallet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawSource('cashOutWallet')}
+                      className={`py-2 px-2 rounded-xl text-[10px] font-black border transition-all ${
+                        withdrawSource === 'cashOutWallet'
+                          ? 'bg-emerald-600 text-white border-emerald-500'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}
+                    >
+                      Cash Out
+                    </button>
+                  </div>
+
+                  {withdrawSource === 'depositWallet' && (
+                    <select
+                      className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs font-bold text-white"
+                      value={withdrawCurrency}
+                      onChange={e => setWithdrawCurrency(e.target.value)}
+                    >
+                      {ACTIVE_WALLET_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code} — Avail: {formatCurrencyAmount(user.walletPockets?.[c.code] ?? (c.code === 'NGN' ? (user.depositWallet || 0) : 0), c.code)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                      6. Amount to Withdraw ({withdrawCurrencyMeta.code})
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                        {withdrawCurrencyMeta.symbol}
+                      </span>
+                      <input
+                        type="text"
+                        pattern="[0-9.]*"
+                        disabled={!!fixedAmount}
+                        placeholder="Enter withdrawal amount"
+                        className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-base font-mono font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={amount}
+                        onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      />
+                    </div>
+                  </div>
+
+                  {isWithdrawInsufficient && (
+                    <div className="p-3 bg-rose-950/90 border border-rose-500 rounded-xl text-rose-200 text-xs font-black flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>
+                        INSUFFICIENT FUNDS — Available: {formatCurrencyAmount(availableWithdrawBalance, withdrawCurrencyMeta.code)}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -909,7 +1247,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 onClick={handlePaystackCheckout}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <span>Proceed with Paystack (₦{(Number(amount) || 0).toLocaleString()})</span>
+                <span>Proceed with Paystack ({formatCurrencyAmount(Number(amount) || 0, depositCurrency)})</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -920,7 +1258,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 onClick={handleFlutterwaveCheckout}
                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <span>Proceed with Flutterwave (₦{(Number(amount) || 0).toLocaleString()})</span>
+                <span>Proceed with Flutterwave ({formatCurrencyAmount(Number(amount) || 0, depositCurrency)})</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -928,9 +1266,14 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
             {(activeTab === 'withdraw' || (activeTab === 'deposit' && (paymentMethod === 'bank_transfer' || paymentMethod === 'crypto'))) && (
               <button
                 type="submit"
-                className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
+                disabled={activeTab === 'withdraw' && (!verifiedAccountName || isWithdrawInsufficient)}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-2xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
               >
-                <span>{activeTab === 'deposit' ? 'Submit Deposit Proof' : 'Request Earnings Cashout'}</span>
+                <span>
+                  {activeTab === 'deposit'
+                    ? 'Submit Deposit Proof'
+                    : `Confirm ${payoutGateway === 'paystack' ? 'Paystack' : 'Flutterwave'} Withdrawal`}
+                </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}

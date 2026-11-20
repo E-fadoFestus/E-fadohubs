@@ -46,50 +46,57 @@ export async function POST(req: Request) {
       }
 
       const paidAmount = Number(verifiedData.amount) / 100;
+      const txCurrency = String(verifiedData.currency || 'NGN').trim().toUpperCase();
+      const ALLOWED_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
       const userId = verifiedData.metadata?.userId || verifiedData.customer?.email;
 
-      if (userId && paidAmount > 0) {
+      if (userId && paidAmount > 0 && ALLOWED_CURRENCIES.includes(txCurrency)) {
         const txDoc = db.doc(`transactions/${reference}`);
         const userTxDoc = db.doc(`wallets/${userId}/transactions/${reference}`);
-        const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
-        const userRef = db.doc(`users/${userId}`);
+        const walletRef = db.doc(`wallets/${userId}/${txCurrency}/depositWallet`);
 
-        const txSnap = await txDoc.get();
-        const existingTx = txSnap.exists ? txSnap.data() : null;
+        await db.runTransaction(async (transaction: any) => {
+          const txSnap = await transaction.get(txDoc);
+          const existingTx = txSnap.exists ? txSnap.data() : null;
+          if (existingTx && existingTx.credited === true) {
+            return;
+          }
 
-        if (!existingTx || existingTx.credited !== true) {
-          await db.runTransaction(async (transaction: any) => {
-            const walletSnap = await transaction.get(walletRef);
-            const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
-            const updatedBalance = oldBalance + paidAmount;
+          const walletSnap = await transaction.get(walletRef);
+          const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance ?? walletSnap.data()?.depositWallet ?? 0) : 0;
+          const updatedBalance = oldBalance + paidAmount;
 
-            transaction.set(walletRef, {
-              balance: updatedBalance,
-              depositWallet: updatedBalance,
-              updatedAt: serverTime
-            }, { merge: true });
+          transaction.set(walletRef, {
+            balance: updatedBalance,
+            depositWallet: updatedBalance,
+            currency: txCurrency,
+            userId,
+            lastFundedRef: reference,
+            createdAt: walletSnap.exists ? (walletSnap.data()?.createdAt || serverTime) : serverTime,
+            updatedAt: serverTime
+          }, { merge: true });
 
-            transaction.set(userRef, {
-              depositWallet: updatedBalance,
-              updatedAt: serverTime
-            }, { merge: true });
+          const successRecord = {
+            type: 'deposit',
+            status: 'completed',
+            credited: true,
+            amount: paidAmount,
+            currency: txCurrency,
+            reference,
+            userId,
+            gateway: 'paystack',
+            method: 'Paystack Gateway',
+            purpose: 'Wallet Top-up',
+            description: `Verified Paystack Deposit (${txCurrency}) [Ref: ${reference}]`,
+            creditedPocket: `wallets/${userId}/${txCurrency}/depositWallet`,
+            timestamp: serverTime,
+            createdAt: existingTx?.createdAt || serverTime,
+            updatedAt: serverTime
+          };
 
-            const successRecord = {
-              type: 'fund',
-              status: 'success',
-              credited: true,
-              amount: paidAmount,
-              currency: 'NGN',
-              reference,
-              userId,
-              gateway: 'paystack',
-              updatedAt: serverTime
-            };
-
-            transaction.set(txDoc, successRecord, { merge: true });
-            transaction.set(userTxDoc, successRecord, { merge: true });
-          });
-        }
+          transaction.set(txDoc, successRecord, { merge: true });
+          transaction.set(userTxDoc, successRecord, { merge: true });
+        });
       }
       return Response.json({ success: true, status: 'processed' }, { status: 200 });
     }
@@ -100,9 +107,9 @@ export async function POST(req: Request) {
         const txSnap = await txDoc.get();
         if (txSnap.exists) {
           const userId = txSnap.data().userId;
-          await txDoc.set({ status: 'success', settledAt: serverTime, updatedAt: serverTime }, { merge: true });
+          await txDoc.set({ status: 'completed', settledAt: serverTime, updatedAt: serverTime }, { merge: true });
           if (userId) {
-            await db.doc(`wallets/${userId}/transactions/${reference}`).set({ status: 'success', settledAt: serverTime, updatedAt: serverTime }, { merge: true });
+            await db.doc(`wallets/${userId}/transactions/${reference}`).set({ status: 'completed', settledAt: serverTime, updatedAt: serverTime }, { merge: true });
           }
         }
       }
@@ -118,26 +125,32 @@ export async function POST(req: Request) {
           const txData = txSnap.data();
           const userId = txData.userId;
           const withdrawAmount = Number(txData.amount || 0);
+          const wdCurrency = String(txData.currency || 'NGN').trim().toUpperCase();
+          const sourceWallet = txData.sourceWallet || 'depositWallet';
 
           if (txData.status === 'pending' && !txData.refunded && userId && withdrawAmount > 0) {
-            const walletRef = db.doc(`wallets/${userId}/NGN/depositWallet`);
+            const walletRef = db.doc(`wallets/${userId}/${wdCurrency}/depositWallet`);
             const userRef = db.doc(`users/${userId}`);
 
             await db.runTransaction(async (transaction: any) => {
-              const walletSnap = await transaction.get(walletRef);
-              const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance || walletSnap.data()?.depositWallet || 0) : 0;
-              const refundedBalance = oldBalance + withdrawAmount;
-
-              transaction.set(walletRef, {
-                balance: refundedBalance,
-                depositWallet: refundedBalance,
-                updatedAt: serverTime
-              }, { merge: true });
-
-              transaction.set(userRef, {
-                depositWallet: refundedBalance,
-                updatedAt: serverTime
-              }, { merge: true });
+              if (sourceWallet === 'playerWallet' || sourceWallet === 'cashOutWallet') {
+                const userSnap = await transaction.get(userRef);
+                const oldBal = userSnap.exists ? Number(userSnap.data()?.[sourceWallet] || 0) : 0;
+                transaction.set(userRef, {
+                  [sourceWallet]: oldBal + withdrawAmount,
+                  updatedAt: serverTime
+                }, { merge: true });
+              } else {
+                const walletSnap = await transaction.get(walletRef);
+                const oldBalance = walletSnap.exists ? Number(walletSnap.data()?.balance ?? walletSnap.data()?.depositWallet ?? 0) : 0;
+                const refundedBalance = oldBalance + withdrawAmount;
+                transaction.set(walletRef, {
+                  balance: refundedBalance,
+                  depositWallet: refundedBalance,
+                  currency: wdCurrency,
+                  updatedAt: serverTime
+                }, { merge: true });
+              }
 
               const failRecord = {
                 status: 'failed',

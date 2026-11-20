@@ -44,7 +44,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
-import { db, auth, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment } from '../firebase';
+import { db, auth, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment, runTransaction, serverTimestamp } from '../firebase';
 import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
 import { resolveBankAccount } from '../utils/bankVerification';
 import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
@@ -57,6 +57,15 @@ import { OpayDeposit } from './OpayDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
 import { useCurrency } from '../lib/CurrencyContext';
+import {
+  ACTIVE_WALLET_CURRENCIES,
+  FUTURE_WALLET_CURRENCIES,
+  formatCurrencyAmount,
+  getMinDepositForCurrency,
+  getWalletCurrencyMeta,
+  isDisabledFutureCurrency,
+  normalizeCurrencyCode
+} from '../constants/walletCurrencies';
 
 interface UserWalletProps {
   user: UserProfile;
@@ -106,7 +115,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [withdrawSource, setWithdrawSource] = useState<'cashOutWallet' | 'playerWallet'>('playerWallet');
+  const [depositCurrency, setDepositCurrency] = useState<string>(() => {
+    const c = normalizeCurrencyCode(selectedCurrency?.code || 'NGN');
+    return isDisabledFutureCurrency(c) ? 'NGN' : c;
+  });
+  const [withdrawSource, setWithdrawSource] = useState<'depositWallet' | 'cashOutWallet' | 'playerWallet'>('playerWallet');
+  const [withdrawCurrency, setWithdrawCurrency] = useState<string>('NGN');
+  const [payoutGateway, setPayoutGateway] = useState<'paystack' | 'flutterwave'>('paystack');
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapSource, setSwapSource] = useState<'playerWallet' | 'cashOutWallet' | 'usd_balance' | 'eur_balance' | 'gbp_balance'>('playerWallet');
   const [swapAmount, setSwapAmount] = useState('');
@@ -155,8 +170,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     localStorage.setItem('efado_payment_shield', shieldActive.toString());
   }, [shieldActive]);
 
-  // Paystack Withdraw States & Bank Directory
+  // Paystack & Flutterwave Withdraw States & Bank Directories
   const [paystackBanks, setPaystackBanks] = useState<{ name: string; code: string }[]>([]);
+  const [flutterwaveBanks, setFlutterwaveBanks] = useState<{ name: string; code: string }[]>([]);
   const [isLoadingBanks, setIsLoadingBanks] = useState(false);
   const [selectedBankCode, setSelectedBankCode] = useState((user as any).routingNumber || '');
   const [accountNumberInput, setAccountNumberInput] = useState(user.accountNumber || '');
@@ -165,6 +181,19 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [withdrawStatusMessage, setWithdrawStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isExecutingWithdraw, setIsExecutingWithdraw] = useState(false);
+
+  const activeBankDirectory =
+    payoutGateway === 'paystack'
+      ? (paystackBanks.length > 0 ? paystackBanks : FLUTTERWAVE_BANKS.map(b => ({ code: b.code, name: b.name })))
+      : (flutterwaveBanks.length > 0 ? flutterwaveBanks : FLUTTERWAVE_BANKS.map(b => ({ code: b.code, name: b.name })));
+
+  const activeWithdrawCurrency = withdrawSource === 'depositWallet' ? normalizeCurrencyCode(withdrawCurrency) : 'NGN';
+  const availableWithdrawBalance =
+    withdrawSource === 'playerWallet'
+      ? (user.playerWallet || 0)
+      : withdrawSource === 'cashOutWallet'
+        ? (user.cashOutWallet || 0)
+        : (user.walletPockets?.[activeWithdrawCurrency] ?? (activeWithdrawCurrency === 'NGN' ? (user.depositWallet || 0) : 0));
 
   useEffect(() => {
     let isMounted = true;
@@ -178,15 +207,27 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           ]);
         }
         const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
-        const res = await fetch('/api/paystack/banks', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
-        const data = await res.json().catch(() => null);
-        if (isMounted && data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
-          setPaystackBanks(data.banks);
+        const [psRes, flwRes] = await Promise.allSettled([
+          fetch('/api/paystack/banks', {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          }),
+          fetch('/api/payments/banks?country=NG')
+        ]);
+
+        if (isMounted && psRes.status === 'fulfilled') {
+          const data = await psRes.value.json().catch(() => null);
+          if (data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
+            setPaystackBanks(data.banks);
+          }
+        }
+        if (isMounted && flwRes.status === 'fulfilled') {
+          const data = await flwRes.value.json().catch(() => null);
+          if (data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
+            setFlutterwaveBanks(data.banks);
+          }
         }
       } catch (err) {
-        console.warn('Paystack banks fetch error:', err);
+        console.warn('Banks directory fetch error:', err);
       } finally {
         if (isMounted) setIsLoadingBanks(false);
       }
@@ -195,13 +236,15 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     return () => { isMounted = false; };
   }, []);
 
+  // Works EVEN IF wallet balance is 0.00; enforces strict 10s timeout & clear error reporting
   const handleVerifyAccount = async () => {
     if (!selectedBankCode) {
       setVerificationError('Please select your destination bank from the dropdown.');
       return;
     }
-    if (!accountNumberInput || accountNumberInput.length !== 10) {
-      setVerificationError('Account number must be exactly 10 digits.');
+    const cleanAcc = accountNumberInput.replace(/\D/g, '');
+    if (!cleanAcc || cleanAcc.length !== 10) {
+      setVerificationError('Invalid account number: must be exactly 10 digits.');
       return;
     }
 
@@ -210,74 +253,88 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     setVerifiedAccountName(null);
 
     try {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
-      const res = await fetch('/api/paystack/verify-account', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          account_number: accountNumberInput,
-          bank_code: selectedBankCode
-        })
-      });
+      const selectedBankObj = activeBankDirectory.find((b) => b.code === selectedBankCode);
+      const bankLabel = selectedBankObj?.name || accountDetails.bankName || '';
+      const result = await resolveBankAccount(cleanAcc, selectedBankCode, bankLabel, payoutGateway);
 
-      const data = await res.json();
-      if (res.ok && data.success && data.account_name) {
-        setVerifiedAccountName(data.account_name);
+      if (result.success && result.accountName) {
+        setVerifiedAccountName(result.accountName);
         setAccountDetails(prev => ({
           ...prev,
-          accountNumber: accountNumberInput,
+          accountNumber: cleanAcc,
           routingNumber: selectedBankCode,
-          accountName: data.account_name
+          bankName: bankLabel || prev.bankName,
+          accountName: result.accountName!
         }));
         setVerificationError(null);
       } else {
-        console.error('Paystack verify account error:', data);
-        const rawErr = data?.error;
-        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
-        const message = errStr || data?.message || 'Account number not found. Check number and bank and try again.';
         setVerifiedAccountName(null);
-        setVerificationError(message);
+        setVerificationError(result.message || 'Invalid account number or wrong bank selected.');
       }
     } catch (err: any) {
-      console.error('Paystack verify account error:', err);
+      console.error('Verify account error:', err);
       setVerifiedAccountName(null);
-      const message = (typeof err?.message === 'string' ? err.message : null) || 'Bank verification service unavailable. Please check details and try again.';
-      setVerificationError(message);
+      setVerificationError(
+        (typeof err?.message === 'string' && err.message) ||
+          'Bank not responding. Please check details and try again.'
+      );
     } finally {
       setIsVerifyingAccount(false);
     }
   };
 
   const handleConfirmWithdraw = async () => {
-    const numAmount = Number(amount);
-    const availableBalance = withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
-
-    if (!numAmount || isNaN(numAmount) || numAmount < 100) {
-      setWithdrawStatusMessage({ text: 'Minimum withdrawal amount is ₦100', type: 'error' });
-      return;
-    }
-    if (numAmount > 1000000) {
-      setWithdrawStatusMessage({ text: 'Maximum withdrawal amount is ₦1,000,000 per transaction', type: 'error' });
-      return;
-    }
-    if (numAmount > availableBalance) {
-      setWithdrawStatusMessage({ text: 'Insufficient wallet balance', type: 'error' });
-      return;
-    }
     if (!verifiedAccountName) {
-      setWithdrawStatusMessage({ text: 'Please verify destination bank account before withdrawing', type: 'error' });
+      setWithdrawStatusMessage({ text: 'Step 1 required: Verify destination bank account first.', type: 'error' });
+      return;
+    }
+
+    if (isDisabledFutureCurrency(activeWithdrawCurrency)) {
+      setWithdrawStatusMessage({ text: 'SIRA currency is Coming Soon and disabled for withdrawals.', type: 'error' });
+      return;
+    }
+
+    const numAmount = Number(amount);
+    const minWithdraw = activeWithdrawCurrency === 'NGN' ? 100 : getMinDepositForCurrency(activeWithdrawCurrency);
+
+    if (!numAmount || isNaN(numAmount) || numAmount < minWithdraw) {
+      setWithdrawStatusMessage({
+        text: `Minimum withdrawal amount is ${formatCurrencyAmount(minWithdraw, activeWithdrawCurrency)}`,
+        type: 'error'
+      });
+      return;
+    }
+    if (numAmount > 10000000) {
+      setWithdrawStatusMessage({
+        text: `Maximum withdrawal amount is ${formatCurrencyAmount(10000000, activeWithdrawCurrency)} per transaction`,
+        type: 'error'
+      });
+      return;
+    }
+    if (numAmount > availableWithdrawBalance) {
+      setWithdrawStatusMessage({
+        text: `INSUFFICIENT FUNDS in selected wallet (Available: ${formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)})`,
+        type: 'error'
+      });
       return;
     }
 
     setIsExecutingWithdraw(true);
     setWithdrawStatusMessage(null);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
     try {
-      const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
-      const res = await fetch('/api/paystack/withdraw', {
+      const token = auth.currentUser
+        ? await auth.currentUser.getIdToken()
+        : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
+      if (!token) {
+        throw new Error('Authentication session required. Please sign in again.');
+      }
+
+      const endpoint = payoutGateway === 'paystack' ? '/api/paystack/withdraw' : '/api/payments/withdraw';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -285,30 +342,23 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         },
         body: JSON.stringify({
           amount: numAmount,
+          currency: activeWithdrawCurrency,
           account_number: accountNumberInput,
           bank_code: selectedBankCode,
           account_name: verifiedAccountName,
           source_wallet: withdrawSource
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(timer);
 
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.success) {
         setWithdrawStatusMessage({
-          text: `✅ ${data.message || 'Withdrawal processing, you will receive in bank shortly'}`,
+          text: `✅ ${data.message || 'Withdrawal processing, you will receive funds in your bank shortly.'}`,
           type: 'success'
         });
-
-        if (!data.debitedOnServer) {
-          await onUpdateBalance(numAmount, 'withdrawal', {
-            accountNumber: accountNumberInput,
-            bankCode: selectedBankCode,
-            accountName: verifiedAccountName,
-            bankName: accountDetails.bankName,
-            sourceWallet: withdrawSource
-          });
-        }
 
         const txReference = data.reference || `WD-${Date.now()}`;
         const newTx: Transaction = {
@@ -316,11 +366,11 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           userId: user.uid,
           type: 'withdrawal',
           amount: numAmount,
-          currency: 'NGN',
+          currency: activeWithdrawCurrency,
           status: 'pending',
-          method: 'Paystack Bank Transfer',
+          method: payoutGateway === 'paystack' ? 'Paystack Bank Transfer' : 'Flutterwave Bank Transfer',
           hub: 'WALLET',
-          purpose: 'Paystack Cash Out',
+          purpose: `${payoutGateway === 'paystack' ? 'Paystack' : 'Flutterwave'} Cash Out (${activeWithdrawCurrency})`,
           reference: txReference,
           timestamp: new Date()
         };
@@ -330,18 +380,22 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         setAmount('');
         setVerifiedAccountName(null);
       } else {
-        console.error('Paystack withdraw error:', data);
+        console.error(`${payoutGateway} withdraw error:`, data);
         const rawErr = data?.error;
-        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
-        const message = errStr || data?.message || 'Withdrawal failed, please try again';
+        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' && rawErr ? JSON.stringify(rawErr) : null));
+        const message = errStr || data?.message || 'Withdrawal failed, please try again.';
         setWithdrawStatusMessage({
           text: `❌ ${message}`,
           type: 'error'
         });
       }
     } catch (err: any) {
-      console.error('Paystack withdraw error:', err);
-      const message = (typeof err?.message === 'string' ? err.message : null) || 'Please try again later';
+      clearTimeout(timer);
+      console.error(`${payoutGateway} withdraw error:`, err);
+      const message =
+        err?.name === 'AbortError'
+          ? 'Payout request timed out after 15 seconds. Please check history before retrying.'
+          : (typeof err?.message === 'string' ? err.message : null) || 'Withdrawal service error. Please try again.';
       setWithdrawStatusMessage({
         text: `❌ ${message}`,
         type: 'error'
@@ -646,40 +700,66 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
     setIsProcessing(true);
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        [swapSource]: increment(-amtToConvert),
-        depositWallet: increment(creditedNaira)
-      });
-
       const reference = `SWAP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-      const txId = await TransactionService.recordTransaction({
-        userId: user.uid,
-        type: 'deposit',
-        amount: creditedNaira,
-        currency: 'NGN',
-        status: 'completed',
-        method: 'Internal Sovereign Swap',
-        hub: 'WALLET',
-        purpose: 'Currency Swap to Stakes',
-        reference,
-        description: `Swapped ${sourceSymbol}${amtToConvert.toLocaleString()} from ${label} to ₦${creditedNaira.toLocaleString()} Deposit Stakes`,
-        skipWalletUpdate: true
+      await runTransaction(db, async (tx) => {
+        const userRef = doc(db, 'users', user.uid);
+        const ngnPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+        const txRef = doc(db, 'transactions', reference);
+
+        const [uSnap, pSnap] = await Promise.all([tx.get(userRef), tx.get(ngnPocketRef)]);
+        const uBal = uSnap.exists() ? Number(uSnap.data()?.[swapSource] || 0) : 0;
+        if (uBal < amtToConvert) {
+          throw new Error(`INSUFFICIENT FUNDS in ${label}`);
+        }
+        const curNgn = pSnap.exists()
+          ? Number(pSnap.data()?.balance ?? pSnap.data()?.depositWallet ?? 0) || 0
+          : 0;
+        const nextNgn = curNgn + creditedNaira;
+
+        tx.update(userRef, {
+          [swapSource]: increment(-amtToConvert)
+        });
+        tx.set(
+          ngnPocketRef,
+          {
+            balance: nextNgn,
+            depositWallet: nextNgn,
+            currency: 'NGN',
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+        tx.set(txRef, {
+          userId: user.uid,
+          type: 'deposit',
+          amount: creditedNaira,
+          currency: 'NGN',
+          status: 'completed',
+          credited: true,
+          creditedPocket: `wallets/${user.uid}/NGN/depositWallet`,
+          method: 'Internal Sovereign Swap',
+          hub: 'WALLET',
+          purpose: 'Currency Swap to Stakes',
+          reference,
+          description: `Swapped ${sourceSymbol}${amtToConvert.toLocaleString()} from ${label} to ₦${creditedNaira.toLocaleString()} Deposit Stakes`,
+          timestamp: serverTimestamp()
+        });
       });
 
       setNotifications(prev => [...prev, {
         id: Date.now().toString(),
-        message: `Successfully swapped ${sourceSymbol}${amtToConvert.toLocaleString()} into ₦${creditedNaira.toLocaleString()} Deposit Stakes!`,
+        message: `Successfully swapped ${sourceSymbol}${amtToConvert.toLocaleString()} into ₦${creditedNaira.toLocaleString()} NGN Deposit Stakes!`,
         type: 'info'
       }]);
 
       setShowSwapModal(false);
       setSwapAmount('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Swap failed', error);
       setNotifications(prev => [...prev, {
         id: Date.now().toString(),
-        message: 'Failed to complete swap. Please try again.',
+        message: error?.message || 'Failed to complete swap. Please try again.',
         type: 'warning'
       }]);
     } finally {
@@ -782,12 +862,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       let txId = '';
       const reference = `EFD-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
 
-      const activeCurrencyCode = selectedCurrency?.code || 'NGN';
-      const activeCurrencySymbol = selectedCurrency?.symbol || '₦';
+      const activeCurrencyCode = isDisabledFutureCurrency(selectedCurrency?.code)
+        ? 'NGN'
+        : normalizeCurrencyCode(selectedCurrency?.code || 'NGN');
+      const activeCurrencySymbol = getWalletCurrencyMeta(activeCurrencyCode).symbol;
 
       if (type === 'deposit') {
         const isManualDep = !['Direct Wallet', 'player_wallet', 'mining_wallet'].includes(selectedMethod);
-        await onUpdateBalance(actionAmount, 'deposit');
         txId = await TransactionService.recordTransaction({
           userId: user.uid,
           type: 'deposit',
@@ -798,10 +879,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           hub: 'WALLET',
           purpose: 'Wallet Top-up',
           reference,
-          description: isManualDep 
+          description: isManualDep
             ? `Verification Pending: Sender [${accountDetails.bankName || 'Unknown Bank'} / ${accountDetails.accountNumber || 'N/A'} / ${accountDetails.accountName || 'N/A'}]`
             : 'Wallet Deposit',
-          skipWalletUpdate: true,
           metadata: {
             senderBankName: accountDetails.bankName,
             senderAccountNumber: accountDetails.accountNumber,
@@ -810,22 +890,23 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           }
         });
       } else {
-        await onUpdateBalance(actionAmount, 'withdrawal', {
-          ...accountDetails,
-          sourceWallet: withdrawSource
-        });
         txId = await TransactionService.recordTransaction({
           userId: user.uid,
           type: 'withdrawal',
           amount: actionAmount,
-          currency: activeCurrencyCode,
+          currency: activeWithdrawCurrency,
           status: 'pending',
           method: selectedMethod || 'Bank Transfer',
           hub: 'WALLET',
           purpose: 'Cash Out Request',
           reference,
           description: `Withdrawal Request to ${accountDetails.bankName || 'Bank'} (${accountDetails.accountNumber || ''})`,
-          skipWalletUpdate: true
+          metadata: {
+            sourceWallet: withdrawSource,
+            accountNumber: accountDetails.accountNumber,
+            bankName: accountDetails.bankName,
+            accountName: accountDetails.accountName
+          }
         });
       }
       
@@ -1330,24 +1411,24 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="space-y-3 text-left">
                         <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Combined Sovereign Asset Node</span>
-                          <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Total Account Balance</h4>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Canonical Sovereign Asset Node</span>
+                          <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Total NGN Account Balance</h4>
                         </div>
                         <h3 className="text-3xl md:text-5xl font-black font-display text-white tracking-tight italic">
-                          ₦{(user.depositWallet + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}
+                          ₦{((user.walletPockets?.NGN ?? user.depositWallet ?? 0) + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}
                         </h3>
                         <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
-                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Verified Ledger Clearance
+                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Single Canonical Ledger Active
                         </div>
                       </div>
 
-                      {/* Explicit ledger explaining exactly how Deposit Wallet is integrated */}
+                      {/* Explicit ledger explaining canonical wallet path */}
                       <div className="bg-slate-900/60 border border-white/5 p-5 rounded-2xl space-y-3 min-w-[280px] text-left">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-500/90 block border-b border-white/5 pb-1.5">Asset Ledger Components (Added to Total)</span>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-500/90 block border-b border-white/5 pb-1.5">Asset Ledger Components</span>
                         <div className="space-y-2 text-[11px] font-bold font-mono">
                           <div className="flex justify-between gap-6">
-                            <span className="text-indigo-400">🏦 DEPOSIT / STAKES:</span>
-                            <span className="text-white">₦{user.depositWallet.toLocaleString()}</span>
+                            <span className="text-indigo-400">🏦 DEPOSIT / STAKES (NGN):</span>
+                            <span className="text-white">₦{(user.walletPockets?.NGN ?? user.depositWallet ?? 0).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between gap-6">
                             <span className="text-emerald-400">🏆 GAME WINNINGS:</span>
@@ -1367,9 +1448,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   </div>
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
                     <div>
-                      <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Deposit Wallet</p>
-                      <h3 className="text-2xl font-black text-gray-950">₦{user.depositWallet.toLocaleString()}</h3>
-                      <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay/stakes</p>
+                      <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">NGN Deposit Pocket</p>
+                      <h3 className="text-2xl font-black text-gray-950">₦{(user.walletPockets?.NGN ?? user.depositWallet ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+                      <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay & stakes</p>
                     </div>
                   </div>
                   <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
@@ -1428,174 +1509,132 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   </div>
                 </div>
 
-                {/* Segregated International Sovereign Currency Vaults Section */}
+                {/* All 9 Active Currency Pockets + 1 Future Disabled SIRA Card */}
                 <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 md:p-8 text-white space-y-6 relative overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2">
-                        <Globe className="w-3.5 h-3.5 text-emerald-400" /> Segregated Currency Vaults
+                        <Globe className="w-3.5 h-3.5 text-emerald-400" /> Multi-Currency Wallet Pockets (9 Active + 1 Upcoming)
                       </div>
                       <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">
-                        International Multi-Currency Accounts
+                        Canonical Currency Pockets
                       </h3>
                       <p className="text-xs text-slate-400 font-medium mt-1">
-                        Each currency is maintained in an independent sovereign balance to eliminate currency mixing.
+                        All 9 active currencies live in independent pockets at <span className="font-mono text-indigo-300">wallets/{'{uid}'}/{'{currency}'}/depositWallet</span> — zero currency mixing.
                       </p>
                     </div>
 
                     <button
                       onClick={() => {
-                        setSwapSource('usd_balance');
+                        setSwapSource('playerWallet');
                         setSwapAmount('');
                         setShowSwapModal(true);
                       }}
                       className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30"
                     >
-                      <ArrowRightLeft className="w-3.5 h-3.5" /> Instant Currency Swap
+                      <ArrowRightLeft className="w-3.5 h-3.5" /> Currency Swap
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {/* USD Vault */}
-                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-emerald-500/40 transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-2xl">🇺🇸</span>
-                          <div>
-                            <p className="text-xs font-black text-white">US Dollar Vault</p>
-                            <p className="text-[10px] text-slate-400 font-mono">USD ($)</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {ACTIVE_WALLET_CURRENCIES.map((cur) => {
+                      const pocketBal =
+                        user.walletPockets?.[cur.code] ??
+                        (cur.code === 'NGN' ? (user.depositWallet || 0) : 0);
+                      return (
+                        <div
+                          key={cur.code}
+                          className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-emerald-500/40 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-2xl">{cur.flag}</span>
+                              <div>
+                                <p className="text-xs font-black text-white">{cur.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  {cur.code} ({cur.symbol})
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                              Active
+                            </span>
+                          </div>
+
+                          <div className="space-y-1">
+                            <h4 className="text-2xl font-black text-emerald-400 font-mono">
+                              {formatCurrencyAmount(pocketBal, cur.code)}
+                            </h4>
+                            {cur.note && (
+                              <p className="text-[10px] text-slate-400 font-bold">{cur.note}</p>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDepositCurrency(cur.code);
+                                setActiveTab('deposit');
+                              }}
+                              className="py-2 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-emerald-500/20 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" /> Deposit {cur.code}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setWithdrawSource('depositWallet');
+                                setWithdrawCurrency(cur.code);
+                                setAmount('');
+                                setWithdrawStatusMessage(null);
+                                setActiveTab('withdraw');
+                              }}
+                              className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <ArrowUpCircle className="w-3 h-3 text-indigo-300" /> Withdraw
+                            </button>
                           </div>
                         </div>
-                        <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                          1 USD ≈ ₦1,500
-                        </span>
-                      </div>
+                      );
+                    })}
 
-                      <div className="space-y-1">
-                        <h4 className="text-2xl font-black text-emerald-400 font-mono">
-                          ${(user.usd_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-bold">
-                          ≈ ₦{((user.usd_balance || 0) * 1500).toLocaleString()} Naira Stakes
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
-                        <button
-                          onClick={() => {
-                            setCurrency('USD');
-                            setActiveTab('deposit');
-                          }}
-                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
-                        >
-                          <Plus className="w-3 h-3 text-emerald-400" /> Deposit $
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSwapSource('usd_balance');
-                            setSwapAmount('');
-                            setShowSwapModal(true);
-                          }}
-                          className="py-2 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-emerald-500/20"
-                        >
-                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* GBP Vault */}
-                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-indigo-500/40 transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-2xl">🇬🇧</span>
-                          <div>
-                            <p className="text-xs font-black text-white">British Pound Vault</p>
-                            <p className="text-[10px] text-slate-400 font-mono">GBP (£)</p>
+                    {/* 1 Future Disabled Currency Card: SIRA (Burkina Faso) */}
+                    {FUTURE_WALLET_CURRENCIES.map((cur) => (
+                      <div
+                        key={cur.code}
+                        aria-disabled="true"
+                        className="bg-slate-800/40 border border-white/5 rounded-2xl p-5 space-y-4 opacity-55 grayscale cursor-not-allowed select-none"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-2xl">{cur.flag}</span>
+                            <div>
+                              <p className="text-xs font-black text-slate-300">{cur.name}</p>
+                              <p className="text-[10px] text-slate-500 font-mono">{cur.code}</p>
+                            </div>
                           </div>
+                          <span className="text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" /> Coming Soon
+                          </span>
                         </div>
-                        <span className="text-[9px] font-black uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">
-                          1 GBP ≈ ₦1,900
-                        </span>
-                      </div>
 
-                      <div className="space-y-1">
-                        <h4 className="text-2xl font-black text-indigo-300 font-mono">
-                          £{(user.gbp_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-bold">
-                          ≈ ₦{((user.gbp_balance || 0) * 1900).toLocaleString()} Naira Stakes
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
-                        <button
-                          onClick={() => {
-                            setCurrency('GBP');
-                            setActiveTab('deposit');
-                          }}
-                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
-                        >
-                          <Plus className="w-3 h-3 text-indigo-400" /> Deposit £
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSwapSource('gbp_balance');
-                            setSwapAmount('');
-                            setShowSwapModal(true);
-                          }}
-                          className="py-2 px-3 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-indigo-500/20"
-                        >
-                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* EUR Vault */}
-                    <div className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-amber-500/40 transition-all">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-2xl">🇪🇺</span>
-                          <div>
-                            <p className="text-xs font-black text-white">Euro Vault</p>
-                            <p className="text-[10px] text-slate-400 font-mono">EUR (€)</p>
-                          </div>
+                        <div className="space-y-1">
+                          <h4 className="text-2xl font-black text-slate-400 font-mono">0.00 SIRA</h4>
+                          <p className="text-[10px] text-slate-400 font-bold">
+                            {cur.note || 'Planned currency — deposits disabled'}
+                          </p>
                         </div>
-                        <span className="text-[9px] font-black uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                          1 EUR ≈ ₦1,620
-                        </span>
-                      </div>
 
-                      <div className="space-y-1">
-                        <h4 className="text-2xl font-black text-amber-300 font-mono">
-                          €{(user.eur_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 font-bold">
-                          ≈ ₦{((user.eur_balance || 0) * 1620).toLocaleString()} Naira Stakes
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
                         <button
-                          onClick={() => {
-                            setCurrency('EUR');
-                            setActiveTab('deposit');
-                          }}
-                          className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1"
+                          type="button"
+                          disabled
+                          className="w-full py-2 px-3 bg-slate-700/50 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-1.5"
                         >
-                          <Plus className="w-3 h-3 text-amber-400" /> Deposit €
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSwapSource('eur_balance');
-                            setSwapAmount('');
-                            setShowSwapModal(true);
-                          }}
-                          className="py-2 px-3 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-amber-500/20"
-                        >
-                          <ArrowRightLeft className="w-3 h-3" /> Swap to ₦
+                          <Lock className="w-3 h-3" /> Coming Soon (Disabled)
                         </button>
                       </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1731,33 +1770,20 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       user={user}
                       defaultAmount={1000}
                       onSuccess={async ({ reference, amount: amt }) => {
-                        try {
-                          await onUpdateBalance(amt, 'deposit');
-                          const txData: any = {
-                            userId: user.uid,
-                            type: 'deposit',
-                            amount: amt,
-                            currency: 'NGN',
-                            status: 'completed',
-                            method: 'OPay Pay-In Gateway',
-                            hub: 'WALLET',
-                            purpose: 'Wallet Top-up',
-                            reference,
-                            description: 'Wallet Top-up via OPay Pay-In Gateway',
-                            skipWalletUpdate: true,
-                            metadata: {
-                              paymentRef: reference,
-                              gateway: 'opay'
-                            }
-                          };
-                          await TransactionService.recordTransaction(txData);
-                          setSelectedReceiptTx({
-                            ...txData,
-                            timestamp: { seconds: Math.floor(Date.now() / 1000) }
-                          });
-                        } catch (err: any) {
-                          console.error("Ledger write error:", err);
-                        }
+                        setSelectedReceiptTx({
+                          id: reference,
+                          userId: user.uid,
+                          type: 'deposit',
+                          amount: amt,
+                          currency: 'NGN',
+                          status: 'completed',
+                          method: 'OPay Pay-In Gateway',
+                          hub: 'WALLET',
+                          purpose: 'Wallet Top-up',
+                          reference,
+                          description: 'Wallet Top-up via OPay Pay-In Gateway',
+                          timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
+                        });
                       }}
                     />
                   ) : depositMethod === 'paystack' ? (
@@ -1767,47 +1793,31 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         <div>
                           <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase">PAYSTACK SECURE AUTOMATED GATEWAY</span>
                           <p className="text-[11px] text-emerald-950 font-bold uppercase leading-normal mt-0.5">
-                            Real-time Paystack processing with Debit Card, Bank Transfer, USSD & Bank Account. Instant wallet credit upon checkout.
+                            Atomic server verification — history & pocket balance update together on confirmed payment.
                           </p>
                         </div>
                       </div>
-                      
-                      <PaystackDeposit 
-                        user={user} 
+
+                      <PaystackDeposit
+                        user={user}
                         defaultAmount={1000}
-                        onSuccess={async ({ reference, amount: amt, alreadyCreditedByServer }) => {
-                          try {
-                            const txData: any = {
-                              userId: user.uid,
-                              type: 'deposit',
-                              amount: amt,
-                              currency: 'NGN',
-                              status: 'completed',
-                              method: 'Paystack Card/USSD/Transfer',
-                              hub: 'WALLET',
-                              purpose: 'Wallet Top-up',
-                              reference,
-                              description: 'Wallet Top-up via Paystack Inline Gateway',
-                              skipWalletUpdate: true,
-                              metadata: {
-                                paymentRef: reference,
-                                gateway: 'paystack'
-                              }
-                            };
-
-                            if (!alreadyCreditedByServer) {
-                              await onUpdateBalance(amt, 'deposit');
-                              await TransactionService.recordTransaction(txData);
-                            }
-
-                            setSelectedReceiptTx({
-                              ...txData,
-                              timestamp: { seconds: Math.floor(Date.now() / 1000) }
-                            });
-                          } catch (err: any) {
-                            console.error("Ledger write error:", err);
-                          }
-                        }} 
+                        defaultCurrency={depositCurrency}
+                        onSuccess={async ({ reference, amount: amt, currency: paidCur }) => {
+                          setSelectedReceiptTx({
+                            id: reference,
+                            userId: user.uid,
+                            type: 'deposit',
+                            amount: amt,
+                            currency: paidCur || 'NGN',
+                            status: 'completed',
+                            method: 'Paystack Gateway',
+                            hub: 'WALLET',
+                            purpose: 'Wallet Top-up',
+                            reference,
+                            description: `Wallet Top-up (${paidCur || 'NGN'}) via Paystack`,
+                            timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
+                          });
+                        }}
                       />
                     </div>
                   ) : depositMethod === 'flutterwave' ? (
@@ -1815,49 +1825,33 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       <div className="p-4 bg-indigo-50 border-2 border-indigo-150 rounded-2xl flex gap-3 shadow-sm mb-2">
                         <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-black tracking-widest text-[#4f46e5] uppercase">SOVEREIGN AUTO-DEPOSIT SYSTEM</span>
+                          <span className="text-[10px] font-black tracking-widest text-[#4f46e5] uppercase">FLUTTERWAVE MULTI-CURRENCY GATEWAY</span>
                           <p className="text-[11px] text-indigo-950 font-bold uppercase leading-normal mt-0.5">
-                            Real-time automated payment processing. Funds are credited directly and instantly into your balance upon checkout completion.
+                            Real-time verified settlement into your exact currency pocket (NGN, USD, GBP, EUR, CAD, AUD, GHS, ZAR, XOF).
                           </p>
                         </div>
                       </div>
-                      
-                      <FlutterwaveDeposit 
-                        user={user} 
+
+                      <FlutterwaveDeposit
+                        user={user}
                         defaultAmount={1000}
-                        onSuccess={async ({ reference, amount: amt, alreadyCreditedByServer }) => {
-                          try {
-                            const txData: any = {
-                              userId: user.uid,
-                              type: 'deposit',
-                              amount: amt,
-                              currency: 'NGN',
-                              status: 'completed',
-                              method: 'Flutterwave Card/USSD/Transfer',
-                              hub: 'WALLET',
-                              purpose: 'Wallet Top-up',
-                              reference,
-                              description: 'Wallet Top-up via Flutterwave Inline',
-                              skipWalletUpdate: true,
-                              metadata: {
-                                paymentRef: reference,
-                                gateway: 'flutterwave'
-                              }
-                            };
-
-                            if (!alreadyCreditedByServer) {
-                              await onUpdateBalance(amt, 'deposit');
-                              await TransactionService.recordTransaction(txData);
-                            }
-
-                            setSelectedReceiptTx({
-                              ...txData,
-                              timestamp: { seconds: Math.floor(Date.now() / 1000) }
-                            });
-                          } catch (err: any) {
-                            console.error("Ledger write failed but payment was success:", err);
-                          }
-                        }} 
+                        defaultCurrency={depositCurrency}
+                        onSuccess={async ({ reference, amount: amt, currency: paidCur }) => {
+                          setSelectedReceiptTx({
+                            id: reference,
+                            userId: user.uid,
+                            type: 'deposit',
+                            amount: amt,
+                            currency: paidCur || 'NGN',
+                            status: 'completed',
+                            method: 'Flutterwave Gateway',
+                            hub: 'WALLET',
+                            purpose: 'Wallet Top-up',
+                            reference,
+                            description: `Wallet Top-up (${paidCur || 'NGN'}) via Flutterwave`,
+                            timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
+                          });
+                        }}
                       />
                     </div>
                   ) : depositMethod === 'diaspora' ? (
@@ -2011,99 +2005,47 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="bg-emerald-600 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -translate-y-12 translate-x-12" />
-                      
-                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-4">Select Wallet Source</p>
-                      
-                      <div className="grid grid-cols-2 gap-2 mb-6 pointer-events-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWithdrawSource('cashOutWallet');
-                            setAmount('');
-                          }}
-                          className={`py-3 px-2 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all border ${
-                            withdrawSource === 'cashOutWallet' 
-                              ? 'bg-white text-emerald-900 border-white shadow-md font-sans' 
-                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
-                          }`}
-                        >
-                          Cash Out (₦{(user.cashOutWallet || 0).toLocaleString()})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWithdrawSource('playerWallet');
-                            setAmount('');
-                          }}
-                          className={`py-3 px-2 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all border ${
-                            withdrawSource === 'playerWallet' 
-                              ? 'bg-white text-emerald-950 border-white shadow-md font-sans' 
-                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
-                          }`}
-                        >
-                          Player Wins (₦{user.playerWallet.toLocaleString()})
-                        </button>
-                      </div>
-
-                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] mb-1">
-                        Liquid Balance ({withdrawSource === 'playerWallet' ? "Player Wins" : "Cash Out"})
-                      </p>
-                      <h4 className="text-3xl font-black mb-6 font-display italic tracking-tighter">₦{(withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
-                      
-                      <label className="block text-[11px] font-black text-emerald-100 uppercase tracking-widest mb-2">TYPE WITHDRAWAL AMOUNT (₦)</label>
-                      <div className="relative mb-6">
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-2xl font-black text-white/20 select-none">₦</span>
-                        <input 
-                          type="number"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          placeholder="Type Amount Here..."
-                          className="w-full pl-8 pr-4 bg-transparent border-b-2 border-white/20 py-3 font-display text-2xl font-black text-white focus:outline-none focus:border-white transition-all placeholder:text-white/20 outline-none"
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-4 gap-2">
-                        {[0.25, 0.5, 0.75, 1].map(percent => (
-                          <button 
-                            key={percent}
-                            onClick={() => {
-                              const base = withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
-                              setAmount(Math.floor(base * percent).toString());
-                            }}
-                            className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black tracking-widest transition-all border border-white/10"
-                          >
-                            {percent * 100}%
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-white border border-gray-100 p-6 rounded-3xl shadow-sm">
-                      <div className="flex items-center gap-3 mb-4">
-                        <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest">Withdrawal Protocols</h5>
-                      </div>
-                      <ul className="space-y-3">
-                        {[
-                          'Verified Identity Required',
-                          'Processing Window: Instant / Automated Settlement',
-                          'Standard Liquidity Processing: 1.5% Settlement Fee',
-                          'Secure Encryption Active'
-                        ].map((txt, i) => (
-                          <li key={i} className="flex items-start gap-2 text-[10px] text-gray-950 font-black uppercase tracking-tight">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                            {txt}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
+                  {/* STEP 1: Select Gateway -> Bank -> Enter Account Number -> Resolve Real Account Name (Works even at ₦0) */}
                   <div className="space-y-6">
                     <div className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">
+                          1. PAYOUT GATEWAY (PAYSTACK OR FLUTTERWAVE)
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPayoutGateway('paystack');
+                              setVerifiedAccountName(null);
+                              setVerificationError(null);
+                            }}
+                            className={`py-3 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              payoutGateway === 'paystack'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            Paystack Payout
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPayoutGateway('flutterwave');
+                              setVerifiedAccountName(null);
+                              setVerificationError(null);
+                            }}
+                            className={`py-3 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              payoutGateway === 'flutterwave'
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                            }`}
+                          >
+                            Flutterwave Payout
+                          </button>
+                        </div>
+                      </div>
+
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest">
@@ -2123,8 +2065,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                             onChange={e => {
                               const code = e.target.value;
                               setSelectedBankCode(code);
-                              const bList = paystackBanks.length > 0 ? paystackBanks : globalAndLocalBanks;
-                              const b = bList.find(x => x.code === code);
+                              const b = activeBankDirectory.find(x => x.code === code);
                               setAccountDetails(prev => ({
                                 ...prev,
                                 routingNumber: code,
@@ -2133,13 +2074,13 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                               setVerifiedAccountName(null);
                               setVerificationError(null);
                             }}
-                            className="w-full pl-12 pr-8 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 cursor-pointer appearance-none"
+                            className="w-full pl-12 pr-8 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 cursor-pointer appearance-none"
                           >
                             <option value="">
-                              -- Select Destination Bank ({paystackBanks.length > 0 ? `${paystackBanks.length} Banks` : 'Paystack Directory'}) --
+                              -- Select Destination Bank ({activeBankDirectory.length} Banks) --
                             </option>
-                            {(paystackBanks.length > 0 ? paystackBanks : globalAndLocalBanks).map(b => (
-                              <option key={`ps-bank-${b.code}`} value={b.code}>
+                            {activeBankDirectory.map(b => (
+                              <option key={`${payoutGateway}-bank-${b.code}-${b.name}`} value={b.code}>
                                 {b.name} ({b.code})
                               </option>
                             ))}
@@ -2150,17 +2091,17 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
                       <div>
                         <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">
-                          3. 10-DIGIT ACCOUNT NUMBER
+                          3. ENTER 10-DIGIT ACCOUNT NUMBER
                         </label>
                         <div className="relative">
                           <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                          <input 
+                          <input
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             maxLength={10}
-                            placeholder="Enter 10-Digit NUBAN Number"
-                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-400 text-gray-900"
+                            placeholder="Enter 10-Digit Account Number"
+                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-400 text-gray-900"
                             value={accountNumberInput}
                             onChange={e => {
                               const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -2173,7 +2114,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         </div>
                       </div>
 
-                      {/* Verify Account Button */}
+                      {/* Verify Account Button — Explicitly ENABLED even if wallet balance is ₦0.00 */}
                       <button
                         type="button"
                         onClick={handleVerifyAccount}
@@ -2183,37 +2124,34 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         {isVerifyingAccount ? (
                           <>
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Verifying Account with Bank...</span>
+                            <span>Verifying Account (max 10s)...</span>
                           </>
                         ) : (
                           <>
                             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                            <span>Verify Account</span>
+                            <span>4. Verify Bank Account</span>
                           </>
                         )}
                       </button>
 
                       {/* Verified Account Name in Green */}
                       {verifiedAccountName && (
-                        <div className="p-4 bg-emerald-950/40 border-2 border-emerald-500/60 rounded-2xl flex items-center gap-2.5 text-emerald-300 font-black text-xs uppercase tracking-wider animate-in fade-in">
+                        <div className="p-4 bg-emerald-950/90 border-2 border-emerald-500 rounded-2xl flex items-center gap-2.5 text-emerald-300 font-black text-xs uppercase tracking-wider animate-in fade-in">
                           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                          <span>✅ Account Name: {verifiedAccountName}</span>
+                          <span>✅ Verified Account Name: {verifiedAccountName}</span>
                         </div>
                       )}
 
-                      {/* Verification Error in Red */}
+                      {/* Clear Verification Error in Red */}
                       {verificationError && (
-                        <div className="p-4 bg-rose-950/40 border border-rose-500/60 rounded-2xl flex items-center gap-2.5 text-rose-300 font-bold text-xs animate-in fade-in">
+                        <div className="p-4 bg-rose-950/90 border border-rose-500 rounded-2xl flex items-center gap-2.5 text-rose-200 font-bold text-xs animate-in fade-in">
                           <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
                           <span>❌ {verificationError}</span>
                         </div>
                       )}
 
-                      {/* Dynamic Beneficiary Preview Card */}
+                      {/* Beneficiary Preview Card */}
                       <div className="p-6 bg-slate-900 text-white rounded-[2rem] border border-white/10 relative overflow-hidden shadow-2xl space-y-4">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/10 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none" />
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl -ml-6 -mb-6 pointer-events-none" />
-
                         <div className="flex justify-between items-center pb-2 border-b border-white/5">
                           <div className="flex items-center gap-1.5">
                             <Building2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -2228,15 +2166,15 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK OF SETTLEMENT</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK</span>
                             <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
                               {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SELECTED</span>}
                             </p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK CODE</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">GATEWAY</span>
                             <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
-                              {selectedBankCode || <span className="text-slate-500">NO CODE</span>}
+                              {payoutGateway.toUpperCase()}
                             </p>
                           </div>
                           <div className="space-y-0.5">
@@ -2246,12 +2184,10 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                             </p>
                           </div>
                           <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY NAME</span>
+                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">REAL ACCOUNT NAME</span>
                             <p className="text-[10px] font-black uppercase tracking-wider truncate">
                               {verifiedAccountName ? (
-                                <span className="text-emerald-400 font-extrabold flex items-center gap-1 text-[10.5px]">
-                                  {verifiedAccountName} ✓
-                                </span>
+                                <span className="text-emerald-400 font-extrabold">{verifiedAccountName} ✓</span>
                               ) : (
                                 <span className="text-amber-400 italic font-medium">PENDING VERIFY</span>
                               )}
@@ -2259,50 +2195,185 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                           </div>
                         </div>
                       </div>
+                    </div>
+                  </div>
 
-                      {/* Withdrawal Processing Status Message */}
-                      {withdrawStatusMessage && (
-                        <div className={`p-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
-                          withdrawStatusMessage.type === 'success' ? 'bg-emerald-950/50 text-emerald-300 border border-emerald-500/60' : 'bg-rose-950/50 text-rose-300 border border-rose-500/60'
-                        }`}>
-                          <span>{withdrawStatusMessage.text}</span>
+                  {/* STEP 2: Check Source Balance -> Enter Amount -> Check INSUFFICIENT FUNDS -> Confirm Withdraw */}
+                  <div className="space-y-6">
+                    <div className="bg-emerald-600 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -translate-y-12 translate-x-12" />
+
+                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.25em] mb-3">
+                        5. SELECT SOURCE POCKET & CHECK BALANCE
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-2 mb-4 pointer-events-auto">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawSource('playerWallet');
+                            setAmount('');
+                            setWithdrawStatusMessage(null);
+                          }}
+                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
+                            withdrawSource === 'playerWallet'
+                              ? 'bg-white text-emerald-950 border-white shadow-md'
+                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
+                          }`}
+                        >
+                          Wins (₦{user.playerWallet.toLocaleString()})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawSource('cashOutWallet');
+                            setAmount('');
+                            setWithdrawStatusMessage(null);
+                          }}
+                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
+                            withdrawSource === 'cashOutWallet'
+                              ? 'bg-white text-emerald-900 border-white shadow-md'
+                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
+                          }`}
+                        >
+                          CashOut (₦{(user.cashOutWallet || 0).toLocaleString()})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawSource('depositWallet');
+                            setAmount('');
+                            setWithdrawStatusMessage(null);
+                          }}
+                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
+                            withdrawSource === 'depositWallet'
+                              ? 'bg-white text-emerald-950 border-white shadow-md'
+                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
+                          }`}
+                        >
+                          Deposit Pocket
+                        </button>
+                      </div>
+
+                      {withdrawSource === 'depositWallet' && (
+                        <div className="mb-4">
+                          <label className="text-[9px] font-black text-emerald-100 uppercase tracking-widest block mb-1.5">
+                            Pocket Currency
+                          </label>
+                          <select
+                            value={withdrawCurrency}
+                            onChange={(e) => {
+                              setWithdrawCurrency(e.target.value);
+                              setWithdrawStatusMessage(null);
+                            }}
+                            className="w-full px-3 py-2.5 bg-emerald-800/70 border border-white/20 rounded-xl text-xs font-black text-white focus:outline-none"
+                          >
+                            {ACTIVE_WALLET_CURRENCIES.map((c) => (
+                              <option key={c.code} value={c.code} className="text-slate-900">
+                                {c.flag} {c.code} — {formatCurrencyAmount(user.walletPockets?.[c.code] ?? (c.code === 'NGN' ? (user.depositWallet || 0) : 0), c.code)}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       )}
+
+                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.25em] mb-1">
+                        Available Balance ({activeWithdrawCurrency})
+                      </p>
+                      <h4 className="text-3xl font-black mb-5 font-display italic tracking-tighter">
+                        {formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)}
+                      </h4>
+
+                      <label className="block text-[11px] font-black text-emerald-100 uppercase tracking-widest mb-2">
+                        6. WITHDRAWAL AMOUNT ({activeWithdrawCurrency})
+                      </label>
+                      <div className="relative mb-4">
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl font-black text-white/40 select-none">
+                          {getWalletCurrencyMeta(activeWithdrawCurrency).symbol}
+                        </span>
+                        <input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => {
+                            setAmount(e.target.value);
+                            setWithdrawStatusMessage(null);
+                          }}
+                          placeholder="Type Amount Here..."
+                          className="w-full pl-12 pr-4 bg-transparent border-b-2 border-white/20 py-3 font-display text-2xl font-black text-white focus:outline-none focus:border-white transition-all placeholder:text-white/20 outline-none"
+                        />
+                      </div>
+
+                      {Number(amount) > availableWithdrawBalance && (
+                        <div className="mb-4 p-3 bg-rose-950/90 border border-rose-400 rounded-xl flex items-center gap-2 text-rose-100 text-xs font-black uppercase tracking-wider">
+                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <span>
+                            INSUFFICIENT FUNDS — Available: {formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-4 gap-2">
+                        {[0.25, 0.5, 0.75, 1].map(percent => (
+                          <button
+                            key={percent}
+                            type="button"
+                            onClick={() => {
+                              setAmount(Math.floor(availableWithdrawBalance * percent).toString());
+                              setWithdrawStatusMessage(null);
+                            }}
+                            className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black tracking-widest transition-all border border-white/10"
+                          >
+                            {percent * 100}%
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Confirm Withdraw Button - Green when verified, grey when disabled */}
-                    <button 
+                    {withdrawStatusMessage && (
+                      <div className={`p-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+                        withdrawStatusMessage.type === 'success' ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-500' : 'bg-rose-950/90 text-rose-200 border border-rose-500'
+                      }`}>
+                        <span>{withdrawStatusMessage.text}</span>
+                      </div>
+                    )}
+
+                    {/* Confirm Withdraw Button */}
+                    <button
                       type="button"
                       onClick={handleConfirmWithdraw}
                       disabled={
-                        isExecutingWithdraw || 
-                        !verifiedAccountName || 
-                        !amount || 
-                        Number(amount) < 100 || 
-                        Number(amount) > (withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0))
+                        isExecutingWithdraw ||
+                        !verifiedAccountName ||
+                        !amount ||
+                        Number(amount) <= 0 ||
+                        Number(amount) > availableWithdrawBalance
                       }
                       className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl transition-all flex items-center justify-center gap-3 ${
-                        verifiedAccountName && Number(amount) >= 100 && Number(amount) <= (withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0))
+                        verifiedAccountName && Number(amount) > 0 && Number(amount) <= availableWithdrawBalance
                           ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40 cursor-pointer active:scale-95'
-                          : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50'
+                          : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
                       }`}
                     >
                       {isExecutingWithdraw ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Initiating Paystack Transfer...</span>
+                          <span>Processing {payoutGateway.toUpperCase()} Transfer...</span>
                         </>
                       ) : (
                         <>
                           <Banknote className="w-5 h-5" />
-                          <span>Confirm Withdraw {amount ? `₦${Number(amount).toLocaleString()}` : ''}</span>
+                          <span>
+                            Confirm Withdraw {amount ? formatCurrencyAmount(Number(amount), activeWithdrawCurrency) : ''}
+                          </span>
                         </>
                       )}
                     </button>
-                    
+
                     <div className="flex items-center justify-center gap-2">
                       <Lock className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">End-to-End Encryption Enabled • Paystack Payout Gateway</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Authenticated Bearer Payout • {payoutGateway.toUpperCase()} Live Settlement
+                      </span>
                     </div>
                   </div>
                 </div>

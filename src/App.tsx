@@ -136,6 +136,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CurrencyProvider, useCurrency } from './lib/CurrencyContext';
 import { CurrencySelector } from './components/CurrencySelector';
 import { TextSizeSelector } from './components/TextSizeSelector';
+import {
+  ACTIVE_WALLET_CURRENCIES,
+  formatCurrencyAmount,
+  isDisabledFutureCurrency,
+  normalizeCurrencyCode
+} from './constants/walletCurrencies';
 
 enum OperationType {
   CREATE = 'create',
@@ -566,12 +572,15 @@ function AppContent() {
   };
 
   const handleStakeDeduction = async (amount: number, gameId: string) => {
-    if (!user || user.depositWallet < amount) return;
+    const ngnBal = user?.walletPockets?.NGN ?? user?.depositWallet ?? 0;
+    if (!user || ngnBal < amount) return;
 
     if (DEVELOPMENT_MODE) {
+      const nextNgn = ngnBal - amount;
       setUser({
         ...user,
-        depositWallet: user.depositWallet - amount
+        depositWallet: nextNgn,
+        walletPockets: { ...(user.walletPockets || {}), NGN: nextNgn }
       });
       if (adminStats) {
         setAdminStats({
@@ -590,9 +599,17 @@ function AppContent() {
 
     try {
       await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', user.uid);
+        const walletPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
         const adminRef = doc(db, 'adminStats', 'global');
-        
+
+        const pocketSnap = await transaction.get(walletPocketRef);
+        const curBal = pocketSnap.exists()
+          ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+          : 0;
+        if (curBal < amount) {
+          throw new Error('INSUFFICIENT FUNDS in NGN Deposit Pocket');
+        }
+
         let stats: AdminStats | null = null;
         try {
           const statsSnap = await transaction.get(adminRef);
@@ -601,9 +618,14 @@ function AppContent() {
           // Non-fatal
         }
 
-        transaction.update(userRef, {
-          depositWallet: increment(-amount)
-        });
+        const nextBal = curBal - amount;
+        transaction.set(walletPocketRef, {
+          balance: nextBal,
+          depositWallet: nextBal,
+          currency: 'NGN',
+          userId: user.uid,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
 
         if (stats) {
           transaction.update(adminRef, {
@@ -618,18 +640,8 @@ function AppContent() {
         }
       });
     } catch (e) {
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, {
-          depositWallet: increment(-amount)
-        });
-      } catch (userErr) {
-        handleFirestoreError(userErr, OperationType.WRITE, 'stake_deduction_user');
-      }
-      setUser(prev => prev ? ({
-        ...prev,
-        depositWallet: Math.max(0, (prev.depositWallet || 0) - amount)
-      }) : null);
+      handleFirestoreError(e, OperationType.WRITE, 'stake_deduction_pocket');
+      throw e;
     }
   };
 
@@ -923,6 +935,7 @@ function AppContent() {
     let unsubAnn: (() => void) | null = null;
     let unsubAdmin: (() => void) | null = null;
     let unsubAds: (() => void) | null = null;
+    let unsubPockets: (() => void)[] = [];
 
     const cleanupFirestore = () => {
       if (unsubUser) { unsubUser(); unsubUser = null; }
@@ -930,6 +943,10 @@ function AppContent() {
       if (unsubAnn) { unsubAnn(); unsubAnn = null; }
       if (unsubAdmin) { unsubAdmin(); unsubAdmin = null; }
       if (unsubAds) { unsubAds(); unsubAds = null; }
+      if (unsubPockets.length > 0) {
+        unsubPockets.forEach((u) => { try { u(); } catch {} });
+        unsubPockets = [];
+      }
     };
 
     const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
@@ -943,11 +960,45 @@ function AppContent() {
         localStorage.setItem('efado_user_session_exists', 'true');
 
         const userRef = doc(db, 'users', firebaseUser.uid);
+        const livePockets: Record<string, number> = {};
+        ACTIVE_WALLET_CURRENCIES.forEach((c) => {
+          livePockets[c.code] = 0;
+        });
+
+        // Subscribe to all 9 canonical currency pockets: wallets/{uid}/{currency}/depositWallet
+        unsubPockets = ACTIVE_WALLET_CURRENCIES.map((cur) =>
+          onSnapshot(
+            doc(db, 'wallets', firebaseUser.uid, cur.code, 'depositWallet'),
+            (snap) => {
+              const bal = snap.exists()
+                ? Number(snap.data()?.balance ?? snap.data()?.depositWallet ?? 0) || 0
+                : 0;
+              livePockets[cur.code] = bal;
+              setUser((prev) => {
+                if (!prev || prev.uid !== firebaseUser.uid) return prev;
+                const nextPockets = { ...(prev.walletPockets || {}), ...livePockets };
+                const merged: UserProfile = {
+                  ...prev,
+                  walletPockets: nextPockets,
+                  depositWallet: nextPockets.NGN ?? 0
+                };
+                localStorage.setItem('efado_cached_user', JSON.stringify(merged));
+                return merged;
+              });
+            },
+            (e) => console.warn(`Pocket snapshot notice (${cur.code}):`, e?.message || e)
+          )
+        );
         
         // Listen for user profile changes
         unsubUser = onSnapshot(userRef, async (snapshot) => {
           if (snapshot.exists()) {
-            const profileData = snapshot.data() as UserProfile;
+            const rawData = snapshot.data() as UserProfile;
+            const profileData: UserProfile = {
+              ...rawData,
+              walletPockets: { ...livePockets },
+              depositWallet: livePockets.NGN ?? 0
+            };
             setUser(profileData);
             localStorage.setItem('efado_cached_user', JSON.stringify(profileData));
           } else {
@@ -958,9 +1009,10 @@ function AppContent() {
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
               photoURL: firebaseUser.photoURL || '',
               playerWallet: 0, // No starting bonus until first deposit
-              depositWallet: 0,
+              depositWallet: livePockets.NGN ?? 0,
               cashOutWallet: 0,
               miningWallet: 0,
+              walletPockets: { ...livePockets },
               miningProgress: { stage: 'E', collectedInStage: 0 },
               role: firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
               createdAt: new Date().toISOString(),
@@ -985,9 +1037,10 @@ function AppContent() {
             displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'EFADO Member',
             photoURL: firebaseUser.photoURL || '',
             playerWallet: 0,
-            depositWallet: 0,
+            depositWallet: livePockets.NGN ?? 0,
             cashOutWallet: 0,
             miningWallet: 0,
+            walletPockets: { ...livePockets },
             miningProgress: { stage: 'E', collectedInStage: 0 },
             role: firebaseUser.email === 'efado226@gmail.com' || firebaseUser.email === 'efadofestus@gmail.com' ? 'admin' : 'player',
             createdAt: new Date().toISOString(),
@@ -1139,8 +1192,10 @@ function AppContent() {
           });
           const data = await res.json().catch(() => null);
 
-          if ((data?.success || data?.status) && (data.data?.status === 'success' || data.already_processed || data.alreadyCredited)) {
-            alert(`✅ PAYSTACK DEPOSIT VERIFIED!\n\nReference: ${reference}\nYour deposit wallet has been successfully credited.`);
+          if ((data?.success || data?.status) && (data.data?.status === 'success' || data.credited || data.already_processed || data.alreadyCredited)) {
+            const cur = data.currency || 'NGN';
+            const amtText = data.amount ? ` (${formatCurrencyAmount(Number(data.amount), cur)})` : '';
+            alert(`✅ PAYSTACK DEPOSIT VERIFIED!\n\nReference: ${reference}${amtText}\nYour ${cur} Deposit Pocket has been credited.`);
           } else {
             console.error('Paystack return verification error:', data);
           }
@@ -1193,7 +1248,9 @@ function AppContent() {
           const data = await res.json().catch(() => null);
 
           if ((data?.success || data?.status) && (data?.verified || data?.credited || data?.data?.status === 'success' || data?.already_processed || data?.alreadyCredited)) {
-            alert(`✅ FLUTTERWAVE PAYMENT VERIFIED!\n\nReference: ${txRef || transactionId}\nStatus: Successful\nYour account/wallet has been credited.`);
+            const cur = data.currency || 'NGN';
+            const amtText = data.amount ? ` (${formatCurrencyAmount(Number(data.amount), cur)})` : '';
+            alert(`✅ FLUTTERWAVE PAYMENT VERIFIED!\n\nReference: ${txRef || transactionId}${amtText}\nYour ${cur} Deposit Pocket has been credited.`);
           } else {
             console.warn('Flutterwave return verification status:', data);
           }
@@ -1794,104 +1851,109 @@ function AppContent() {
     signOut(auth);
   };
 
-  const handleDeposit = async (amount: number) => {
+  const handleDeposit = async (amount: number, currency: string = 'NGN') => {
     if (!user) return;
-    const bonusToApply = !user.hasReceivedSignupBonus ? 100 : 0;
+    const cur = normalizeCurrencyCode(currency);
+    if (isDisabledFutureCurrency(cur)) {
+      throw new Error('SIRA (Burkina Faso) is Coming Soon and not yet in circulation.');
+    }
+    const bonusToApply = !user.hasReceivedSignupBonus && cur === 'NGN' ? 100 : 0;
     if (DEVELOPMENT_MODE) {
+      const curBal = user.walletPockets?.[cur] ?? (cur === 'NGN' ? user.depositWallet : 0);
+      const nextBal = curBal + amount;
       setUser({
         ...user,
-        depositWallet: user.depositWallet + amount,
-        playerWallet: user.playerWallet + amount + bonusToApply,
+        depositWallet: cur === 'NGN' ? nextBal : user.depositWallet,
+        walletPockets: { ...(user.walletPockets || {}), [cur]: nextBal },
+        playerWallet: user.playerWallet + bonusToApply,
         hasReceivedSignupBonus: true
       });
       setTransactions([
-        { id: Math.random().toString(), userId: user.uid, type: 'deposit', amount, status: 'completed', timestamp: { toDate: () => new Date() } as any, currency: 'NGN' },
+        { id: Math.random().toString(), userId: user.uid, type: 'deposit', amount, status: 'completed', timestamp: { toDate: () => new Date() } as any, currency: cur },
         ...transactions
       ]);
       return;
     }
     try {
       await runTransaction(db, async (transaction) => {
+        const walletPocketRef = doc(db, 'wallets', user.uid, cur, 'depositWallet');
         const userRef = doc(db, 'users', user.uid);
         const txRef = doc(collection(db, 'transactions'));
-        
-        transaction.update(userRef, {
-          depositWallet: increment(amount),
-          playerWallet: increment(amount + bonusToApply),
-          hasReceivedSignupBonus: true
-        });
+
+        const pocketSnap = await transaction.get(walletPocketRef);
+        const oldBal = pocketSnap.exists()
+          ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+          : 0;
+        const nextBal = oldBal + amount;
+
+        transaction.set(walletPocketRef, {
+          balance: nextBal,
+          depositWallet: nextBal,
+          currency: cur,
+          userId: user.uid,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        if (bonusToApply > 0) {
+          transaction.update(userRef, {
+            playerWallet: increment(bonusToApply),
+            hasReceivedSignupBonus: true
+          });
+        }
 
         transaction.set(txRef, {
           userId: user.uid,
           type: 'deposit',
           amount,
+          currency: cur,
           status: 'completed',
+          credited: true,
+          creditedPocket: `wallets/${user.uid}/${cur}/depositWallet`,
           timestamp: serverTimestamp()
         });
       });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'deposit_transaction');
+      throw e;
     }
   };
 
   const handleWalletUpdate = async (amount: number, type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win', withdrawalAccountDetails?: any) => {
     if (!user) return;
-    const currency = withdrawalAccountDetails?.currency || 'NGN';
+    const cur = normalizeCurrencyCode(withdrawalAccountDetails?.currency || 'NGN');
+    if (isDisabledFutureCurrency(cur)) {
+      throw new Error('SIRA (Burkina Faso) is Coming Soon and not yet in circulation.');
+    }
     const sourceWallet = withdrawalAccountDetails?.sourceWallet;
 
     if (DEVELOPMENT_MODE) {
+      const prevPocket = user.walletPockets?.[cur] ?? (cur === 'NGN' ? user.depositWallet : 0);
       if (type === 'deposit') {
-        const bonusToApply = !user.hasReceivedSignupBonus && currency === 'NGN' ? 100 : 0;
-        if (currency === 'USD') {
-          setUser({
-            ...user,
-            usd_balance: (user.usd_balance || 0) + amount
-          });
-        } else if (currency === 'EUR') {
-          setUser({
-            ...user,
-            eur_balance: (user.eur_balance || 0) + amount
-          });
-        } else if (currency === 'GBP') {
-          setUser({
-            ...user,
-            gbp_balance: (user.gbp_balance || 0) + amount
-          });
-        } else {
-          setUser({
-            ...user,
-            depositWallet: user.depositWallet + amount,
-            playerWallet: user.playerWallet + bonusToApply,
-            hasReceivedSignupBonus: true
-          });
-        }
+        const bonusToApply = !user.hasReceivedSignupBonus && cur === 'NGN' ? 100 : 0;
+        const nextPocket = prevPocket + amount;
+        setUser({
+          ...user,
+          depositWallet: cur === 'NGN' ? nextPocket : user.depositWallet,
+          walletPockets: { ...(user.walletPockets || {}), [cur]: nextPocket },
+          playerWallet: user.playerWallet + bonusToApply,
+          hasReceivedSignupBonus: true
+        });
       } else if (type === 'withdrawal') {
         const fee = amount * 0.015;
         const netAmount = amount - fee;
-        
-        if (currency === 'USD' || sourceWallet === 'usd_balance') {
+        if (sourceWallet === 'playerWallet' || sourceWallet === 'cashOutWallet') {
           setUser({
             ...user,
-            usd_balance: Math.max(0, (user.usd_balance || 0) - amount)
-          });
-        } else if (currency === 'EUR' || sourceWallet === 'eur_balance') {
-          setUser({
-            ...user,
-            eur_balance: Math.max(0, (user.eur_balance || 0) - amount)
-          });
-        } else if (currency === 'GBP' || sourceWallet === 'gbp_balance') {
-          setUser({
-            ...user,
-            gbp_balance: Math.max(0, (user.gbp_balance || 0) - amount)
+            [sourceWallet]: Math.max(0, (user[sourceWallet] || 0) - amount)
           });
         } else {
-          const walletToDeduct = sourceWallet === 'playerWallet' ? 'playerWallet' : 'cashOutWallet';
+          const nextPocket = Math.max(0, prevPocket - amount);
           setUser({
             ...user,
-            [walletToDeduct]: Math.max(0, user[walletToDeduct] - amount)
+            depositWallet: cur === 'NGN' ? nextPocket : user.depositWallet,
+            walletPockets: { ...(user.walletPockets || {}), [cur]: nextPocket }
           });
         }
-
         if (adminStats) {
           setAdminStats({
             ...adminStats,
@@ -1901,18 +1963,12 @@ function AppContent() {
           });
         }
       } else if (type === 'game_bet') {
+        const nextPocket = Math.max(0, prevPocket - amount);
         setUser({
           ...user,
-          depositWallet: Math.max(0, user.depositWallet - amount)
+          depositWallet: cur === 'NGN' ? nextPocket : user.depositWallet,
+          walletPockets: { ...(user.walletPockets || {}), [cur]: nextPocket }
         });
-        if (adminStats) {
-          setAdminStats({
-            ...adminStats,
-            adminWallet: adminStats.adminWallet + amount,
-            totalHouseGain: adminStats.totalHouseGain + amount,
-            lastUpdated: new Date()
-          });
-        }
       } else if (type === 'game_win') {
         setUser({
           ...user,
@@ -1925,56 +1981,80 @@ function AppContent() {
     try {
       const userRef = doc(db, 'users', user.uid);
       const adminRef = doc(db, 'adminStats', 'global');
+      const walletPocketRef = doc(db, 'wallets', user.uid, cur, 'depositWallet');
 
       if (type === 'deposit') {
-        const bonusToApply = !user.hasReceivedSignupBonus && currency === 'NGN' ? 100 : 0;
-        if (currency === 'USD') {
-          await updateDoc(userRef, {
-            usd_balance: increment(amount)
-          });
-        } else if (currency === 'EUR') {
-          await updateDoc(userRef, {
-            eur_balance: increment(amount)
-          });
-        } else if (currency === 'GBP') {
-          await updateDoc(userRef, {
-            gbp_balance: increment(amount)
-          });
-        } else {
-          await updateDoc(userRef, {
-            depositWallet: increment(amount),
-            playerWallet: increment(bonusToApply),
-            hasReceivedSignupBonus: true
-          });
-        }
+        const bonusToApply = !user.hasReceivedSignupBonus && cur === 'NGN' ? 100 : 0;
+        await runTransaction(db, async (transaction) => {
+          const pocketSnap = await transaction.get(walletPocketRef);
+          const oldBal = pocketSnap.exists()
+            ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+            : 0;
+          const nextBal = oldBal + amount;
+          transaction.set(walletPocketRef, {
+            balance: nextBal,
+            depositWallet: nextBal,
+            currency: cur,
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+          if (bonusToApply > 0) {
+            transaction.update(userRef, {
+              playerWallet: increment(bonusToApply),
+              hasReceivedSignupBonus: true
+            });
+          }
+        });
       } else if (type === 'withdrawal') {
         const withdrawalRef = doc(collection(db, 'withdrawals'));
         const txRef = doc(db, 'transactions', withdrawalRef.id);
-
         const fee = amount * 0.015;
         const netAmount = amount - fee;
 
-        let walletToDeductField = 'cashOutWallet';
-        if (currency === 'USD' || sourceWallet === 'usd_balance') {
-          walletToDeductField = 'usd_balance';
-        } else if (currency === 'EUR' || sourceWallet === 'eur_balance') {
-          walletToDeductField = 'eur_balance';
-        } else if (currency === 'GBP' || sourceWallet === 'gbp_balance') {
-          walletToDeductField = 'gbp_balance';
-        } else if (sourceWallet === 'playerWallet') {
-          walletToDeductField = 'playerWallet';
-        }
+        const useUserField = sourceWallet === 'playerWallet' || sourceWallet === 'cashOutWallet';
+        const walletToDeductField = useUserField ? sourceWallet : 'depositWallet';
 
         await runTransaction(db, async (transaction) => {
-          transaction.update(userRef, {
-            [walletToDeductField]: increment(-amount)
-          });
+          let adminExists = false;
+          try {
+            const adminSnap = await transaction.get(adminRef);
+            adminExists = adminSnap.exists();
+          } catch {}
 
-          transaction.update(adminRef, {
-            adminWallet: increment(fee),
-            pendingPayouts: increment(netAmount),
-            lastUpdated: serverTimestamp()
-          });
+          if (useUserField) {
+            const uSnap = await transaction.get(userRef);
+            const curFieldBal = uSnap.exists() ? Number(uSnap.data()?.[walletToDeductField] || 0) : 0;
+            if (curFieldBal < amount) {
+              throw new Error(`INSUFFICIENT FUNDS in ${walletToDeductField}`);
+            }
+            transaction.update(userRef, {
+              [walletToDeductField]: increment(-amount)
+            });
+          } else {
+            const pSnap = await transaction.get(walletPocketRef);
+            const oldBal = pSnap.exists()
+              ? Number(pSnap.data()?.balance ?? pSnap.data()?.depositWallet ?? 0) || 0
+              : 0;
+            if (oldBal < amount) {
+              throw new Error(`INSUFFICIENT FUNDS in ${cur} Deposit Pocket`);
+            }
+            const nextBal = oldBal - amount;
+            transaction.set(walletPocketRef, {
+              balance: nextBal,
+              depositWallet: nextBal,
+              currency: cur,
+              userId: user.uid,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          }
+
+          if (adminExists) {
+            transaction.update(adminRef, {
+              adminWallet: increment(fee),
+              pendingPayouts: increment(netAmount),
+              lastUpdated: serverTimestamp()
+            });
+          }
 
           transaction.set(withdrawalRef, {
             userId: user.uid,
@@ -1982,12 +2062,12 @@ function AppContent() {
             amount: netAmount,
             originalAmount: amount,
             fee: fee,
-            currency: currency,
+            currency: cur,
             status: 'pending',
             timestamp: serverTimestamp(),
             accountDetails: {
               ...(withdrawalAccountDetails || { method: 'default' }),
-              currency,
+              currency: cur,
               walletSource: walletToDeductField
             }
           });
@@ -2000,21 +2080,42 @@ function AppContent() {
             fee: fee,
             status: 'pending',
             timestamp: serverTimestamp(),
-            currency: currency,
-            description: `Cashout withdrawal of ${currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₦'}${amount.toLocaleString()} to ${withdrawalAccountDetails?.bankName || 'nominated account'}.`,
+            currency: cur,
+            description: `Cashout withdrawal of ${formatCurrencyAmount(amount, cur)} to ${withdrawalAccountDetails?.bankName || 'nominated account'}.`,
             method: withdrawalAccountDetails?.method || 'Wallet Payout'
           });
         });
       } else if (type === 'game_bet') {
         await runTransaction(db, async (transaction) => {
-          transaction.update(userRef, {
-            depositWallet: increment(-amount)
-          });
-          transaction.update(adminRef, {
-            adminWallet: increment(amount),
-            totalHouseGain: increment(amount),
-            lastUpdated: serverTimestamp()
-          });
+          const pSnap = await transaction.get(walletPocketRef);
+          const oldBal = pSnap.exists()
+            ? Number(pSnap.data()?.balance ?? pSnap.data()?.depositWallet ?? 0) || 0
+            : 0;
+          if (oldBal < amount) {
+            throw new Error(`INSUFFICIENT FUNDS in ${cur} Deposit Pocket`);
+          }
+          let adminExists = false;
+          try {
+            const adminSnap = await transaction.get(adminRef);
+            adminExists = adminSnap.exists();
+          } catch {}
+
+          const nextBal = oldBal - amount;
+          transaction.set(walletPocketRef, {
+            balance: nextBal,
+            depositWallet: nextBal,
+            currency: cur,
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+          if (adminExists) {
+            transaction.update(adminRef, {
+              adminWallet: increment(amount),
+              totalHouseGain: increment(amount),
+              lastUpdated: serverTimestamp()
+            });
+          }
         });
       } else if (type === 'game_win') {
         await updateDoc(userRef, {
@@ -2023,6 +2124,7 @@ function AppContent() {
       }
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `wallet_${type}`);
+      throw e;
     }
   };
 
@@ -2163,10 +2265,12 @@ function AppContent() {
     try {
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', user.uid);
+        const walletPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
         const adminRef = doc(db, 'adminStats', 'global');
         const txRef = doc(collection(db, 'transactions'));
 
         // READS FIRST
+        const pocketSnap = bet > 0 ? await transaction.get(walletPocketRef) : null;
         let stats: AdminStats | null = null;
         try {
           const statsSnap = await transaction.get(adminRef);
@@ -2175,30 +2279,37 @@ function AppContent() {
           // non-fatal read
         }
 
-        // Deduct stake from Player's Deposit Wallet, add wins to Player's Win Wallet
         if (bet > 0) {
-          transaction.update(userRef, {
-            depositWallet: increment(-bet),
-            playerWallet: increment(winAmount)
-          });
-        } else if (winAmount > 0) {
+          const oldBal = pocketSnap?.exists()
+            ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+            : 0;
+          if (oldBal < bet) {
+            throw new Error('INSUFFICIENT FUNDS in NGN Deposit Pocket');
+          }
+          const nextBal = oldBal - bet;
+          transaction.set(walletPocketRef, {
+            balance: nextBal,
+            depositWallet: nextBal,
+            currency: 'NGN',
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+
+        if (winAmount > 0) {
           transaction.update(userRef, {
             playerWallet: increment(winAmount)
           });
         }
 
         // Entire stake goes to admin wallet if admin stats accessible
-        if (stats) {
-          const currentAdminWalletIncrement = bet;
-          const currentTotalHouseGainIncrement = bet;
-          const currentGameWalletIncrement = bet;
-
+        if (stats && bet > 0) {
           transaction.update(adminRef, {
-            adminWallet: increment(currentAdminWalletIncrement),
-            totalHouseGain: increment(currentTotalHouseGainIncrement),
+            adminWallet: increment(bet),
+            totalHouseGain: increment(bet),
             gameWallets: {
               ...stats.gameWallets,
-              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + currentGameWalletIncrement
+              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + bet
             },
             lastUpdated: serverTimestamp()
           });
@@ -2210,33 +2321,14 @@ function AppContent() {
             userId: user.uid,
             type: winAmount > 0 ? 'game_win' : 'game_bet',
             amount: winAmount > 0 ? winAmount : bet,
+            currency: 'NGN',
             status: 'completed',
             timestamp: serverTimestamp()
           });
         }
       });
     } catch (e) {
-      // Resilient fallback: update user doc directly and update React state immediately
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        if (bet > 0) {
-          await updateDoc(userRef, {
-            depositWallet: increment(-bet),
-            playerWallet: increment(winAmount)
-          });
-        } else if (winAmount > 0) {
-          await updateDoc(userRef, {
-            playerWallet: increment(winAmount)
-          });
-        }
-      } catch (userErr) {
-        handleFirestoreError(userErr, OperationType.WRITE, 'game_result_user');
-      }
-      setUser(prev => prev ? ({
-        ...prev,
-        depositWallet: bet > 0 ? Math.max(0, (prev.depositWallet || 0) - bet) : (prev.depositWallet || 0),
-        playerWallet: (prev.playerWallet || 0) + winAmount
-      }) : null);
+      handleFirestoreError(e, OperationType.WRITE, 'game_result_pocket');
     } finally {
       setIsSpinning(false);
     }
@@ -2315,12 +2407,26 @@ function AppContent() {
         onStakeDeduction={async (amount, gameId) => {
           if (!user) return;
           try {
-            const userRef = doc(db, 'users', user.uid);
-            if ((user.depositWallet || 0) >= amount) {
-              await updateDoc(userRef, { depositWallet: increment(-amount) });
-            } else {
-              await updateDoc(userRef, { playerWallet: increment(-amount) });
-            }
+            await runTransaction(db, async (tx) => {
+              const pocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+              const userRef = doc(db, 'users', user.uid);
+              const pocketSnap = await tx.get(pocketRef);
+              const pocketBal = pocketSnap.exists()
+                ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+                : 0;
+              if (pocketBal >= amount) {
+                const nextBal = pocketBal - amount;
+                tx.set(pocketRef, {
+                  balance: nextBal,
+                  depositWallet: nextBal,
+                  currency: 'NGN',
+                  userId: user.uid,
+                  updatedAt: serverTimestamp()
+                }, { merge: true });
+              } else {
+                tx.update(userRef, { playerWallet: increment(-amount) });
+              }
+            });
           } catch (err) {
             console.error('Stake deduction failed:', err);
           }
@@ -2405,12 +2511,26 @@ function AppContent() {
     if (!confirmBuy) return;
 
     try {
-      const userRef = doc(db, 'users', user.uid);
-      if ((user.depositWallet || 0) >= itemPrice) {
-        await updateDoc(userRef, { depositWallet: increment(-itemPrice) });
-      } else {
-        await updateDoc(userRef, { playerWallet: increment(-itemPrice) });
-      }
+      await runTransaction(db, async (tx) => {
+        const pocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+        const userRef = doc(db, 'users', user.uid);
+        const pocketSnap = await tx.get(pocketRef);
+        const pocketBal = pocketSnap.exists()
+          ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+          : 0;
+        if (pocketBal >= itemPrice) {
+          const nextBal = pocketBal - itemPrice;
+          tx.set(pocketRef, {
+            balance: nextBal,
+            depositWallet: nextBal,
+            currency: 'NGN',
+            userId: user.uid,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        } else {
+          tx.update(userRef, { playerWallet: increment(-itemPrice) });
+        }
+      });
 
       const orderRef = await addDoc(collection(db, 'market_orders'), {
         orderCode: `EFD-BUY-${Math.floor(100000 + Math.random() * 900000)}`,
