@@ -40,6 +40,7 @@ import {
   isDisabledFutureCurrency,
   normalizeCurrencyCode
 } from '../constants/walletCurrencies';
+import { extractErrorMessage, readResponseSafely } from '../utils/errorFormat';
 
 export interface EasyPaymentPlatformProps {
   user: UserProfile;
@@ -311,13 +312,14 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
             currency: chosenCurrency
           })
         });
-        const initData = await initRes.json().catch(() => null);
+        const { data: initData, rawText } = await readResponseSafely(initRes);
         const authUrl = initData?.authorization_url || initData?.data?.authorization_url;
         if (!initRes.ok || !authUrl) {
           throw new Error(
-            initData?.error ||
-              initData?.message ||
+            extractErrorMessage(
+              initData ?? rawText,
               'Paystack keys are not configured. Set VITE_PAYSTACK_PUBLIC_KEY or PAYSTACK_SECRET_KEY in Vercel.'
+            )
           );
         }
         setProcessingProgress(100);
@@ -354,12 +356,13 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                     headers: { Authorization: `Bearer ${token}` }
                   }
                 );
-                const verifyData = await verifyRes.json().catch(() => null);
+                const { data: verifyData, rawText: verifyRaw } = await readResponseSafely(verifyRes);
                 if (!verifyRes.ok || !verifyData?.success || verifyData?.credited === false) {
                   throw new Error(
-                    verifyData?.error ||
-                      verifyData?.message ||
+                    extractErrorMessage(
+                      verifyData ?? verifyRaw,
                       'Server verification did not credit wallet. Balance was NOT updated.'
+                    )
                   );
                 }
 
@@ -389,7 +392,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
                 if (onSuccess) onSuccess();
               } catch (cbErr: any) {
                 console.error('Paystack callback verification error:', cbErr);
-                setError(cbErr?.message || 'Payment verification failed.');
+                setError(extractErrorMessage(cbErr, 'Payment verification failed.'));
                 setStep('form');
               }
             })();
@@ -405,7 +408,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       }
     } catch (err: any) {
       console.error('Paystack checkout initialization error:', err);
-      setError(err?.message || 'Could not initialize Paystack checkout.');
+      setError(extractErrorMessage(err, 'Could not initialize Paystack checkout.'));
       setStep('form');
     }
   };
@@ -578,9 +581,9 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
         });
         clearTimeout(timer);
 
-        const data = await res.json().catch(() => null);
+        const { data, rawText } = await readResponseSafely(res);
         if (!res.ok || !data?.success) {
-          throw new Error(data?.error || data?.message || 'Withdrawal failed.');
+          throw new Error(extractErrorMessage(data ?? rawText, 'Withdrawal failed.'));
         }
 
         // Save preferred payout bank details
@@ -672,7 +675,7 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
       setError(
         err?.name === 'AbortError'
           ? 'Payout gateway timed out. Check your transaction history before retrying.'
-          : err?.message || 'Transaction submission failed. Please try again.'
+          : extractErrorMessage(err, 'Transaction submission failed. Please try again.')
       );
       setStep('form');
     }

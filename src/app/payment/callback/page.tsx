@@ -4,6 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { CheckCircle2, XCircle, Loader2, ArrowRight, Wallet, RefreshCw } from 'lucide-react';
 import { auth } from '../../../firebase';
 import { formatCurrencyAmount } from '../../../constants/walletCurrencies';
+import { extractErrorMessage, readResponseSafely } from '../../../utils/errorFormat';
 
 function CallbackContent() {
   const [reference, setReference] = useState<string>('');
@@ -46,7 +47,7 @@ function CallbackContent() {
           }
         });
 
-        const data = await res.json().catch(() => null);
+        const { data, rawText } = await readResponseSafely(res);
 
         if (!isMounted) return;
 
@@ -55,19 +56,17 @@ function CallbackContent() {
           setAmount(data.amount || null);
           setCurrency(data.currency || 'NGN');
         } else {
-          console.error('Paystack verify error:', data);
+          console.error('Paystack verify error:', res.status, data ?? rawText);
           setSuccess(false);
-          const rawErr = data?.error;
-          const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' ? JSON.stringify(rawErr) : null));
-          const message = errStr || data?.message || 'Payment verification could not be confirmed.';
-          setErrorMessage(message);
+          setErrorMessage(
+            extractErrorMessage(data ?? rawText, 'Payment verification could not be confirmed.')
+          );
         }
       } catch (err: any) {
         if (!isMounted) return;
         console.error('Paystack verify error:', err);
         setSuccess(false);
-        const message = (typeof err?.message === 'string' ? err.message : null) || 'Network error verifying payment.';
-        setErrorMessage(message);
+        setErrorMessage(extractErrorMessage(err, 'Network error verifying payment.'));
       } finally {
         if (isMounted) setLoading(false);
       }

@@ -66,6 +66,7 @@ import {
   isDisabledFutureCurrency,
   normalizeCurrencyCode
 } from '../constants/walletCurrencies';
+import { extractErrorMessage, readResponseSafely } from '../utils/errorFormat';
 
 interface UserWalletProps {
   user: UserProfile;
@@ -352,7 +353,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       });
       clearTimeout(timer);
 
-      const data = await res.json().catch(() => null);
+      const { data, rawText } = await readResponseSafely(res);
 
       if (res.ok && data?.success) {
         setWithdrawStatusMessage({
@@ -380,10 +381,8 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         setAmount('');
         setVerifiedAccountName(null);
       } else {
-        console.error(`${payoutGateway} withdraw error:`, data);
-        const rawErr = data?.error;
-        const errStr = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (typeof rawErr === 'object' && rawErr ? JSON.stringify(rawErr) : null));
-        const message = errStr || data?.message || 'Withdrawal failed, please try again.';
+        console.error(`${payoutGateway} withdraw error:`, res.status, data ?? rawText);
+        const message = extractErrorMessage(data ?? rawText, 'Withdrawal failed, please try again.');
         setWithdrawStatusMessage({
           text: `❌ ${message}`,
           type: 'error'
@@ -395,7 +394,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
       const message =
         err?.name === 'AbortError'
           ? 'Payout request timed out after 15 seconds. Please check history before retrying.'
-          : (typeof err?.message === 'string' ? err.message : null) || 'Withdrawal service error. Please try again.';
+          : extractErrorMessage(err, 'Withdrawal service error. Please try again.');
       setWithdrawStatusMessage({
         text: `❌ ${message}`,
         type: 'error'

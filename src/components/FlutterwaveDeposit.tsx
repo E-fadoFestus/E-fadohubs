@@ -25,6 +25,7 @@ import {
   isDisabledFutureCurrency,
   normalizeCurrencyCode
 } from '../constants/walletCurrencies';
+import { extractErrorMessage } from '../utils/errorFormat';
 
 interface FlutterwaveDepositProps {
   user: UserProfile;
@@ -184,9 +185,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         });
       } else {
         throw new Error(
-          verifyData.error ||
-            verifyData.message ||
-            'Payment not yet confirmed by gateway. Wallet was NOT credited.'
+          extractErrorMessage(verifyData, 'Payment not yet confirmed by gateway. Wallet was NOT credited.')
         );
       }
     } catch (err: any) {
@@ -196,7 +195,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       setErrorMessage(
         err?.name === 'AbortError'
           ? 'Verification timed out. Please try checking status again.'
-          : err.message || 'Verification could not confirm gateway status yet.'
+          : extractErrorMessage(err, 'Verification could not confirm gateway status yet.')
       );
     }
   };
@@ -254,7 +253,7 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
         throw new Error('Flutterwave initialization endpoint returned an invalid response.');
       }
       if (!initRes.ok || !initData.success) {
-        throw new Error(initData.error || initData.message || 'Payment initialization failed. Please try again.');
+        throw new Error(extractErrorMessage(initData, 'Payment initialization failed. Please try again.'));
       }
 
       if (!initData.link || typeof initData.link !== 'string') {
@@ -279,10 +278,10 @@ export const FlutterwaveDeposit: React.FC<FlutterwaveDepositProps> = ({
       setIsInitializing(false);
       setIsVerifying(false);
       setStatusMessage(null);
-      if (err.name === 'AbortError') {
+      if (err?.name === 'AbortError') {
         setErrorMessage('Connection timed out after 15 seconds. Please try again.');
       } else {
-        setErrorMessage(err.message || 'Failed to initialize payment. Please try again.');
+        setErrorMessage(extractErrorMessage(err, 'Failed to initialize payment. Please try again.'));
       }
     }
   };

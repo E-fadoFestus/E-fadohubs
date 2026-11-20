@@ -23,6 +23,7 @@ import {
   isDisabledFutureCurrency,
   normalizeCurrencyCode
 } from '../constants/walletCurrencies';
+import { extractErrorMessage, readResponseSafely } from '../utils/errorFormat';
 
 interface PaystackDepositProps {
   user: UserProfile;
@@ -173,7 +174,8 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
     }
   }, []);
 
-  const showError = (msg: string, debugPayload?: unknown) => {
+  const showError = (errOrMsg: unknown, debugPayload?: unknown) => {
+    const msg = extractErrorMessage(errOrMsg, 'Payment failed, please try again.');
     if (debugPayload !== undefined) {
       console.error('Paystack deposit error:', msg, debugPayload);
     } else {
@@ -229,6 +231,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
 
       let verifyRes: Response;
       let verifyData: any = null;
+      let verifyRawText = '';
       try {
         verifyRes = await fetch(
           `/api/paystack/verify?reference=${encodeURIComponent(paidRef)}`,
@@ -241,23 +244,20 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
             signal: controller.signal
           }
         );
-        verifyData = await verifyRes.json().catch(() => null);
+        const parsed = await readResponseSafely(verifyRes);
+        verifyData = parsed.data;
+        verifyRawText = parsed.rawText;
       } finally {
         clearTimeout(timeoutId);
       }
 
       if (!verifyRes.ok || !verifyData?.success || verifyData?.credited === false) {
-        console.error('Paystack verify failed:', verifyData);
-        const rawErr = verifyData?.error;
-        const errStr =
-          typeof rawErr === 'string'
-            ? rawErr
-            : rawErr?.message || (typeof rawErr === 'object' && rawErr ? JSON.stringify(rawErr) : null);
-        throw new Error(
-          errStr ||
-            verifyData?.message ||
-            'Server could not verify and credit payment. Wallet was NOT credited.'
+        console.error('Paystack verify failed:', verifyRes.status, verifyData ?? verifyRawText);
+        const message = extractErrorMessage(
+          verifyData ?? verifyRawText,
+          'Server could not verify and credit payment. Wallet was NOT credited.'
         );
+        throw new Error(message);
       }
 
       const verifiedAmount = Number(verifyData.amount || paidAmount);
@@ -281,7 +281,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       showError(
         err?.name === 'AbortError'
           ? `Verification timed out. Check wallet history or retry with ref: ${paidRef}`
-          : err?.message || `Payment verification failed for ref: ${paidRef}.`,
+          : extractErrorMessage(err, `Payment verification failed for ref: ${paidRef}.`),
         err
       );
     }
@@ -359,9 +359,15 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
             signal: initController.signal
           });
           clearTimeout(initTimer);
-          const initData = await initRes.json().catch(() => null);
+          const { data: initData, rawText: initRawText } = await readResponseSafely(initRes);
           if (!initRes.ok) {
-            throw new Error(initData?.error || initData?.message || 'Failed to pre-register transaction on server.');
+            console.error('Paystack initialize error:', initRes.status, initData ?? initRawText);
+            throw new Error(
+              extractErrorMessage(
+                initData ?? initRawText,
+                `Failed to pre-register transaction on server (HTTP ${initRes.status}).`
+              )
+            );
           }
           activeRef = initData?.reference || initData?.data?.reference || '';
         } catch (preInitErr: any) {
@@ -369,7 +375,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
           throw new Error(
             preInitErr?.name === 'AbortError'
               ? 'Server timed out initializing Paystack transaction. Please try again.'
-              : preInitErr?.message || 'Could not initialize Paystack transaction.'
+              : extractErrorMessage(preInitErr, 'Could not initialize Paystack transaction.')
           );
         }
 
@@ -443,24 +449,21 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       });
 
       clearTimeout(timeoutId);
-      const data = await response.json().catch(() => null);
+      const { data, rawText } = await readResponseSafely(response);
       const authUrl: string | undefined = data?.authorization_url || data?.data?.authorization_url;
       const isOk = Boolean(response.ok && (data?.success || data?.status) && authUrl);
 
       if (!isOk || !authUrl) {
-        console.error('Paystack initialize error:', data);
-        const rawErr = data?.error;
-        const errStr =
-          typeof rawErr === 'string'
-            ? rawErr
-            : rawErr?.message || (typeof rawErr === 'object' && rawErr ? JSON.stringify(rawErr) : null);
-
-        const baseMsg = errStr || data?.message || 'Failed to initialize Paystack checkout.';
+        console.error('Paystack initialize error:', response.status, data ?? rawText);
+        const baseMsg = extractErrorMessage(
+          data ?? rawText,
+          `Failed to initialize Paystack checkout (HTTP ${response.status}).`
+        );
         const helpfulMsg = baseMsg.includes('PAYSTACK_SECRET_KEY')
           ? 'Paystack keys are not configured. Set PAYSTACK_SECRET_KEY in server environment.'
           : baseMsg;
 
-        showError(helpfulMsg, data);
+        showError(helpfulMsg, data ?? rawText);
         return;
       }
 
@@ -476,10 +479,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         showError('Connection to Paystack timed out after 12 seconds. Please try again.', err);
         return;
       }
-      const message =
-        (typeof err?.message === 'string' && err.message) ||
-        'Payment failed to initialize. Please try again.';
-      showError(message, err);
+      showError(extractErrorMessage(err, 'Payment failed to initialize. Please try again.'), err);
     }
   };
 
@@ -679,9 +679,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs animate-in fade-in">
           <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
           <div className="font-bold flex-1">
-            {typeof errorMessage === 'string'
-              ? errorMessage
-              : (errorMessage as any)?.message || 'Payment failed, please try again'}
+            {extractErrorMessage(errorMessage, 'Payment failed, please try again.')}
           </div>
         </div>
       )}

@@ -66,7 +66,13 @@ async function paystackRequest<T = any>(endpoint: string, options: RequestInit =
   }
 
   if (!response.ok) {
-    const errorMsg = data?.message || `Paystack request failed with status ${response.status}`;
+    const rawMsg = data?.message ?? data?.error;
+    const errorMsg =
+      typeof rawMsg === 'string' && rawMsg.trim() && rawMsg.trim() !== '[object Object]'
+        ? rawMsg.trim()
+        : rawMsg && typeof rawMsg === 'object'
+          ? (typeof rawMsg.message === 'string' ? rawMsg.message : JSON.stringify(rawMsg))
+          : `Paystack request failed with status ${response.status}`;
     const error: any = new Error(errorMsg);
     error.status = response.status;
     error.details = data;

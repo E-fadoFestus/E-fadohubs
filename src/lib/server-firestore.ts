@@ -1,7 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, FieldValue as AdminFieldValue } from 'firebase-admin/firestore';
-import { db as clientDb } from '../firebase';
 import { doc, getDoc, setDoc, runTransaction, serverTimestamp as clientServerTimestamp } from 'firebase/firestore';
 import cfg from '../../firebase-applet-config.json';
 
@@ -51,16 +50,22 @@ export function auth() {
   return getAuth(getAdminApp());
 }
 
+async function getClientDb() {
+  const mod = await import('../firebase');
+  return mod.db;
+}
+
 /**
- * Creates client SDK adapter for Firestore operations when no service account is provided
+ * Creates lazy client SDK adapter for Firestore operations when no service account is provided
  */
 function createClientDbAdapter() {
   return {
     doc(path: string) {
-      const d = doc(clientDb, path);
       return {
-        _d: d,
+        _path: path,
         async get() {
+          const clientDb = await getClientDb();
+          const d = doc(clientDb, path);
           const snap = await getDoc(d);
           return {
             exists: snap.exists(),
@@ -68,15 +73,18 @@ function createClientDbAdapter() {
           };
         },
         async set(data: any, options?: { merge?: boolean }) {
+          const clientDb = await getClientDb();
+          const d = doc(clientDb, path);
           return await setDoc(d, data, options || {});
         }
       };
     },
     async runTransaction(updateFn: (tx: any) => Promise<any>) {
+      const clientDb = await getClientDb();
       return await runTransaction(clientDb, async (clientTx) => {
         const txAdapter = {
           async get(docRef: any) {
-            const rawDoc = docRef._d || docRef;
+            const rawDoc = docRef._d || (docRef._path ? doc(clientDb, docRef._path) : docRef);
             const snap = await clientTx.get(rawDoc);
             return {
               exists: snap.exists(),
@@ -84,7 +92,7 @@ function createClientDbAdapter() {
             };
           },
           set(docRef: any, data: any, options?: { merge?: boolean }) {
-            const rawDoc = docRef._d || docRef;
+            const rawDoc = docRef._d || (docRef._path ? doc(clientDb, docRef._path) : docRef);
             return clientTx.set(rawDoc, data, options || {});
           }
         };
