@@ -40,6 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'www.e-fado.com';
     const reqUrl = new URL(req.url || '/api/paystack', `${proto}://${host}`);
     const action = String(req.query?.action || '').toLowerCase().trim();
+    const queryRef = typeof req.query?.reference === 'string' ? req.query.reference.trim() : '';
+    if (queryRef && !reqUrl.searchParams.has('reference')) {
+      reqUrl.searchParams.set('reference', queryRef);
+    }
 
     // Determine target handler from rewrite ?action=... or URL pathname
     let resolvedAction = action;

@@ -343,6 +343,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
         const initController = new AbortController();
         const initTimer = setTimeout(() => initController.abort(), 10000);
         let activeRef = '';
+        let fallbackAuthUrl = '';
         try {
           const initRes = await fetch('/api/paystack/initialize', {
             method: 'POST',
@@ -370,6 +371,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
             );
           }
           activeRef = initData?.reference || initData?.data?.reference || '';
+          fallbackAuthUrl = initData?.authorization_url || initData?.data?.authorization_url || '';
         } catch (preInitErr: any) {
           clearTimeout(initTimer);
           throw new Error(
@@ -383,9 +385,25 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
           activeRef = `EFADO-FUND-${(user?.uid || 'USR').substring(0, 8)}-${Date.now()}`;
         }
 
-        await loadPaystackInlineScript();
+        try {
+          await loadPaystackInlineScript();
+        } catch (scriptErr) {
+          if (fallbackAuthUrl) {
+            setCheckoutUrl(fallbackAuthUrl);
+            setStatusMessage('Redirecting to Paystack secure checkout...');
+            window.location.assign(fallbackAuthUrl);
+            return;
+          }
+          throw scriptErr;
+        }
 
         if (!window.PaystackPop || typeof window.PaystackPop.setup !== 'function') {
+          if (fallbackAuthUrl) {
+            setCheckoutUrl(fallbackAuthUrl);
+            setStatusMessage('Redirecting to Paystack secure checkout...');
+            window.location.assign(fallbackAuthUrl);
+            return;
+          }
           throw new Error('Paystack Checkout SDK did not initialize properly.');
         }
 

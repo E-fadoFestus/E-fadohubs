@@ -42,8 +42,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    let parsedBody: any = req.body || {};
+    if (typeof parsedBody === 'string') {
+      try { parsedBody = JSON.parse(parsedBody); } catch { parsedBody = {}; }
+    }
     const { amount, currency: rawCurrency, email, userId, name, phone, channel, tx_ref: customRef, meta, customizations, redirect_url } =
-      req.body || {};
+      parsedBody;
 
     const requestedCurrency = String(rawCurrency || 'NGN').trim().toUpperCase();
     if (requestedCurrency === 'SIRA') {
@@ -117,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let paymentLink = '';
+    let gatewayError = '';
 
     // 1. Primary V3 Standard Payments API when a V3 secret key (or secret bearer) is configured
     if (v3Secret || (activeSecret && activeSecret.startsWith('FLWSECK'))) {
@@ -161,10 +166,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (flwData?.status === 'success' && flwData?.data?.link) {
           paymentLink = flwData.data.link;
         } else {
+          gatewayError = flwData?.message || '';
           console.warn('[Vercel Flutterwave V3 Init Notice]:', flwData?.message || flwData);
         }
       } catch (v3Err: any) {
         clearTimeout(timer);
+        gatewayError = v3Err?.message || '';
         console.warn('[Vercel Flutterwave V3 Init Error]:', v3Err?.message || v3Err);
       }
     }
@@ -239,7 +246,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({
         success: false,
         status: false,
-        message: 'Could not obtain a valid Flutterwave checkout link. Verify your Flutterwave keys in Vercel.'
+        message: gatewayError || 'Could not obtain a valid Flutterwave checkout link. Verify your Flutterwave keys in Vercel.'
       });
     }
 

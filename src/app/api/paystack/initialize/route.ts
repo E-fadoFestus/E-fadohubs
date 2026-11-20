@@ -53,8 +53,8 @@ export async function POST(req: Request) {
     const baseAppUrl = (originHeader || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://www.e-fado.com').replace(/\/$/, '');
     const callbackUrl = `${baseAppUrl}/payment/callback`;
 
-    const serverTime = getServerTimestamp();
     const db = getServerDb();
+    const serverTime = getServerTimestamp();
     if (db) {
       try {
         const txDoc = db.doc(`transactions/${reference}`);
@@ -118,9 +118,13 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('[Next.js Paystack Init Error]:', error);
+    const status =
+      typeof error?.status === 'number' && error.status >= 400 && error.status < 600
+        ? error.status
+        : 500;
     return Response.json({
       success: false,
       error: error.message || 'Failed to initialize payment'
-    }, { status: 500 });
+    }, { status });
   }
 }

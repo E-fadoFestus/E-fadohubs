@@ -1165,6 +1165,11 @@ function AppContent() {
   useEffect(() => {
     const handlePaystackCallback = async () => {
       try {
+        const curPath = window.location.pathname.toLowerCase();
+        const curHash = window.location.hash.toLowerCase();
+        if (curPath.startsWith('/payment/callback') || curHash.startsWith('#/payment/callback') || curHash.startsWith('#payment/callback')) {
+          return;
+        }
         const urlParams = new URLSearchParams(window.location.search);
         const reference = urlParams.get('reference') || urlParams.get('trxref');
         const simUserId = urlParams.get('userId');

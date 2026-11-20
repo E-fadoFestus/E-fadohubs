@@ -146,7 +146,7 @@ export function getServerDb(): any {
 
 export function getServerTimestamp() {
   try {
-    if (useAdminSdkFirestore || hasServiceAccount()) {
+    if (useAdminSdkFirestore) {
       return AdminFieldValue.serverTimestamp();
     }
     return clientServerTimestamp();
