@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getServerDb, getServerTimestamp, auth } from '../../src/lib/server-firestore';
+import { getServerDb, getServerTimestamp, auth } from '../../src/lib/server-firestore.js';
 
 const ACTIVE_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
 

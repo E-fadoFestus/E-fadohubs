@@ -1,5 +1,5 @@
-import { resolveAccountNumber } from '../../../../lib/paystack';
-import { auth } from '../../../../lib/server-firestore';
+import { resolveAccountNumber } from '../../../../lib/paystack.js';
+import { auth } from '../../../../lib/server-firestore.js';
 
 export async function POST(req: Request) {
   try {

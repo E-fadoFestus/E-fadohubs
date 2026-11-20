@@ -1,5 +1,5 @@
-import { initializePaystackPayment } from '../../../../lib/paystack';
-import { getServerDb, getServerTimestamp, auth } from '../../../../lib/server-firestore';
+import { initializePaystackPayment } from '../../../../lib/paystack.js';
+import { getServerDb, getServerTimestamp, auth } from '../../../../lib/server-firestore.js';
 
 export async function POST(req: Request) {
   try {

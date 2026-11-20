@@ -1,5 +1,5 @@
-import { getTransferStatus, verifyTransfer } from '../../../../../lib/paystack';
-import { auth } from '../../../../../lib/server-firestore';
+import { getTransferStatus, verifyTransfer } from '../../../../../lib/paystack.js';
+import { auth } from '../../../../../lib/server-firestore.js';
 
 export async function GET(req: Request) {
   try {

@@ -1,8 +1,14 @@
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, FieldValue as AdminFieldValue } from 'firebase-admin/firestore';
-import { doc, getDoc, setDoc, runTransaction, serverTimestamp as clientServerTimestamp } from 'firebase/firestore';
-import cfg from '../../firebase-applet-config.json';
+import { initializeApp as initializeClientApp, getApps as getClientApps } from 'firebase/app';
+import { initializeFirestore as initializeClientFirestore, getFirestore as getClientFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp as clientServerTimestamp } from 'firebase/firestore';
+
+const cfg = JSON.parse(
+  fs.readFileSync(fileURLToPath(new URL('../../firebase-applet-config.json', import.meta.url)), 'utf8')
+);
 
 function hasServiceAccount(): boolean {
   return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -51,8 +57,22 @@ export function auth() {
 }
 
 async function getClientDb() {
-  const mod = await import('../firebase');
-  return mod.db;
+  const appName = 'efado-server-client-fallback';
+  const existing = getClientApps().find((a) => a.name === appName);
+  const clientApp = existing || initializeClientApp(cfg, appName);
+  const databaseId = cfg.firestoreDatabaseId || '(default)';
+  try {
+    return initializeClientFirestore(
+      clientApp,
+      {
+        experimentalAutoDetectLongPolling: true,
+        ignoreUndefinedProperties: true
+      },
+      databaseId
+    );
+  } catch {
+    return getClientFirestore(clientApp, databaseId);
+  }
 }
 
 /**

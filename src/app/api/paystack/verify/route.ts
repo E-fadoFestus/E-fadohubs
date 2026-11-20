@@ -1,5 +1,5 @@
-import { verifyPaystackPayment } from '../../../../lib/paystack';
-import { getServerDb, getServerTimestamp, auth } from '../../../../lib/server-firestore';
+import { verifyPaystackPayment } from '../../../../lib/paystack.js';
+import { getServerDb, getServerTimestamp, auth } from '../../../../lib/server-firestore.js';
 
 const ACTIVE_CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'CAD', 'AUD', 'GHS', 'ZAR', 'XOF'];
 

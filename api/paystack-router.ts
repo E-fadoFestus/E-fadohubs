@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { POST as paystackInitializePost } from '../src/app/api/paystack/initialize/route';
-import { GET as paystackVerifyGet, POST as paystackVerifyPost } from '../src/app/api/paystack/verify/route';
-import { GET as paystackBanksGet } from '../src/app/api/paystack/banks/route';
-import { POST as paystackVerifyAccountPost } from '../src/app/api/paystack/verify-account/route';
-import { POST as paystackWithdrawPost } from '../src/app/api/paystack/withdraw/route';
-import { GET as paystackWithdrawStatusGet } from '../src/app/api/paystack/withdraw/status/route';
-import { POST as paystackWebhookPost } from '../src/app/api/webhook/paystack/route';
+import { POST as paystackInitializePost } from '../src/app/api/paystack/initialize/route.js';
+import { GET as paystackVerifyGet, POST as paystackVerifyPost } from '../src/app/api/paystack/verify/route.js';
+import { GET as paystackBanksGet } from '../src/app/api/paystack/banks/route.js';
+import { POST as paystackVerifyAccountPost } from '../src/app/api/paystack/verify-account/route.js';
+import { POST as paystackWithdrawPost } from '../src/app/api/paystack/withdraw/route.js';
+import { GET as paystackWithdrawStatusGet } from '../src/app/api/paystack/withdraw/status/route.js';
+import { POST as paystackWebhookPost } from '../src/app/api/webhook/paystack/route.js';
 
 async function readRawBody(req: VercelRequest): Promise<string | undefined> {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {

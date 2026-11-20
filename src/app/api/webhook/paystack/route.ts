@@ -1,5 +1,5 @@
-import { verifyPaystackSignature, verifyPaystackPayment } from '../../../../lib/paystack';
-import { getServerDb, getServerTimestamp } from '../../../../lib/server-firestore';
+import { verifyPaystackSignature, verifyPaystackPayment } from '../../../../lib/paystack.js';
+import { getServerDb, getServerTimestamp } from '../../../../lib/server-firestore.js';
 
 export async function POST(req: Request) {
   try {
