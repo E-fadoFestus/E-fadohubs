@@ -76,11 +76,32 @@ export async function POST(req: Request) {
           updatedAt: serverTime
         };
 
-        await Promise.all([
-          txDoc.set(txData, { merge: true }),
-          userTxDoc.set(txData, { merge: true })
-        ]);
-      } catch (dbErr) {
+        let dbTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            Promise.all([
+              txDoc.set(txData, { merge: true }),
+              userTxDoc.set(txData, { merge: true })
+            ]),
+            new Promise<never>((_, reject) => {
+              dbTimer = setTimeout(() => {
+                const timeoutErr: any = new Error('Database timed out saving transaction (exceeded 8s). Please try again.');
+                timeoutErr.code = 'FIRESTORE_TIMEOUT';
+                reject(timeoutErr);
+              }, 8000);
+            })
+          ]);
+        } finally {
+          if (dbTimer) clearTimeout(dbTimer);
+        }
+      } catch (dbErr: any) {
+        if (dbErr?.code === 'FIRESTORE_TIMEOUT') {
+          console.error('[Next.js Paystack Init] Firestore timeout:', dbErr);
+          return Response.json({
+            success: false,
+            error: dbErr.message
+          }, { status: 504 });
+        }
         console.warn('[Next.js Paystack Init] DB record warning:', dbErr);
       }
     }

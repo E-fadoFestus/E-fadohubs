@@ -324,7 +324,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     setWithdrawStatusMessage(null);
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), 30000);
 
     try {
       const token = auth.currentUser

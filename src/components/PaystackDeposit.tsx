@@ -341,7 +341,7 @@ export const PaystackDeposit: React.FC<PaystackDepositProps> = ({
       // Method 1: Paystack Inline Checkout (PaystackPop) when public key is configured
       if (publicKey) {
         const initController = new AbortController();
-        const initTimer = setTimeout(() => initController.abort(), 10000);
+        const initTimer = setTimeout(() => initController.abort(), 30000);
         let activeRef = '';
         let fallbackAuthUrl = '';
         try {
