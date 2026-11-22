@@ -15,6 +15,8 @@ interface CashierModalProps {
   onWithdraw: (amount: number, currency: DeepSeaCurrency, address: string) => void;
   onResetPracticeBalance: () => void;
   onOpenProfileWallet?: (tab: 'deposit' | 'withdraw') => void;
+  depositBalance?: number;
+  winBalance?: number;
 }
 
 export const CashierModal: React.FC<CashierModalProps> = ({
@@ -29,6 +31,8 @@ export const CashierModal: React.FC<CashierModalProps> = ({
   onWithdraw,
   onResetPracticeBalance,
   onOpenProfileWallet,
+  depositBalance,
+  winBalance,
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   const [method, setMethod] = useState<'crypto' | 'card' | 'wallet'>('crypto');
@@ -218,11 +222,29 @@ export const CashierModal: React.FC<CashierModalProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Synced Balance</span>
-                <span className="text-xl font-black text-emerald-400">
-                  ₦{realBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+              <div className="space-y-2.5">
+                {(depositBalance !== undefined || winBalance !== undefined) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider block">Deposit Wallet</span>
+                      <span className="text-base font-black text-white">
+                        ₦{(depositBalance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-emerald-500/20">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Win Wallet (Winnings)</span>
+                      <span className="text-base font-black text-emerald-400">
+                        ₦{(winBalance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Synced Balance</span>
+                  <span className="text-xl font-black text-cyan-300">
+                    ₦{realBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">

@@ -285,7 +285,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
           <X className="w-6 h-6" />
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center pt-12 lg:pt-6">
           {/* Left Column: Info & Stats */}
           <div className="lg:col-span-5 space-y-8">
             <div>
@@ -304,10 +304,18 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
 
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Win Wallet</div>
+                <button
+                  type="button"
+                  onClick={() => openShadowWallet('withdraw')}
+                  title="Cash Out Winnings via Account Profile Wallet"
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-400/40 rounded-2xl p-4 text-left transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Win Wallet</div>
+                    <ArrowUpRight className="w-3 h-3 text-emerald-400" />
+                  </div>
                   <div className="text-2xl font-black text-white">{formatPrice(user.playerWallet)}</div>
-                </div>
+                </button>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                   <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Stake Req.</div>
                   <div className="text-2xl font-black text-yellow-500">{formatPrice(stakeAmount)}</div>
@@ -322,8 +330,9 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                    </div>
                    <div className="text-xl font-black text-white">{formatPrice(user.depositWallet)}</div>
                    <button 
+                    type="button"
                     onClick={() => openShadowWallet('deposit')}
-                    className="w-full mt-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
+                    className="w-full mt-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all cursor-pointer"
                   >
                     Fund Wallet
                   </button>
@@ -335,8 +344,9 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                    </div>
                    <div className="text-xl font-black text-white">{formatPrice(user.playerWallet)}</div>
                     <button 
+                    type="button"
                     onClick={() => openShadowWallet('withdraw')}
-                    className="w-full mt-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
+                    className="w-full mt-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all cursor-pointer"
                   >
                     Withdraw
                   </button>
@@ -630,9 +640,13 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
               </button>
 
               {user.depositWallet < stakeAmount && !isSpinning && (
-                <p className="text-center text-rose-500 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                  Insufficient Funds / Balance
-                </p>
+                <button
+                  type="button"
+                  onClick={() => openShadowWallet('deposit')}
+                  className="w-full py-3 px-4 bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 rounded-2xl text-rose-400 hover:text-rose-300 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                >
+                  Insufficient Funds — Click to Fund Account Profile Wallet
+                </button>
               )}
               
               <div className="flex items-center justify-center gap-3 py-2">

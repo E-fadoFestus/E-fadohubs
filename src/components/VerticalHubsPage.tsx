@@ -30,7 +30,7 @@ interface VerticalHubsPageProps {
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
   onNavigateHome?: () => void;
-  onOpenCashier?: () => void;
+  onOpenCashier?: (tab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => void;
   onLogin?: () => void;
 }
 
@@ -130,7 +130,7 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
             {/* 1 Unified Wallet Card */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div 
-                onClick={onOpenCashier}
+                onClick={() => onOpenCashier?.('overview')}
                 className="bg-slate-900/90 hover:bg-slate-850 border-2 border-emerald-500/40 rounded-2xl p-4 shadow-xl shadow-emerald-950/20 cursor-pointer transition-all group"
               >
                 <div className="flex items-center justify-between gap-4">
@@ -145,7 +145,14 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
                       </span>
                     </div>
                   </div>
-                  <button className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold transition-colors">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCashier?.('deposit');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold transition-colors cursor-pointer"
+                  >
                     Top Up
                   </button>
                 </div>

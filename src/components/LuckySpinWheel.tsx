@@ -329,77 +329,90 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
         </div>
 
-        <div className="absolute top-6 right-16 z-50">
-          <CurrencySelector />
+        {/* Top Bar: Navigation Tabs, Currency & Close (Non-overlapping flex header) */}
+        <div className="relative z-40 flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-xl">
+            <button
+              type="button"
+              onClick={() => setCurrentView('game')}
+              className={`px-6 sm:px-8 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-2 cursor-pointer ${currentView === 'game' ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Gamepad2 className="w-3.5 h-3.5" />
+              Arena
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('wallets')}
+              className={`px-6 sm:px-8 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-2 cursor-pointer ${currentView === 'wallets' ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400 hover:text-white'}`}
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Wealth
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 ml-auto">
+            <CurrencySelector />
+            <button 
+              type="button"
+              onClick={onClose}
+              aria-label="Close Lucky Spin Wheel"
+              className="p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white transition-colors z-50"
-        >
-          <X className="w-6 h-6" />
-        </button>
-
-        {/* Navigation Tabs */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex bg-white/5 p-1 rounded-2xl border border-white/5 z-50 backdrop-blur-xl">
-          <button
-            onClick={() => setCurrentView('game')}
-            className={`px-8 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-2 ${currentView === 'game' ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Gamepad2 className="w-3.5 h-3.5" />
-            Arena
-          </button>
-          <button
-            onClick={() => setCurrentView('wallets')}
-            className={`px-8 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center gap-2 ${currentView === 'wallets' ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400 hover:text-white'}`}
-          >
-            <Wallet className="w-3.5 h-3.5" />
-            Wealth
-          </button>
-        </div>
- streams:
-
-        <div className="relative">
+        <div className="relative mt-4">
           {currentView === 'game' ? (
             <>
-              {/* Top Wallet Bar - Desktop */}
-          <div className="hidden lg:flex absolute top-0 left-0 right-0 justify-between items-start z-50 pointer-events-none">
-            <div className="flex gap-3">
-                {/* Win Wallet */}
-                 <button 
-                  onClick={() => setCurrentView('wallets')}
-                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-white/20 transition-all text-left pointer-events-auto"
-                >
-                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Win Wallet</div>
-                  <div className="text-3xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.playerWin)}</div>
-                </button>
-                {/* Deposit Wallet */}
+              {/* Top Wallet Bar - Desktop (Stacked cleanly below header so nothing overlaps) */}
+              <div className="hidden lg:flex justify-between items-center gap-4 mb-4 relative z-30">
+                <div className="flex gap-3">
+                  {/* Win Wallet */}
+                  <button 
+                    type="button"
+                    onClick={() => openShadowWallet('withdraw')}
+                    title="Withdraw Winnings via Account Profile Wallet"
+                    className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-emerald-400/50 transition-all text-left cursor-pointer group"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">Win Wallet</span>
+                      <ArrowUpRight className="w-3 h-3 text-emerald-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </div>
+                    <div className="text-2xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.playerWin)}</div>
+                  </button>
+                  {/* Deposit Wallet */}
+                  <button 
+                    type="button"
+                    onClick={() => openShadowWallet('deposit')}
+                    title="Fund Deposit Wallet via Account Profile Wallet"
+                    className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-indigo-500/50 transition-all text-left cursor-pointer group"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Deposit Bank</span>
+                      <ArrowUpRight className="w-3 h-3 text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </div>
+                    <div className="text-2xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.deposit)}</div>
+                  </button>
+                </div>
+                {/* Cash Out Wallet */}
                 <button 
-                  onClick={() => openShadowWallet('deposit')}
-                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-indigo-500/50 transition-all text-left pointer-events-auto group"
+                  type="button"
+                  onClick={() => openShadowWallet('withdraw')}
+                  title="Cash Out Winnings via Account Profile Wallet"
+                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-rose-500/50 transition-all text-left cursor-pointer group"
                 >
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Bank</span>
-                    <ArrowUpRight className="w-3 h-3 text-indigo-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    <span className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em]">Cash Out</span>
+                    <ArrowDownLeft className="w-3 h-3 text-rose-400 group-hover:-translate-x-0.5 group-hover:translate-y-0.5 transition-transform" />
                   </div>
-                  <div className="text-3xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.deposit)}</div>
+                  <div className="text-2xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.cashOut)}</div>
                 </button>
               </div>
-              {/* Cash Out Wallet (Repositioned below Win) */}
-              <button 
-                onClick={() => openShadowWallet('withdraw')}
-                className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-rose-500/50 transition-all text-left pointer-events-auto group"
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em]">Earnings</span>
-                  <ArrowDownLeft className="w-3 h-3 text-rose-400 group-hover:-translate-x-0.5 group-hover:translate-y-0.5 transition-transform" />
-                </div>
-                <div className="text-3xl font-black text-white font-display tracking-tighter">{formatPrice(wallets.cashOut)}</div>
-              </button>
-            </div>
 
           {/* Game Area */}
-          <div className="flex flex-col items-center pt-24 lg:pt-32">
+          <div className="flex flex-col items-center pt-2 lg:pt-4">
             <div className="text-center mb-4 relative z-40">
               <div className="flex flex-col items-center gap-4">
                 {/* Mode Toggle */}
@@ -553,24 +566,30 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
             </div>
 
             <div className="relative flex flex-col items-center justify-center min-h-[400px] lg:min-h-[650px] w-full">
-              {/* Mobile/Tablet Wallet Bar (Visible when HUD is hidden) */}
-              <div className="xl:hidden w-full mb-6 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="p-2 bg-slate-800/50 rounded-xl border border-white/5 flex flex-col">
-                  <span className="text-[7px] font-bold text-yellow-500 uppercase">Win</span>
-                  <span className="text-sm font-black text-white">{formatPrice(wallets.playerWin)}</span>
-                </div>
-                <button 
-                  onClick={() => openShadowWallet('deposit')}
-                  className="p-2 bg-blue-600/20 hover:bg-blue-600/30 rounded-xl border border-blue-500/30 flex flex-col text-left transition-colors"
+              {/* Mobile/Tablet Wallet Bar (Visible when Desktop HUD is hidden) */}
+              <div className="lg:hidden w-full mb-6 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => openShadowWallet('withdraw')}
+                  className="p-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 rounded-xl border border-emerald-500/30 flex flex-col text-left transition-colors cursor-pointer"
                 >
-                  <span className="text-[7px] font-bold text-blue-400 uppercase">Deposit</span>
+                  <span className="text-[8px] font-bold text-emerald-400 uppercase">Win Wallet (Tap to Cash Out)</span>
+                  <span className="text-sm font-black text-white">{formatPrice(wallets.playerWin)}</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => openShadowWallet('deposit')}
+                  className="p-2.5 bg-blue-600/20 hover:bg-blue-600/30 rounded-xl border border-blue-500/30 flex flex-col text-left transition-colors cursor-pointer"
+                >
+                  <span className="text-[8px] font-bold text-blue-400 uppercase">Deposit (Tap to Fund)</span>
                   <span className="text-sm font-black text-white">{formatPrice(wallets.deposit)}</span>
                 </button>
                 <button 
+                  type="button"
                   onClick={() => openShadowWallet('withdraw')}
-                  className="p-2 bg-purple-600/20 hover:bg-purple-600/30 rounded-xl border border-purple-500/30 flex flex-col text-left transition-colors"
+                  className="p-2.5 bg-purple-600/20 hover:bg-purple-600/30 rounded-xl border border-purple-500/30 flex flex-col text-left transition-colors cursor-pointer"
                 >
-                  <span className="text-[7px] font-bold text-purple-400 uppercase">Cash Out</span>
+                  <span className="text-[8px] font-bold text-purple-400 uppercase">Cash Out</span>
                   <span className="text-sm font-black text-white">{formatPrice(wallets.cashOut)}</span>
                 </button>
               </div>
@@ -757,15 +776,17 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                         </motion.div>
                       )}
                       {insufficientFundsError && (
-                        <motion.div
+                        <motion.button
+                          type="button"
+                          onClick={() => openShadowWallet('deposit')}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 10 }}
-                          className="px-6 py-2 bg-red-650 text-white border border-red-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2"
+                          className="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white border border-red-400/50 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2 cursor-pointer transition-colors"
                         >
-                          <ShieldAlert className="w-3 h-3 text-red-100" />
-                          Insufficient Funds / Balance
-                        </motion.div>
+                          <ShieldAlert className="w-3.5 h-3.5 text-red-100" />
+                          <span>Insufficient Funds — Click to Fund Wallet</span>
+                        </motion.button>
                       )}
                       <button
                         disabled={isSpinning || systemSettings.maintenanceMode}
@@ -811,7 +832,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
       <motion.div 
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="pt-24 lg:pt-32 px-4 lg:px-8 pb-12"
+        className="pt-4 lg:pt-6 px-4 lg:px-8 pb-12"
       >
         <div className="flex flex-col sm:flex-row items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-4">

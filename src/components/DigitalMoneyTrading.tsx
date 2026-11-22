@@ -432,9 +432,9 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
         <div className="absolute bottom-4 right-4 text-[8px] text-blue-500/30 font-mono pointer-events-none z-10">SYS: ACTIVE_MAPPING</div>
 
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-md z-20">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b border-white/5 bg-slate-900/50 backdrop-blur-md z-30 relative">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -443,10 +443,11 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button 
+              type="button"
               onClick={() => setIsMuted(!isMuted)}
-              className="p-2 text-slate-400 hover:text-white transition-colors bg-slate-800/50 rounded-xl border border-white/5"
+              className="p-2 text-slate-400 hover:text-white transition-colors bg-slate-800/50 rounded-xl border border-white/5 cursor-pointer"
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
@@ -455,7 +456,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               type="button"
               onClick={() => openShadowWallet('deposit')}
               title="Fund via Account Profile Wallet"
-              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-white/5 hover:border-blue-500/40 transition-all relative overflow-hidden cursor-pointer"
+              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-white/5 hover:border-blue-500/40 transition-all relative overflow-hidden cursor-pointer shrink-0"
             >
               <AnimatePresence mode="wait">
                 {lastResult?.status === 'WON' && (
@@ -486,7 +487,7 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               type="button"
               onClick={() => openShadowWallet('withdraw')}
               title="Withdraw wins via Account Profile Wallet"
-              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-emerald-500/20 hover:border-emerald-400/50 transition-all relative overflow-hidden cursor-pointer"
+              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-emerald-500/20 hover:border-emerald-400/50 transition-all relative overflow-hidden cursor-pointer shrink-0"
             >
               <Trophy className="w-4 h-4 text-emerald-400 animate-pulse" />
               <div className="text-right relative z-10">
@@ -502,17 +503,19 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               </div>
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button 
+                type="button"
                 onClick={() => openShadowWallet('deposit')}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
               >
                 <ArrowUpRight className="w-4 h-4 text-white" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Fund Wallet</span>
               </button>
               <button 
+                type="button"
                 onClick={() => openShadowWallet('withdraw')}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
               >
                 <ArrowDownLeft className="w-4 h-4 text-white" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Cash Out</span>
@@ -522,8 +525,9 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
             <CurrencySelector />
 
             <button 
+              type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white transition-colors"
+              className="p-2 text-slate-400 hover:text-white transition-colors cursor-pointer"
             >
               <X className="w-6 h-6" />
             </button>
@@ -940,8 +944,17 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               exit={{ opacity: 0, y: 50 }}
               className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[70] bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-bold"
             >
-              <AlertCircle className="w-5 h-5" />
-              {error}
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+              {error.toLowerCase().includes('insufficient') && (
+                <button
+                  type="button"
+                  onClick={() => openShadowWallet('deposit')}
+                  className="ml-2 px-3 py-1 bg-white text-red-700 rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-100 cursor-pointer"
+                >
+                  Fund Wallet
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

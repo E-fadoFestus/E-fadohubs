@@ -21,7 +21,7 @@ interface UniversalHubHeaderProps {
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
   onNavigateHome: () => void;
-  onOpenCashier?: () => void;
+  onOpenCashier?: (tab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => void;
   onLogin?: () => void;
 }
 
@@ -164,8 +164,9 @@ export const UniversalHubHeader: React.FC<UniversalHubHeaderProps> = ({
         <div className="flex items-center gap-2 sm:gap-3">
           {/* 1 Unified Wallet Display */}
           <button
-            onClick={onOpenCashier}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/40 hover:border-emerald-400 transition-all text-xs sm:text-sm font-black text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)] group"
+            type="button"
+            onClick={() => onOpenCashier?.('overview')}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950/80 to-slate-900 border border-emerald-500/40 hover:border-emerald-400 transition-all text-xs sm:text-sm font-black text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)] group cursor-pointer"
             title="1 Unified Wallet across all 10 Hubs"
           >
             <Wallet className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />

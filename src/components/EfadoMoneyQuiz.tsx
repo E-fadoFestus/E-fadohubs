@@ -1059,35 +1059,39 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center shrink-0">
             <Wallet className="w-6 h-6 text-indigo-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deposit Wallet</p>
-            <h3 className="text-xl font-black text-slate-900">₦{user.depositWallet.toLocaleString()}</h3>
+            <h3 className="text-xl font-black text-slate-900">₦{(user.depositWallet || 0).toLocaleString()}</h3>
           </div>
           <button 
+            type="button"
             onClick={() => openShadowWallet('deposit')}
             title="Fund via Account Profile Wallet"
-            className="ml-auto p-2 bg-indigo-600 text-white rounded-xl hover:scale-110 transition-all"
+            className="ml-auto px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-md"
           >
-            <Zap className="w-4 h-4" />
+            <Zap className="w-3.5 h-3.5" />
+            <span>Fund</span>
           </button>
         </div>
         <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center shrink-0">
             <Trophy className="w-6 h-6 text-emerald-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Win Wallet</p>
-            <h3 className="text-xl font-black text-slate-900">₦{user.playerWallet.toLocaleString()}</h3>
+            <h3 className="text-xl font-black text-slate-900">₦{(user.playerWallet || 0).toLocaleString()}</h3>
           </div>
           <button 
+            type="button"
             onClick={() => openShadowWallet('withdraw')}
-            title="Withdraw via Account Profile Wallet"
-            className="ml-auto p-2 bg-emerald-600 text-white rounded-xl hover:scale-110 transition-all"
+            title="Cash Out Winnings via Account Profile Wallet"
+            className="ml-auto px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-md"
           >
-            <ArrowUpRight className="w-4 h-4" />
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>Cash Out</span>
           </button>
         </div>
         <div className="bg-slate-900 p-6 rounded-[2.5rem] shadow-xl flex items-center gap-4 text-white">

@@ -12,7 +12,9 @@ import {
   Play, 
   Flame,
   ShieldCheck,
-  Wallet
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft
 } from 'lucide-react';
 import { DeepSeaJetGame } from './DeepSeaJetGame';
 import { LuckySpinWheel } from './LuckySpinWheel';
@@ -27,7 +29,7 @@ interface ArenaHubViewProps {
   wallet: number;
   onResult: (winAmount: number, gameId: string, stake: number, metadata?: any) => void;
   onStakeDeduction?: (amount: number, gameId: string) => Promise<void>;
-  onOpenCashier?: () => void;
+  onOpenCashier?: (tab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => void;
   onLogin?: () => void;
   initialGame?: 'jet' | 'spin' | 'dmt' | 'card' | 'quiz' | 'equilibrium';
 }
@@ -48,12 +50,16 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
     onResult(winAmount, String(gameId), bet, { multiplier });
   };
 
-  const handleUpdateBalance = async (_amount: number, _type?: any) => {
-    // Handled in parent state
+  const handleUpdateBalance = async (amount: number, type?: any) => {
+    if (type === 'game_bet' && onStakeDeduction) {
+      await onStakeDeduction(amount, 'moneyQuiz');
+    } else if (type === 'game_win') {
+      onResult(amount, 'moneyQuiz', 0, { multiplier: 1 });
+    }
   };
 
   const handleAddTransaction = async (_tx: any) => {
-    // Recorded in ledger
+    // Recorded in ledger via parent transaction flow
   };
 
   const handleGameStart = async (amount: number, gameId: string) => {
@@ -168,17 +174,33 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <div className="text-right hidden sm:block">
-              <span className="text-[10px] font-mono text-slate-400 block uppercase">Shared Wallet</span>
-              <span className="text-xs font-mono font-black text-emerald-400">₦{wallet.toLocaleString()}</span>
+            <div className="text-right hidden sm:block px-2 py-0.5 rounded-lg bg-slate-950/60 border border-white/5">
+              <span className="text-[9px] font-mono text-slate-400 block uppercase">Deposit</span>
+              <span className="text-xs font-mono font-black text-indigo-300">₦{(user?.depositWallet || 0).toLocaleString()}</span>
+            </div>
+            <div className="text-right hidden sm:block px-2 py-0.5 rounded-lg bg-slate-950/60 border border-emerald-500/20">
+              <span className="text-[9px] font-mono text-emerald-400 block uppercase">Win Wallet</span>
+              <span className="text-xs font-mono font-black text-emerald-400">₦{(user?.playerWallet || 0).toLocaleString()}</span>
             </div>
             {onOpenCashier && (
-              <button
-                onClick={onOpenCashier}
-                className="px-2.5 py-1 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-bold font-mono transition-colors"
-              >
-                + Deposit
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenCashier('deposit')}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 text-xs font-bold font-mono transition-colors cursor-pointer"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Fund</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenCashier('withdraw')}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 text-xs font-bold font-mono transition-colors cursor-pointer"
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <span>Cash Out</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -196,7 +218,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onResult={handleGameResult}
                 onGameStart={handleGameStart}
                 onUpdateBalance={() => {}}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -223,7 +245,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -243,7 +265,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -263,7 +285,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -283,7 +305,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onUpdateBalance={handleUpdateBalance}
                 onAddTransaction={handleAddTransaction}
                 onClose={() => setActiveGame('none')}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -305,7 +327,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onGameStart={handleGameStart}
                 onUpdateBalance={handleUpdateBalance}
                 onAddTransaction={handleAddTransaction}
-                onOpenWallet={() => onOpenCashier?.()}
+                onOpenWallet={(tab) => onOpenCashier?.(tab)}
               />
             ) : (
               <div className="text-center py-16 px-4">

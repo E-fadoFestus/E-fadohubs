@@ -78,6 +78,10 @@ interface UserWalletProps {
 export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
   const { selectedCurrency, setCurrency, formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   const [depositMethod, setDepositMethod] = useState<'paystack' | 'opay' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('paystack');
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
   const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');

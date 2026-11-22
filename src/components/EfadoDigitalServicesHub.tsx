@@ -13,6 +13,7 @@ import {
   Copy,
   Info,
   ArrowUpRight,
+  ArrowDownLeft,
   ArrowRight,
   UserCheck,
   Phone,
@@ -1064,17 +1065,30 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
                           </div>
                         </label>
                         {onOpenWallet && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenWallet('deposit')}
-                            className="w-full flex items-center justify-between p-4 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 rounded-2xl transition-all text-left"
-                          >
-                            <div>
-                              <p className="text-xs font-black text-indigo-300">Fund Account Profile Wallet</p>
-                              <p className="text-[9px] text-slate-400 font-bold uppercase">Add funds to your central EFADO wallet</p>
-                            </div>
-                            <ArrowUpRight className="w-4 h-4 text-indigo-400 shrink-0" />
-                          </button>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => onOpenWallet('deposit')}
+                              className="w-full flex items-center justify-between p-4 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 rounded-2xl transition-all text-left cursor-pointer"
+                            >
+                              <div>
+                                <p className="text-xs font-black text-indigo-300">Fund Wallet</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase">Deposit to Profile Wallet</p>
+                              </div>
+                              <ArrowUpRight className="w-4 h-4 text-indigo-400 shrink-0" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOpenWallet('withdraw')}
+                              className="w-full flex items-center justify-between p-4 bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 rounded-2xl transition-all text-left cursor-pointer"
+                            >
+                              <div>
+                                <p className="text-xs font-black text-emerald-300">Cash Out</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase">Withdraw Winnings</p>
+                              </div>
+                              <ArrowDownLeft className="w-4 h-4 text-emerald-400 shrink-0" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1121,12 +1135,24 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
                   <AlertCircle className="w-16 h-16 text-rose-500 mx-auto animate-bounce" />
                   <h3 className="text-xl font-black text-white">VTU TOPUP FAILED</h3>
                   <p className="text-xs text-rose-400 uppercase tracking-wider">{vendingStatusMessage}</p>
-                  <button
-                    onClick={() => setVendingStatus('idle')}
-                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase"
-                  >
-                    Retry Vending
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {onOpenWallet && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenWallet('deposit')}
+                        className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer"
+                      >
+                        Fund Account Profile Wallet
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setVendingStatus('idle')}
+                      className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase cursor-pointer"
+                    >
+                      Retry Vending
+                    </button>
+                  </div>
                 </div>
               )}
 

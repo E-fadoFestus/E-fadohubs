@@ -48,7 +48,7 @@ interface UniversalHubPageProps {
   wallet: number;
   onNavigateHub: (slug: string, inNewTab?: boolean) => void;
   onNavigateHome: () => void;
-  onOpenCashier?: () => void;
+  onOpenCashier?: (tab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => void;
   onLogin?: () => void;
   onResult: (winAmount: number, gameId: string, stake: number, metadata?: any) => void;
   onStakeDeduction?: (amount: number, gameId: string) => Promise<void>;
@@ -206,6 +206,7 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
           <EfadoDigitalServicesHub
             user={effectiveUser}
             initialSection="vending"
+            onOpenWallet={(tab) => onOpenCashier?.(tab)}
           />
         );
 
@@ -222,6 +223,7 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
           <EfadoDigitalServicesHub
             user={effectiveUser}
             initialSection="crypto"
+            onOpenWallet={(tab) => onOpenCashier?.(tab)}
           />
         );
 

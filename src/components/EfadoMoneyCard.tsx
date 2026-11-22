@@ -137,7 +137,8 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
   const handleStart = () => {
     if (balance < stake) {
       setMessage("Insufficient Funds / Balance");
-      setTimeout(() => setMessage(null), 3500);
+      openShadowWallet('deposit');
+      setTimeout(() => setMessage(null), 4000);
       return;
     }
 
@@ -272,7 +273,7 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-900/50 to-slate-950 pointer-events-none" />
         
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl z-20">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-slate-900/40 backdrop-blur-xl z-30 relative">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20 ring-1 ring-white/20 flex-shrink-0">
               <CreditCard className="w-5 h-5 text-white" />
@@ -303,8 +304,8 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
             </div>
           </div>
 
-          {/* Wallets and Stats - Centered between Name and Sound */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 mx-2 overflow-x-auto no-scrollbar">
+          {/* Wallets and Stats */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 overflow-x-auto no-scrollbar max-w-full">
             {/* Stake */}
             <div className="flex items-center gap-2 px-3 border-r border-white/10 shrink-0">
               <Coins className="w-3.5 h-3.5 text-orange-400" />
@@ -323,46 +324,49 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
               </div>
             </div>
 
-            {/* Player Wallet */}
-            <div className="flex items-center gap-2 px-3 border-r border-white/10 shrink-0">
-              <Wallet className="w-3.5 h-3.5 text-blue-400" />
-              <div>
-                <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">Wallet</p>
-                <p className="text-xs font-display font-black text-white">{formatPrice(balance)}</p>
-              </div>
-            </div>
-
-            {/* Win Wallet */}
-            <div className="flex items-center gap-2 px-3 border-r border-white/10 shrink-0">
+            {/* Win Wallet (Tap to Cash Out) */}
+            <button
+              type="button"
+              onClick={() => openShadowWallet('withdraw')}
+              title="Cash Out Winnings via Account Profile Wallet"
+              className="flex items-center gap-2 px-3 border-r border-white/10 shrink-0 hover:bg-white/5 rounded-lg py-1 transition-colors text-left cursor-pointer"
+            >
               <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
               <div>
-                <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">Win Wallet</p>
+                <p className="text-[6px] font-bold text-emerald-400 uppercase tracking-widest">Win Wallet</p>
                 <p className="text-xs font-display font-black text-white">{formatPrice(winWallet)}</p>
               </div>
-            </div>
+            </button>
 
-            {/* Deposit Wallet */}
-            <div className="flex items-center gap-2 px-3 shrink-0">
+            {/* Deposit Wallet (Tap to Fund) */}
+            <button
+              type="button"
+              onClick={() => openShadowWallet('deposit')}
+              title="Fund via Account Profile Wallet"
+              className="flex items-center gap-2 px-3 shrink-0 hover:bg-white/5 rounded-lg py-1 transition-colors text-left cursor-pointer"
+            >
               <ArrowDownLeft className="w-3.5 h-3.5 text-indigo-400" />
               <div>
-                <p className="text-[6px] font-bold text-slate-500 uppercase tracking-widest">Deposit Wallet</p>
+                <p className="text-[6px] font-bold text-indigo-400 uppercase tracking-widest">Deposit Wallet</p>
                 <p className="text-xs font-display font-black text-white">{formatPrice(depositWallet)}</p>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Fund and Cashout Buttons */}
-          <div className="flex items-center gap-2 mx-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button 
+              type="button"
               onClick={() => openShadowWallet('deposit')}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 border border-white/10"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 border border-white/10 cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               Fund Wallet
             </button>
             <button 
+              type="button"
               onClick={() => openShadowWallet('withdraw')}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 border border-white/10"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 border border-white/10 cursor-pointer"
             >
               <ArrowUpCircle className="w-3.5 h-3.5" />
               Cashout
@@ -373,15 +377,17 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
             <CurrencySelector />
 
             <button 
+              type="button"
               onClick={() => setIsMuted(!isMuted)}
-              className="p-2 text-slate-400 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
+              className="p-2 text-slate-400 hover:text-white transition-all bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 cursor-pointer"
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
             
             <button 
+              type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white transition-colors hover:rotate-90 duration-300"
+              className="p-1.5 text-slate-400 hover:text-white transition-colors hover:rotate-90 duration-300 cursor-pointer"
             >
               <X className="w-6 h-6" />
             </button>
@@ -594,8 +600,15 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
               exit={{ opacity: 0, y: 50, scale: 0.9 }}
               className="absolute bottom-32 left-1/2 -translate-x-1/2 z-[110] bg-red-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 font-black uppercase tracking-widest text-sm"
             >
-              <AlertCircle className="w-6 h-6" />
-              {message}
+              <AlertCircle className="w-6 h-6 shrink-0" />
+              <span>{message}</span>
+              <button
+                type="button"
+                onClick={() => openShadowWallet('deposit')}
+                className="px-3 py-1.5 bg-white text-red-700 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-100 cursor-pointer shrink-0"
+              >
+                Fund Wallet
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

@@ -523,10 +523,50 @@ function AppContent() {
   const [showWallet, setShowWallet] = useState(false);
   const [walletInitialTab, setWalletInitialTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>('overview');
   
-  const openWalletWithTab = (tab: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings') => {
-    setWalletInitialTab(tab);
+  const openWalletWithTab = (tab: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings' = 'overview') => {
+    if (!user) {
+      handleLogin();
+      return;
+    }
+    const validTabs = ['overview', 'profile', 'deposit', 'withdraw', 'history', 'settings'] as const;
+    const safeTab = typeof tab === 'string' && (validTabs as readonly string[]).includes(tab) ? tab : 'overview';
+    setWalletInitialTab(safeTab);
     setShowWallet(true);
   };
+
+  const renderWalletModal = () => (
+    <AnimatePresence>
+      {showWallet && user && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowWallet(false)}
+          className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl"
+          >
+            <button 
+              type="button"
+              onClick={() => setShowWallet(false)}
+              aria-label="Close Account Profile Wallet"
+              className="absolute top-4 right-4 z-20 p-2 bg-slate-900/80 hover:bg-slate-800 rounded-full text-slate-300 hover:text-white transition-all border border-white/10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <UserWallet 
+              user={user} 
+              onUpdateBalance={handleWalletUpdate}
+              onClose={() => setShowWallet(false)}
+              initialTab={walletInitialTab}
+            />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   const [isPaymentCallback, setIsPaymentCallback] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -2380,14 +2420,17 @@ function AppContent() {
   if (showVerticalHubsDirectory) {
     const totalSharedWallet = (user?.depositWallet || 0) + (user?.playerWallet || 0);
     return (
-      <VerticalHubsPage
-        user={user}
-        wallet={totalSharedWallet}
-        onNavigateHub={navigateToVerticalHub}
-        onNavigateHome={handleNavigateHome}
-        onOpenCashier={() => openWalletWithTab('overview')}
-        onLogin={handleLogin}
-      />
+      <>
+        <VerticalHubsPage
+          user={user}
+          wallet={totalSharedWallet}
+          onNavigateHub={navigateToVerticalHub}
+          onNavigateHome={handleNavigateHome}
+          onOpenCashier={(tab) => openWalletWithTab(tab || 'overview')}
+          onLogin={handleLogin}
+        />
+        {renderWalletModal()}
+      </>
     );
   }
 
@@ -2395,56 +2438,59 @@ function AppContent() {
   if (verticalHubSlug) {
     const totalSharedWallet = (user?.depositWallet || 0) + (user?.playerWallet || 0);
     return (
-      <UniversalHubPage
-        slug={verticalHubSlug}
-        itemId={hubItemId || undefined}
-        user={user}
-        wallet={totalSharedWallet}
-        onNavigateHub={navigateToVerticalHub}
-        onNavigateHome={handleNavigateHome}
-        onOpenCashier={() => openWalletWithTab('overview')}
-        onLogin={handleLogin}
-        onResult={(winAmount, gameId, stake) => {
-          const mult = stake > 0 ? winAmount / stake : 0;
-          onResult(mult, stake, gameId as any, winAmount);
-        }}
-        onStakeDeduction={async (amount, gameId) => {
-          if (!user) return;
-          try {
-            await runTransaction(db, async (tx) => {
-              const pocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+      <>
+        <UniversalHubPage
+          slug={verticalHubSlug}
+          itemId={hubItemId || undefined}
+          user={user}
+          wallet={totalSharedWallet}
+          onNavigateHub={navigateToVerticalHub}
+          onNavigateHome={handleNavigateHome}
+          onOpenCashier={(tab) => openWalletWithTab(tab || 'overview')}
+          onLogin={handleLogin}
+          onResult={(winAmount, gameId, stake) => {
+            const mult = stake > 0 ? winAmount / stake : 0;
+            onResult(mult, stake, gameId as any, winAmount);
+          }}
+          onStakeDeduction={async (amount, gameId) => {
+            if (!user) return;
+            try {
+              await runTransaction(db, async (tx) => {
+                const pocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+                const userRef = doc(db, 'users', user.uid);
+                const pocketSnap = await tx.get(pocketRef);
+                const pocketBal = pocketSnap.exists()
+                  ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+                  : 0;
+                if (pocketBal >= amount) {
+                  const nextBal = pocketBal - amount;
+                  tx.set(pocketRef, {
+                    balance: nextBal,
+                    depositWallet: nextBal,
+                    currency: 'NGN',
+                    userId: user.uid,
+                    updatedAt: serverTimestamp()
+                  }, { merge: true });
+                } else {
+                  tx.update(userRef, { playerWallet: increment(-amount) });
+                }
+              });
+            } catch (err) {
+              console.error('Stake deduction failed:', err);
+            }
+          }}
+          onUpdateBalance={async (amount) => {
+            if (!user) return;
+            try {
               const userRef = doc(db, 'users', user.uid);
-              const pocketSnap = await tx.get(pocketRef);
-              const pocketBal = pocketSnap.exists()
-                ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
-                : 0;
-              if (pocketBal >= amount) {
-                const nextBal = pocketBal - amount;
-                tx.set(pocketRef, {
-                  balance: nextBal,
-                  depositWallet: nextBal,
-                  currency: 'NGN',
-                  userId: user.uid,
-                  updatedAt: serverTimestamp()
-                }, { merge: true });
-              } else {
-                tx.update(userRef, { playerWallet: increment(-amount) });
-              }
-            });
-          } catch (err) {
-            console.error('Stake deduction failed:', err);
-          }
-        }}
-        onUpdateBalance={async (amount) => {
-          if (!user) return;
-          try {
-            const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, { playerWallet: increment(amount) });
-          } catch (err) {
-            console.error('Balance update failed:', err);
-          }
-        }}
-      />
+              await updateDoc(userRef, { playerWallet: increment(amount) });
+            } catch (err) {
+              console.error('Balance update failed:', err);
+            }
+          }}
+        />
+        {renderWalletModal()}
+      </>
     );
   }
 
@@ -3695,30 +3741,6 @@ function AppContent() {
             </AnimatePresence>
 
             <AnimatePresence>
-              {showWallet && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-                >
-                  <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto no-scrollbar">
-                    <button 
-                      onClick={() => setShowWallet(false)}
-                      className="absolute top-4 right-4 z-10 p-2 bg-white/5 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-all"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                    <UserWallet 
-                      user={user} 
-                      onUpdateBalance={handleWalletUpdate}
-                      onClose={() => setShowWallet(false)}
-                      initialTab={walletInitialTab}
-                    />
-                  </div>
-                </motion.div>
-              )}
-
               {/* Simulated SMS Gateway Floating Banner */}
               {showSmsPopup && authorizedSmsRecipient === 'festdanemh@gmail.com' && (
                 <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-full max-w-sm p-5 bg-slate-900/95 border-2 border-amber-500/80 rounded-2xl shadow-2xl backdrop-blur-md animate-bounce">
@@ -4905,6 +4927,7 @@ function AppContent() {
       />
 
       {user && <EfadoHelpChat user={user} />}
+      {renderWalletModal()}
     </div>
   );
 }

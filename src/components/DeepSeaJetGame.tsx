@@ -24,7 +24,9 @@ import {
   CheckCircle,
   TrendingUp,
   Flame,
-  Timer
+  Timer,
+  ArrowUpRight,
+  ArrowDownLeft
 } from 'lucide-react';
 
 interface DeepSeaJetGameProps {
@@ -647,7 +649,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
     <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-2 sm:p-4 overflow-y-auto no-scrollbar font-sans text-slate-100">
       <div className="relative w-full max-w-7xl bg-slate-900 border-2 border-cyan-500/30 rounded-[2.5rem] shadow-[0_0_80px_rgba(6,182,212,0.2)] overflow-hidden flex flex-col">
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-cyan-500/20 bg-slate-950/60 backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-cyan-500/20 bg-slate-950/60 backdrop-blur-md">
           {/* Brand Logo & Telemetry */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)]">
@@ -669,12 +671,13 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
           </div>
 
           {/* Wallet Balance, Controls & Sound */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Wallet Chip */}
             <button
+              type="button"
               id="game-wallet-chip"
               onClick={() => setShowCashier(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-950/90 border border-cyan-500/30 hover:border-cyan-400 rounded-2xl transition-all shadow-inner group"
+              className="flex items-center gap-2 px-3.5 py-2 bg-slate-950/90 border border-cyan-500/30 hover:border-cyan-400 rounded-2xl transition-all shadow-inner group cursor-pointer"
             >
               <Wallet className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
               <div className="text-left">
@@ -688,11 +691,53 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
               </div>
             </button>
 
+            {/* Win Wallet Readout in Real Stakes */}
+            {!isPracticeMode && (
+              <button
+                type="button"
+                onClick={() => (onOpenWallet ? onOpenWallet('withdraw') : setShowCashier(true))}
+                title="Withdraw Winnings via Account Profile Wallet"
+                className="flex items-center gap-2 px-3 py-2 bg-emerald-950/50 border border-emerald-500/30 hover:border-emerald-400 rounded-2xl transition-all text-left cursor-pointer"
+              >
+                <div>
+                  <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest leading-none">
+                    Win Wallet
+                  </div>
+                  <div className="text-sm font-black text-emerald-300 font-mono">
+                    ₦{(user.playerWallet || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </button>
+            )}
+
+            {/* Direct Fund & Cash Out Shadow Buttons */}
+            {!isPracticeMode && onOpenWallet && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenWallet('deposit')}
+                  className="flex items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs rounded-xl shadow-md uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  <span>Fund</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenWallet('withdraw')}
+                  className="flex items-center gap-1 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <span>Cash Out</span>
+                </button>
+              </>
+            )}
+
             {/* Cashier Button */}
             <button
+              type="button"
               id="open-cashier-modal"
               onClick={() => setShowCashier(true)}
-              className="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] uppercase tracking-wider transition-all"
+              className="px-3.5 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs rounded-xl shadow-[0_0_15px_rgba(6,182,212,0.3)] uppercase tracking-wider transition-all cursor-pointer"
             >
               Cashier
             </button>
@@ -955,6 +1000,8 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
             }}
             onResetPracticeBalance={() => setPracticeBalance(1000)}
             onOpenProfileWallet={onOpenWallet}
+            depositBalance={user.depositWallet || 0}
+            winBalance={user.playerWallet || 0}
           />
         )}
 
