@@ -71,7 +71,6 @@ import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
 import { DiagnosticModal } from './components/DiagnosticModal';
-import { GameManualPayment } from './components/GameManualPayment';
 import { PaymentCallback } from './components/PaymentCallback';
 import { getBackendUrl } from './config/backend';
 import { AdSenseBanner } from './components/AdSenseBanner';
@@ -3306,10 +3305,6 @@ function AppContent() {
                     </div>
                   </div>
                 </div>
-
-                {user && (
-                  <GameManualPayment user={user} />
-                )}
               </motion.section>
             )}
 
@@ -3609,6 +3604,7 @@ function AppContent() {
                 onClose={() => setShowSpinWheel(false)} 
                 user={user}
                 onResult={onResult}
+                onOpenWallet={openWalletWithTab}
               />
             )}
 
@@ -3617,6 +3613,7 @@ function AppContent() {
                 onClose={() => setShowTradingGame(false)} 
                 user={user}
                 onResult={onResult}
+                onOpenWallet={openWalletWithTab}
               />
             )}
 
@@ -3626,6 +3623,7 @@ function AppContent() {
                 user={user}
                 onResult={onResult}
                 onUpdateBalance={handleWalletUpdate}
+                onOpenWallet={openWalletWithTab}
               />
             )}
 
@@ -3702,7 +3700,7 @@ function AppContent() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                  className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 >
                   <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto no-scrollbar">
                     <button 
@@ -4161,7 +4159,11 @@ function AppContent() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
               >
-                <EfadoDigitalServicesHub user={user} initialSection={digitalServicesSection} />
+                <EfadoDigitalServicesHub
+                  user={user}
+                  initialSection={digitalServicesSection}
+                  onOpenWallet={openWalletWithTab}
+                />
               </motion.div>
             )}
 
@@ -4178,6 +4180,7 @@ function AppContent() {
                     onUpdateBalance={handleWalletUpdate}
                     onAddTransaction={handleAddTransaction}
                     onClose={() => setShowMoneyQuiz(false)}
+                    onOpenWallet={openWalletWithTab}
                   />
                 </div>
               </motion.div>
@@ -4191,6 +4194,7 @@ function AppContent() {
                 onGameStart={handleStakeDeduction}
                 onUpdateBalance={handleWalletUpdate}
                 onAddTransaction={handleAddTransaction}
+                onOpenWallet={openWalletWithTab}
               />
             )}
 
@@ -4203,6 +4207,7 @@ function AppContent() {
                 onUpdateBalance={() => {
                   // User balance is synchronized via real-time firestore onSnapshot or local state in DEV mode
                 }}
+                onOpenWallet={openWalletWithTab}
               />
             )}
 

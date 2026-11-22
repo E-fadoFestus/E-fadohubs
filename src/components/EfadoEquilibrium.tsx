@@ -20,7 +20,6 @@ import {
 import confetti from 'canvas-confetti';
 import { UserProfile, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { CurrencySelector } from './CurrencySelector';
 
 interface EfadoEquilibriumProps {
@@ -30,6 +29,7 @@ interface EfadoEquilibriumProps {
   onGameStart?: (bet: number, gameId: string) => Promise<void>;
   onUpdateBalance: (amount: number, type: 'deposit' | 'withdrawal') => Promise<void>;
   onAddTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => Promise<void>;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 // Slot Value Interpretation
@@ -45,7 +45,8 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
   onResult, 
   onGameStart,
   onUpdateBalance,
-  onAddTransaction
+  onAddTransaction,
+  onOpenWallet
 }) => {
   const { formatPrice } = useCurrency();
   const [isSpinning, setIsSpinning] = useState(false);
@@ -70,9 +71,12 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
 
   const [showRules, setShowRules] = useState(false);
   const [shake, setShake] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [paymentType, setPaymentType] = useState<'deposit' | 'withdraw'>('deposit');
-  const [isProcessing, setIsProcessing] = useState(false);
+
+  const openShadowWallet = (tab: 'deposit' | 'withdraw') => {
+    if (onOpenWallet) {
+      onOpenWallet(tab);
+    }
+  };
 
   const controls1 = useAnimation();
   const controls2 = useAnimation();
@@ -256,41 +260,6 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
     setIsSpinning(false);
   };
 
-  const handlePaymentComplete = async (amount: number, method: string) => {
-    setIsProcessing(true);
-    try {
-      if (paymentType === 'deposit') {
-        await onUpdateBalance(amount, 'deposit');
-        await onAddTransaction({
-          userId: user.uid,
-          type: 'deposit',
-          amount: amount,
-          currency: 'USD',
-          status: 'completed',
-          method: method || 'Direct Deposit',
-          description: 'Equilibrium Wallet Top-up'
-        });
-      } else {
-        // Withdrawal from playerWallet (linked cash out)
-        await onUpdateBalance(amount, 'withdrawal');
-        await onAddTransaction({
-          userId: user.uid,
-          type: 'withdrawal',
-          amount: amount,
-          currency: 'USD',
-          status: 'pending',
-          method: method || 'Bank Transfer',
-          description: 'Equilibrium Cash Out Request'
-        });
-      }
-      setShowPayment(false);
-    } catch (error) {
-      console.error('Payment processing failed', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -301,23 +270,6 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
       <div className="relative w-full max-w-4xl bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-6 lg:p-10 shadow-2xl overflow-hidden glass-card-ultra">
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-[6px] bg-gradient-to-r from-yellow-500 via-orange-500 to-yellow-500" />
-        
-        <AnimatePresence>
-          {showPayment && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-              <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
-                <EasyPaymentPlatform 
-                  user={user}
-                  type={paymentType}
-                  onClose={() => setShowPayment(false)}
-                  onComplete={handlePaymentComplete}
-                  hub="EQUILIBRIUM"
-                  purpose={paymentType === 'deposit' ? "EFADO Equilibrium Stake Funding" : "EFADO Equilibrium Dividend Extraction"}
-                />
-              </div>
-            </div>
-          )}
-        </AnimatePresence>
 
         <div className="absolute -top-24 -left-24 w-64 h-64 bg-yellow-500/10 rounded-full blur-[100px] animate-pulse" />
         <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-[100px] animate-pulse" />
@@ -366,11 +318,11 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                 <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4">
                    <div className="flex justify-between items-center mb-1">
                       <div className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Deposit Wallet</div>
-                      <Plus className="w-3 h-3 text-indigo-400 cursor-pointer" onClick={() => { setPaymentType('deposit'); setShowPayment(true); }} />
+                      <Plus className="w-3 h-3 text-indigo-400 cursor-pointer" onClick={() => openShadowWallet('deposit')} />
                    </div>
                    <div className="text-xl font-black text-white">{formatPrice(user.depositWallet)}</div>
                    <button 
-                    onClick={() => { setPaymentType('deposit'); setShowPayment(true); }}
+                    onClick={() => openShadowWallet('deposit')}
                     className="w-full mt-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
                   >
                     Fund Wallet
@@ -379,11 +331,11 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4">
                    <div className="flex justify-between items-center mb-1">
                       <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Cash Out Wallet</div>
-                      <ArrowUpRight className="w-3 h-3 text-emerald-400 cursor-pointer" onClick={() => { setPaymentType('withdraw'); setShowPayment(true); }} />
+                      <ArrowUpRight className="w-3 h-3 text-emerald-400 cursor-pointer" onClick={() => openShadowWallet('withdraw')} />
                    </div>
                    <div className="text-xl font-black text-white">{formatPrice(user.playerWallet)}</div>
                     <button 
-                    onClick={() => { setPaymentType('withdraw'); setShowPayment(true); }}
+                    onClick={() => openShadowWallet('withdraw')}
                     className="w-full mt-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all"
                   >
                     Withdraw

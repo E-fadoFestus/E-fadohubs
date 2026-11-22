@@ -33,6 +33,7 @@ interface DeepSeaJetGameProps {
   onResult: (multiplier: number, bet: number, gameId: any, payoutOverride?: number) => Promise<void>;
   onGameStart?: (amount: number, gameId: string) => Promise<void>;
   onUpdateBalance?: () => void;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 const CURRENCY_SYMBOLS: Record<DeepSeaCurrency, string> = {
@@ -61,6 +62,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
   onResult,
   onGameStart,
   onUpdateBalance,
+  onOpenWallet,
 }) => {
   // Game Lifecycle States: 'betting' (5s countdown) -> 'flying'/'diving' -> 'crashed'
   const [gameState, setGameState] = useState<'betting' | 'diving' | 'flying' | 'crashed' | 'idle'>('betting');
@@ -220,8 +222,11 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
 
       // Check balance
       if (targetBet.betAmount > currentBalance) {
-        alert('Insufficient balance to place stake. Please fund via Cashier.');
-        setShowCashier(true);
+        if (!isPracticeMode && onOpenWallet) {
+          onOpenWallet('deposit');
+        } else {
+          setShowCashier(true);
+        }
         return;
       }
       setTargetBet((prev) => ({ ...prev, status: 'placed' }));
@@ -949,6 +954,7 @@ export const DeepSeaJetGame: React.FC<DeepSeaJetGameProps> = ({
               }
             }}
             onResetPracticeBalance={() => setPracticeBalance(1000)}
+            onOpenProfileWallet={onOpenWallet}
           />
         )}
 

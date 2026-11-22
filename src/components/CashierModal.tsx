@@ -14,6 +14,7 @@ interface CashierModalProps {
   onDeposit: (amount: number, currency: DeepSeaCurrency) => void;
   onWithdraw: (amount: number, currency: DeepSeaCurrency, address: string) => void;
   onResetPracticeBalance: () => void;
+  onOpenProfileWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 export const CashierModal: React.FC<CashierModalProps> = ({
@@ -27,6 +28,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({
   onDeposit,
   onWithdraw,
   onResetPracticeBalance,
+  onOpenProfileWallet,
 }) => {
   const [tab, setTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   const [method, setMethod] = useState<'crypto' | 'card' | 'wallet'>('crypto');
@@ -173,30 +175,83 @@ export const CashierModal: React.FC<CashierModalProps> = ({
           </div>
         </div>
 
-        {/* Currencies Pills */}
-        <div className="px-6 py-2.5 bg-slate-900 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 shrink-0">
-            Currency:
-          </span>
-          {currencies.map((c) => (
-            <button
-              key={c.code}
-              onClick={() => {
-                soundManager.playClick();
-                onSelectCurrency(c.code);
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-black shrink-0 transition-all ${
-                activeCurrency === c.code
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm'
-                  : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {c.symbol} {c.code}
-            </button>
-          ))}
-        </div>
+        {/* Currencies Pills (Practice Mode only or fallback) */}
+        {(isPracticeMode || !onOpenProfileWallet) && (
+          <div className="px-6 py-2.5 bg-slate-900 border-b border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 shrink-0">
+              Currency:
+            </span>
+            {currencies.map((c) => (
+              <button
+                key={c.code}
+                onClick={() => {
+                  soundManager.playClick();
+                  onSelectCurrency(c.code);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black shrink-0 transition-all ${
+                  activeCurrency === c.code
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm'
+                    : 'bg-slate-800/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {c.symbol} {c.code}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {/* Deposit / Withdraw Sub-Tabs */}
+        {/* Shadow Wallet Bridge for Real Stakes, or Practice Demo Cashier */}
+        {!isPracticeMode && onOpenProfileWallet ? (
+          <div className="p-6 overflow-y-auto no-scrollbar flex-1 space-y-5">
+            <div className="p-5 bg-slate-950 border border-cyan-500/20 rounded-3xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white uppercase tracking-wide">
+                    Connected to Account Profile Wallet
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Your Real Stakes balance syncs directly with your central EFADO Account Profile Wallet.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-900/90 rounded-2xl border border-slate-800 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Synced Balance</span>
+                <span className="text-xl font-black text-emerald-400">
+                  ₦{realBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    onClose();
+                    onOpenProfileWallet('deposit');
+                  }}
+                  className="py-4 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black rounded-2xl shadow-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <ArrowDownRight className="w-4 h-4" />
+                  <span>Fund Profile Wallet</span>
+                </button>
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    onClose();
+                    onOpenProfileWallet('withdraw');
+                  }}
+                  className="py-4 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black rounded-2xl shadow-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <ArrowUpRight className="w-4 h-4" />
+                  <span>Cash Out / Withdraw</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="p-6 overflow-y-auto no-scrollbar flex-1 space-y-5">
           <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
             <button
@@ -403,6 +458,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

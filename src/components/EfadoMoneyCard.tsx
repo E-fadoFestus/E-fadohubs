@@ -30,7 +30,6 @@ import confetti from 'canvas-confetti';
 
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { CurrencySelector } from './CurrencySelector';
 
 interface Card {
@@ -45,9 +44,10 @@ interface EfadoMoneyCardProps {
   user: UserProfile;
   onResult: (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium', payoutOverride?: number) => Promise<void>;
   onUpdateBalance?: (amount: number, type: 'deposit' | 'withdrawal', accountDetails?: any) => Promise<void>;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
-export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, onResult, onUpdateBalance }) => {
+export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, onResult, onUpdateBalance, onOpenWallet }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
   const [currentStage, setCurrentStage] = useState(0);
   const [cards, setCards] = useState<Card[]>([]);
@@ -56,15 +56,12 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
   const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'REVEALED'>('IDLE');
   const [isMuted, setIsMuted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentModalType, setPaymentModalType] = useState<'FUND' | 'CASHOUT'>('FUND');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
-  const [paymentStep, setPaymentStep] = useState<'METHOD' | 'DETAILS' | 'AMOUNT' | 'QR_SCAN' | 'SUCCESS'>('METHOD');
-  const [qrScanning, setQrScanning] = useState(false);
-  const [accountNumber, setAccountNumber] = useState<string>('');
-  const [verifiedName, setVerifiedName] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
+
+  const openShadowWallet = (tab: 'deposit' | 'withdraw') => {
+    if (onOpenWallet) {
+      onOpenWallet(tab);
+    }
+  };
 
   const [showWinOverlay, setShowWinOverlay] = useState(false);
   const [winAmount, setWinAmount] = useState(0);
@@ -357,22 +354,14 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
           {/* Fund and Cashout Buttons */}
           <div className="flex items-center gap-2 mx-2">
             <button 
-              onClick={() => {
-                setPaymentModalType('FUND');
-                setPaymentStep('METHOD');
-                setShowPaymentModal(true);
-              }}
+              onClick={() => openShadowWallet('deposit')}
               className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 border border-white/10"
             >
               <PlusCircle className="w-3.5 h-3.5" />
               Fund Wallet
             </button>
             <button 
-              onClick={() => {
-                setPaymentModalType('CASHOUT');
-                setPaymentStep('METHOD');
-                setShowPaymentModal(true);
-              }}
+              onClick={() => openShadowWallet('withdraw')}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 border border-white/10"
             >
               <ArrowUpCircle className="w-3.5 h-3.5" />
@@ -612,31 +601,6 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
         </AnimatePresence>
 
       </div>
-
-      {/* Payment Modal Overlay */}
-      <AnimatePresence>
-        {showPaymentModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-            <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
-              <EasyPaymentPlatform
-                user={user}
-                type={paymentModalType === 'FUND' ? 'deposit' : 'withdraw'}
-                onComplete={async (amount, method) => {
-                  if (onUpdateBalance) {
-                    await onUpdateBalance(
-                      amount,
-                      paymentModalType === 'FUND' ? 'deposit' : 'withdrawal'
-                    );
-                  }
-                }}
-                onClose={() => setShowPaymentModal(false)}
-                hub="MONEY_CARD"
-                purpose={paymentModalType === 'FUND' ? "Efado Money Card Stake Refunding" : "Efado Money Card Win Cashout"}
-              />
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
 
     </motion.div>
 

@@ -31,7 +31,6 @@ import {
 
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { db, doc, onSnapshot, updateDoc, increment } from '../firebase';
-import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
 
@@ -40,6 +39,7 @@ interface LuckySpinWheelProps {
   initialStageIdx?: number;
   user: UserProfile;
   onResult: (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame') => Promise<void>;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 const BASE_SEGMENTS = [
@@ -71,7 +71,7 @@ const ELITE_TIERS = [
   { name: 'MASTER', multiplier: 50, color: '#FF0000', glow: 'shadow-[0_0_20px_rgba(255,0,0,0.5)]' },
 ];
 
-export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initialStageIdx = 0, user, onResult }) => {
+export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initialStageIdx = 0, user, onResult, onOpenWallet }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
   const [gameMode, setGameMode] = useState<'standard' | 'elite'>('standard');
   const [eliteTierIdx, setEliteTierIdx] = useState(0);
@@ -82,11 +82,12 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
   const [currentStageIdx, setCurrentStageIdx] = useState(initialStageIdx);
   const [showStageDropdown, setShowStageDropdown] = useState(false);
   const [currentView, setCurrentView] = useState<'game' | 'wallets'>('game');
-  const [showPaymentUI, setShowPaymentUI] = useState<{ 
-    type: 'deposit' | 'cashout', 
-    active: boolean,
-    selectedMethod: string | null 
-  }>({ type: 'deposit', active: false, selectedMethod: null });
+
+  const openShadowWallet = (tab: 'deposit' | 'withdraw') => {
+    if (onOpenWallet) {
+      onOpenWallet(tab);
+    }
+  };
   
   const [copied, setCopied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -177,7 +178,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
     if (user.depositWallet < stakeAmount) {
       setInsufficientFundsError(true);
       setTimeout(() => setInsufficientFundsError(false), 4000);
-      setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null });
+      openShadowWallet('deposit');
       return;
     }
 
@@ -374,7 +375,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                 </button>
                 {/* Deposit Wallet */}
                 <button 
-                  onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                  onClick={() => openShadowWallet('deposit')}
                   className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-indigo-500/50 transition-all text-left pointer-events-auto group"
                 >
                   <div className="flex justify-between items-center mb-1">
@@ -386,7 +387,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
               </div>
               {/* Cash Out Wallet (Repositioned below Win) */}
               <button 
-                onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                onClick={() => openShadowWallet('withdraw')}
                 className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 min-w-[180px] shadow-2xl hover:bg-white/10 hover:border-rose-500/50 transition-all text-left pointer-events-auto group"
               >
                 <div className="flex justify-between items-center mb-1">
@@ -518,7 +519,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
               <div className="flex items-center justify-center gap-4 mt-6">
                 {/* Cash Out Button */}
                 <button 
-                  onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                  onClick={() => openShadowWallet('withdraw')}
                   className="group flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 border border-white/20 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95"
                 >
                   <ArrowDownLeft className="w-4 h-4 text-white" />
@@ -542,7 +543,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
 
                 {/* Fund Wallet Button */}
                 <button 
-                  onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                  onClick={() => openShadowWallet('deposit')}
                   className="group flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 border border-white/20 rounded-2xl transition-all shadow-lg hover:scale-105 active:scale-95"
                 >
                   <span className="text-xs font-black text-white uppercase tracking-widest">Fund Wallet</span>
@@ -559,14 +560,14 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
                   <span className="text-sm font-black text-white">{formatPrice(wallets.playerWin)}</span>
                 </div>
                 <button 
-                  onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                  onClick={() => openShadowWallet('deposit')}
                   className="p-2 bg-blue-600/20 hover:bg-blue-600/30 rounded-xl border border-blue-500/30 flex flex-col text-left transition-colors"
                 >
                   <span className="text-[7px] font-bold text-blue-400 uppercase">Deposit</span>
                   <span className="text-sm font-black text-white">{formatPrice(wallets.deposit)}</span>
                 </button>
                 <button 
-                  onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                  onClick={() => openShadowWallet('withdraw')}
                   className="p-2 bg-purple-600/20 hover:bg-purple-600/30 rounded-xl border border-purple-500/30 flex flex-col text-left transition-colors"
                 >
                   <span className="text-[7px] font-bold text-purple-400 uppercase">Cash Out</span>
@@ -825,14 +826,14 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
 
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+              onClick={() => openShadowWallet('deposit')}
               className="flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-display font-black text-white uppercase tracking-widest shadow-xl shadow-blue-600/20 transition-all hover:scale-105 active:scale-95"
             >
               <ArrowDownLeft className="w-5 h-5" />
               Deposit {formatPrice(50)}
             </button>
             <button 
-              onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+              onClick={() => openShadowWallet('withdraw')}
               className="flex items-center gap-3 px-8 py-4 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-2xl font-display font-black text-white uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
             >
               <ArrowUpRight className="w-5 h-5" />
@@ -857,7 +858,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
               <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Total funds deposited into your account for playing games.</p>
             </div>
             <button
-              onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+              onClick={() => openShadowWallet('deposit')}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
             >
               <ArrowDownLeft className="w-4 h-4 animate-bounce" />
@@ -881,13 +882,13 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                onClick={() => openShadowWallet('deposit')}
                 className="py-4 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
               >
                 Fund Wallet
               </button>
               <button
-                onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                onClick={() => openShadowWallet('withdraw')}
                 className="py-4 bg-yellow-500 hover:bg-yellow-400 text-slate-950 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
               >
                 Withdraw Wins
@@ -910,7 +911,7 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
               <p className="text-slate-500 text-sm font-medium leading-relaxed mb-6">Winnings ready to be withdrawn to your bank or crypto wallet.</p>
             </div>
             <button
-              onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+              onClick={() => openShadowWallet('withdraw')}
               className="w-full py-4 bg-green-500 hover:bg-green-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
             >
               <ArrowUpRight className="w-4 h-4 animate-pulse" />
@@ -940,24 +941,6 @@ export const LuckySpinWheel: React.FC<LuckySpinWheelProps> = ({ onClose, initial
       </motion.div>
     )}
     </div>
-
-        {/* Extended Highly-Polished Unified EFADO Payment/Cashout Platform */}
-        <AnimatePresence>
-          {showPaymentUI.active && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-              <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
-                <EasyPaymentPlatform 
-                  user={user}
-                  type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
-                  onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  onSuccess={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  hub="SPIN_GAME"
-                  purpose={showPaymentUI.type === 'deposit' ? "EFADO Challenge Entry Refunding" : "EFADO Challenge Reward Redemption"}
-                />
-              </div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );

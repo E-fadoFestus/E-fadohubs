@@ -39,15 +39,16 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
-  increment
+  increment,
+  runTransaction
 } from '../firebase';
-import { PaymentPlatform } from './PaymentPlatform';
 import { UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 
 interface EfadoDigitalServicesHubProps {
   user: UserProfile;
   initialSection?: 'crypto' | 'money' | 'vending';
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 interface CurrencyItem {
@@ -201,15 +202,9 @@ const GLOBAL_VENDING_COUNTRIES: Country[] = [
   }
 ];
 
-export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = ({ user, initialSection }) => {
+export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = ({ user, initialSection, onOpenWallet }) => {
   const { formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState<'crypto' | 'money' | 'vending'>(initialSection || 'crypto');
-
-  // Unified payment states
-  const [showPaymentPlatform, setShowPaymentPlatform] = useState(false);
-  const [paymentPlatformAmount, setPaymentPlatformAmount] = useState(1000);
-  const [paymentPlatformPurpose, setPaymentPlatformPurpose] = useState('');
-  const [paymentPlatformOnSuccess, setPaymentPlatformOnSuccess] = useState<(() => Promise<void> | void) | null>(null);
 
   // Vending Flow States
   const [vendingCountry, setVendingCountry] = useState<string>('NG');
@@ -218,7 +213,7 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
   const [vendingPhone, setVendingPhone] = useState<string>('');
   const [vendingCustomAirtimeAmount, setVendingCustomAirtimeAmount] = useState<number>(500);
   const [vendingSelectedDataPlanId, setVendingSelectedDataPlanId] = useState<string>('mtn_ng_1');
-  const [vendingPayMethod, setVendingPayMethod] = useState<'win_wallet' | 'deposit_wallet' | 'transfer'>('win_wallet');
+  const [vendingPayMethod, setVendingPayMethod] = useState<'win_wallet' | 'deposit_wallet'>('win_wallet');
   const [vendingStatus, setVendingStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [vendingStatusMessage, setVendingStatusMessage] = useState<string>('');
   const [vendingLogs, setVendingLogs] = useState<string[]>([
@@ -300,20 +295,44 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
     const walletField = vendingPayMethod === 'win_wallet' ? 'playerWallet' : 'depositWallet';
     const currentBalance = user[walletField] || 0;
 
-    if (vendingPayMethod !== 'transfer' && currentBalance < purchaseCostNGN) {
+    if (currentBalance < purchaseCostNGN) {
       setVendingStatus('failed');
-      setVendingStatusMessage(`Insufficient funds in your ${vendingPayMethod === 'win_wallet' ? 'Win' : 'Deposit'} Wallet.`);
+      setVendingStatusMessage(`Insufficient funds in your ${vendingPayMethod === 'win_wallet' ? 'Win' : 'Deposit'} Wallet. Please fund your Account Profile Wallet.`);
       addVendingLog('[Balance Error] Insufficient funds to clear ledger.');
       return;
     }
 
     const executeVendingDbWrite = async () => {
       try {
-        if (vendingPayMethod !== 'transfer') {
-          await updateDoc(doc(db, 'users', user.uid), {
-            [walletField]: increment(-purchaseCostNGN)
-          });
-        }
+        await runTransaction(db, async (tx) => {
+          if (vendingPayMethod === 'deposit_wallet') {
+            const pocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
+            const pocketSnap = await tx.get(pocketRef);
+            const oldBal = pocketSnap.exists()
+              ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
+              : 0;
+            if (oldBal < purchaseCostNGN) {
+              throw new Error('Insufficient funds in your Deposit Wallet.');
+            }
+            const newBal = oldBal - purchaseCostNGN;
+            tx.set(pocketRef, {
+              balance: newBal,
+              depositWallet: newBal,
+              currency: 'NGN',
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          } else {
+            const userRef = doc(db, 'users', user.uid);
+            const userSnap = await tx.get(userRef);
+            const oldWin = userSnap.exists() ? Number(userSnap.data()?.playerWallet ?? 0) || 0 : 0;
+            if (oldWin < purchaseCostNGN) {
+              throw new Error('Insufficient funds in your Win Wallet.');
+            }
+            tx.update(userRef, {
+              playerWallet: oldWin - purchaseCostNGN
+            });
+          }
+        });
 
         await addDoc(collection(db, 'transactions'), {
           userId: user.uid,
@@ -335,17 +354,7 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
       }
     };
 
-    if (vendingPayMethod === 'transfer') {
-      setPaymentPlatformAmount(purchaseCostNGN);
-      setPaymentPlatformPurpose(`VTU Refill to ${vendingPhone}`);
-      setPaymentPlatformOnSuccess(() => async () => {
-        await executeVendingDbWrite();
-      });
-      setShowPaymentPlatform(true);
-      setVendingStatus('idle');
-    } else {
-      await executeVendingDbWrite();
-    }
+    await executeVendingDbWrite();
   };
 
   // Crypto swap helper
@@ -1054,20 +1063,19 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
                             <p className="text-[10px] text-indigo-400 font-bold">₦{(user.depositWallet || 0).toLocaleString()}</p>
                           </div>
                         </label>
-                        <label className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-2xl cursor-pointer hover:bg-white/10">
-                          <input
-                            type="radio"
-                            name="payMethod"
-                            value="transfer"
-                            checked={vendingPayMethod === 'transfer'}
-                            onChange={() => setVendingPayMethod('transfer')}
-                            className="text-indigo-600 focus:ring-0 cursor-pointer"
-                          />
-                          <div className="text-left">
-                            <p className="text-xs font-black text-white">Direct Checkout / Transfer</p>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase">Manual Bank Receipt Upload</p>
-                          </div>
-                        </label>
+                        {onOpenWallet && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenWallet('deposit')}
+                            className="w-full flex items-center justify-between p-4 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 rounded-2xl transition-all text-left"
+                          >
+                            <div>
+                              <p className="text-xs font-black text-indigo-300">Fund Account Profile Wallet</p>
+                              <p className="text-[9px] text-slate-400 font-bold uppercase">Add funds to your central EFADO wallet</p>
+                            </div>
+                            <ArrowUpRight className="w-4 h-4 text-indigo-400 shrink-0" />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1154,22 +1162,6 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
         <ArrowLeft className="w-5 h-5" />
       </button>
 
-      {/* Payment Platform Modal */}
-      {showPaymentPlatform && (
-        <PaymentPlatform
-          user={user}
-          type="deposit"
-          amount={paymentPlatformAmount}
-          purpose={paymentPlatformPurpose}
-          onSuccess={async () => {
-            if (paymentPlatformOnSuccess) {
-              await paymentPlatformOnSuccess();
-            }
-            setShowPaymentPlatform(false);
-          }}
-          onClose={() => setShowPaymentPlatform(false)}
-        />
-      )}
     </div>
   );
 };

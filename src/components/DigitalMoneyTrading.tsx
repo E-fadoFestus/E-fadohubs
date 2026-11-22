@@ -49,7 +49,6 @@ import confetti from 'canvas-confetti';
 import { UserProfile, AdminStats, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { db, doc, updateDoc, increment } from '../firebase';
-import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { CurrencySelector } from './CurrencySelector';
 
 function randomGauss(mean = 0, stdDev = 1): number {
@@ -75,9 +74,10 @@ interface DigitalMoneyTradingProps {
   onClose: () => void;
   user: UserProfile;
   onResult: (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame') => Promise<void>;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
-export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClose, user, onResult }) => {
+export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClose, user, onResult, onOpenWallet }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
   const [stake, setStake] = useState(100);
   const [expiry, setExpiry] = useState(60); // seconds
@@ -89,13 +89,14 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<{ status: 'WON' | 'LOST', amount: number, type: 'BUY' | 'SELL' } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [showPaymentUI, setShowPaymentUI] = useState<{ 
-    type: 'deposit' | 'cashout', 
-    active: boolean,
-    selectedMethod: string | null 
-  }>({ type: 'deposit', active: false, selectedMethod: null });
   const [copied, setCopied] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const openShadowWallet = (tab: 'deposit' | 'withdraw') => {
+    if (onOpenWallet) {
+      onOpenWallet(tab);
+    }
+  };
 
   // Derived from user prop
   const balance = user.depositWallet;
@@ -360,8 +361,8 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
 
   const handleTrade = (type: 'BUY' | 'SELL') => {
     if (balance < stake) {
-      setError("Insufficient Funds / Balance");
-      setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null });
+      setError("Insufficient Funds / Balance — Redirecting to Account Profile Wallet");
+      openShadowWallet('deposit');
       setTimeout(() => setError(null), 3550);
       return;
     }
@@ -449,8 +450,13 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
-            {/* Trading Wallet Card */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-2xl border border-white/5 relative overflow-hidden">
+            {/* Trading Wallet Card (Shadow of Profile Wallet) */}
+            <button
+              type="button"
+              onClick={() => openShadowWallet('deposit')}
+              title="Fund via Account Profile Wallet"
+              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-white/5 hover:border-blue-500/40 transition-all relative overflow-hidden cursor-pointer"
+            >
               <AnimatePresence mode="wait">
                 {lastResult?.status === 'WON' && (
                   <motion.div 
@@ -473,10 +479,15 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                   {formatPrice(balance)}
                 </motion.p>
               </div>
-            </div>
+            </button>
 
-            {/* Win Wallet Card */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 rounded-2xl border border-emerald-500/20 relative overflow-hidden">
+            {/* Win Wallet Card (Shadow of Winning Wallet) */}
+            <button
+              type="button"
+              onClick={() => openShadowWallet('withdraw')}
+              title="Withdraw wins via Account Profile Wallet"
+              className="flex items-center gap-3 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 rounded-2xl border border-emerald-500/20 hover:border-emerald-400/50 transition-all relative overflow-hidden cursor-pointer"
+            >
               <Trophy className="w-4 h-4 text-emerald-400 animate-pulse" />
               <div className="text-right relative z-10">
                 <p className="text-[8px] font-bold text-emerald-500 uppercase tracking-widest">Win Wallet</p>
@@ -489,18 +500,18 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
                   {formatPrice(user.playerWallet || 0)}
                 </motion.p>
               </div>
-            </div>
+            </button>
 
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => setShowPaymentUI({ type: 'deposit', active: true, selectedMethod: null })}
+                onClick={() => openShadowWallet('deposit')}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95"
               >
                 <ArrowUpRight className="w-4 h-4 text-white" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Fund Wallet</span>
               </button>
               <button 
-                onClick={() => setShowPaymentUI({ type: 'cashout', active: true, selectedMethod: null })}
+                onClick={() => openShadowWallet('withdraw')}
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 border border-white/20 rounded-xl transition-all shadow-lg hover:scale-105 active:scale-95"
               >
                 <ArrowDownLeft className="w-4 h-4 text-white" />
@@ -932,24 +943,6 @@ export const DigitalMoneyTrading: React.FC<DigitalMoneyTradingProps> = ({ onClos
               <AlertCircle className="w-5 h-5" />
               {error}
             </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Extended Highly-Polished Unified EFADO Payment/Cashout Platform */}
-        <AnimatePresence>
-          {showPaymentUI.active && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-              <div className="w-full max-w-[500px] h-[90vh] max-h-[750px] flex flex-col">
-                <EasyPaymentPlatform 
-                  user={user}
-                  type={showPaymentUI.type === 'deposit' ? 'deposit' : 'withdraw'}
-                  onClose={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  onSuccess={() => setShowPaymentUI(prev => ({ ...prev, active: false }))}
-                  hub="DMT_GAME"
-                  purpose={showPaymentUI.type === 'deposit' ? "Tactical DMT Trading Account Funding" : "Tactical DMT Trading Profit Cashout"}
-                />
-              </div>
-            </div>
           )}
         </AnimatePresence>
 

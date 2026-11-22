@@ -35,8 +35,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, QuizQuestion, QuizSession, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
-import { PaymentPlatform } from './PaymentPlatform';
-import { EasyPaymentPlatform } from './EasyPaymentPlatform';
 import { CurrencySelector } from './CurrencySelector';
 
 interface EfadoMoneyQuizProps {
@@ -44,6 +42,7 @@ interface EfadoMoneyQuizProps {
   onUpdateBalance: (amount: number, type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win') => Promise<void>;
   onAddTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => Promise<void>;
   onClose?: () => void;
+  onOpenWallet?: (tab: 'deposit' | 'withdraw') => void;
 }
 
 const SUBJECTS = [
@@ -751,7 +750,7 @@ const QUESTIONS: QuizQuestion[] = [
   { id: 'sec20', subject: 'Security', question: 'What is a network security system that monitors and controls incoming and outgoing network traffic based on predetermined security rules?', options: ['Barrier', 'Firewall', 'Shield', 'Guard'], correctAnswer: 1 },
 ];
 
-export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBalance, onAddTransaction, onClose }) => {
+export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBalance, onAddTransaction, onClose, onOpenWallet }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
   const [gameState, setGameState] = useState<'lobby' | 'playing' | 'result'>('lobby');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -763,11 +762,12 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedStageIndex, setSelectedStageIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showWalletHub, setShowWalletHub] = useState<{ active: boolean; type: 'deposit' | 'withdraw' }>({ active: false, type: 'deposit' });
-  const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw' | 'history'>('deposit');
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const openShadowWallet = (tab: 'deposit' | 'withdraw') => {
+    if (onOpenWallet) {
+      onOpenWallet(tab);
+    }
+  };
 
   const paymentCategories = [
     {
@@ -862,7 +862,8 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
 
   const startGame = async () => {
     if (user.depositWallet < stakeAmount) {
-      addNotification('Insufficient Funds / Balance', 'error');
+      addNotification('Insufficient Funds / Balance — Opening Account Profile Wallet', 'error');
+      openShadowWallet('deposit');
       return;
     }
 
@@ -1066,10 +1067,8 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
             <h3 className="text-xl font-black text-slate-900">₦{user.depositWallet.toLocaleString()}</h3>
           </div>
           <button 
-            onClick={() => {
-              setWalletTab('deposit');
-              setShowWalletHub({ active: true, type: 'deposit' });
-            }}
+            onClick={() => openShadowWallet('deposit')}
+            title="Fund via Account Profile Wallet"
             className="ml-auto p-2 bg-indigo-600 text-white rounded-xl hover:scale-110 transition-all"
           >
             <Zap className="w-4 h-4" />
@@ -1084,10 +1083,8 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
             <h3 className="text-xl font-black text-slate-900">₦{user.playerWallet.toLocaleString()}</h3>
           </div>
           <button 
-            onClick={() => {
-              setWalletTab('withdraw');
-              setShowWalletHub({ active: true, type: 'withdraw' });
-            }}
+            onClick={() => openShadowWallet('withdraw')}
+            title="Withdraw via Account Profile Wallet"
             className="ml-auto p-2 bg-emerald-600 text-white rounded-xl hover:scale-110 transition-all"
           >
             <ArrowUpRight className="w-4 h-4" />
@@ -1455,162 +1452,6 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Efado Extended Wallet Hub */}
-      <AnimatePresence>
-        {showWalletHub.active && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-5xl rounded-[3rem] shadow-2xl overflow-hidden h-[750px] flex flex-col md:flex-row relative border border-white/20"
-            >
-              {/* Sidebar Navigation */}
-              <div className="w-full md:w-80 bg-slate-950 p-10 text-white flex flex-col justify-between relative overflow-hidden shrink-0">
-                <div className="absolute top-0 left-0 w-full h-full bg-grid-white/[0.03] pointer-events-none" />
-                <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] -mt-32 -ml-32" />
-                
-                <div className="relative z-10">
-                  <div className="flex items-center gap-4 mb-12">
-                    <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                      <Wallet className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="font-black text-xl tracking-tighter italic uppercase text-white">Efado Wallet</h2>
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                        <p className="text-[10px] font-black text-slate-100 uppercase tracking-widest leading-none">Hub Connect</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {[
-                      { id: 'deposit', label: 'Fund Wallet', icon: Zap },
-                      { id: 'withdraw', label: 'Cash Out', icon: ArrowUpRight },
-                      { id: 'history', label: 'Transaction history', icon: History }
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          setWalletTab(tab.id as any);
-                          setSelectedMethod(null);
-                          setPaymentAmount('');
-                        }}
-                        className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
-                          walletTab === tab.id 
-                            ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' 
-                            : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                        }`}
-                      >
-                        <tab.icon className="w-5 h-5" />
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="relative z-10 pt-10 border-t border-white/5">
-                  <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2rem] border border-white/5 shadow-2xl">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 italic">Active Protection</p>
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                      <p className="text-[9px] text-slate-300 font-bold uppercase tracking-tight leading-tight">Neural Fraud Prevention Level 3 Active</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Content */}
-              <div className="flex-1 p-10 overflow-y-auto no-scrollbar bg-slate-50">
-                <button 
-                  onClick={() => setShowWalletHub({ ...showWalletHub, active: false })}
-                  className="absolute top-8 right-8 p-3 bg-white border border-slate-100 rounded-full hover:bg-slate-900 hover:text-white transition-all shadow-lg active:scale-90 z-20"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-
-                <AnimatePresence mode="wait">
-                  {(walletTab === 'deposit' || walletTab === 'withdraw') && (
-                    <motion.div
-                      key={walletTab}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="w-full max-w-[500px] mx-auto bg-white rounded-3xl overflow-hidden"
-                    >
-                      <EasyPaymentPlatform
-                        user={user}
-                        type={walletTab === 'deposit' ? 'deposit' : 'withdraw'}
-                        onComplete={async (amount, method) => {
-                          try {
-                            await onUpdateBalance(
-                              amount, 
-                              walletTab === 'deposit' ? 'deposit' : 'withdrawal'
-                            );
-                            await onAddTransaction({
-                              userId: user.uid,
-                              type: walletTab === 'deposit' ? 'deposit' : 'withdrawal',
-                              amount,
-                              currency: 'NGN',
-                              status: 'completed',
-                              method: method || 'Easy Transfer',
-                              description: walletTab === 'deposit' ? 'Efado Money Quiz Recharge' : 'Efado Money Quiz Extraction'
-                            });
-                            addNotification(`${walletTab === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₦${amount.toLocaleString()} successful!`, 'success');
-                            setPaymentAmount('');
-                            setWalletTab('history');
-                          } catch (e) {
-                            addNotification('Transaction failed. Contact strategic support.', 'error');
-                          }
-                        }}
-                        onClose={() => setShowWalletHub({ ...showWalletHub, active: false })}
-                        hub="MONEY_QUIZ"
-                        purpose={walletTab === 'deposit' ? "Efado Money Quiz Credit Top-up" : "Efado Money Quiz Dividend Cashout"}
-                      />
-                    </motion.div>
-                  )}
-
-                  {walletTab === 'history' && (
-                    <motion.div
-                      key="history"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="space-y-8"
-                    >
-                      <div className="flex items-center justify-between mb-10">
-                        <h3 className="text-4xl font-black text-slate-950 tracking-tighter italic uppercase underline decoration-indigo-500 underline-offset-8 transition-all">Strategic Flow History</h3>
-                        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-                           <Search className="w-5 h-5 text-slate-400 ml-2" />
-                           <input placeholder="Search Tactical ID..." className="bg-transparent border-none focus:outline-none text-xs font-black uppercase tracking-widest w-48" />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div className="p-12 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                          <History className="w-16 h-16 text-slate-200 mx-auto mb-6" />
-                          <p className="text-slate-400 font-black uppercase tracking-[0.25em] text-xs italic">Syncing neural transaction nodes...</p>
-                          <p className="text-[10px] text-slate-300 font-bold uppercase mt-2">Live updates from Efado Global Ledger enabled</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Legacy Payment Platform Modal - Optional (but usually replaced by Hub) */}
-
     </div>
   );
 };

@@ -196,6 +196,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onResult={handleGameResult}
                 onGameStart={handleGameStart}
                 onUpdateBalance={() => {}}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -222,6 +223,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -241,6 +243,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -260,6 +263,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 user={user}
                 onClose={() => setActiveGame('none')}
                 onResult={handleGameResult}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -279,6 +283,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onUpdateBalance={handleUpdateBalance}
                 onAddTransaction={handleAddTransaction}
                 onClose={() => setActiveGame('none')}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
@@ -300,6 +305,7 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
                 onGameStart={handleGameStart}
                 onUpdateBalance={handleUpdateBalance}
                 onAddTransaction={handleAddTransaction}
+                onOpenWallet={() => onOpenCashier?.()}
               />
             ) : (
               <div className="text-center py-16 px-4">
