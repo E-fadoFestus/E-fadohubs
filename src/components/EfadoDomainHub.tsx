@@ -65,6 +65,7 @@ import { DomainSeller, DomainCatalog, DomainOrder, UserProfile } from '../types'
 import { useCurrency } from '../lib/CurrencyContext';
 import { EfadoEmailHub } from './EfadoEmailHub';
 import { VendingMarketplace } from './VendingMarketplace';
+import { HubGuideNote } from './HubGuideNote';
 
 interface EfadoDomainHubProps {
   user: UserProfile;
@@ -3007,6 +3008,19 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                 </button>
               </div>
 
+              <HubGuideNote
+                guideId={
+                  activeLandingSection === 'vending'
+                    ? 'vtu'
+                    : activeLandingSection === 'otc'
+                    ? otcInternalTab === 'convert'
+                      ? 'moneyExchange'
+                      : 'cryptoOtc'
+                    : 'domainsPartners'
+                }
+                variant="dark"
+              />
+
               {/* SECTION: DOMAINS REGISTRAR */}
               {activeLandingSection === 'domains' && (
                 <div className="space-y-12 animate-fadeIn">
@@ -4701,14 +4715,13 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
 
                       <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col justify-center min-w-[200px] text-left shadow-lg">
                         <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                          <span className="text-[9px] text-slate-400 uppercase font-black">Admin Receiving Bank (CEO)</span>
+                          <span className="text-[9px] text-slate-400 uppercase font-black">Settlement Pipeline</span>
                         </div>
-                        <p className="text-[11px] font-black text-white mt-1">Guaranty Trust Bank (GTBank)</p>
-                        <p className="text-xs text-emerald-400 font-mono font-bold">0122941589</p>
-                        <p className="text-[9px] text-slate-500 font-medium mt-0.5 leading-tight uppercase">EFADO INT'L COGNITIVE SERVICES</p>
+                        <p className="text-[11px] font-black text-white mt-1">EFADO Treasury Settlement</p>
+                        <p className="text-xs text-emerald-400 font-semibold">Live Wallet &amp; Bank Payout</p>
+                        <p className="text-[9px] text-slate-500 font-medium mt-0.5 leading-tight uppercase">Verified Instant Rate Quote</p>
                         <div className="border-t border-slate-800 mt-2 pt-2 flex items-center justify-between">
-                          <span className="text-[8px] text-slate-400 uppercase font-bold">Sovereign Benefit Rate</span>
+                          <span className="text-[8px] text-slate-400 uppercase font-bold">Platform Service Fee</span>
                           <span className="text-[10px] text-emerald-400 font-black">5.0% Fixed</span>
                         </div>
                       </div>
@@ -4767,7 +4780,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                   sourceAmount: "500 USDT",
                                   targetAmount: "775,000 NGN",
                                   fee: "38,750 NGN (5%)",
-                                  recipient: "GTBank ****1589 (Sovereign Benefit)",
+                                  recipient: "Verified Settlement Wallet",
                                   status: "Settled",
                                   txHash: "0x7a839dae198b182390f7a39e831"
                                 },
@@ -4778,7 +4791,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                   sourceAmount: "200 USD",
                                   targetAmount: "310,000 NGN",
                                   fee: "15,500 NGN (5%)",
-                                  recipient: "Access Bank ****1102 (Aremu Adebayo)",
+                                  recipient: "Verified Payout Account",
                                   status: "Dispatched",
                                   txHash: "0xe72a39d82138a0f9b1837d92"
                                 }
@@ -5013,7 +5026,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                 <div>
                                   <h4 className="text-[10px] font-black text-indigo-950 uppercase tracking-wider">CEO / Admin Brokerage Protocol Rules</h4>
                                   <p className="text-[10px] text-indigo-700 leading-relaxed font-semibold mt-0.5">
-                                    The 5.0% service charge is allocated directly to the founding eFado Administrator bank index (GTBank - 0122941589) for processing settlements. This is auto-deducted before payout dispatch.
+                                    The 5.0% service charge goes directly to the EFADO platform treasury settlement ledger for processing and liquidity. This is clearly shown and deducted before payout dispatch.
                                   </p>
                                 </div>
                               </div>
@@ -5289,13 +5302,13 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                         setOtcOrders(prev => [payload, ...prev]);
                                         setOtcStep('complete');
                                         addVendingLog(`[PAYOUT DISPATCH] 3/3 block confirmations archived! Broker system initiated fiat output settlement through bank API gateway.`);
-                                        addVendingLog(`[PAYOUT CONFIRMED] Direct cashout finalized. Transferred ${cleanDispatchVal.toLocaleString()} ${otcGetCurrency} to ${payload.recipient}. 5% royalty routed to CEO bank index GTBank (0122941589). Done.`);
+                                        addVendingLog(`[PAYOUT CONFIRMED] Direct cashout finalized. Transferred ${cleanDispatchVal.toLocaleString()} ${otcGetCurrency} to ${payload.recipient}. 5% fee recorded to EFADO treasury ledger.`);
                                       }, 6000);
                                     }}
                                     disabled={otcProgress > 0}
                                     className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-[11px] font-black uppercase tracking-widest py-3 px-4 rounded-xl shadow transition-all cursor-pointer text-center"
                                   >
-                                    {otcProgress > 0 && otcProgress < 100 ? 'Confirming Transaction...' : otcProgress >= 100 ? 'Telemetry Settled ✓' : 'Simulate Blockchain Deposit Receipt'}
+                                    {otcProgress > 0 && otcProgress < 100 ? 'Confirming Transaction...' : otcProgress >= 100 ? 'Deposit Confirmed ✓' : 'Verify & Confirm OTC Deposit'}
                                   </button>
                                 </div>
                               </div>
@@ -5534,7 +5547,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                       
                                       setOtcOrders(prev => [receipt, ...prev]);
                                       setConvStatus('success');
-                                      addVendingLog(`[DISPATCH] Sovereign remit settled successfully! Dispatched ${convertedRecipientGets.toLocaleString()} ${convTargetCurrency} out to ${receipt.recipient}. 5% royalty routed to CEO GTBANK corporate (0122941589).`);
+                                      addVendingLog(`[DISPATCH] Conversion settled! Dispatched ${convertedRecipientGets.toLocaleString()} ${convTargetCurrency} out to ${receipt.recipient}. 5% service fee recorded in EFADO treasury ledger.`);
                                     }, 3000);
                                   }}
                                   className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest py-4 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -5583,7 +5596,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                 </div>
                                 <div className="flex justify-between">
                                   <span>5.0% Admin Protocol Royalty Fee:</span>
-                                  <span className="font-bold text-indigo-600 font-mono">{(convAmount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })} {convSourceCurrency} (to GTBank)</span>
+                                  <span className="font-bold text-indigo-600 font-mono">{(convAmount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })} {convSourceCurrency} (Platform Fee)</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Recipient Details:</span>
@@ -6221,14 +6234,9 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
 
                     {/* Bank Transfer specific instruction */}
                     {paymentMethod === 'transfer' && (
-                      <div className="bg-slate-950 text-white p-5 rounded-2xl font-mono text-xs space-y-2 border border-slate-800 animate-slideUp">
-                        <p className="text-[9px] text-amber-400 uppercase font-black tracking-widest">⚠️ EFADO CORRESPONDENT BANK ACCOUNTS</p>
-                        <p className="text-slate-350">Please initiate transfer to our Sovereign corporate receiver accounts:</p>
-                        <div className="space-y-1 border-t border-slate-800 pt-2 text-[10px]">
-                          <p>🏦 <strong>Bank:</strong> Guaranty Trust Bank (GTBank)</p>
-                          <p>📋 <strong>Acc Name:</strong> EFADO INTERNATIONAL COGNITIVE SERVICES</p>
-                          <p>🔢 <strong>Acc Num:</strong> 0122941589</p>
-                        </div>
+                      <div className="bg-slate-950 text-white p-5 rounded-2xl text-xs space-y-2 border border-slate-800 animate-slideUp">
+                        <p className="text-[10px] text-amber-400 uppercase font-black tracking-widest">Pay via Paystack or Account Wallet</p>
+                        <p className="text-slate-300 leading-relaxed">For instant automated approval, fund your EFADO Account Profile Wallet using Paystack Checkout or select Wallet checkout above. Need help? Open Help Chat anytime.</p>
                       </div>
                     )}
 

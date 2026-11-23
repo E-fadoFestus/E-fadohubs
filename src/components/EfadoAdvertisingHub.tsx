@@ -59,6 +59,7 @@ import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
 import { PaymentPlatform } from './PaymentPlatform';
 import { EfadoPromoKit } from './EfadoPromoKit';
+import { HubGuideNote } from './HubGuideNote';
 
 interface EfadoAdvertisingHubProps {
   user: UserProfile;
@@ -606,7 +607,8 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <HubGuideNote guideId="advertising" variant="light" className="mb-6" />
         {view === 'BROWSE' ? (
           <div className="space-y-12">
             {/* Hero Section */}
@@ -726,31 +728,6 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                      <span className="text-[12px] font-black uppercase tracking-tight leading-tight text-gray-950">{cat.label}</span>
                    </motion.button>
                  ))}
-               </div>
-            </section>
-
-            {/* Hub Guide - Comprehensive instructions */}
-            <section className="p-8 md:p-12 bg-indigo-50 border border-indigo-100 rounded-[2rem] md:rounded-[4rem] grid grid-cols-1 md:grid-cols-3 gap-12">
-               <div className="space-y-6">
-                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                    <BookOpen className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-xl font-black text-gray-950 uppercase tracking-tighter italic">Advertising Hub Manual</h4>
-                  <p className="text-sm font-black text-gray-900 leading-relaxed uppercase tracking-tighter">Everything you need to know about boosting your strategic visibility on EFADO.</p>
-               </div>
-               
-                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-8">
-                  {[
-                    { t: "1. Defined Goals", d: "Use 'ADVERT' for visibility like Hotels or Church Programs. Use 'SELL' for liquidating Farm harvest or Vehicles." },
-                    { t: "2. Strategic Specs", d: "Fill high-fidelity data. Number of rooms, land title type, or harvest yield helps patrons decide fast." },
-                    { t: "3. Exposure Plans", d: "From 3-Day Free Trial to Yearly VIP. Choice of plan determines your rank in the network neural grid." },
-                    { t: "4. Global Sync", d: "Your ad isn't just a post; it's synced across Gist Feed, Hub sidebars, and universal search results." }
-                  ].map((step, i) => (
-                    <div key={i} className="space-y-2">
-                       <p className="text-[10px] font-black text-indigo-700 uppercase tracking-[0.2em]">{step.t}</p>
-                       <p className="text-[11px] font-black text-gray-900 leading-relaxed uppercase tracking-tight italic">{step.d}</p>
-                    </div>
-                  ))}
                </div>
             </section>
 

@@ -253,7 +253,7 @@ export const EfadoHelpChat: React.FC<EfadoHelpChatProps> = ({ user }) => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-            className="fixed bottom-24 right-6 z-[2000] w-[380px] h-[550px] bg-slate-950 border border-white/10 rounded-[2.5rem] flex flex-col shadow-[0_16px_48px_rgba(0,0,0,0.8)] overflow-hidden"
+            className="fixed bottom-24 right-3 sm:right-6 z-[3500] w-[calc(100vw-1.5rem)] max-w-[380px] h-[75vh] max-h-[550px] bg-slate-950 border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] flex flex-col shadow-[0_16px_48px_rgba(0,0,0,0.8)] overflow-hidden"
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 border-b border-white/5 flex items-center justify-between">

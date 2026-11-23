@@ -36,6 +36,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, QuizQuestion, QuizSession, Transaction } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
+import { db } from '../firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 interface EfadoMoneyQuizProps {
   user: UserProfile;
@@ -994,7 +996,24 @@ export const EfadoMoneyQuiz: React.FC<EfadoMoneyQuizProps> = ({ user, onUpdateBa
     } else {
       addNotification('Game over. Better luck next time!', 'info');
     }
-  }, [selectedQuestions, potentialWin, user.uid, onUpdateBalance, onAddTransaction, gainPerQuestion]);
+
+    try {
+      await addDoc(collection(db, 'quiz_sessions'), {
+        userId: user.uid,
+        stake: stakeAmount,
+        potentialWin: finalWin,
+        score: correctCount,
+        totalQuestions: selectedQuestions.length || 6,
+        subjects: selectedSubjects,
+        status: finalWin > 0 ? 'won' : 'lost',
+        isTimeout,
+        createdAt: serverTimestamp(),
+        endTime: serverTimestamp()
+      });
+    } catch (quizErr) {
+      console.warn('Quiz session log warning:', quizErr);
+    }
+  }, [selectedQuestions, potentialWin, user.uid, onUpdateBalance, onAddTransaction, gainPerQuestion, stakeAmount, selectedSubjects]);
 
   // Total Game Timer
   useEffect(() => {

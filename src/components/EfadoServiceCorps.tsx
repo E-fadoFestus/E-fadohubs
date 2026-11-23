@@ -37,6 +37,7 @@ import { ServiceBargainPlatform } from './ServiceBargainPlatform';
 import { db, collection, onSnapshot, query, where, limit, orderBy } from '../firebase';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
 import { EfadoworksOnline } from './EfadoworksOnline';
+import { HubGuideNote } from './HubGuideNote';
 
 interface ServiceSubcategory {
   name: string;
@@ -513,6 +514,7 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
           <EfadoworksOnline user={user} />
         ) : (
           <>
+            <HubGuideNote guideId="serviceCorps" variant="dark" className="mb-8" />
             {/* Header */}
             <div className="mb-20 text-center relative">
           <motion.div 

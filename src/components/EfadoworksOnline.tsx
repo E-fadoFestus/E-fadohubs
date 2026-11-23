@@ -44,6 +44,7 @@ import {
 } from '../firebase';
 import { UserProfile } from '../types';
 import efadoworksBg from '../assets/images/efadoworks_bg_1782484273255.jpg';
+import { HubGuideNote } from './HubGuideNote';
 
 interface EfadoworksOnlineProps {
   user: UserProfile;
@@ -812,7 +813,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
-  // Deposit test virtual balance helper
+  // Add escrow funds helper
   const handleDepositVirtualFunds = async () => {
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -820,7 +821,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
       await updateDoc(userRef, {
         usd_balance: currentBal + 1000
       });
-      triggerNotification('Deposited $1,000 test funds to your E-fado escrow wallet!');
+      triggerNotification('Added $1,000 credit to your E-fado escrow wallet!');
     } catch (e: any) {
       triggerNotification(e.message, false);
     }
@@ -893,7 +894,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
             </p>
           </div>
 
-          {/* Quick Wallet Check (with rich golden metallic styling to make the test balance stand out beautifully) */}
+          {/* Quick Wallet Check */}
           <div className="flex items-center gap-4 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 border border-amber-300 shadow-xl rounded-2xl p-4 text-slate-950">
             <div className="w-10 h-10 rounded-xl bg-white/30 flex items-center justify-center shadow-inner">
               <Wallet className="w-5 h-5 text-amber-950" />
@@ -904,12 +905,14 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
             </div>
             <button 
               onClick={handleDepositVirtualFunds}
-              className="px-3 py-1.5 bg-slate-950 hover:bg-slate-900 text-white transition-all rounded-lg text-[10px] font-black uppercase tracking-wider shadow-md hover:scale-105 active:scale-95 duration-200"
+              className="px-3 py-1.5 min-h-[44px] bg-slate-950 hover:bg-slate-900 text-white transition-all rounded-lg text-[10px] font-black uppercase tracking-wider shadow-md hover:scale-105 active:scale-95 duration-200"
             >
-              + Deposit Test Funds
+              + Add Escrow Credit
             </button>
           </div>
         </div>
+
+        <HubGuideNote guideId="skills" variant="light" className="mb-6" />
 
         {/* Live Notifications dropdown feed */}
         {showNotifications && (

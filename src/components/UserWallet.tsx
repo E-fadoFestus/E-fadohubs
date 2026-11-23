@@ -56,6 +56,7 @@ import { FlutterwaveDeposit } from './FlutterwaveDeposit';
 import { OpayDeposit } from './OpayDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
+import { HubGuideNote } from './HubGuideNote';
 import { useCurrency } from '../lib/CurrencyContext';
 import {
   ACTIVE_WALLET_CURRENCIES,
@@ -143,7 +144,6 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
     }
     return [
       { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
-      { id: 'pm2', type: 'bank_transfer', name: 'GTBank Corporate NGN', details: '3001964082', isDefault: false },
       { id: 'pm3', type: 'crypto', name: 'Bitcoin Wallet', details: 'bc1qxy2kg...z7v', isDefault: false },
     ];
   });
@@ -1037,6 +1037,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
               </button>
             </div>
           )}
+          <HubGuideNote guideId="walletPaystack" variant="light" className="mb-6" />
           <AnimatePresence mode="wait">
             {activeTab === 'profile' && (
               <motion.div
@@ -1877,10 +1878,10 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                         </div>
 
                         <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
-                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: USD / GBP / EUR SWIFT Wire</span>
-                          <p className="text-xs text-gray-300 font-bold">Bank Name: Access Bank Plc / UBA Corporate</p>
-                          <p className="text-xs text-gray-300 font-bold">Account Name: EFADO Technology & Digital Ecosystem</p>
-                          <p className="text-[10px] text-gray-400 mt-1">Submit your wire receipt to CEO Support for instant ledger credit.</p>
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: International Bank Transfer Support</span>
+                          <p className="text-xs text-gray-300 font-bold">Desk: EFADO Verified Settlement Desk</p>
+                          <p className="text-xs text-gray-300 font-bold">For NGN funding, use Paystack Card / Bank Transfer for instant credit.</p>
+                          <p className="text-[10px] text-gray-400 mt-1">Need international transfer guidance? Tap Need Help? Chat Us anytime.</p>
                         </div>
                       </div>
                     </div>
@@ -1889,9 +1890,9 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                       <div className="p-4 bg-amber-50 border-2 border-amber-150 rounded-2xl flex gap-3 shadow-sm mb-2">
                         <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <span className="text-[10px] font-black tracking-widest text-amber-800 uppercase">CEO STRATEGIC TRUST DEPOSIT</span>
+                          <span className="text-[10px] font-black tracking-widest text-amber-800 uppercase">VERIFIED BANK DEPOSIT OPTION</span>
                           <p className="text-[11px] text-amber-950 font-bold uppercase leading-normal mt-0.5">
-                            Manual bank transfer to corporate Escrow accounts. Submit your transaction id and proof screenshot to receive clearance.
+                            Tip: Paystack Checkout credits your wallet immediately. If using bank transfer receipt upload, submit your proof below for admin confirmation.
                           </p>
                         </div>
                       </div>

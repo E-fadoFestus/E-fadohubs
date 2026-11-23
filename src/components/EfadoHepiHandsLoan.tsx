@@ -44,6 +44,8 @@ import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/bu
 import { LoanVendorRegistration } from './LoanVendorRegistration';
 import { PaymentPlatform } from './PaymentPlatform';
 import { increment } from '../firebase';
+import { HubGuideNote } from './HubGuideNote';
+import { HUB_GUIDES } from '../data/hubGuides';
 
 const FormField: React.FC<{
   label: string,
@@ -561,90 +563,80 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
 
           <AnimatePresence>
             {showSystemGuide && (
-              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto">
                 <motion.div 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setShowSystemGuide(false)}
-                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+                  className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
                 />
                 <motion.div 
-                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  initial={{ scale: 0.94, opacity: 0, y: 16 }}
                   animate={{ scale: 1, opacity: 1, y: 0 }}
-                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  className="relative w-full max-w-2xl bg-white rounded-[3rem] p-10 shadow-3xl overflow-hidden"
+                  exit={{ scale: 0.94, opacity: 0, y: 16 }}
+                  className="relative w-full max-w-xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl my-auto max-h-[88vh] overflow-y-auto"
                 >
                   <button 
                     onClick={() => setShowSystemGuide(false)}
-                    className="absolute top-8 right-8 p-3 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full transition-all"
+                    className="absolute top-4 right-4 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-all"
+                    aria-label="Close guide"
                   >
                     <X className="w-5 h-5" />
                   </button>
 
-                  <div className="mb-12">
-                    <h2 className="text-4xl font-black text-slate-950 tracking-tighter mb-2">How it works</h2>
-                    <p className="text-slate-500 font-medium">Master the EFADO ecosystem flow</p>
-                  </div>
+                  <div className="space-y-4 pr-8">
+                    <div>
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">How EFADO HepiHands Works</h2>
+                      <p className="text-sm text-slate-600 font-medium mt-1">Simple guide to applying for and repaying a loan</p>
+                    </div>
 
-                  <div className="space-y-10">
-                    {[
-                      {
-                        step: '1',
-                        title: 'Deposit funds into your **Deposit Wallet**.',
-                        what: 'Access your secure funding terminal.',
-                        how: 'Select "Deposit" in the Wallet Hub and choose your preferred gateway (Stripe, Crypto, or Bank Transfer).',
-                        benefits: 'Instant liquidity access across all EFADO platforms with neural-grade security.'
-                      },
-                      {
-                        step: '2',
-                        title: 'Play the Lucky Spin using your **Player Wallet**.',
-                        what: 'Activate your interactive experience.',
-                        how: 'Move funds from your Deposit Wallet to your Player Wallet via the internal transfer bridge. Navigate to the Game hub to deploy your spins.',
-                        benefits: 'Access to exclusive high-multiplier multipliers and early-bird raffle entries.'
-                      },
-                      {
-                        step: '3',
-                        title: 'Winnings are sent to your **Cash Out Wallet** for withdrawal.',
-                        what: 'Seamlessly extract your success.',
-                        how: 'Request a payout from your Cash Out wallet to your external linked accounts. Approval is fast-tracked for verified elite users.',
-                        benefits: 'Global liquidity at your fingertips with zero-fee fast-track processing.'
-                      }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex gap-6 group">
-                        <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-black text-xl shadow-lg shadow-indigo-100 group-hover:scale-110 transition-transform">
-                          {item.step}
+                    <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-100">
+                      <p className="text-xs font-black uppercase tracking-wider text-indigo-700 mb-1">What is this?</p>
+                      <p className="text-sm text-slate-800 leading-relaxed">{HUB_GUIDES.loans.whatIsThis}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-black uppercase tracking-wider text-indigo-700">What to do:</p>
+                      {HUB_GUIDES.loans.steps.map((stepText, idx) => (
+                        <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="w-6 h-6 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-black text-xs shrink-0 mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <p className="text-sm text-slate-800 leading-relaxed">{stepText}</p>
                         </div>
-                        <div className="space-y-4">
-                          <h4 className="text-xl font-bold text-slate-900 leading-tight">
-                            {item.title.split('**').map((text, i) => i % 2 === 1 ? <span key={i} className="text-indigo-600 font-black">{text}</span> : text)}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                             <div className="space-y-1">
-                               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">What to do</p>
-                               <p className="text-xs text-slate-600 font-medium leading-relaxed">{item.what}</p>
-                             </div>
-                             <div className="space-y-1">
-                               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">How to do it</p>
-                               <p className="text-xs text-slate-600 font-medium leading-relaxed">{item.how}</p>
-                             </div>
-                             <div className="space-y-1">
-                               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Your Benefits</p>
-                               <p className="text-xs text-slate-600 font-medium leading-relaxed">{item.benefits}</p>
-                             </div>
-                          </div>
-                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-100">
+                        <p className="text-xs font-black uppercase tracking-wider text-emerald-700 mb-1">What happens next?</p>
+                        <p className="text-sm text-slate-800 leading-relaxed">{HUB_GUIDES.loans.whatHappensNext}</p>
                       </div>
-                    ))}
-                  </div>
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-100">
+                        <p className="text-xs font-black uppercase tracking-wider text-amber-800 mb-1">Example:</p>
+                        <p className="text-sm text-slate-800 leading-relaxed">{HUB_GUIDES.loans.example}</p>
+                      </div>
+                    </div>
 
-                  <div className="mt-12 pt-10 border-t border-gray-100">
-                     <button 
-                       onClick={() => setShowSystemGuide(false)}
-                       className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-600 transition-all"
-                     >
-                       I Understood the Flow
-                     </button>
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSystemGuide(false);
+                          window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.loans.helpCategory } }));
+                        }}
+                        className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all"
+                      >
+                        Need Help? Chat Us
+                      </button>
+                      <button 
+                        onClick={() => setShowSystemGuide(false)}
+                        className="flex-1 min-h-[44px] px-4 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-indigo-600 transition-all"
+                      >
+                        Got It
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               </div>
@@ -1880,6 +1872,8 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
             System Locked
           </div>
         </div>
+
+        <HubGuideNote guideId="loans" variant="light" className="mb-6" />
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2 mb-12 overflow-x-auto pb-4 no-scrollbar">

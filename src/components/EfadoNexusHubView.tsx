@@ -58,6 +58,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { HubGuideNote } from './HubGuideNote';
 
 export interface EfadoNexusHubViewProps {
   user: UserProfile;
@@ -1162,6 +1163,10 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
             </span>
           </button>
         </div>
+      </div>
+
+      <div className="px-4 sm:px-6 py-2 bg-slate-950/80 border-b border-indigo-500/10 shrink-0">
+        <HubGuideNote guideId="nexus" variant="dark" />
       </div>
 
       {/* STATUS / STORIES SECTION - SPEC 3: HORIZONTAL SCROLL WITH AD BADGE & CREATOR FUND */}

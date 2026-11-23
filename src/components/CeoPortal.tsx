@@ -5,6 +5,7 @@ import { CurrencySelector } from './CurrencySelector';
 import { useCurrency } from '../lib/CurrencyContext';
 import { CeoHubsManager } from './CeoHubsManager';
 import { getBackendUrl } from '../config/backend';
+import { HubGuideNote } from './HubGuideNote';
 import { 
   ShieldCheck, 
   Users, 
@@ -56,6 +57,7 @@ import {
 } from 'recharts';
 import { 
   db, 
+  auth,
   collection, 
   onSnapshot, 
   doc, 
@@ -76,8 +78,6 @@ import { UserProfile, AdminStats, Announcement, WithdrawalRequest, Transaction, 
 import { Efado3DLogo } from './Efado3DLogo';
 import { StrategicReceipt } from './StrategicReceipt';
 import { PatronageTracker } from './PatronageTracker';
-import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
-import { monetizationService } from '../services/monetizationService';
 import ceoImage from '../assets/images/ceo_exact_attached_1779365508172.png';
 import { Landmark, ArrowRight, Eye, Sparkles, Lock, EyeOff, Copy, ExternalLink, Filter, Layers, Send, Check, BookOpen, Cpu, Radio, Video, PhoneCall, Package, GraduationCap, Award, Smartphone, Share2, Compass, Tv, Activity, RefreshCw, Play, Flame, Gift } from 'lucide-react';
 
@@ -145,6 +145,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [vendingPurchases, setVendingPurchases] = useState<any[]>([]);
   const [sourcingRequests, setSourcingRequests] = useState<any[]>([]);
   const [cryptoConversions, setCryptoConversions] = useState<any[]>([]);
+  const [moneyExchanges, setMoneyExchanges] = useState<any[]>([]);
   const [partnerApplications, setPartnerApplications] = useState<any[]>([]);
   const [zoomSubscriptions, setZoomSubscriptions] = useState<any[]>([]);
   const [jambCandidates, setJambCandidates] = useState<any[]>([]);
@@ -228,189 +229,57 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [directMsgBonus, setDirectMsgBonus] = useState<number>(0);
   const [directMsgStatus, setDirectMsgStatus] = useState<string | null>(null);
   const [pendingFilter, setPendingFilter] = useState<'all' | 'deposits' | 'withdrawals'>('all');
-  const [monStats, setMonStats] = useState(monetizationService.getMonetizationStats());
-  const [showMonWithdrawalModal, setShowMonWithdrawalModal] = useState(false);
-  const [selectedMonBank, setSelectedMonBank] = useState<any>(null);
-  const [monWithdrawAmount, setMonWithdrawAmount] = useState<number>(0);
-  const [monWithdrawDest, setMonWithdrawDest] = useState('');
-  const [monWithdrawSuccess, setMonWithdrawSuccess] = useState(false);
-  const [monWithdrawError, setMonWithdrawError] = useState('');
-  const [isProcessingMonWithdraw, setIsProcessingMonWithdraw] = useState(false);
-  const [simulatedLiveEarningsStatus, setSimulatedLiveEarningsStatus] = useState<string>('');
-  
-  // Custom manual adjustments for standard monetization banks
-  const [bankWithdrawalHistory, setBankWithdrawalHistory] = useState<any[]>([
-    { id: 'mwt-1', timestamp: new Date(Date.now() - 4 * 3600 * 1050).toLocaleString(), bank: 'GTB Dollar Current', amount: '$150.00', dest: 'USD Personal Bank Transfer Wire', status: 'Completed' },
-    { id: 'mwt-2', timestamp: new Date(Date.now() - 24 * 3600 * 1050).toLocaleString(), bank: 'Opay Business', amount: '₦25,000', dest: 'Corporate Reserve Bank Acc', status: 'Completed' }
-  ]);
+  const [paystackBalanceState, setPaystackBalanceState] = useState<{
+    loading: boolean;
+    connected: boolean;
+    balances: Array<{ currency: string; balanceKobo: number; balanceMajor: number }>;
+    error: string | null;
+    lastChecked: string | null;
+  }>({
+    loading: false,
+    connected: false,
+    balances: [],
+    error: null,
+    lastChecked: null
+  });
 
-  // Hook to keep active monetization state fresh when loaded
-  useEffect(() => {
-    setMonStats(monetizationService.getMonetizationStats());
-    const interval = setInterval(() => {
-      setMonStats(monetizationService.getMonetizationStats());
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Compute live state wallets based on site data dynamically combined with static bases
-  const getBankWalletBalances = (stats: any) => {
-    const defaultPageViews = stats.pageViews || 1420;
-    const defaultClicks = stats.miningClicks || 0;
-    const defaultCoins = stats.coinsMined || 0;
-    const defaultSeminars = stats.seminarsAccessed || 0;
-    const defaultAds = stats.adsImpressions || 124;
-    const defaultVideoAds = stats.videoAdsCompleted || 0;
-    const defaultAffiliateClicks = stats.affiliateClicks || 0;
-    const defaultUSD = stats.totalEarningsUSD || 4.82;
-
-    return {
-      savings_uba: {
-        name: 'UBA Savings (2120742200)',
-        baseCurrency: '₦',
-        balance: 84000 + (defaultPageViews * 12) + (defaultClicks * 150),
-        detail: 'Okhawere Festus Daniel • Savings'
-      },
-      savings_gtb: {
-        name: 'GTB Savings (0126434623)',
-        baseCurrency: '₦',
-        balance: 120000 + (defaultPageViews * 15) + (defaultAffiliateClicks * 500),
-        detail: 'Okhawere Festus Daniel • Savings'
-      },
-      savings_access: {
-        name: 'Access Savings (0001304979)',
-        baseCurrency: '₦',
-        balance: 58000 + (defaultPageViews * 10) + (defaultCoins * 5),
-        detail: 'Okhawere Festus Daniel • Savings'
-      },
-      current_usd: {
-        name: 'GTB Dollar Current (0424168460)',
-        baseCurrency: '$',
-        balance: 450 + (defaultUSD * 0.85) + (defaultAffiliateClicks * 2.5),
-        detail: 'Okhawere Festus Daniel • Current (Dollar)'
-      },
-      current_ngn: {
-        name: 'GTB Naira Current (0424168563)',
-        baseCurrency: '₦',
-        balance: 185000 + (defaultCoins * 15) + (defaultVideoAds * 450),
-        detail: 'Okhawere Festus Daniel • Current (Naira)'
-      },
-      current_eur_personal: {
-        name: 'GTB Euro Current (0424168587)',
-        baseCurrency: '€',
-        balance: 350 + (defaultUSD * 0.45) + (defaultAffiliateClicks * 1.8),
-        detail: 'Okhawere Festus Daniel • Current (Europe)'
-      },
-      business_opay: {
-        name: 'Opay Business (8072456836)',
-        baseCurrency: '₦',
-        balance: 342000 + (defaultClicks * 95) + (defaultSeminars * 850),
-        detail: 'EFADO Technology Training & Services • Business'
-      },
-      business_gtb_eur: {
-        name: 'GTB EUR Business (3001964147)',
-        baseCurrency: '€',
-        balance: 2100 + (defaultUSD * 0.65) + (defaultAffiliateClicks * 4.2),
-        detail: 'EFADO Technology Training & Services • EUR'
-      },
-      business_gtb_gbp: {
-        name: 'GTB GBP Business (3001964123)',
-        baseCurrency: '£',
-        balance: 1800 + (defaultUSD * 0.55) + (defaultAffiliateClicks * 3.5),
-        detail: 'EFADO Technology Training & Services • GBP'
-      },
-      business_gtb_ngn: {
-        name: 'GTB NGN Business (3001964082)',
-        baseCurrency: '₦',
-        balance: 1450000 + (defaultCoins * 85) + (defaultVideoAds * 1250) + (defaultSeminars * 5000),
-        detail: 'EFADO Technology Training & Services • NGN Corporate'
-      },
-      business_gtb_usd: {
-        name: 'GTB USD Business (3001964109)',
-        baseCurrency: '$',
-        balance: 1250 + (defaultUSD * 1.25) + (defaultAffiliateClicks * 8.5),
-        detail: 'EFADO Technology Training & Services • USD Corporate'
-      }
-    };
-  };
-
-  const monBankWallets = getBankWalletBalances(monStats);
-
-  // Automatic simulation engine to increase site engagement and ad views instantly
-  const handleTriggerSimulatedTraffic = () => {
-    setSimulatedLiveEarningsStatus('Simulating User Traffic Burst & Ad Personalization views...');
-    monetizationService.logGA4Event('mining_button_click', { stage: 'O', automaticSim: true });
-    monetizationService.logGA4Event('rewarded_ad_watched', { trigger: 'simulate_burst' });
-    monetizationService.logGA4Event('coin_mined', { amount: 50 });
-    monetizationService.logGA4Event('seminar_access', { seminarId: 'jamb-seminar', amountPaidNaira: 1500 });
-
-    setTimeout(() => {
-      setMonStats(monetizationService.getMonetizationStats());
-      setSimulatedLiveEarningsStatus('Revenue updated dynamically across standard CEO wallets!');
-      setTimeout(() => setSimulatedLiveEarningsStatus(''), 3000);
-    }, 1200);
-  };
-
-  // Withdrawals processing
-  const handleMonWithdrawal = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMonBank || monWithdrawAmount <= 0) {
-      setMonWithdrawError('Please specify valid bank wallet and extraction amount.');
-      return;
-    }
-
-    if (monWithdrawAmount > selectedMonBank.balance) {
-      setMonWithdrawError(`Requested extraction exceeds active ${selectedMonBank.baseCurrency}${selectedMonBank.balance.toLocaleString()} balance.`);
-      return;
-    }
-
-    if (!monWithdrawDest.trim()) {
-      setMonWithdrawError('Please enter valid destination bank details or crypto payment receipt address.');
-      return;
-    }
-
-    setIsProcessingMonWithdraw(true);
-    setMonWithdrawError('');
-
-    setTimeout(() => {
-      // Simulate deduction and register transaction
-      const updatedStats = { ...monStats };
-      // Subtract directly or write manual adjustments
-      const uniqueId = 'mwt-' + Math.random().toString(36).substr(2, 9);
-      
-      const newTransaction = {
-        id: uniqueId,
-        timestamp: new Date().toLocaleString(),
-        bank: selectedMonBank.name,
-        amount: `${selectedMonBank.baseCurrency}${monWithdrawAmount.toLocaleString()}`,
-        dest: monWithdrawDest,
-        status: 'Completed'
-      };
-
-      setBankWithdrawalHistory(prev => [newTransaction, ...prev]);
-      
-      // Update global transaction telemetry
-      try {
-        addDoc(collection(db, 'transactions'), {
-          userId: 'ADMIN_CEO',
-          type: 'payout',
-          amount: monWithdrawAmount,
-          currency: selectedMonBank.baseCurrency,
-          status: 'completed',
-          timestamp: serverTimestamp(),
-          description: `CEO Ad/Affiliate Monetization Payout from ${selectedMonBank.name}`,
-          metadata: {
-            destination: monWithdrawDest,
-            systemMethod: 'Direct Server Ledger Clearance'
-          }
+  const fetchPaystackBalance = async () => {
+    setPaystackBalanceState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        setPaystackBalanceState({
+          loading: false,
+          connected: false,
+          balances: [],
+          error: 'Not Connected (Admin Firebase Sign-In Required)',
+          lastChecked: new Date().toLocaleTimeString()
         });
-      } catch (err) {
-        console.warn("Failed to log cloud ledger event, proceeding locally: ", err);
+        return;
       }
 
-      setIsProcessingMonWithdraw(false);
-      setMonWithdrawSuccess(true);
-    }, 1800);
+      const res = await fetch(getBackendUrl('/api/paystack/balance'), {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      setPaystackBalanceState({
+        loading: false,
+        connected: Boolean(data?.connected),
+        balances: Array.isArray(data?.balances) ? data.balances : [],
+        error: data?.error || (!res.ok ? `HTTP ${res.status}` : null),
+        lastChecked: new Date().toLocaleTimeString()
+      });
+    } catch (err: any) {
+      setPaystackBalanceState({
+        loading: false,
+        connected: false,
+        balances: [],
+        error: err?.message || 'Unable to reach Paystack balance endpoint',
+        lastChecked: new Date().toLocaleTimeString()
+      });
+    }
   };
 
   const [detectiveSandboxInput, setDetectiveSandboxInput] = useState('');
@@ -484,9 +353,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [adminWithdrawCurrency, setAdminWithdrawCurrency] = useState<'NGN' | 'USD' | 'EUR' | 'GBP'>('NGN');
   const [withdrawAdminAmount, setWithdrawAdminAmount] = useState<number>(0);
   const [adminWithdrawDetails, setAdminWithdrawDetails] = useState({
-    bankName: 'Access Bank Plc',
-    accountNumber: '0001304979',
-    accountName: 'Okhawere Festus Daniel'
+    bankName: '',
+    accountNumber: '',
+    accountName: ''
   });
 
   const handleWithdrawAdminWallet = async () => {
@@ -497,9 +366,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
     setIsProcessing(true);
     try {
-      const bankDestination = adminWithdrawDetails.bankName.trim() || 'Access Bank / OPay CEO Account';
-      const accNumber = adminWithdrawDetails.accountNumber.trim() || '0001304979';
-      const accName = adminWithdrawDetails.accountName.trim() || 'CEO Festus Daniel';
+      const bankDestination = adminWithdrawDetails.bankName.trim() || 'Paystack Settlement Bank';
+      const accNumber = adminWithdrawDetails.accountNumber.trim() || 'Settlement Ledger';
+      const accName = adminWithdrawDetails.accountName.trim() || 'CEO Ledger Record';
       const processedDateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium' });
 
       const currencySymbol = adminWithdrawCurrency === 'USD' ? '$' : adminWithdrawCurrency === 'EUR' ? '€' : adminWithdrawCurrency === 'GBP' ? '£' : '₦';
@@ -629,8 +498,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   useEffect(() => {
     if (!isUnlocked) return;
     
-    // Initial fetch and continuous high-sensitivity polling for live CEO telemetry
+    // Initial fetch and continuous high-sensitivity polling for live CEO telemetry & Paystack balance
     fetchCeoTelemetry();
+    fetchPaystackBalance();
     const telemetryInterval = setInterval(fetchCeoTelemetry, 15000);
 
     const handleSnapError = (err: any, col: string) => {
@@ -797,6 +667,10 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       setCryptoConversions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (e) => handleSnapError(e, 'crypto_conversions'));
 
+    const unsubMoneyExchanges = onSnapshot(collection(db, 'money_exchanges'), (snap) => {
+      setMoneyExchanges(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (e) => handleSnapError(e, 'money_exchanges'));
+
     // Fetch Partners & Zoom Subscriptions
     const unsubPartners = onSnapshot(collection(db, 'partner_applications'), (snap) => {
       setPartnerApplications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -852,6 +726,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       unsubVending();
       unsubSourcing();
       unsubCrypto();
+      unsubMoneyExchanges();
       unsubPartners();
       unsubZoom();
       unsubJamb();
@@ -1130,6 +1005,22 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       });
     });
 
+    moneyExchanges.forEach(mx => {
+      items.push({
+        id: `mx-${mx.id}`,
+        category: 'digital',
+        hubName: 'Money Exchange',
+        title: `FX Conversion: ${Number(mx.sourceAmount || 0).toLocaleString()} ${mx.sourceCurrency || 'NGN'} → ${Number(mx.targetAmount || 0).toLocaleString()} ${mx.targetCurrency || 'USD'}`,
+        description: `Method: ${mx.payoutType || 'wallet'} • User: ${mx.userEmail || mx.userId || 'Guest'}`,
+        amount: `${Number(mx.sourceAmount || 0).toLocaleString()} ${mx.sourceCurrency || 'NGN'}`,
+        user: mx.userEmail || mx.userId || 'Guest',
+        timestamp: parseTime(mx.createdAt),
+        status: mx.status || 'completed',
+        badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+        rawData: mx
+      });
+    });
+
     // 8. Education Hub (JAMB CBT & WAEC)
     jambCandidates.forEach(jc => {
       items.push({
@@ -1229,6 +1120,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
     vendingPurchases,
     sourcingRequests,
     cryptoConversions,
+    moneyExchanges,
     jambCandidates,
     serviceRequests,
     loanApplications,
@@ -2394,6 +2286,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 exit={{ opacity: 0, y: -20 }}
                 className="space-y-8"
               >
+                <HubGuideNote guideId="ceoPortal" variant="dark" />
                 {/* Executive Persona Banner */}
                 <div className="bg-gradient-to-r from-indigo-950 to-slate-900 border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden flex flex-col md:flex-row items-center gap-8 shadow-2xl">
                   <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl -mr-48 -mt-48" />
@@ -2567,7 +2460,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         onClick={() => setShowAdminWithdrawModal(true)}
                         className="px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 active:scale-[0.98] text-[10px] text-white font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-indigo-600/20"
                       >
-                        ⚡ Withdraw Benefit Vault
+                        Record Benefit Withdrawal
                       </button>
                     </div>
 
@@ -2935,7 +2828,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                           <div className="p-8 bg-slate-950/40 rounded-3xl border border-emerald-500/20 text-center space-y-2">
                             <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
                             <h4 className="text-base font-black text-white uppercase tracking-wider">All Clear! No Pending Financial Approvals</h4>
-                            <p className="text-xs text-slate-400 font-bold">All direct bank deposits and player cash-outs have been reviewed, verified, and processed.</p>
+                            <p className="text-xs text-slate-400 font-bold">All wallet deposits and player cash-outs have been reviewed, verified, and processed.</p>
                           </div>
                         ) : (
                           <>
@@ -2951,7 +2844,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-[9px] uppercase tracking-widest rounded-full">
-                                          📥 DIRECT BANK DEPOSIT
+                                          📥 WALLET DEPOSIT REVIEW
                                         </span>
                                         <span className="px-2.5 py-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 font-mono text-[9px] font-black uppercase tracking-wider rounded-full flex items-center gap-1">
                                           <Clock className="w-3 h-3 animate-spin" /> PENDING CEO APPROVAL
@@ -3105,7 +2998,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   );
                 })()}
 
-                {/* Site Standard Monetization Wallet Gateway */}
+                {/* Live Paystack & Vault Treasury Gateway */}
                 <div className="bg-gradient-to-r from-amber-950/40 via-indigo-950/40 to-slate-900 border-2 border-amber-500/20 rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl" />
                   <div className="flex items-center gap-4 text-left">
@@ -3113,23 +3006,27 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                       <Coins className="w-8 h-8" />
                     </div>
                     <div>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[7px] font-black uppercase tracking-widest inline-block mb-1.5">Sovereign Monetization Engine</span>
-                      <h4 className="text-lg font-black text-white uppercase italic tracking-tight">Earn Money From Site Wallet</h4>
+                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-[7px] font-black uppercase tracking-widest inline-block mb-1.5">Live Treasury &amp; Vault Ledger</span>
+                      <h4 className="text-lg font-black text-white uppercase italic tracking-tight">Paystack Settlement &amp; Vault Treasury</h4>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none mt-1">
-                        Display Ads, URL Affiliates, & Premium seminar transactions are mapped dynamically & split automatically into your 11 integrated CEO/admin banks.
+                        Real-time Paystack Settlement Bank balance paired with Firestore internal vault accounting.
                       </p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 shrink-0">
                     <div className="px-4 py-2 bg-slate-900 border border-white/5 rounded-xl text-right">
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Monetized Value</p>
-                      <p className="text-sm font-black text-emerald-400 font-mono">${(monStats.totalEarningsUSD || 0).toLocaleString()} USD + ₦{(monStats.coinsMined * 25).toLocaleString()}</p>
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Paystack Live Settlement</p>
+                      <p className="text-sm font-black text-emerald-400 font-mono">
+                        {paystackBalanceState.connected && paystackBalanceState.balances.length > 0
+                          ? paystackBalanceState.balances.map((b) => `${b.currency} ${b.balanceMajor.toLocaleString()}`).join(' | ')
+                          : 'Not Connected'}
+                      </p>
                     </div>
                     <button 
                       onClick={() => setActiveTab('monetization')}
                       className="px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-[10px] uppercase tracking-widest flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/10"
                     >
-                      <Landmark className="w-4 h-4" /> Manage Mon. Wallet
+                      <Landmark className="w-4 h-4" /> Open Treasury Tab
                     </button>
                   </div>
                 </div>
@@ -3197,13 +3094,13 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   </button>
                 </div>
 
-                {/* Game Wallets */}
+                {/* Game Wallets - All 6 Games */}
                 <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 golden-card-border">
                   <h3 className="text-xl font-extrabold text-white mb-6 flex items-center gap-3">
                     <Zap className="w-6 h-6 text-yellow-400" />
-                    Individual Game Wallets
+                    Individual Game Wallets (All 6 Live Arena Games)
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
                       <div className="flex items-center gap-3 mb-4">
                         <Coins className="w-5 h-5 text-indigo-400" />
@@ -3224,6 +3121,27 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         <span className="text-sm font-bold text-slate-400">Digital Money Trading</span>
                       </div>
                       <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.tradingGame || 0)}</p>
+                    </div>
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Activity className="w-5 h-5 text-emerald-400" />
+                        <span className="text-sm font-bold text-slate-400">Equilibrium Arena</span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.equilibrium || 0)}</p>
+                    </div>
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Flame className="w-5 h-5 text-cyan-400" />
+                        <span className="text-sm font-bold text-slate-400">Deep Sea Jet</span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.deepSeaJet || 0)}</p>
+                    </div>
+                    <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Brain className="w-5 h-5 text-purple-400" />
+                        <span className="text-sm font-bold text-slate-400">EFADO Money Quiz</span>
+                      </div>
+                      <p className="text-2xl font-black text-white font-display">{formatPrice(adminStats?.gameWallets?.moneyQuiz || 0)}</p>
                     </div>
                   </div>
                 </div>
@@ -3915,168 +3833,185 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                     </button>
                   </div>
                 )}
-                {/* 1. Header Information */}
-                <div className="bg-gradient-to-r from-amber-900 to-indigo-950 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl -mr-48 -mt-48" />
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 z-10 relative">
-                    <div className="space-y-2">
-                       <div className="flex items-center gap-2">
-                          <span className="px-2.5 py-1 bg-[#DAA520]/25 border border-[#DAA520]/30 rounded-full text-[9px] font-black uppercase text-[#DAA520] tracking-widest flex items-center gap-1">
-                             <Sparkles className="w-3.5 h-3.5" /> Site Account Autopilot Active
-                          </span>
-                       </div>
-                       <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter">
-                          Earn Money From Site Wallet
-                       </h3>
-                       <p className="text-xs text-slate-300 max-w-2xl font-medium leading-relaxed">
-                          This wallet interface acts as the central receiving hub for standard monetization methods. Display ads, lazy-loaded AdSense blocks, and affiliate commissions are accrued automatically and split dynamically based on traffic weights into the CEO bank accounts.
-                       </p>
+                {/* 1. Header Information: Real Paystack Treasury & Internal Vault Accounting */}
+                <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 z-10 relative">
+                    <div className="space-y-2 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1 border ${
+                          paystackBalanceState.connected
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                            : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        }`}>
+                          <Landmark className="w-3.5 h-3.5" />
+                          {paystackBalanceState.connected ? 'Paystack Live Treasury Connected' : 'Paystack Balance: Not Connected'}
+                        </span>
+                        {paystackBalanceState.lastChecked && (
+                          <span className="text-[9px] font-mono text-slate-400">Checked {paystackBalanceState.lastChecked}</span>
+                        )}
+                      </div>
+                      <h3 className="text-3xl font-black text-white italic uppercase tracking-tighter">
+                        Real Paystack &amp; Vault Treasury
+                      </h3>
+                      <p className="text-xs text-slate-300 max-w-2xl font-medium leading-relaxed">
+                        All real NGN deposits and payouts settle exclusively through the live Paystack gateway and your Paystack Settlement Bank. Internal Firestore vaults below track net house profit and multi-currency platform accounting only.
+                      </p>
                     </div>
-                    
-                    <button
-                      onClick={handleTriggerSimulatedTraffic}
-                      className="px-6 py-4 bg-[#DAA520] hover:bg-yellow-500 text-slate-950 font-black rounded-2xl text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/30 flex items-center gap-2 shrink-0 group"
-                    >
-                      <Eye className="w-4 h-4 text-slate-950 group-hover:scale-125 transition-transform" /> Simulate Dynamic Ad Traffic
-                    </button>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button
+                        onClick={fetchPaystackBalance}
+                        disabled={paystackBalanceState.loading}
+                        className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${paystackBalanceState.loading ? 'animate-spin' : ''}`} />
+                        {paystackBalanceState.loading ? 'Checking Paystack...' : 'Refresh Live Balance'}
+                      </button>
+                      <button
+                        onClick={() => setShowAdminWithdrawModal(true)}
+                        className="px-5 py-3 bg-slate-800 hover:bg-slate-700 border border-white/10 text-white font-black rounded-2xl text-xs uppercase tracking-widest transition-all"
+                      >
+                        Record Benefit Withdrawal
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Live Paystack Settlement Balance Cards */}
+                <div className="bg-slate-900/70 border border-emerald-500/20 p-6 rounded-3xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <Landmark className="w-5 h-5 text-emerald-400" />
+                      Live Paystack Gateway Settlement Balance
+                    </h4>
+                    <span className="text-[10px] font-mono uppercase text-slate-400">Source: /api/paystack/balance</span>
                   </div>
 
-                  {simulatedLiveEarningsStatus && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-4 px-4 py-2.5 bg-indigo-950/80 border border-indigo-500/30 rounded-xl text-[10.5px] font-black text-amber-300 uppercase tracking-widest animate-pulse"
-                    >
-                      🚀 {simulatedLiveEarningsStatus}
-                    </motion.div>
+                  {paystackBalanceState.connected && paystackBalanceState.balances.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {paystackBalanceState.balances.map((b, idx) => (
+                        <div key={idx} className="bg-slate-950 border border-emerald-500/30 p-5 rounded-2xl text-left">
+                          <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Paystack Available ({b.currency})</p>
+                          <p className="text-2xl font-black text-white font-mono mt-1">
+                            {b.currency === 'NGN' ? '₦' : `${b.currency} `}{b.balanceMajor.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-2">Settled via configured Paystack Settlement Bank</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-950 border border-amber-500/20 p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="text-left">
+                        <p className="text-xs font-black text-amber-300 uppercase">Not Connected</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {paystackBalanceState.error || 'Live Paystack settlement balance unavailable. Sign in with an authorized admin Firebase account or verify PAYSTACK_SECRET_KEY on the server.'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={fetchPaystackBalance}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0"
+                      >
+                        Retry Connection
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                {/* 2. Live Standard Monetization Statistics Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[
-                    { label: "Google AdSense Impressions", val: `${(monStats?.adsImpressions || 0).toLocaleString()} views`, detail: `$${(((monStats?.adsImpressions || 0) * 0.012)).toFixed(2)} USD Ad-Match` },
-                    { label: "Active Affiliate Clicks", val: `${(monStats?.affiliateClicks || 0)} redirected`, detail: `Approx. $${(((monStats?.affiliateClicks || 0) * 5.50)).toFixed(2)} CPA Commission` },
-                    { label: "Course & Seminar Accesses", val: `${monStats.seminarsAccessed} payments`, detail: `₦${(monStats.seminarsAccessed * 1500).toLocaleString()} direct NGN` },
-                    { label: "Coins Extracted Value", val: `${monStats.coinsMined.toLocaleString()} EM`, detail: `₦${(monStats.coinsMined * 25).toLocaleString()} Token equivalent` }
-                  ].map((tile, i) => (
-                    <div key={i} className="bg-slate-900 border border-white/5 p-5 rounded-2xl">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">{tile.label}</p>
-                      <h4 className="text-lg font-black text-white italic font-mono leading-none">{tile.val}</h4>
-                      <p className="text-[10px] text-[#DAA520] font-black uppercase mt-2">{tile.detail}</p>
+                {/* 3. Real Internal Firestore Vault Ledger + External Monetization Integrations */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-slate-900/70 border border-white/10 p-6 rounded-3xl space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">Internal Firestore Vault Ledger</h4>
+                      <span className="text-[9px] font-mono text-indigo-400 uppercase">adminStats/global</span>
                     </div>
-                  ))}
-                </div>
-
-                {/* 3. The 11 CEO/Admin Bank Receiving Wallets */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                     <div className="flex items-center gap-3">
-                        <Landmark className="w-6 h-6 text-indigo-400 animate-pulse" />
-                        <h4 className="text-lg font-black text-white uppercase italic tracking-wider">Dynamic Integrated Bank Receiving Wallets ({Object.keys(monBankWallets).length} Active Channels)</h4>
-                     </div>
-                     <span className="text-[8px] font-black text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full uppercase tracking-widest">Auto Cash Splitting Installed</span>
-                  </div>
-
-                  {/* Savings / Current / Business category blocks */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                     {Object.entries(monBankWallets).map(([key, wallet]) => {
-                       const isDollar = wallet.baseCurrency === '$';
-                       const isEuro = wallet.baseCurrency === '€';
-                       const isGbp = wallet.baseCurrency === '£';
-                       const colorClass = isDollar ? 'border-emerald-500/20' : isEuro ? 'border-purple-500/20' : isGbp ? 'border-amber-500/20' : 'border-[#DAA520]/20';
-                       const badgeClass = isDollar ? 'bg-emerald-500/10 text-emerald-400' : isEuro ? 'bg-purple-500/10 text-purple-400' : isGbp ? 'bg-amber-500/10 text-amber-400' : 'bg-[#DAA520]/10 text-amber-400';
-                       
-                       return (
-                         <div 
-                           key={key} 
-                           className={`bg-slate-950/90 border-2 ${colorClass} rounded-3xl p-6 flex flex-col justify-between hover:scale-[1.02] transition-transform duration-300 relative overflow-hidden shadow-xl group`}
-                         >
-                           {/* Decorative background logo */}
-                           <div className="absolute -right-6 -bottom-6 w-24 h-24 text-white/[0.01] group-hover:text-white/[0.03] transition-colors">
-                             <Landmark className="w-full h-full" />
-                           </div>
-
-                           <div className="space-y-3 relative z-10">
-                             <div className="flex justify-between items-start">
-                               <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${badgeClass}`}>
-                                 {wallet.detail.split('•')[1] || 'Sovereign'}
-                               </span>
-                               <span className="text-[9px] font-mono text-slate-500 uppercase font-black">
-                                 Active Wallet
-                               </span>
-                             </div>
-
-                             <div className="space-y-1">
-                               <h5 className="text-xs font-black text-white uppercase italic tracking-tight">{wallet.name}</h5>
-                               <p className="text-[9px] text-slate-500 font-bold uppercase leading-none">{wallet.detail.split('•')[0]}</p>
-                             </div>
-
-                             <div className="pt-2 border-t border-white/5 flex items-baseline gap-1">
-                                <span className="text-sm font-black text-slate-400">{wallet.baseCurrency}</span>
-                                <h4 className="text-2xl font-black text-white font-mono italic">
-                                   {wallet.balance.toLocaleString(undefined, { minimumFractionDigits: isDollar || isEuro ? 2 : 0, maximumFractionDigits: isDollar || isEuro ? 2 : 0 })}
-                                </h4>
-                             </div>
-                           </div>
-
-                           <div className="mt-6 pt-3 border-t border-white/5 flex items-center justify-between relative z-10">
-                              <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1">
-                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live receiving
-                              </span>
-                              <button
-                                onClick={() => {
-                                  setSelectedMonBank({ ...wallet, id: key });
-                                  setMonWithdrawAmount(Math.floor(wallet.balance * 0.5)); // Default to 50%
-                                  setMonWithdrawDest(wallet.name);
-                                  setMonWithdrawSuccess(false);
-                                  setMonWithdrawError('');
-                                  setShowMonWithdrawalModal(true);
-                                }}
-                                className="px-3 py-1.5 bg-white text-slate-950 hover:bg-[#DAA520] hover:text-slate-950 transition-colors rounded-lg text-[9px] font-black uppercase tracking-wider"
-                              >
-                                Extract Earnings
-                              </button>
-                           </div>
-                         </div>
-                       );
-                     })}
-                  </div>
-                </div>
-
-                {/* 4. Financial Withdrawal Wave and Local Log */}
-                <div className="bg-slate-800/20 p-8 rounded-[2.5rem] border border-white/5 space-y-6">
-                   <div className="flex justify-between items-center">
-                      <div>
-                         <h4 className="text-sm font-black text-white uppercase tracking-wider">Historical Monetization Extractions Log</h4>
-                         <p className="text-[10px] text-slate-505 uppercase tracking-widest leading-none mt-1">Real-time clearance to corporate out-banks</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase">NGN Benefit Vault</p>
+                        <p className="text-xl font-black text-emerald-400 font-mono mt-1">₦{(adminStats?.adminWallet || 0).toLocaleString()}</p>
                       </div>
-                      <span className="text-[9px] font-mono text-emerald-400 font-black">SSL Secure Clearing Nodes Active</span>
-                   </div>
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase">Total House Gain (NGN)</p>
+                        <p className="text-xl font-black text-white font-mono mt-1">₦{(adminStats?.totalHouseGain || 0).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase">USD / EUR / GBP Ledgers</p>
+                        <p className="text-sm font-black text-blue-300 font-mono mt-1">
+                          ${(adminStats?.adminWalletUSD || 0).toLocaleString()} • €{(adminStats?.adminWalletEUR || 0).toLocaleString()} • £{(adminStats?.adminWalletGBP || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-white/5">
+                        <p className="text-[9px] font-black text-slate-500 uppercase">Paystack Channel Deposits</p>
+                        <p className="text-sm font-black text-indigo-300 font-mono mt-1">
+                          {depositsList.filter(d => d.status === 'completed' || d.status === 'success').length} Completed
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
-                   <div className="divide-y divide-white/5">
-                      {bankWithdrawalHistory.map((item) => (
-                         <div key={item.id} className="py-4 flex justify-between items-center hover:bg-white/[0.01] px-2 rounded-xl">
+                  <div className="bg-slate-900/70 border border-white/10 p-6 rounded-3xl space-y-4 text-left">
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">External Ad &amp; Affiliate APIs</h4>
+                    <div className="space-y-3">
+                      {[
+                        { name: 'Google AdSense Reporting API', desc: 'Direct publisher revenue sync' },
+                        { name: 'Affiliate Network Payout API', desc: 'External CPA commission reporting' },
+                        { name: 'Direct Ad Billing Webhook', desc: 'Automated external sponsor invoicing' }
+                      ].map((ext, i) => (
+                        <div key={i} className="bg-slate-950 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-black text-white">{ext.name}</p>
+                            <p className="text-[10px] text-slate-500">{ext.desc}</p>
+                          </div>
+                          <span className="px-2.5 py-1 bg-slate-800 border border-white/10 text-slate-400 rounded-full text-[9px] font-black uppercase tracking-widest">
+                            Not Connected
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Real CEO Ledger Withdrawals (from Firestore withdrawals collection) */}
+                <div className="bg-slate-800/20 p-8 rounded-[2.5rem] border border-white/5 space-y-6">
+                  <div className="flex justify-between items-center text-left">
+                    <div>
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">CEO Benefit Ledger Withdrawal Records</h4>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest leading-none mt-1">
+                        Internal accounting entries synced with Firestore withdrawals (USER ID: ADMIN_CEO)
+                      </p>
+                    </div>
+                    <span className="text-[9px] font-mono text-indigo-400 font-black">Real Firestore Ledger Only</span>
+                  </div>
+
+                  <div className="divide-y divide-white/5">
+                    {withdrawals.filter(w => w.userId === 'ADMIN_CEO').length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-500 italic">
+                        No CEO benefit ledger withdrawal entries recorded yet.
+                      </div>
+                    ) : (
+                      withdrawals
+                        .filter(w => w.userId === 'ADMIN_CEO')
+                        .map((item: any) => (
+                          <div key={item.id} className="py-4 flex justify-between items-center hover:bg-white/[0.01] px-2 rounded-xl text-left">
                             <div>
-                               <p className="text-xs font-black text-white uppercase italic tracking-tight">{item.bank} Wallet Extraction</p>
-                               <p className="text-[9.5px] text-slate-405 mt-1 font-mono uppercase tracking-wider">Cleared to: {item.dest} • ID: {item.id}</p>
+                              <p className="text-xs font-black text-white uppercase tracking-tight">
+                                {item.bankName || 'Paystack Settlement Bank'}
+                              </p>
+                              <p className="text-[9.5px] text-slate-400 mt-1 font-mono uppercase tracking-wider">
+                                Ref: {item.accountNumber || 'Settlement Ledger'} • {item.accountName || 'CEO Ledger Record'}
+                              </p>
                             </div>
                             <div className="text-right">
-                               <p className="text-sm font-black text-rose-400 font-mono">-{item.amount}</p>
-                               <span className="text-[7.5px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded tracking-widest">{item.status}</span>
+                              <p className="text-sm font-black text-rose-400 font-mono">
+                                -{item.currency === 'USD' ? '$' : item.currency === 'EUR' ? '€' : item.currency === 'GBP' ? '£' : '₦'}{Number(item.amount || 0).toLocaleString()}
+                              </p>
+                              <span className="text-[7.5px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded tracking-widest">
+                                {item.status || 'completed'}
+                              </span>
                             </div>
-                         </div>
-                      ))}
-                   </div>
-                </div>
-
-                {/* 5. In-view Interactive Mini-Wizard */}
-                <div className="bg-gradient-to-br from-indigo-950/40 to-slate-950 p-8 rounded-[3rem] border border-white/5 relative overflow-hidden">
-                   <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl" />
-                   <h4 className="text-sm font-black text-white uppercase tracking-wider mb-2">Automated Local Split Matrix Ledger Rule</h4>
-                   <p className="text-[10.5px] text-slate-400 max-w-2xl leading-relaxed">
-                      All monetization components utilize structural Google API callbacks. Standard clicks route payouts directly through the payment processor APIs. No user-side payment intervention is required for these earnings to reflect.
-                   </p>
+                          </div>
+                        ))
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -4643,6 +4578,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   vendingPurchases={vendingPurchases}
                   sourcingRequests={sourcingRequests}
                   cryptoConversions={cryptoConversions}
+                  moneyExchanges={moneyExchanges}
                   jambCandidates={jambCandidates}
                   waecCards={waecCards}
                   serviceRequests={serviceRequests}
@@ -5537,8 +5473,8 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
               {/* Header */}
               <div className="p-8 border-b border-white/5 bg-slate-900/50 flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">Withdraw CEO Benefit</h3>
-                  <p className="text-xs text-slate-400 mt-1">Direct payout from available Segregated Admin Wallet vault</p>
+                  <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">Record Benefit Withdrawal</h3>
+                  <p className="text-xs text-slate-400 mt-1">Internal Ledger Accounting Only — Real cash is held in / settled via Paystack Settlement Bank</p>
                 </div>
                 <button 
                   onClick={() => setShowAdminWithdrawModal(false)}
@@ -5550,9 +5486,12 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
               {/* Form */}
               <div className="p-8 space-y-6">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-left text-[11px] text-amber-200 font-medium leading-relaxed">
+                  <strong>Internal Ledger Notice:</strong> Recording a withdrawal here updates your Firestore accounting vault balance (<code className="font-mono">adminStats/global</code>) and logs an audit trail. Actual bank settlement occurs in your Paystack Dashboard via your configured Paystack Settlement Bank.
+                </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                    Select Vault Currency to Withdraw From
+                    Select Vault Currency to Record Against
                   </label>
                   <div className="grid grid-cols-4 gap-2 p-1.5 bg-slate-800 rounded-2xl border border-white/10">
                     {(['NGN', 'USD', 'EUR', 'GBP'] as const).map(curr => (
@@ -5574,7 +5513,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                    Amount to Withdraw ({adminWithdrawCurrency})
+                    Amount to Record ({adminWithdrawCurrency})
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-indigo-400 font-mono select-none">
@@ -5596,7 +5535,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                     const currSym = adminWithdrawCurrency === 'USD' ? '$' : adminWithdrawCurrency === 'EUR' ? '€' : adminWithdrawCurrency === 'GBP' ? '£' : '₦';
                     return (
                       <p className="text-[10px] text-slate-500 text-left mt-2">
-                        Available {adminWithdrawCurrency} balance: <span className="text-white font-black">{currSym}{availableVaultBal.toLocaleString()}</span>
+                        Available {adminWithdrawCurrency} ledger balance: <span className="text-white font-black">{currSym}{availableVaultBal.toLocaleString()}</span>
                       </p>
                     );
                   })()}
@@ -5604,11 +5543,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
 
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                    Destination Bank / Platform
+                    Settlement Channel / Note
                   </label>
                   <input 
                     type="text"
-                    placeholder="e.g. Access Bank Pls"
+                    placeholder="e.g. Paystack Settlement Bank"
                     value={adminWithdrawDetails.bankName}
                     onChange={(e) => setAdminWithdrawDetails({ ...adminWithdrawDetails, bankName: e.target.value })}
                     className="w-full bg-slate-800 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-indigo-500 outline-none transition-all font-medium text-left"
@@ -5618,11 +5557,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                      Account / Wallet Number
+                      Settlement Reference (Optional)
                     </label>
                     <input 
                       type="text"
-                      placeholder="e.g. 1012356789"
+                      placeholder="Paystack payout ref"
                       value={adminWithdrawDetails.accountNumber}
                       onChange={(e) => setAdminWithdrawDetails({ ...adminWithdrawDetails, accountNumber: e.target.value })}
                       className="w-full bg-slate-800 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-indigo-500 outline-none transition-all font-mono text-left"
@@ -5630,11 +5569,11 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 text-left">
-                      Account Name / Signature
+                      Recorded By (Optional)
                     </label>
                     <input 
                       type="text"
-                      placeholder="CEO Name"
+                      placeholder="CEO / Treasury Officer"
                       value={adminWithdrawDetails.accountName}
                       onChange={(e) => setAdminWithdrawDetails({ ...adminWithdrawDetails, accountName: e.target.value })}
                       className="w-full bg-slate-800 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-indigo-500 outline-none transition-all font-medium text-left"
@@ -5654,7 +5593,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                         disabled={isProcessing || withdrawAdminAmount <= 0 || withdrawAdminAmount > availableVaultBal}
                         className="flex-grow py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                       >
-                        {isProcessing ? 'Processing Payout...' : `Process ${adminWithdrawCurrency} Withdrawal`}
+                        {isProcessing ? 'Recording Entry...' : `Record ${adminWithdrawCurrency} Ledger Withdrawal`}
                       </button>
                     );
                   })()}
@@ -5677,138 +5616,6 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
           <PatronageTracker 
             onClose={() => setShowPatronageTracker(false)}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Standard Monetization Extraction Modal */}
-      <AnimatePresence>
-        {showMonWithdrawalModal && selectedMonBank && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-amber-500/20 rounded-[2.5rem] overflow-hidden shadow-2xl"
-            >
-              {/* Gold header */}
-              <div className="p-8 border-b border-white/5 bg-gradient-to-r from-amber-950/40 to-indigo-950/40 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-display font-black text-white uppercase tracking-tight flex items-center gap-2">
-                    <Landmark className="w-5 h-5 text-amber-500" /> Monetization Extraction Gate
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">Direct wire payout validation logic cleared to target accounts</p>
-                </div>
-                <button 
-                  onClick={() => setShowMonWithdrawalModal(false)}
-                  className="p-3 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-2xl transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {monWithdrawSuccess ? (
-                <div className="p-8 text-center space-y-6">
-                  <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Ledger Clearance Verified!</h4>
-                    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                      Sovereign funds wire initiated from <strong>{selectedMonBank.name}</strong> has been cleared successfully. The payout of <strong>{selectedMonBank.baseCurrency}{monWithdrawAmount}</strong> will reflect on your out-channel bank within immediate routing hours.
-                    </p>
-                  </div>
-                  <div className="p-4 bg-slate-950/60 rounded-2xl border border-white/5 text-left font-mono text-[9px] text-slate-500 space-y-1">
-                    <p>TRANSACTION ID: MWT-{Math.floor(Math.random() * 900000 + 100000)}</p>
-                    <p>ORIGIN NODE: AI_STUDIO_STEWARD_BYPASS</p>
-                    <p>SETTLEMENT TYPE: AD_REV_COMMISSION_SPLIT</p>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setShowMonWithdrawalModal(false);
-                      setMonWithdrawSuccess(false);
-                    }}
-                    className="w-full py-4 bg-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs transition-transform active:scale-95"
-                  >
-                    Complete Session
-                  </button>
-                </div>
-              ) : (
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleMonWithdrawal(e);
-                  }} 
-                  className="p-8 space-y-6"
-                >
-                  {monWithdrawError && (
-                    <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 text-left font-bold">
-                      ⚠ {monWithdrawError}
-                    </div>
-                  )}
-
-                  <div>
-                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 text-left">
-                       Source Wallet Origin
-                     </label>
-                     <div className="p-4 bg-slate-950 border border-white/5 rounded-2xl text-left">
-                       <p className="text-xs font-black text-white uppercase italic">{selectedMonBank.name}</p>
-                       <p className="text-[10px] text-[#DAA520] font-black uppercase tracking-widest mt-1">
-                         Current balance: {selectedMonBank.baseCurrency}{selectedMonBank.balance.toLocaleString()}
-                       </p>
-                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-left">
-                      Amount to Extract ({selectedMonBank.baseCurrency})
-                    </label>
-                    <input 
-                      type="number"
-                      placeholder="Enter amount..."
-                      value={monWithdrawAmount || ''}
-                      onChange={(e) => setMonWithdrawAmount(Number(e.target.value))}
-                      className="w-full bg-slate-800 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-amber-500 outline-none transition-all text-xl font-black font-mono text-left"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-left">
-                      Destination Clearance Address / Wire Instructions
-                    </label>
-                    <input 
-                      type="text"
-                      placeholder="e.g. Okhawere Festus Daniel UBA Savings Acc or TRX wallet"
-                      value={monWithdrawDest}
-                      onChange={(e) => setMonWithdrawDest(e.target.value)}
-                      className="w-full bg-slate-800 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-amber-500 outline-none transition-all text-xs font-medium text-left"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <button 
-                      type="submit"
-                      disabled={isProcessingMonWithdraw}
-                      className="flex-grow py-4 bg-[#DAA520] text-slate-950 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg active:scale-95 disabled:opacity-50"
-                    >
-                      {isProcessingMonWithdraw ? 'Clearing Bank Wire...' : 'Authorize Extraction Wireless'}
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setShowMonWithdrawalModal(false)}
-                      className="px-6 py-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-            </motion.div>
-          </motion.div>
         )}
       </AnimatePresence>
 

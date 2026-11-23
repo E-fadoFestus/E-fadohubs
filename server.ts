@@ -11,7 +11,9 @@ import { GET as paystackBanksRoute } from './src/app/api/paystack/banks/route';
 import { POST as paystackVerifyAccountRoute } from './src/app/api/paystack/verify-account/route';
 import { POST as paystackWithdrawRoute } from './src/app/api/paystack/withdraw/route';
 import { GET as paystackWithdrawStatusRoute } from './src/app/api/paystack/withdraw/status/route';
+import { GET as paystackBalanceRoute } from './src/app/api/paystack/balance/route';
 import { POST as paystackWebhookRoute } from './src/app/api/webhook/paystack/route';
+import { POST as gameLedgerRoute } from './src/app/api/game/ledger/route';
 import paymentsInitializeHandler from './api/payments/initialize';
 import paymentsVerifyHandler from './api/payments/verify';
 import paymentsBanksHandler from './api/payments/banks';
@@ -388,6 +390,7 @@ app.post(['/api/paystack/initialize', '/api/paystack/initialize/', '/pay'], asyn
 });
 
 app.get(['/api/paystack/banks', '/api/paystack/banks/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackBanksRoute, req, res));
+app.get(['/api/paystack/balance', '/api/paystack/balance/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackBalanceRoute, req, res));
 app.post(['/api/paystack/verify-account', '/api/paystack/verify-account/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackVerifyAccountRoute, req, res));
 app.post(['/api/paystack/withdraw', '/api/paystack/withdraw/'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawRoute, req, res));
 app.get(['/api/paystack/withdraw/status', '/api/paystack/withdraw/status/', '/api/paystack/withdraw-status'], (req: express.Request, res: express.Response) => handleAppRoute(paystackWithdrawStatusRoute, req, res));
@@ -1190,6 +1193,7 @@ const handleGameCrash = (req: any, res: any) => {
 };
 app.post('/game/crash', handleGameCrash);
 app.post('/api/game/crash', handleGameCrash);
+app.post(['/api/game/ledger', '/api/game/ledger/'], (req: express.Request, res: express.Response) => handleAppRoute(gameLedgerRoute, req, res));
 
 // ============================================================================
 // EFADO NEXUS HUB - CENTRALIZED BACKEND APIS (v2.0 SPEC)

@@ -45,6 +45,7 @@ import {
 } from '../firebase';
 import { UserProfile } from '../types';
 import { useCurrency } from '../lib/CurrencyContext';
+import { HubGuideNote } from './HubGuideNote';
 
 interface EfadoDigitalServicesHubProps {
   user: UserProfile;
@@ -335,6 +336,10 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           }
         });
 
+        const planObj = vendingType === 'data'
+          ? opObj.plans.find(p => p.id === vendingSelectedDataPlanId)
+          : undefined;
+
         await addDoc(collection(db, 'transactions'), {
           userId: user.uid,
           type: 'payment',
@@ -344,6 +349,20 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           purpose: `VTU Refill - ${opObj.name}`,
           description: `Vended ${vendingType === 'airtime' ? '₦' + purchaseCostNGN + ' Airtime' : 'Data Bundle'} to ${vendingPhone}.`,
           timestamp: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'vending_purchases'), {
+          userId: user.uid,
+          userEmail: user.email || '',
+          phoneNumber: vendingPhone,
+          network: opObj.name,
+          country: countryObj?.name || vendingCountry,
+          serviceType: vendingType,
+          planName: planObj?.name || `₦${purchaseCostNGN} Airtime`,
+          amount: purchaseCostNGN,
+          paymentWallet: vendingPayMethod,
+          status: 'success',
+          createdAt: serverTimestamp()
         });
 
         setVendingStatus('success');
@@ -406,6 +425,23 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           timestamp: serverTimestamp()
         });
 
+        await addDoc(collection(db, 'crypto_conversions'), {
+          userId: user.uid,
+          userEmail: user.email || '',
+          cryptoAmount: otcSellAmount,
+          cryptoSymbol: otcSellCrypto,
+          targetCurrency: otcGetCurrency,
+          rate: Math.round(swap.usdRate * (fiatRates[otcGetCurrency] || 1550)),
+          payoutNaira: swap.finalAmount,
+          txHash: otcTxHash.trim(),
+          payoutMethod: otcPayoutMethod,
+          bankName: otcBankName || '',
+          accountNumber: otcBankAccount || '',
+          accountName: otcAccountName || '',
+          status: 'completed',
+          createdAt: serverTimestamp()
+        });
+
         setOtcStep('complete');
       } catch (e) {
         console.error("OTC write error:", e);
@@ -434,6 +470,21 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           purpose: `Money Exchange - ${convSourceCurrency} to ${convTargetCurrency}`,
           description: `Converted ${convAmount} ${convSourceCurrency} to ${finalPayout} ${convTargetCurrency} for payout.`,
           timestamp: serverTimestamp()
+        });
+
+        await addDoc(collection(db, 'money_exchanges'), {
+          userId: user.uid,
+          userEmail: user.email || '',
+          sourceCurrency: convSourceCurrency,
+          targetCurrency: convTargetCurrency,
+          sourceAmount: convAmount,
+          targetAmount: finalPayout,
+          payoutType: convPayoutType,
+          payoutBank: convPayoutBank || '',
+          payoutAccount: convPayoutAccount || '',
+          payoutName: convPayoutName || '',
+          status: 'completed',
+          createdAt: serverTimestamp()
         });
 
         setConvStatus('success');
@@ -512,8 +563,9 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           
           {/* TAB 1: Crypto OTC Swap */}
           {activeTab === 'crypto' && (
-            <div className="space-y-8 animate-fadeIn">
-              <div className="border-b border-white/5 pb-6">
+            <div className="space-y-8 animate-fadeIn normal-case">
+              <HubGuideNote guideId="cryptoOtc" variant="dark" />
+              <div className="border-b border-white/5 pb-6 uppercase">
                 <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
                   <Coins className="w-6 h-6 text-indigo-400" />
                   Sovereign Crypto OTC Exchange
@@ -769,8 +821,9 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
 
           {/* TAB 2: Money Exchange */}
           {activeTab === 'money' && (
-            <div className="space-y-8 animate-fadeIn">
-              <div className="border-b border-white/5 pb-6">
+            <div className="space-y-8 animate-fadeIn normal-case">
+              <HubGuideNote guideId="moneyExchange" variant="dark" />
+              <div className="border-b border-white/5 pb-6 uppercase">
                 <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
                   <ArrowLeftRight className="w-6 h-6 text-indigo-400" />
                   Instant Money Exchange & Fiat Portal
@@ -919,8 +972,9 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
 
           {/* TAB 3: Airtime & Data Vending */}
           {activeTab === 'vending' && (
-            <div className="space-y-8 animate-fadeIn">
-              <div className="border-b border-white/5 pb-6">
+            <div className="space-y-8 animate-fadeIn normal-case">
+              <HubGuideNote guideId="vtu" variant="dark" />
+              <div className="border-b border-white/5 pb-6 uppercase">
                 <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
                   <Zap className="w-6 h-6 text-amber-400 fill-amber-400" />
                   Global Airtime & Data Bundle Vending

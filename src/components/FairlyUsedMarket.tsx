@@ -59,6 +59,7 @@ import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc,
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
 import { OFFICE_ADDRESSES } from '../constants/businessProfile';
 import bokehBg from '../assets/images/marketplace_bokeh_bg_1783758466790.jpg';
+import { HubGuideNote } from './HubGuideNote';
 
 // Category Dataset (4-level taxonomy)
 const CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
@@ -763,8 +764,9 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="h-full flex flex-col p-6 md:p-8 overflow-y-auto custom-scrollbar"
+                className="h-full flex flex-col p-4 sm:p-6 md:p-8 overflow-y-auto custom-scrollbar"
               >
+                <HubGuideNote guideId="marketplace" variant="dark" className="mb-4 shrink-0" />
                 {/* Breadcrumbs */}
           <div className="flex items-center gap-2 mb-6 bg-slate-900 px-5 py-3 rounded-2xl border border-slate-800 self-start shadow-sm">
             <ShoppingBag className="w-4 h-4 text-indigo-400" />
@@ -1805,52 +1807,16 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           </p>
                         </div>
 
-                        {/* STEP 1: Bank list to copy */}
+                        {/* STEP 1: Verified Checkout Gateway Notice */}
                         <div className="space-y-3 font-sans">
-                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: SELECT & COPY CO-OPERATE ACCOUNT DETAILS</label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {[
-                              { id: 'acc1', name: 'ACCESS BANK', num: '0001304979', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
-                              { id: 'acc2', name: 'UBA BANK', num: '2120742200', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
-                              { id: 'acc3', name: 'OPAY DIGITAL MFB', num: '8072456836', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Opay Business' },
-                              { id: 'acc4', name: 'GTBANK PLC', num: '3001964082', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Corporate NGN' }
-                            ].map(item => (
-                              <div key={item.id} className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col justify-between gap-3 hover:border-white/15 transition-all text-left">
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[9.5px] font-black text-indigo-400 uppercase tracking-wide">{item.name}</span>
-                                    <span className="text-[8px] font-sans font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 uppercase tracking-wider">{item.type}</span>
-                                  </div>
-                                  <p className="text-[11px] font-mono font-black text-white tracking-widest leading-none py-1">{item.num}</p>
-                                  <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-tight truncate max-w-full font-sans">{item.holder}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(item.num);
-                                    setCopiedBankId(item.id);
-                                    setTimeout(() => setCopiedBankId(null), 2000);
-                                  }}
-                                  className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all font-sans ${
-                                    copiedBankId === item.id 
-                                      ? 'bg-emerald-600 border border-emerald-400 text-white' 
-                                      : 'bg-slate-950 border border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
-                                  }`}
-                                >
-                                  {copiedBankId === item.id ? (
-                                    <>
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      Copied!
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3.5 h-3.5" />
-                                      Copy Account
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            ))}
+                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: AUTOMATED SETTLEMENT GATEWAY</label>
+                          <div className="p-4 bg-slate-900/60 border border-emerald-500/20 rounded-2xl text-left space-y-1.5">
+                            <span className="text-[9.5px] font-black text-emerald-400 uppercase tracking-wide block">
+                              Paystack Settlement Gateway Active
+                            </span>
+                            <p className="text-[10px] text-slate-300 leading-relaxed">
+                              Direct personal and corporate bank accounts have been removed. Please use <strong>Escrow Wallet / Paystack &amp; Flutterwave Checkout</strong> above for instant automated settlement.
+                            </p>
                           </div>
                         </div>
 

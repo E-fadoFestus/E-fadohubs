@@ -103,6 +103,9 @@ export interface AdminStats {
     spinGame: number;
     moneyCard: number;
     tradingGame: number;
+    equilibrium: number;
+    deepSeaJet: number;
+    moneyQuiz: number;
   };
   lastUpdated: any;
 }

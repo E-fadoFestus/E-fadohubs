@@ -5,6 +5,7 @@ import { GET as paystackBanksGet } from '../src/app/api/paystack/banks/route.js'
 import { POST as paystackVerifyAccountPost } from '../src/app/api/paystack/verify-account/route.js';
 import { POST as paystackWithdrawPost } from '../src/app/api/paystack/withdraw/route.js';
 import { GET as paystackWithdrawStatusGet } from '../src/app/api/paystack/withdraw/status/route.js';
+import { GET as paystackBalanceGet } from '../src/app/api/paystack/balance/route.js';
 import { POST as paystackWebhookPost } from '../src/app/api/webhook/paystack/route.js';
 
 async function readRawBody(req: VercelRequest): Promise<string | undefined> {
@@ -55,12 +56,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       else if (path.includes('withdraw')) resolvedAction = 'withdraw';
       else if (path.includes('verify')) resolvedAction = 'verify';
       else if (path.includes('banks')) resolvedAction = 'banks';
+      else if (path.includes('balance')) resolvedAction = 'balance';
       else if (path.includes('webhook')) resolvedAction = 'webhook';
     }
 
     let routeFn: ((r: Request) => Promise<Response>) | null = null;
     if (resolvedAction === 'initialize' && req.method === 'POST') routeFn = paystackInitializePost;
     else if (resolvedAction === 'banks' && req.method === 'GET') routeFn = paystackBanksGet;
+    else if (resolvedAction === 'balance' && req.method === 'GET') routeFn = paystackBalanceGet;
     else if (resolvedAction === 'verify-account' && req.method === 'POST') routeFn = paystackVerifyAccountPost;
     else if (resolvedAction === 'withdraw' && req.method === 'POST') routeFn = paystackWithdrawPost;
     else if (resolvedAction === 'withdraw-status' && req.method === 'GET') routeFn = paystackWithdrawStatusGet;

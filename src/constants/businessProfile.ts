@@ -1,76 +1,11 @@
-export const CEO_BANK_ACCOUNTS = {
-  savings: [
-    {
-      bank: 'UBA',
-      accountNumber: '2120742200',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Savings'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '0126434623',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Savings'
-    },
-    {
-      bank: 'Access',
-      accountNumber: '0001304979',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Savings'
-    }
-  ],
-  current: [
-    {
-      bank: 'GTB',
-      accountNumber: '0424168460',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Current (Dollar)'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '0424168563',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Current (Naira)'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '0424168587',
-      accountName: 'Okhawere Festus Daniel',
-      type: 'Current (Europe)'
-    }
-  ],
-  business: [
-    {
-      bank: 'Opay',
-      accountNumber: '8072456836',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      type: 'Business'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '3001964147',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      type: 'Current (EUR Business)'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '3001964123',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      type: 'Current (GBP Business)'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '3001964082',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      type: 'Current (NGN Business)'
-    },
-    {
-      bank: 'GTB',
-      accountNumber: '3001964109',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      type: 'Current (USD Business)'
-    }
-  ]
+export const CEO_BANK_ACCOUNTS: {
+  savings: Array<{ bank: string; accountNumber: string; accountName: string; type: string }>;
+  current: Array<{ bank: string; accountNumber: string; accountName: string; type: string }>;
+  business: Array<{ bank: string; accountNumber: string; accountName: string; type: string }>;
+} = {
+  savings: [],
+  current: [],
+  business: []
 };
 
 export const SUPPORT_EMAILS = {

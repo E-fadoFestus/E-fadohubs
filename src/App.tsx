@@ -610,6 +610,31 @@ function AppContent() {
     }
   };
 
+  const syncServerGameLedger = async (
+    gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium' | 'deepSeaJet' | 'moneyQuiz',
+    stake: number,
+    payout: number
+  ) => {
+    if (DEVELOPMENT_MODE) return;
+    if (!Number.isFinite(stake) || !Number.isFinite(payout)) return;
+    if (stake === 0 && payout === 0) return;
+    try {
+      const currentUser = auth.currentUser;
+      const token = currentUser ? await currentUser.getIdToken() : null;
+      if (!token) return;
+      await fetch(getBackendUrl('/api/game/ledger'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ gameId, stake, payout })
+      });
+    } catch (err) {
+      console.warn('[Server Game Ledger Sync Warning]:', err);
+    }
+  };
+
   const handleStakeDeduction = async (amount: number, gameId: string) => {
     const ngnBal = user?.walletPockets?.NGN ?? user?.depositWallet ?? 0;
     if (!user || ngnBal < amount) return;
@@ -639,22 +664,12 @@ function AppContent() {
     try {
       await runTransaction(db, async (transaction) => {
         const walletPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
-        const adminRef = doc(db, 'adminStats', 'global');
-
         const pocketSnap = await transaction.get(walletPocketRef);
         const curBal = pocketSnap.exists()
           ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
           : 0;
         if (curBal < amount) {
           throw new Error('INSUFFICIENT FUNDS in NGN Deposit Pocket');
-        }
-
-        let stats: AdminStats | null = null;
-        try {
-          const statsSnap = await transaction.get(adminRef);
-          if (statsSnap.exists()) stats = statsSnap.data() as AdminStats;
-        } catch {
-          // Non-fatal
         }
 
         const nextBal = curBal - amount;
@@ -665,19 +680,9 @@ function AppContent() {
           userId: user.uid,
           updatedAt: serverTimestamp()
         }, { merge: true });
-
-        if (stats) {
-          transaction.update(adminRef, {
-            adminWallet: increment(amount),
-            totalHouseGain: increment(amount),
-            gameWallets: {
-              ...stats.gameWallets,
-              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + amount
-            },
-            lastUpdated: serverTimestamp()
-          });
-        }
       });
+
+      void syncServerGameLedger(gameId as any, amount, 0);
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'stake_deduction_pocket');
       throw e;
@@ -911,7 +916,10 @@ function AppContent() {
         gameWallets: {
           spinGame: 2000,
           moneyCard: 1500,
-          tradingGame: 1500
+          tradingGame: 1500,
+          equilibrium: 0,
+          deepSeaJet: 0,
+          moneyQuiz: 0
         },
         lastUpdated: new Date()
       });
@@ -2024,7 +2032,6 @@ function AppContent() {
 
     try {
       const userRef = doc(db, 'users', user.uid);
-      const adminRef = doc(db, 'adminStats', 'global');
       const walletPocketRef = doc(db, 'wallets', user.uid, cur, 'depositWallet');
 
       if (type === 'deposit') {
@@ -2059,12 +2066,6 @@ function AppContent() {
         const walletToDeductField = useUserField ? sourceWallet : 'depositWallet';
 
         await runTransaction(db, async (transaction) => {
-          let adminExists = false;
-          try {
-            const adminSnap = await transaction.get(adminRef);
-            adminExists = adminSnap.exists();
-          } catch {}
-
           if (useUserField) {
             const uSnap = await transaction.get(userRef);
             const curFieldBal = uSnap.exists() ? Number(uSnap.data()?.[walletToDeductField] || 0) : 0;
@@ -2090,14 +2091,6 @@ function AppContent() {
               userId: user.uid,
               updatedAt: serverTimestamp()
             }, { merge: true });
-          }
-
-          if (adminExists) {
-            transaction.update(adminRef, {
-              adminWallet: increment(fee),
-              pendingPayouts: increment(netAmount),
-              lastUpdated: serverTimestamp()
-            });
           }
 
           transaction.set(withdrawalRef, {
@@ -2138,11 +2131,6 @@ function AppContent() {
           if (oldBal < amount) {
             throw new Error(`INSUFFICIENT FUNDS in ${cur} Deposit Pocket`);
           }
-          let adminExists = false;
-          try {
-            const adminSnap = await transaction.get(adminRef);
-            adminExists = adminSnap.exists();
-          } catch {}
 
           const nextBal = oldBal - amount;
           transaction.set(walletPocketRef, {
@@ -2152,19 +2140,13 @@ function AppContent() {
             userId: user.uid,
             updatedAt: serverTimestamp()
           }, { merge: true });
-
-          if (adminExists) {
-            transaction.update(adminRef, {
-              adminWallet: increment(amount),
-              totalHouseGain: increment(amount),
-              lastUpdated: serverTimestamp()
-            });
-          }
         });
+        void syncServerGameLedger('moneyQuiz', amount, 0);
       } else if (type === 'game_win') {
         await updateDoc(userRef, {
           playerWallet: increment(amount)
         });
+        void syncServerGameLedger('moneyQuiz', 0, amount);
       }
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, `wallet_${type}`);
@@ -2224,18 +2206,9 @@ function AppContent() {
         const userRef = doc(db, 'users', user.uid);
         const withdrawalRef = doc(collection(db, 'withdrawals'));
         const txRef = doc(db, 'transactions', withdrawalRef.id);
-        const adminRef = doc(db, 'adminStats', 'global');
-        
-        const statsSnap = await transaction.get(adminRef);
-        const stats = statsSnap.data() as AdminStats;
 
         transaction.update(userRef, {
           cashOutWallet: 0
-        });
-
-        transaction.update(adminRef, {
-          adminWallet: increment(fee), // Credit 3% fee to admin/ceo wallet
-          pendingPayouts: increment(netAmount)
         });
 
         const txData = {
@@ -2273,13 +2246,11 @@ function AppContent() {
     setError(null);
   };
 
-  const onResult = async (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium' | 'deepSeaJet', payoutOverride?: number) => {
+  const onResult = async (multiplier: number, bet: number, gameId: 'spinGame' | 'moneyCard' | 'tradingGame' | 'equilibrium' | 'deepSeaJet' | 'moneyQuiz', payoutOverride?: number) => {
     if (!user) return;
     const winAmount = payoutOverride !== undefined ? payoutOverride : bet * multiplier;
 
     if (DEVELOPMENT_MODE) {
-      // Stake money -> deducted from Player's Deposit Wallet, credited entirely to Admin/CEO Wallet
-      // Player wins -> credited to Player's Win Wallet (user.playerWallet)
       setUser({
         ...user,
         depositWallet: Math.max(0, user.depositWallet - bet),
@@ -2289,11 +2260,11 @@ function AppContent() {
       if (adminStats) {
         setAdminStats({
           ...adminStats,
-          adminWallet: adminStats.adminWallet + bet, // Entire stake is the benefit
-          totalHouseGain: adminStats.totalHouseGain + bet,
+          adminWallet: adminStats.adminWallet + bet - winAmount,
+          totalHouseGain: adminStats.totalHouseGain + bet - winAmount,
           gameWallets: {
             ...adminStats.gameWallets,
-            [gameId]: ((adminStats.gameWallets as any)[gameId] || 0) + bet
+            [gameId]: ((adminStats.gameWallets as any)[gameId] || 0) + bet - winAmount
           },
           lastUpdated: new Date()
         });
@@ -2310,18 +2281,9 @@ function AppContent() {
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', user.uid);
         const walletPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
-        const adminRef = doc(db, 'adminStats', 'global');
         const txRef = doc(collection(db, 'transactions'));
 
-        // READS FIRST
         const pocketSnap = bet > 0 ? await transaction.get(walletPocketRef) : null;
-        let stats: AdminStats | null = null;
-        try {
-          const statsSnap = await transaction.get(adminRef);
-          if (statsSnap.exists()) stats = statsSnap.data() as AdminStats;
-        } catch {
-          // non-fatal read
-        }
 
         if (bet > 0) {
           const oldBal = pocketSnap?.exists()
@@ -2346,20 +2308,6 @@ function AppContent() {
           });
         }
 
-        // Entire stake goes to admin wallet if admin stats accessible
-        if (stats && bet > 0) {
-          transaction.update(adminRef, {
-            adminWallet: increment(bet),
-            totalHouseGain: increment(bet),
-            gameWallets: {
-              ...stats.gameWallets,
-              [gameId]: ((stats.gameWallets as any)[gameId] || 0) + bet
-            },
-            lastUpdated: serverTimestamp()
-          });
-        }
-
-        // Record Transaction
         if (winAmount > 0 || bet > 0) {
           transaction.set(txRef, {
             userId: user.uid,
@@ -2371,6 +2319,8 @@ function AppContent() {
           });
         }
       });
+
+      void syncServerGameLedger(gameId, bet, winAmount);
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'game_result_pocket');
     } finally {
@@ -2475,6 +2425,7 @@ function AppContent() {
                   tx.update(userRef, { playerWallet: increment(-amount) });
                 }
               });
+              void syncServerGameLedger(gameId as any, amount, 0);
             } catch (err) {
               console.error('Stake deduction failed:', err);
             }

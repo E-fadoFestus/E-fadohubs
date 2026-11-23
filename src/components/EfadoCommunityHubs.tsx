@@ -59,6 +59,8 @@ import { useCurrency } from '../lib/CurrencyContext';
 import { CurrencySelector } from './CurrencySelector';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
 import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
+import { HubGuideNote } from './HubGuideNote';
+import { HUB_GUIDES } from '../data/hubGuides';
 
 interface EfadoCommunityHubsProps {
   user: UserProfile;
@@ -129,18 +131,13 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
       setResolvedWithdrawStatusMessage('Enquiring bank gateway details...');
       
       const timer = setTimeout(() => {
-        let resolvedName = '';
-        if (withdrawAccNum === '000122668' || withdrawAccNum === '2120742200' || withdrawAccNum === '0001304979' || withdrawAccNum === '0011629991') {
-          resolvedName = 'OKHAWERE FESTUS DANIEL';
-        } else {
-          // Stable pseudo-random Name based on account digits
-          const sum = withdrawAccNum.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
-          const firsts = ['DANIEL', 'OLUMIDE', 'KINGSLEY', 'TEMITOPE', 'CHINONSO', 'YUSUF', 'IBRAHIM', 'CHINEDU', 'OKHAWERE', 'FUNMILAYO', 'NGOZI', 'BABATUNDE'];
-          const lasts = ['FESTUS', 'OKHAWERE', 'OJO', 'ADEYEMI', 'EZE', 'ALIYU', 'ALABI', 'NWACHUKWU', 'JOHNSON', 'BALOGUN', 'DOKUBO'];
-          const fName = firsts[sum % firsts.length];
-          const lName = lasts[(sum * 7) % lasts.length];
-          resolvedName = `${fName} ${lName}`;
-        }
+        // Stable pseudo-random Name based on account digits when gateway preview runs
+        const sum = withdrawAccNum.split('').reduce((acc, char) => acc + parseInt(char || '0', 10), 0);
+        const firsts = ['DANIEL', 'OLUMIDE', 'KINGSLEY', 'TEMITOPE', 'CHINONSO', 'YUSUF', 'IBRAHIM', 'CHINEDU', 'ADEBAYO', 'FUNMILAYO', 'NGOZI', 'BABATUNDE'];
+        const lasts = ['FESTUS', 'ADEMOLA', 'OJO', 'ADEYEMI', 'EZE', 'ALIYU', 'ALABI', 'NWACHUKWU', 'JOHNSON', 'BALOGUN', 'DOKUBO'];
+        const fName = firsts[sum % firsts.length];
+        const lName = lasts[(sum * 7) % lasts.length];
+        const resolvedName = `${fName} ${lName}`;
         
         setWithdrawTargName(resolvedName);
         setIsResolvingWithdrawName(false);
@@ -502,51 +499,74 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-md overflow-y-auto"
         >
-          <div className="w-full max-w-xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -mr-24 -mt-24 opacity-50" />
+          <div className="w-full max-w-xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto">
             <button 
               onClick={() => setShowGuide(false)}
-              className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-900 transition-all font-black"
+              className="absolute top-4 right-4 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 hover:text-gray-900 transition-all"
+              aria-label="Close guide"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
             </button>
             
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 mb-8">
-                <ShieldCheck className="w-8 h-8" />
+            <div className="space-y-4 pr-8">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">CSCC & Thrift Savings Guide</h2>
+                  <p className="text-xs font-semibold text-indigo-600">How group contributions & payouts work</p>
+                </div>
               </div>
-              <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">Tactical Hub Guide</h2>
-              <p className="text-gray-700 font-bold mb-8 leading-relaxed uppercase tracking-[0.1em] text-xs">
-                Welcome to the Strategic Nexus. Here is how you dominate your financial goals within the EFADO Ecosystem:
-              </p>
-              
-              <div className="space-y-6">
-                {[
-                  { icon: TrendingUp, title: "EFADO CSCC", desc: "Join collective savings groups. Contribute regularly to receive large lump-sum payouts." },
-                  { icon: Zap, title: "Cycle Central", desc: "Monitor active saving cycles, track your turn position, and manage approvals." },
-                  { icon: Wallet, title: "Smart Wallets", desc: "Strategic funds management. Keep your deposit wallet funded for seamless contributions." },
-                  { icon: MessageSquare, title: "Group Feed", desc: "Connect with group members, share strategic insights, and participate in discourse." }
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-4 group">
-                    <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                      <item.icon className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-1">{item.title}</h4>
-                      <p className="text-xs text-gray-700 leading-relaxed font-bold">{item.desc}</p>
-                    </div>
+
+              <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-100">
+                <p className="text-xs font-black uppercase tracking-wider text-indigo-700 mb-1">What is this?</p>
+                <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.cscc.whatIsThis}</p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-indigo-700">What to do:</p>
+                {HUB_GUIDES.cscc.steps.map((step, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+                    <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </span>
+                    <p className="text-sm text-gray-800 leading-relaxed">{step}</p>
                   </div>
                 ))}
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-100">
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700 mb-1">What happens next?</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.cscc.whatHappensNext}</p>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-100">
+                  <p className="text-xs font-black uppercase tracking-wider text-amber-800 mb-1">Example:</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.cscc.example}</p>
+                </div>
+              </div>
               
-              <button 
-                onClick={() => setShowGuide(false)}
-                className="w-full mt-10 py-5 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-gray-300 hover:scale-[1.02] active:scale-95 transition-all"
-              >
-                Let's Strategize
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGuide(false);
+                    window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.cscc.helpCategory } }));
+                  }}
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4" /> Need Help? Chat Us
+                </button>
+                <button 
+                  onClick={() => setShowGuide(false)}
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-indigo-600 transition-all"
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -2452,7 +2472,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                       onClick={() => setActiveFundTab('bank_transfer')}
                       className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${activeFundTab === 'bank_transfer' ? 'border-b-4 border-indigo-600 text-indigo-600' : 'text-gray-400 hover:text-gray-650'}`}
                     >
-                      🏦 Direct Bank Wire (11 CEO Accounts)
+                      🏦 Automated Settlement Wire
                     </button>
                     <button 
                       type="button"
@@ -2512,10 +2532,10 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                       </div>
 
                       <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: USD / GBP / EUR SWIFT Wire</span>
-                        <p className="text-xs text-gray-300 font-bold">Bank Name: Access Bank Plc / UBA Corporate</p>
-                        <p className="text-xs text-gray-300 font-bold">Account Name: EFADO Technology & Digital Ecosystem</p>
-                        <p className="text-[10px] text-gray-400 mt-1">Submit your wire receipt to CEO Support for instant ledger credit.</p>
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: International Bank Wire Support</span>
+                        <p className="text-xs text-gray-300 font-bold">Desk: EFADO Verified Settlement Desk</p>
+                        <p className="text-xs text-gray-300 font-bold">For NGN savings, use Paystack Card / Bank Transfer for instant wallet funding.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Need international transfer instructions? Message EFADO Help Chat for verified details.</p>
                       </div>
                     </div>
                   </div>
@@ -3433,6 +3453,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
 
           {/* Tab Content Rendering */}
           {renderGuide()}
+          <HubGuideNote guideId="cscc" variant="light" />
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

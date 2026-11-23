@@ -71,6 +71,8 @@ import { UserProfile } from '../types';
 import { AiStudyPlatform } from './education/AiStudyPlatform';
 import { WaecScratchCardPortal } from './education/WaecScratchCardPortal';
 import { AdSenseBanner } from './AdSenseBanner';
+import { HubGuideNote } from './HubGuideNote';
+import { HUB_GUIDES } from '../data/hubGuides';
 import { 
   CgpaCalculator, 
   SiwesLogbook, 
@@ -453,51 +455,74 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-md overflow-y-auto"
           >
-            <div className="w-full max-w-xl bg-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50 rounded-full blur-3xl -mr-24 -mt-24 opacity-50" />
+            <div className="w-full max-w-xl bg-white rounded-3xl p-6 sm:p-8 shadow-2xl relative my-auto max-h-[88vh] overflow-y-auto">
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-900 transition-all font-black"
+                className="absolute top-4 right-4 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-600 hover:text-gray-900 transition-all"
+                aria-label="Close guide"
               >
-                <X className="w-6 h-6 text-gray-950" />
+                <X className="w-5 h-5 text-gray-950" />
               </button>
               
-              <div className="relative z-10">
-                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 mb-8">
-                  <GraduationCap className="w-8 h-8" />
+              <div className="space-y-4 pr-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0">
+                    <GraduationCap className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-gray-950 tracking-tight">Education & Study Guide</h2>
+                    <p className="text-xs font-semibold text-indigo-600">Simple steps for WAEC, JAMB, and CBT prep</p>
+                  </div>
                 </div>
-                <h2 className="text-3xl font-black text-gray-950 mb-4 tracking-tight uppercase">Academic Tactical Guide</h2>
-                <p className="text-gray-950 font-black mb-8 leading-relaxed uppercase tracking-[0.1em] text-xs">
-                  Universal learning protocols active. Here is how you navigate the EFADO Education Hub:
-                </p>
-                
-                <div className="space-y-6">
-                  {[
-                    { icon: BookOpen, title: "Level-Specific Hubs", desc: "Access specialized resources for O'Level, Primary, Nursery, and JAMB preparations." },
-                    { icon: Library, title: "Resource Portals", desc: "Direct access to syllabi, past questions, and official result checker portals." },
-                    { icon: Target, title: "Admission Tracker", desc: "Monitor cut-off marks and school admission statuses across the global network." },
-                    { icon: Zap, title: "Interactive Prep", desc: "Engage with subject tutorials and learning games to optimize academic performance." }
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-4 group">
-                      <div className="w-12 h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-indigo-600 transition-all duration-300 pointer-events-none">
-                        <item.icon className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-gray-950 uppercase tracking-widest mb-1">{item.title}</h4>
-                        <p className="text-xs text-gray-900 leading-relaxed font-black">{item.desc}</p>
-                      </div>
+
+                <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-100">
+                  <p className="text-xs font-black uppercase tracking-wider text-indigo-700 mb-1">What is this?</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.education.whatIsThis}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase tracking-wider text-indigo-700">What to do:</p>
+                  {HUB_GUIDES.education.steps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+                      <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-sm text-gray-800 leading-relaxed">{step}</p>
                     </div>
                   ))}
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-100">
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-700 mb-1">What happens next?</p>
+                    <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.education.whatHappensNext}</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-100">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-800 mb-1">Example:</p>
+                    <p className="text-sm text-gray-800 leading-relaxed">{HUB_GUIDES.education.example}</p>
+                  </div>
+                </div>
                 
-                <button 
-                  onClick={() => setShowGuide(false)}
-                  className="w-full mt-10 py-5 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-gray-300 hover:scale-[1.02] active:scale-95 transition-all"
-                >
-                  Enter Academy
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowGuide(false);
+                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.education.helpCategory } }));
+                    }}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all"
+                  >
+                    Need Help? Chat Us
+                  </button>
+                  <button 
+                    onClick={() => setShowGuide(false)}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-gray-950 text-white rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-indigo-600 transition-all"
+                  >
+                    Enter Academy
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -571,6 +596,7 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
       </div>
 
       <main className="max-w-7xl mx-auto p-6 space-y-8 pb-32">
+        <HubGuideNote guideId="education" variant="dark" />
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -651,8 +677,8 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
               <h3 className="text-2xl font-black text-white uppercase tracking-tight">
                 WAEC Scratch Card & Serial PIN Portal
               </h3>
-              <p className="text-xs text-slate-300 font-medium leading-relaxed max-w-2xl mt-1">
-                Direct CEO Bank Deposit (OPay & Access Bank), Wallet & Flutterwave payment for checking WASSCE & GCE candidate results and printing official transcripts.
+              <p className="text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mt-1">
+                Pay securely with your EFADO Account Profile Wallet or Paystack card/bank checkout to buy your WAEC Scratch Card &amp; Serial PIN for result checks and transcripts.
               </p>
             </div>
           </div>

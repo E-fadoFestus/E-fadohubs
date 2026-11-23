@@ -933,48 +933,14 @@ export const EasyPaymentPlatform: React.FC<EasyPaymentPlatformProps> = ({
             {/* Direct Bank Transfer Account Details Display */}
             {activeTab === 'deposit' && paymentMethod === 'bank_transfer' && (
               <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                <p className="text-xs font-bold text-slate-800">Transfer Funds To Official Bank Account:</p>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                  <div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
-                      {CEO_BANK_ACCOUNTS.current?.[1]?.bank || 'GTBANK PLC (Corporate)'}
-                    </span>
-                    <p className="text-xs font-mono font-black text-slate-900 mt-1">
-                      {CEO_BANK_ACCOUNTS.current?.[1]?.accountNumber || '0424168563'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                      {CEO_BANK_ACCOUNTS.current?.[1]?.accountName || 'EFADO Technology'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(CEO_BANK_ACCOUNTS.current?.[1]?.accountNumber || '0424168563', 'gtb')}
-                    className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
-                  >
-                    {copySuccess === 'gtb' ? 'Copied ✓' : 'Copy'}
-                  </button>
-                </div>
-
-                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                  <div>
-                    <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                      {CEO_BANK_ACCOUNTS.business?.[0]?.bank || 'OPAY DIGITAL MFB'}
-                    </span>
-                    <p className="text-xs font-mono font-black text-slate-900 mt-1">
-                      {CEO_BANK_ACCOUNTS.business?.[0]?.accountNumber || '8072456836'}
-                    </p>
-                    <p className="text-[10px] text-slate-500 truncate max-w-[200px]">
-                      {CEO_BANK_ACCOUNTS.business?.[0]?.accountName || 'EFADO Technology'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(CEO_BANK_ACCOUNTS.business?.[0]?.accountNumber || '8072456836', 'opay')}
-                    className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all"
-                  >
-                    {copySuccess === 'opay' ? 'Copied ✓' : 'Copy'}
-                  </button>
+                <p className="text-xs font-bold text-slate-800">Automated Bank Transfer Settlement (Paystack):</p>
+                <div className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-sm space-y-1">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                    Paystack Dynamic Virtual Transfer
+                  </span>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed mt-1">
+                    Manual hardcoded accounts have been retired. Switch to <strong>Paystack</strong> above for an instant virtual transfer account settled directly via Paystack Settlement Bank, or submit your verified transfer proof below.
+                  </p>
                 </div>
 
                 <div className="space-y-2.5 pt-2 border-t border-slate-200">

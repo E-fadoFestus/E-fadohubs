@@ -84,6 +84,7 @@ interface CeoHubsManagerProps {
   partnerApplications: any[];
   zoomSubscriptions: any[];
   liveBroadcastClasses: any[];
+  moneyExchanges?: any[];
   handleUpdateContentStatus: (collectionName: string, id: string, status: string) => Promise<void>;
   handleDeleteContentItem: (collectionName: string, id: string) => Promise<void>;
   onDirectMessageUser: (user: any) => void;
@@ -130,6 +131,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
   partnerApplications,
   zoomSubscriptions,
   liveBroadcastClasses,
+  moneyExchanges = [],
   handleUpdateContentStatus,
   handleDeleteContentItem,
   onDirectMessageUser,
@@ -310,7 +312,7 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
             }`}
           >
             <Smartphone className="w-4 h-4 text-cyan-400" />
-            Telecom Vending & Sourcing ({vendingPurchases.length + sourcingRequests.length})
+            Telecom, FX & Sourcing ({vendingPurchases.length + sourcingRequests.length + cryptoConversions.length + moneyExchanges.length})
           </button>
 
           <button
@@ -527,11 +529,11 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
                 </span>
               </div>
               <div>
-                <h4 className="text-sm font-black text-white uppercase group-hover:text-yellow-300 transition-colors">7. Crypto OTC Terminal</h4>
-                <p className="text-[10px] text-slate-400">Instant USDT / NGN settlement</p>
+                <h4 className="text-sm font-black text-white uppercase group-hover:text-yellow-300 transition-colors">7. Crypto OTC & Money Exchange</h4>
+                <p className="text-[10px] text-slate-400">Instant USDT / Multi-Currency FX settlement</p>
               </div>
               <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs">
-                <span className="font-bold text-yellow-400">{cryptoConversions.length} Swaps</span>
+                <span className="font-bold text-yellow-400">{cryptoConversions.length} OTC • {moneyExchanges.length} FX</span>
                 <span className="text-[9px] font-bold text-slate-400">Liquid</span>
               </div>
             </div>
@@ -1185,6 +1187,54 @@ export const CeoHubsManager: React.FC<CeoHubsManagerProps> = ({
                               Approve Payout
                             </button>
                           )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Money Exchange Conversions */}
+          <div className="bg-slate-900/60 border border-emerald-500/30 rounded-3xl p-6 space-y-4">
+            <h4 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-emerald-400" />
+              Money Exchange Conversions ({moneyExchanges.length})
+            </h4>
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950/80 text-[10px] font-black uppercase text-slate-400 border-b border-white/10">
+                  <tr>
+                    <th className="p-3">User</th>
+                    <th className="p-3">Conversion</th>
+                    <th className="p-3">Rate / Fee</th>
+                    <th className="p-3">Payout Method</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {moneyExchanges.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-6 text-slate-500">No money exchange conversions logged yet.</td></tr>
+                  ) : (
+                    moneyExchanges.map(mx => (
+                      <tr key={mx.id} className="hover:bg-white/5">
+                        <td className="p-3 font-mono text-white">{mx.userEmail || mx.userId || 'Guest'}</td>
+                        <td className="p-3 font-bold text-emerald-400">
+                          {Number(mx.sourceAmount || 0).toLocaleString()} {mx.sourceCurrency || 'NGN'} → {Number(mx.targetAmount || 0).toLocaleString()} {mx.targetCurrency || 'USD'}
+                        </td>
+                        <td className="p-3 font-mono text-slate-300">
+                          {mx.rate ? mx.rate : 'Live Spot'}
+                        </td>
+                        <td className="p-3 uppercase font-bold text-indigo-300">{mx.payoutType || 'wallet'}</td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[9px] font-black uppercase">
+                            {mx.status || 'completed'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono text-[10px] text-slate-400">
+                          {mx.createdAt?.toDate ? mx.createdAt.toDate().toLocaleDateString() : 'Today'}
                         </td>
                       </tr>
                     ))

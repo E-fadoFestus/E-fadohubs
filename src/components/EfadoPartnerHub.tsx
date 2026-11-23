@@ -32,6 +32,8 @@ import {
   Coins
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { db, addDoc, collection, serverTimestamp } from '../firebase';
+import { HubGuideNote } from './HubGuideNote';
 
 interface PartnerHubProps {
   user: UserProfile | null;
@@ -156,13 +158,36 @@ const CompanyRegistrationModal: React.FC<{
     }
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
     if (!validateStep(4)) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await addDoc(collection(db, 'partner_applications'), {
+        businessName: form.businessName.trim(),
+        registrationNumber: form.registrationNumber.trim(),
+        industry: form.industry,
+        website: form.website.trim(),
+        contactName: form.contactName.trim(),
+        contactEmail: form.contactEmail.trim(),
+        contactPhone: form.contactPhone.trim(),
+        country: form.country,
+        address: form.address.trim(),
+        bankName: form.bankName.trim(),
+        accountNumber: form.accountNumber.trim(),
+        currency: form.currency,
+        uploadedFiles,
+        userId: user?.uid || 'guest',
+        userEmail: form.contactEmail.trim() || user?.email || '',
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
       setStep(5);
-    }, 2500);
+    } catch (err) {
+      console.error('Partner application write failed:', err);
+      setErrors({ incorporation: 'Failed to submit application to server. Please try again.' });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -897,6 +922,7 @@ export const EfadoPartnerHub: React.FC<PartnerHubProps> = ({ user, onNavigate })
       </div>
 
       <div className="max-w-7xl mx-auto px-4 mt-[-60px] relative z-20">
+        <HubGuideNote guideId="domainsPartners" variant="dark" className="mb-6" />
         {/* Navigation */}
         <div className="flex items-center gap-4 mb-12 overflow-x-auto pb-4 no-scrollbar">
           {[

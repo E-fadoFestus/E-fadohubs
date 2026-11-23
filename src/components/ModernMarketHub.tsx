@@ -63,6 +63,8 @@ import {
   Download
 } from 'lucide-react';
 import { StrategicReceipt } from './StrategicReceipt';
+import { HubGuideNote } from './HubGuideNote';
+import { HUB_GUIDES } from '../data/hubGuides';
 import { SAMPLE_PRODUCTS } from '../sampleData';
 import bokehBg from '../assets/images/marketplace_bokeh_bg_1783758466790.jpg';
 import { MarketProduct, UserProfile, MarketOrder } from '../types';
@@ -831,51 +833,73 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto"
           >
-            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden text-white">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none" />
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl relative text-white my-auto max-h-[88vh] overflow-y-auto">
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-6 right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black"
+                className="absolute top-4 right-4 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-all"
+                aria-label="Close guide"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
               
-              <div className="relative z-10">
-                <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-900/40 mb-6">
-                  <ShieldCheck className="w-8 h-8" />
+              <div className="space-y-4 pr-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shrink-0">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Marketplace Guide</h2>
+                    <p className="text-xs font-semibold text-emerald-300">Simple steps to buy or sell on EFADO</p>
+                  </div>
                 </div>
-                <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight uppercase">Tactical Marketplace Guide</h2>
-                <p className="text-slate-300 font-bold mb-6 leading-relaxed uppercase tracking-[0.1em] text-xs">
-                  Strategic commerce protocols active. Here is how you navigate the EFADO Marketplace:
-                </p>
-                
-                <div className="space-y-4">
-                  {[
-                    { icon: ShoppingBag, title: "Modern Categories", desc: "Browse high-fidelity products across specialized categories from electronics to real estate." },
-                    { icon: QrCode, title: "QR Strategic Link", desc: "Scan physical product markers to instantly link into the digital inventory system." },
-                    { icon: UserPlus, title: "Vendor Protocol", desc: "Initialize your professional profile to start deploying products to the EFADO network." },
-                    { icon: CreditCard, title: "Wallet Settlement", desc: "Seamless transactions using your EFADO Deposit Wallet for instant asset acquisition." }
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-4 p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-                      <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center shrink-0">
-                        <item.icon className="w-5 h-5 text-emerald-400" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-widest mb-0.5">{item.title}</h4>
-                        <p className="text-[11px] text-slate-300 leading-relaxed font-medium">{item.desc}</p>
-                      </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-300 mb-1">What is this?</p>
+                  <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.marketplace.whatIsThis}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-300">What to do:</p>
+                  {HUB_GUIDES.marketplace.steps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-sm text-slate-200 leading-relaxed">{step}</p>
                     </div>
                   ))}
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                    <p className="text-xs font-black uppercase tracking-wider text-cyan-300 mb-1">What happens next?</p>
+                    <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.marketplace.whatHappensNext}</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-300 mb-1">Example:</p>
+                    <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.marketplace.example}</p>
+                  </div>
+                </div>
                 
-                <button 
-                  onClick={() => setShowGuide(false)}
-                  className="w-full mt-6 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all"
-                >
-                  Initiate Trade
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button 
+                    onClick={() => {
+                      setShowGuide(false);
+                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.marketplace.helpCategory } }));
+                    }}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-400" /> Need Help? Chat Us
+                  </button>
+                  <button 
+                    onClick={() => setShowGuide(false)}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-xl transition-all"
+                  >
+                    Start Shopping
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -1017,6 +1041,11 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       </div>
 
         {/* Main Content Area */}
+        {activeView === 'browse' && (
+          <div className="px-4 md:px-10 py-2.5 bg-slate-950 border-b border-slate-800/80 shrink-0">
+            <HubGuideNote guideId="marketplace" variant="dark" />
+          </div>
+        )}
         <div className="flex-grow overflow-hidden relative">
           <AnimatePresence mode="wait">
             {activeView === 'browse' ? (
@@ -2071,52 +2100,16 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                           </p>
                         </div>
 
-                        {/* STEP 1: Bank list to copy */}
+                        {/* STEP 1: Verified Checkout Gateway Notice */}
                         <div className="space-y-3 font-sans">
-                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: SELECT & COPY CO-OPERATE ACCOUNT DETAILS</label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {[
-                              { id: 'acc1', name: 'ACCESS BANK', num: '0001304979', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
-                              { id: 'acc2', name: 'UBA BANK', num: '2120742200', holder: 'DANIEL F. OKHAWERE', type: 'Savings Account' },
-                              { id: 'acc3', name: 'OPAY DIGITAL MFB', num: '8072456836', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Opay Business' },
-                              { id: 'acc4', name: 'GTBANK PLC', num: '3001964082', holder: 'EFADO TECHNOLOGY COMPUTER ENGINEER...', type: 'Corporate NGN' }
-                            ].map(item => (
-                              <div key={item.id} className="p-4 bg-slate-900/60 border border-white/5 rounded-2xl flex flex-col justify-between gap-3 hover:border-white/15 transition-all text-left">
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[9.5px] font-black text-indigo-400 uppercase tracking-wide">{item.name}</span>
-                                    <span className="text-[8px] font-sans font-black px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 uppercase tracking-wider">{item.type}</span>
-                                  </div>
-                                  <p className="text-[11px] font-mono font-black text-white tracking-widest leading-none py-1">{item.num}</p>
-                                  <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-tight truncate max-w-full font-sans">{item.holder}</p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(item.num);
-                                    setCopiedBankId(item.id);
-                                    setTimeout(() => setCopiedBankId(null), 2000);
-                                  }}
-                                  className={`w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all font-sans ${
-                                    copiedBankId === item.id 
-                                      ? 'bg-emerald-600 border border-emerald-400 text-white' 
-                                      : 'bg-slate-950 border border-white/5 text-slate-400 hover:text-white hover:bg-slate-900'
-                                  }`}
-                                >
-                                  {copiedBankId === item.id ? (
-                                    <>
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      Copied!
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Copy className="w-3.5 h-3.5" />
-                                      Copy Account
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                            ))}
+                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: AUTOMATED SETTLEMENT GATEWAY</label>
+                          <div className="p-4 bg-slate-900/60 border border-emerald-500/20 rounded-2xl text-left space-y-1.5">
+                            <span className="text-[9.5px] font-black text-emerald-400 uppercase tracking-wide block">
+                              Paystack Settlement Gateway Active
+                            </span>
+                            <p className="text-[10px] text-slate-300 leading-relaxed">
+                              Direct personal and corporate bank accounts have been removed. Please use <strong>Escrow Wallet / Paystack &amp; Flutterwave Checkout</strong> above for instant automated settlement.
+                            </p>
                           </div>
                         </div>
 

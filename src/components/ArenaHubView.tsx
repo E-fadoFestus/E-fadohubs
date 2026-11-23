@@ -22,7 +22,10 @@ import { DigitalMoneyTrading } from './DigitalMoneyTrading';
 import { EfadoMoneyCard } from './EfadoMoneyCard';
 import { EfadoMoneyQuiz } from './EfadoMoneyQuiz';
 import { EfadoEquilibrium } from './EfadoEquilibrium';
+import { HubGuideNote } from './HubGuideNote';
 import { UserProfile } from '../types';
+import { db } from '../firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 interface ArenaHubViewProps {
   user: UserProfile | null;
@@ -58,8 +61,15 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
     }
   };
 
-  const handleAddTransaction = async (_tx: any) => {
-    // Recorded in ledger via parent transaction flow
+  const handleAddTransaction = async (tx: any) => {
+    try {
+      await addDoc(collection(db, 'transactions'), {
+        ...tx,
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      console.warn('Arena transaction log warning:', err);
+    }
   };
 
   const handleGameStart = async (amount: number, gameId: string) => {
@@ -207,7 +217,8 @@ export const ArenaHubView: React.FC<ArenaHubViewProps> = ({
       </div>
 
       {/* Main Area */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 mt-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 mt-4 space-y-4">
+        <HubGuideNote guideId="games" variant="dark" />
         {/* Active Game Window */}
         {activeGame === 'jet' && (
           <div className="relative rounded-3xl overflow-hidden border border-cyan-500/30 shadow-2xl bg-slate-950 p-2 sm:p-4">

@@ -195,7 +195,7 @@ export const JambDetailedGuide: React.FC<JambDetailedGuideProps> = ({ onClose })
                   <div className="space-y-3 font-semibold text-slate-500 text-[11px] leading-relaxed">
                     <div className="flex gap-3">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                      <p><span className="text-slate-950 font-black uppercase">Instantly Add Funds</span>: Click the <span className="text-emerald-600 font-black">"Add Simulated Funds (₦25k)"</span> button on the dashboard to immediately replenish your active balance without leaving the app.</p>
+                      <p><span className="text-slate-950 font-black uppercase">Fund via Profile Wallet</span>: Open your <span className="text-emerald-600 font-black">EFADO Account Profile Wallet</span> and top up via Paystack (Card, Bank Transfer, or USSD) anytime you need balance for JAMB e-PINs or WAEC scratch cards.</p>
                     </div>
                     <div className="flex gap-3">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />

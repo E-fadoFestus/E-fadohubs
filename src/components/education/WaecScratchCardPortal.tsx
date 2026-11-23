@@ -23,6 +23,9 @@ import { UserProfile } from '../../types';
 import { createFlutterwavePaymentLink } from '../../utils/flutterwave';
 import { TransactionService } from '../../services/TransactionService';
 import { useCurrency } from '../../lib/CurrencyContext';
+import { db } from '../../firebase';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { HubGuideNote } from '../HubGuideNote';
 
 interface WaecScratchCardPortalProps {
   user: UserProfile;
@@ -42,35 +45,14 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
 
   // Views: 'form' (unified checkout & details) | 'card' (issued card display) | 'result' (checked result grades)
   const [view, setView] = useState<'form' | 'card' | 'result'>('form');
-  const [paymentMethod, setPaymentMethod] = useState<'direct_bank' | 'wallet' | 'flutterwave'>('direct_bank');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'flutterwave'>('wallet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Direct CEO Bank Accounts State
-  const [selectedBank, setSelectedBank] = useState<'opay' | 'access'>('opay');
   const [depositorName, setDepositorName] = useState(user.displayName || '');
-  const [depositorBank, setDepositorBank] = useState('');
   const [transferRef, setTransferRef] = useState('');
   const [accountCopyNotice, setAccountCopyNotice] = useState<string | null>(null);
-
-  // CEO Account Details
-  const CEO_BANK_ACCOUNTS = {
-    opay: {
-      bankName: 'OPAY DIGITAL MFB',
-      accountNumber: '8072456836',
-      accountName: 'EFADO Technology Computer Engineering Training and Services',
-      badge: 'OPay Business Instant (Recommended)',
-      color: 'amber'
-    },
-    access: {
-      bankName: 'ACCESS BANK PLC',
-      accountNumber: '0001304979',
-      accountName: 'Okhawere Festus Daniel',
-      badge: 'Access Direct Account',
-      color: 'blue'
-    }
-  };
 
   // Form Input States
   const [candidateName, setCandidateName] = useState(user.displayName || '');
@@ -152,10 +134,31 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
           candidateName: cardObj.candidateName,
           service: 'WAEC_SCRATCH_CARD',
           depositorName: depositorName || user.displayName,
-          depositorBank: depositorBank || 'CEO Bank Account',
+          depositorBank: 'Paystack / EFADO Gateway',
           transferRef: transferRef || txRef
         }
       });
+
+      try {
+        await addDoc(collection(db, 'waec_scratch_cards'), {
+          userId: user.uid,
+          userEmail: user.email || '',
+          candidateName: cardObj.candidateName,
+          candidateNumber: cardObj.candidateNumber,
+          nin: cardObj.nin,
+          examYear: cardObj.examYear,
+          examDiet: cardObj.examDiet,
+          serialNumber: cardObj.serialNumber,
+          pin: cardObj.pin,
+          amount: FLAT_FEE,
+          method: methodUsed,
+          reference: txRef,
+          status: 'issued',
+          createdAt: serverTimestamp()
+        });
+      } catch (waecErr) {
+        console.warn('WAEC record warning:', waecErr);
+      }
 
       setView('card');
       if (onSuccess) onSuccess();
@@ -181,23 +184,9 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
       return;
     }
 
-    if (paymentMethod === 'direct_bank') {
-      // Direct Bank Deposit / Transfer into CEO Accounts (OPay or Access Bank)
-      setIsProcessing(true);
-      const activeAccount = CEO_BANK_ACCOUNTS[selectedBank];
-      const proofRef = transferRef ? transferRef.toUpperCase() : `TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-      const paymentRef = `EFD-WAEC-DIRECT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-      await new Promise(r => setTimeout(r, 1200));
-      await handleCompleteSuccess(
-        paymentRef, 
-        `Manual Bank Deposit (${activeAccount.bankName})`, 
-        `Paid via ${activeAccount.bankName} (${activeAccount.accountNumber}) • Sender: ${depositorName || user.displayName} • Ref: ${proofRef}`
-      );
-
-    } else if (paymentMethod === 'wallet') {
+    if (paymentMethod === 'wallet') {
       if (user.playerWallet < FLAT_FEE) {
-        setError(`Insufficient Profile Wallet Balance. You need ₦${FLAT_FEE.toLocaleString()}, but have ${formatPrice(user.playerWallet)}. Please select Direct Bank Transfer to pay into CEO OPay or Access Bank.`);
+        setError(`Insufficient Profile Wallet Balance. You need ₦${FLAT_FEE.toLocaleString()}, but have ${formatPrice(user.playerWallet)}. Please top up your EFADO Wallet or pay with Card / Bank Checkout.`);
         return;
       }
 
@@ -294,7 +283,7 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300 font-medium">
-                Official WAEC Serial PIN Portal • CEO Bank Deposit or Wallet Payment
+                Official WAEC Serial PIN Portal • Pay via EFADO Account Wallet or Card
               </p>
             </div>
           </div>
@@ -314,6 +303,7 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
           {/* VIEW 1: UNIFIED SINGLE FORM (Candidate Details + Payment Method) */}
           {view === 'form' && (
             <form onSubmit={handleFormSubmit} className="space-y-6">
+              <HubGuideNote guideId="education" variant="dark" />
               
               {/* Card Summary Banner */}
               <div className="bg-gradient-to-r from-blue-900 via-[#0A0E3F] to-indigo-950 text-white p-6 rounded-3xl border border-blue-800/50 relative overflow-hidden shadow-xl">
@@ -458,180 +448,11 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Select Payment Method (PROMINENT CEO OPAY & ACCESS BANK OPTION) */}
+              {/* 2. Select Payment Method */}
               <div className="space-y-3">
                 <label className="text-xs font-black uppercase text-amber-400 tracking-wider block">
                   2. Select Payment Method (₦3,500)
                 </label>
-
-                {/* METHOD A: DIRECT BANK TRANSFER TO CEO ACCOUNTS (OPAY & ACCESS BANK) */}
-                <div 
-                  onClick={() => setPaymentMethod('direct_bank')}
-                  className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden ${
-                    paymentMethod === 'direct_bank'
-                      ? 'bg-slate-950 border-amber-400 shadow-2xl shadow-amber-500/10 ring-2 ring-amber-400/30'
-                      : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${
-                        paymentMethod === 'direct_bank' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-                      }`}>
-                        <Building2 className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                            DIRECT BANK TRANSFER (CEO ACCOUNTS)
-                          </h4>
-                          <span className="bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[10px] font-black px-2.5 py-0.5 rounded-full">
-                            CEO OPay & Access Bank
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-300 font-medium mt-1">
-                          Transfer ₦3,500 directly into the CEO OPay or Access Bank account. Independent of Flutterwave.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {paymentMethod === 'direct_bank' && (
-                        <div className="w-6 h-6 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center">
-                          <CheckCircle2 className="w-4 h-4" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* EXPANDED DIRECT BANK ACCOUNT DISPLAY & PROOF FORM */}
-                  {paymentMethod === 'direct_bank' && (
-                    <div className="mt-5 pt-5 border-t border-slate-800 space-y-4 cursor-default" onClick={(e) => e.stopPropagation()}>
-                      
-                      <p className="text-[11px] font-black uppercase text-amber-400 tracking-wider">
-                        Choose Destination Account to Transfer ₦3,500:
-                      </p>
-
-                      {/* Bank Tabs (OPay vs Access Bank) */}
-                      <div className="grid grid-cols-2 gap-3">
-                        
-                        {/* OPay Account Button */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBank('opay')}
-                          className={`p-3.5 rounded-2xl border-2 text-left transition-all relative ${
-                            selectedBank === 'opay'
-                              ? 'bg-amber-950/40 border-amber-400 text-white'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                          }`}
-                        >
-                          <span className="text-[10px] font-black uppercase tracking-wider block text-amber-400">
-                            1. CEO OPAY ACCOUNT
-                          </span>
-                          <span className="text-sm font-black text-white block mt-0.5 font-mono">
-                            8072456836
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 block truncate">
-                            OPay Digital MFB
-                          </span>
-                        </button>
-
-                        {/* Access Bank Button */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedBank('access')}
-                          className={`p-3.5 rounded-2xl border-2 text-left transition-all relative ${
-                            selectedBank === 'access'
-                              ? 'bg-blue-950/40 border-blue-400 text-white'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                          }`}
-                        >
-                          <span className="text-[10px] font-black uppercase tracking-wider block text-blue-400">
-                            2. CEO ACCESS BANK
-                          </span>
-                          <span className="text-sm font-black text-white block mt-0.5 font-mono">
-                            0001304979
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400 block truncate">
-                            Access Bank PLC
-                          </span>
-                        </button>
-
-                      </div>
-
-                      {/* Selected Account Detail Box */}
-                      <div className="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
-                            {CEO_BANK_ACCOUNTS[selectedBank].badge}
-                          </span>
-                          <span className="text-xs font-black text-emerald-400 font-mono">
-                            ₦3,500 FLAT FEE
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Bank Name</span>
-                            <span className="font-black text-white text-sm uppercase block mt-0.5">
-                              {CEO_BANK_ACCOUNTS[selectedBank].bankName}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Number</span>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="font-mono text-base font-black text-amber-300">
-                                {CEO_BANK_ACCOUNTS[selectedBank].accountNumber}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleCopyText(CEO_BANK_ACCOUNTS[selectedBank].accountNumber, CEO_BANK_ACCOUNTS[selectedBank].bankName)}
-                                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow-md"
-                              >
-                                <Copy className="w-3 h-3" />
-                                <span>Copy</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Account Name</span>
-                            <span className="font-bold text-slate-200 uppercase text-xs block mt-0.5">
-                              {CEO_BANK_ACCOUNTS[selectedBank].accountName}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Proof of Payment Submission Inputs */}
-                      <div className="space-y-3 pt-2">
-                        <span className="text-[11px] font-black uppercase text-slate-300 tracking-wider block">
-                          Sender Payment Proof Details (Optional for Fast Issue):
-                        </span>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <input
-                            type="text"
-                            placeholder="Depositor / Sender Full Name"
-                            className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white uppercase focus:border-amber-400 focus:outline-none"
-                            value={depositorName}
-                            onChange={(e) => setDepositorName(e.target.value)}
-                          />
-
-                          <input
-                            type="text"
-                            placeholder="Transaction Ref / Teller / Session ID"
-                            className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-amber-300 font-mono focus:border-amber-400 focus:outline-none"
-                            value={transferRef}
-                            onChange={(e) => setTransferRef(e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                    </div>
-                  )}
-                </div>
 
                 {/* METHOD B: EFADO PROFILE ACCOUNT WALLET */}
                 <div 
@@ -742,11 +563,9 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
                 type="submit"
                 disabled={isProcessing}
                 className={`w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-2xl transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 ${
-                  paymentMethod === 'direct_bank'
-                    ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-amber-400/30'
-                    : paymentMethod === 'wallet' 
-                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                  paymentMethod === 'wallet' 
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
                 }`}
               >
                 {isProcessing ? (
@@ -756,11 +575,7 @@ export const WaecScratchCardPortal: React.FC<WaecScratchCardPortalProps> = ({
                   </div>
                 ) : (
                   <>
-                    <span>
-                      {paymentMethod === 'direct_bank'
-                        ? 'Confirm CEO Bank Transfer & Issue WAEC Card (₦3,500)'
-                        : 'Buy & Generate WAEC Scratch Card (₦3,500)'}
-                    </span>
+                    <span>Buy & Generate WAEC Scratch Card (₦3,500)</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

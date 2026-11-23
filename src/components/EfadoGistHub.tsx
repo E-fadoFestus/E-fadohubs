@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCurrency } from '../lib/CurrencyContext';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
+import { HubGuideNote } from './HubGuideNote';
+import { HUB_GUIDES } from '../data/hubGuides';
 import { 
   MessageSquare, 
   ChevronRight, 
@@ -1355,82 +1357,71 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
             exit={{ opacity: 0, scale: 0.95 }}
             className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
           >
-            <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-8 md:p-10 shadow-2xl relative overflow-hidden text-white my-auto max-h-[88vh] overflow-y-auto custom-scrollbar">
-              <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl -mr-24 -mt-24 pointer-events-none" />
+            <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl relative text-white my-auto max-h-[88vh] overflow-y-auto custom-scrollbar">
               <button 
                 onClick={() => setShowGuide(false)}
-                className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-all font-black z-20"
+                className="absolute top-4 right-4 p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 hover:text-white transition-all z-20"
                 aria-label="Close Guide"
               >
-                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                <X className="w-5 h-5" />
               </button>
               
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-900/40 shrink-0">
+              <div className="space-y-4 pr-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shrink-0">
                     <MessageSquare className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">Tactical Manual</span>
-                    <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">Nexus Hub User Guide</h2>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Nexus &amp; Reels Guide</h2>
+                    <p className="text-xs font-semibold text-cyan-300">Post, watch reels, chat, and earn creator rewards</p>
                   </div>
                 </div>
 
-                <p className="text-slate-300 font-medium text-xs leading-relaxed mb-6">
-                  Learn how to post, chat, create high-performance reels, and earn creator rewards across the global EFADO network.
-                </p>
-                
-                <div className="space-y-3.5">
-                  {[
-                    { 
-                      icon: MessageSquare, 
-                      color: "text-cyan-400 bg-cyan-500/15 border-cyan-500/30",
-                      title: "1. Global Feed & Post Integrity", 
-                      desc: "Share thoughts, photos, and updates with zero latency. Every image and download maintains checksum integrity to prevent media corruption." 
-                    },
-                    { 
-                      icon: Video, 
-                      color: "text-rose-400 bg-rose-500/15 border-rose-500/30",
-                      title: "2. Reels Studio & 206 Streaming", 
-                      desc: "Record or upload videos (>4MB supported). Tracks true 0% → 100% upload progress via Firebase Storage resumable upload + chunked fallback, with instant playback via HTTP 206 Partial Content." 
-                    },
-                    { 
-                      icon: MessageCircle, 
-                      color: "text-blue-400 bg-blue-500/15 border-blue-500/30",
-                      title: "3. Direct Messaging & Communities", 
-                      desc: "Encrypted 1-on-1 private messaging and verified special forums (Business, Marriage, Tech, Wives Forum) with real-time delivery and online status." 
-                    },
-                    { 
-                      icon: Coins, 
-                      color: "text-amber-400 bg-amber-500/15 border-amber-500/30",
-                      title: "4. Creator Earnings & Monetization", 
-                      desc: "Earn ₦100 per 1k views on popular reels. Earnings credit automatically to your sovereign wallet, withdrawable anytime to your bound bank account." 
-                    },
-                    { 
-                      icon: Shield, 
-                      color: "text-emerald-400 bg-emerald-500/15 border-emerald-500/30",
-                      title: "5. Trust & Account Security", 
-                      desc: "Sovereign authentication with Google identity, strict community moderation, and encrypted transport protocols guarantee full data safety." 
-                    }
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-3.5 p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800/90 transition-all">
-                      <div className={`w-9 h-9 border rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
-                        <item.icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black text-white uppercase tracking-wider mb-0.5">{item.title}</h4>
-                        <p className="text-[11px] text-slate-300 leading-relaxed font-normal">{item.desc}</p>
-                      </div>
+                <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+                  <p className="text-xs font-black uppercase tracking-wider text-cyan-300 mb-1">What is this?</p>
+                  <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.nexus.whatIsThis}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase tracking-wider text-cyan-300">What to do:</p>
+                  {HUB_GUIDES.nexus.steps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700/60">
+                      <span className="w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <p className="text-sm text-slate-200 leading-relaxed">{step}</p>
                     </div>
                   ))}
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                    <p className="text-xs font-black uppercase tracking-wider text-emerald-300 mb-1">What happens next?</p>
+                    <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.nexus.whatHappensNext}</p>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                    <p className="text-xs font-black uppercase tracking-wider text-amber-300 mb-1">Example:</p>
+                    <p className="text-sm text-slate-200 leading-relaxed">{HUB_GUIDES.nexus.example}</p>
+                  </div>
+                </div>
                 
-                <button 
-                  onClick={() => setShowGuide(false)}
-                  className="w-full mt-6 py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-600 hover:brightness-110 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl transition-all active:scale-[0.98]"
-                >
-                  Explore Nexus Hub
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button 
+                    onClick={() => {
+                      setShowGuide(false);
+                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.nexus.helpCategory } }));
+                    }}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4 text-cyan-400" /> Need Help? Chat Us
+                  </button>
+                  <button 
+                    onClick={() => setShowGuide(false)}
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:brightness-110 text-white rounded-2xl font-black uppercase tracking-wider text-xs shadow-xl transition-all"
+                  >
+                    Explore Nexus Hub
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -1706,6 +1697,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
           {/* View Content */}
           <div className={`flex-grow ${['CHAT', 'REELS'].includes(activeView) ? 'overflow-hidden' : 'overflow-y-auto'} custom-scrollbar bg-gray-50/30`}>
+            {!['CHAT', 'REELS'].includes(activeView) && (
+              <div className="max-w-6xl mx-auto px-4 sm:px-8 pt-4">
+                <HubGuideNote guideId="nexus" variant="dark" />
+              </div>
+            )}
             <AnimatePresence mode="wait">
               {activeView === 'BLOG' && (() => {
                 const ALL_BLOG_POSTS = [

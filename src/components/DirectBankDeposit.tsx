@@ -14,35 +14,10 @@ interface DirectBankDepositProps {
   onClose?: () => void;
 }
 
-const OFFICIAL_NGN_ACCOUNTS = [
-  { bankName: 'GTBANK PLC', accountName: 'EFADO Technology Computer Engineering Training and Services', accountNo: '3001964082', badge: 'Primary Corporate NGN' },
-  { bankName: 'OPAY DIGITAL MFB', accountName: 'EFADO Technology Computer Engineering Training and Services', accountNo: '8072456836', badge: 'OPay Business Instant' },
-  { bankName: 'ACCESS BANK PLC', accountName: 'Okhawere Festus Daniel', accountNo: '0001304979', badge: 'Access Corporate / Savings' },
-  { bankName: 'UBA BANK PLC', accountName: 'Okhawere Festus Daniel', accountNo: '2120742200', badge: 'UBA Corporate / Savings' },
-];
-
-const INTERNATIONAL_ACCOUNTS: Record<string, { bankName: string; accountName: string; accountNo: string; extraLabel?: string; extraValue?: string }> = {
-  USD: {
-    bankName: 'GTBANK PLC (USD Domiciliary / Wire)',
-    accountName: 'EFADO Technology Computer Engineering Training and Services',
-    accountNo: '3001964109',
-    extraLabel: 'SWIFT / BIC Code',
-    extraValue: 'GTBIGBLA'
-  },
-  GBP: {
-    bankName: 'GTBANK PLC (GBP Domiciliary / Wire)',
-    accountName: 'EFADO Technology Computer Engineering Training and Services',
-    accountNo: '3001964123',
-    extraLabel: 'SWIFT / BIC Code',
-    extraValue: 'GTBIGBLA'
-  },
-  EUR: {
-    bankName: 'GTBANK PLC (EUR Domiciliary / Wire)',
-    accountName: 'EFADO Technology Computer Engineering Training and Services',
-    accountNo: '3001964147',
-    extraLabel: 'SWIFT / BIC Code',
-    extraValue: 'GTBIGBLA'
-  }
+const SETTLEMENT_GATEWAY_INFO = {
+  channelName: 'Paystack Verified Settlement Bank',
+  supportedCurrencies: ['NGN', 'USD', 'GBP', 'EUR'],
+  settlementMode: 'Automated Virtual & Card Gateway Checkout'
 };
 
 export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
@@ -225,8 +200,8 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
         proof_name: proofFileName,
         status: 'pending', // 'Pending Review'
         created_at: serverTimestamp(),
-        destination_bank: currency === 'NGN' ? 'GTBANK PLC / OPAY / ACCESS / UBA' : INTERNATIONAL_ACCOUNTS[currency]?.bankName || 'GTBank Wire',
-        destination_account: currency === 'NGN' ? '3001964082 / 8072456836' : INTERNATIONAL_ACCOUNTS[currency]?.accountNo || '3001964109'
+        destination_bank: 'Paystack Settlement Bank',
+        destination_account: `${currency} Automated Settlement`
       };
 
       // 1. Save directly to 'deposits' collection
@@ -285,7 +260,7 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-amber-400" />
           <span className="text-xs font-black uppercase text-amber-300 tracking-wider">
-            DEFAULT PAYMENT METHOD: DIRECT BANK DEPOSIT
+            BANK TRANSFER &amp; RECEIPT VERIFICATION
           </span>
         </div>
         <button
@@ -389,11 +364,11 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-[#DAA520]" />
               <h3 className="text-xs font-black uppercase tracking-wider text-[#DAA520]">
-                EFADO DIRECT BANK TRANSFER & ESCROW DEPOSIT
+                EFADO BANK TRANSFER &amp; RECEIPT UPLOAD OPTION
               </h3>
             </div>
-            <p className="text-[10px] text-slate-300 leading-relaxed font-medium">
-              Please review the company bank accounts below and make your transfer using your bank app or USSD code. No personal form input is required in this step.
+            <p className="text-[11px] text-slate-300 leading-relaxed font-medium">
+              For fastest instant deposit, use Paystack Checkout in your Account Profile Wallet. If paying by bank transfer receipt, confirm the details below and upload your proof in Step 2.
             </p>
           </div>
 
@@ -476,99 +451,31 @@ export const DirectBankDeposit: React.FC<DirectBankDepositProps> = ({
             </div>
           </div>
 
-          {/* EFADO Escrow Bank Account List */}
+          {/* Settlement Gateway Notice */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                3. EFADO Active Escrow Bank Accounts
+                3. Settlement Channel
               </span>
-              <span className="text-[9px] text-emerald-600 font-bold uppercase">Verified Corporate Accounts</span>
+              <span className="text-[9px] text-emerald-600 font-bold uppercase">{SETTLEMENT_GATEWAY_INFO.channelName}</span>
             </div>
 
-            {currency === 'NGN' ? (
-              <div className="space-y-3">
-                {OFFICIAL_NGN_ACCOUNTS.map((acc, idx) => (
-                  <div key={idx} className="p-4 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl space-y-3 text-white transition-all shadow-md">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <span className="text-xs font-black text-[#DAA520] uppercase tracking-wide">
-                        {acc.bankName}
-                      </span>
-                      <span className="text-[8px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-black uppercase">
-                        {acc.badge}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                      <div>
-                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest block">Account Number</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-sm font-black font-mono text-white">{acc.accountNo}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(acc.accountNo, `num_${idx}`)}
-                            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-all active:scale-95"
-                            title="Copy Account Number"
-                          >
-                            {copiedField === `num_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest block">Account Name</span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs font-black text-slate-200 truncate max-w-[180px]">{acc.accountName}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(acc.accountName, `name_${idx}`)}
-                            className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 hover:text-white transition-all active:scale-95"
-                            title="Copy Account Name"
-                          >
-                            {copiedField === `name_${idx}` ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <div className="p-5 bg-slate-900 border border-emerald-500/30 rounded-2xl space-y-3 text-white">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="text-xs font-black text-[#DAA520] uppercase tracking-wide">
+                  Paystack Automated Settlement Channel
+                </span>
+                <span className="text-[8px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-black uppercase">
+                  Live Gateway
+                </span>
               </div>
-            ) : (
-              <div className="p-5 bg-slate-900 border border-slate-800 rounded-2xl space-y-4 text-white">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <span className="text-xs font-black text-[#DAA520]">{INTERNATIONAL_ACCOUNTS[currency]?.bankName}</span>
-                  <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full uppercase font-black">
-                    International Wire
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Account Holder</span>
-                    <span className="text-xs font-black text-white">{INTERNATIONAL_ACCOUNTS[currency]?.accountName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Account Number / IBAN</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-black text-[#DAA520]">{INTERNATIONAL_ACCOUNTS[currency]?.accountNo}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText(INTERNATIONAL_ACCOUNTS[currency]?.accountNo || '', 'intl_acc')}
-                        className="p-1 bg-slate-800 rounded text-slate-300"
-                      >
-                        {copiedField === 'intl_acc' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {INTERNATIONAL_ACCOUNTS[currency]?.extraLabel && (
-                  <div className="p-3 bg-slate-950 rounded-xl flex items-center justify-between text-xs border border-slate-800">
-                    <span className="text-slate-400 font-bold uppercase text-[9px]">{INTERNATIONAL_ACCOUNTS[currency]?.extraLabel}</span>
-                    <span className="font-mono font-black text-amber-300">{INTERNATIONAL_ACCOUNTS[currency]?.extraValue}</span>
-                  </div>
-                )}
-              </div>
-            )}
+              <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                All live deposits settle automatically through <strong>Paystack Checkout</strong> (Card, Bank Transfer, USSD, or Virtual Account) directly into the configured Paystack Settlement Bank. For instant crediting without manual review, use the <strong>Paystack Instant Top-Up</strong> tab in your Wallet.
+              </p>
+              <p className="text-[10px] text-slate-400 font-mono uppercase">
+                Supported Currencies: {SETTLEMENT_GATEWAY_INFO.supportedCurrencies.join(' • ')}
+              </p>
+            </div>
           </div>
 
           {/* Action Button to Proceed to Step 2 */}
