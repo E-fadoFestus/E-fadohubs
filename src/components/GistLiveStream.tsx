@@ -93,7 +93,7 @@ const GIFTS_CATALOG = [
   { id: 'rocket', name: 'Rocket', icon: '🚀', coins: 500, effect: 'blast' },
   { id: 'crown', name: 'Crown', icon: '👑', coins: 1000, effect: 'royal' },
   { id: 'lion', name: 'Golden Lion', icon: '🦁', coins: 2500, effect: 'roar' },
-  { id: 'diamond', name: 'Sovereign Diamond', icon: '💎', coins: 5000, effect: 'galaxy' },
+  { id: 'diamond', name: 'Royal Diamond', icon: '💎', coins: 5000, effect: 'galaxy' },
 ];
 
 export const GistLiveStream: React.FC<GistLiveStreamProps> = ({ user, onClose, onNavigate }) => {
@@ -244,13 +244,19 @@ export const GistLiveStream: React.FC<GistLiveStreamProps> = ({ user, onClose, o
             <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-b from-indigo-950 via-slate-900 to-black">
               {isCameraActive ? (
                 <div className="relative w-full h-full flex flex-col items-center justify-center p-6 text-center">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-rose-500 via-purple-600 to-indigo-600 p-1 mb-4 shadow-2xl animate-pulse">
-                    <img 
-                      src={user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`} 
-                      alt="Broadcaster" 
-                      className="w-full h-full rounded-full object-cover" 
-                      referrerPolicy="no-referrer" 
-                    />
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-rose-500 via-purple-600 to-indigo-600 p-1 mb-4 shadow-2xl animate-pulse flex items-center justify-center">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt="Broadcaster" 
+                        className="w-full h-full rounded-full object-cover" 
+                        referrerPolicy="no-referrer" 
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-3xl font-black text-white">
+                        {(user.displayName || user.email || 'Y').charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <span className="px-3 py-1 bg-rose-600 text-white font-black text-xs uppercase tracking-widest rounded-full animate-bounce mb-2">
                     ● YOU ARE LIVE
@@ -283,13 +289,17 @@ export const GistLiveStream: React.FC<GistLiveStreamProps> = ({ user, onClose, o
           {/* Top Live Bar Controls */}
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 pointer-events-auto">
             <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 shadow-lg">
-              <div className="w-10 h-10 rounded-full border-2 border-rose-500 p-0.5 overflow-hidden">
-                <img 
-                  src={isBroadcasting ? (user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`) : activeChannel.hostPhoto} 
-                  alt="Host" 
-                  className="w-full h-full object-cover rounded-full" 
-                  referrerPolicy="no-referrer" 
-                />
+              <div className="w-10 h-10 rounded-full border-2 border-rose-500 p-0.5 overflow-hidden bg-slate-900 flex items-center justify-center text-white font-bold text-xs">
+                {(isBroadcasting ? user.photoURL : activeChannel.hostPhoto) ? (
+                  <img 
+                    src={isBroadcasting ? user.photoURL : activeChannel.hostPhoto} 
+                    alt="Host" 
+                    className="w-full h-full object-cover rounded-full" 
+                    referrerPolicy="no-referrer" 
+                  />
+                ) : (
+                  <span>{(isBroadcasting ? (user.displayName || 'Y') : activeChannel.hostName).charAt(0).toUpperCase()}</span>
+                )}
               </div>
               <div>
                 <div className="flex items-center gap-2">

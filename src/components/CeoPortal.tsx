@@ -6,6 +6,7 @@ import { useCurrency } from '../lib/CurrencyContext';
 import { CeoHubsManager } from './CeoHubsManager';
 import { getBackendUrl } from '../config/backend';
 import { HubGuideNote } from './HubGuideNote';
+import { DiagnosticModal } from './DiagnosticModal';
 import { 
   ShieldCheck, 
   Users, 
@@ -88,10 +89,11 @@ interface CeoPortalProps {
 
 export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => {
   const { formatPrice, selectedCurrency } = useCurrency();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'players' | 'transactions' | 'withdrawals' | 'hubs' | 'monetization' | 'announcements' | 'settings' | 'detective' | 'support'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'players' | 'transactions' | 'withdrawals' | 'hubs' | 'monetization' | 'announcements' | 'settings' | 'detective' | 'support' | 'help_inbox'>('dashboard');
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showPatronageTracker, setShowPatronageTracker] = useState(false);
   const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
+  const [showSystemDiagnostics, setShowSystemDiagnostics] = useState(false);
   const [newPasswordInput, setNewPasswordInput] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordSaveStatus, setPasswordSaveStatus] = useState<string | null>(null);
@@ -193,6 +195,9 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
   const [selectedSupportTicket, setSelectedSupportTicket] = useState<any>(null);
   const [ceoReplyText, setCeoReplyText] = useState('');
+  const [helpInboxMessages, setHelpInboxMessages] = useState<any[]>([]);
+  const [helpInboxFilter, setHelpInboxFilter] = useState<'all' | 'New' | 'Replied' | 'Closed'>('all');
+  const [helpInboxUpdatingId, setHelpInboxUpdatingId] = useState<string | null>(null);
   const [incubatorIdeas, setIncubatorIdeas] = useState<any[]>([]);
   const [selectedIncubatorIdea, setSelectedIncubatorIdea] = useState<any>(null);
   const [pitchFeedbackText, setPitchFeedbackText] = useState('');
@@ -626,6 +631,25 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       setSupportTickets(list);
     }, (e) => handleSnapError(e, 'help_requests'));
 
+    // Fetch Dedicated Help / Support Inbox messages
+    const unsubHelpInbox = onSnapshot(collection(db, 'help_inbox'), (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a: any, b: any) => {
+        const tA = a.createdAt?.seconds
+          ? a.createdAt.seconds * 1000
+          : a.createdAtIso
+          ? Date.parse(a.createdAtIso)
+          : 0;
+        const tB = b.createdAt?.seconds
+          ? b.createdAt.seconds * 1000
+          : b.createdAtIso
+          ? Date.parse(b.createdAtIso)
+          : 0;
+        return tB - tA;
+      });
+      setHelpInboxMessages(list);
+    }, (e) => handleSnapError(e, 'help_inbox'));
+
     // Fetch Incubator Innovation pitches
     const unsubIdeas = onSnapshot(collection(db, 'incubator_ideas'), (snap) => {
       setIncubatorIdeas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -717,6 +741,7 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       unsubSocialPosts();
       unsubReels();
       unsubSupport();
+      unsubHelpInbox();
       unsubIdeas();
       unsubLiveClasses();
       unsubCreatorStats();
@@ -1270,6 +1295,23 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
       }
     } catch (err) {
       console.error("Failed to update status: ", err);
+    }
+  };
+
+  const handleUpdateHelpInboxStatus = async (
+    messageId: string,
+    newStatus: 'New' | 'Replied' | 'Closed'
+  ) => {
+    setHelpInboxUpdatingId(messageId);
+    try {
+      await updateDoc(doc(db, 'help_inbox', messageId), {
+        status: newStatus,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Failed to update Help / Support Inbox status:', err);
+    } finally {
+      setHelpInboxUpdatingId(null);
     }
   };
 
@@ -2231,10 +2273,12 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
             ...transactions.filter(t => t.type === 'deposit' && t.status === 'pending' && !depositsList.some(d => d.id === t.id))
           ].length;
           const totalHubEventsCount = serviceRequests.length + loans.length + marketOrders.length + csccGroups.length + domainOrders.length;
+          const newHelpInboxCount = helpInboxMessages.filter(m => (m.status || 'New') === 'New').length;
 
           const tabs = [
             { id: 'dashboard', icon: TrendingUp, label: 'Dashboard', badge: (pendingPayoutsCount + pendingDepositsCount) > 0 ? `${pendingPayoutsCount + pendingDepositsCount} Action` : null, badgeColor: 'bg-amber-500/20 border-amber-500/40 text-amber-300' },
             { id: 'withdrawals', icon: ArrowUpRight, label: '💸 Cash Out Approvals', badge: pendingPayoutsCount > 0 ? `${pendingPayoutsCount} Pending` : null, badgeColor: 'bg-pink-500/30 border-pink-500/50 text-pink-300 animate-pulse' },
+            { id: 'help_inbox', icon: Mail, label: 'Help / Support Inbox', badge: newHelpInboxCount > 0 ? `${newHelpInboxCount}` : null, badgeColor: 'bg-rose-600 border-rose-500 text-white tabular-nums' },
             { id: 'transactions', icon: CreditCard, label: 'Transactions', badge: pendingDepositsCount > 0 ? `${pendingDepositsCount} Dep` : null, badgeColor: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
             { id: 'hubs', icon: Zap, label: '🌐 All Digital Hubs', badge: totalHubEventsCount > 0 ? `${totalHubEventsCount} Live` : null, badgeColor: 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' },
             { id: 'monetization', icon: Coins, label: 'Monetization' },
@@ -4517,6 +4561,31 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                   </div>
                 </div>
 
+                {/* CEO-Only System Health & Diagnostics (Redacted) */}
+                <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+                      <ShieldCheck className="w-6 h-6 text-indigo-400" />
+                      System Health &amp; Diagnostics
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">
+                      Inspect runtime host status and redacted integration checks (CEO-only access).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSystemDiagnostics(true)}
+                    className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold transition-colors shrink-0"
+                  >
+                    Open System Diagnostics
+                  </button>
+                </div>
+
+                <DiagnosticModal
+                  isOpen={showSystemDiagnostics}
+                  onClose={() => setShowSystemDiagnostics(false)}
+                />
+
                 {/* Audit Logs */}
                 <div className="bg-slate-800/30 p-8 rounded-[2.5rem] border border-white/5">
                   <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tight flex items-center gap-3">
@@ -5301,6 +5370,243 @@ export const CeoPortal: React.FC<CeoPortalProps> = ({ onClose, adminStats }) => 
                 </div>
               </motion.div>
             )}
+
+            {activeTab === 'help_inbox' && (() => {
+              const newCount = helpInboxMessages.filter(m => (m.status || 'New') === 'New').length;
+              const repliedCount = helpInboxMessages.filter(m => m.status === 'Replied').length;
+              const closedCount = helpInboxMessages.filter(m => m.status === 'Closed').length;
+              const filteredMessages = helpInboxMessages.filter((item) => {
+                if (helpInboxFilter === 'all') return true;
+                return (item.status || 'New') === helpInboxFilter;
+              });
+
+              const formatTimestamp = (item: any) => {
+                if (item.createdAt?.seconds) {
+                  return new Date(item.createdAt.seconds * 1000).toLocaleString();
+                }
+                if (item.createdAtIso) {
+                  return new Date(item.createdAtIso).toLocaleString();
+                }
+                return 'Just now';
+              };
+
+              const statusBadgeStyle = (status: string) => {
+                if (status === 'Replied') return 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300';
+                if (status === 'Closed') return 'bg-slate-700/40 border-slate-600/50 text-slate-300';
+                return 'bg-rose-600/20 border-rose-500/50 text-rose-300';
+              };
+
+              return (
+                <motion.div
+                  key="help_inbox"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="space-y-6 text-left text-white"
+                >
+                  {/* Header + Summary Counts */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <h3 className="text-xl font-bold text-white">Help / Support Inbox</h3>
+                        {newCount > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-xs font-bold tabular-nums">
+                            {newCount} New
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-400">
+                        Support messages sent from “Need Help? Chat Us” across all EFADO Guides.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2.5 sm:gap-3 shrink-0">
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-center">
+                        <span className="block text-[11px] font-semibold text-rose-400 uppercase">New</span>
+                        <span className="text-lg font-bold text-white tabular-nums">{newCount}</span>
+                      </div>
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-center">
+                        <span className="block text-[11px] font-semibold text-emerald-400 uppercase">Replied</span>
+                        <span className="text-lg font-bold text-white tabular-nums">{repliedCount}</span>
+                      </div>
+                      <div className="bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-center">
+                        <span className="block text-[11px] font-semibold text-slate-400 uppercase">Closed</span>
+                        <span className="text-lg font-bold text-white tabular-nums">{closedCount}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Bar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(['all', 'New', 'Replied', 'Closed'] as const).map((filterOpt) => (
+                      <button
+                        key={filterOpt}
+                        type="button"
+                        onClick={() => setHelpInboxFilter(filterOpt)}
+                        className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                          helpInboxFilter === filterOpt
+                            ? 'bg-indigo-600 border-indigo-500 text-white'
+                            : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        {filterOpt === 'all' ? `All (${helpInboxMessages.length})` : filterOpt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Inbox List */}
+                  {filteredMessages.length === 0 ? (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center space-y-2">
+                      <Mail className="w-10 h-10 text-slate-600 mx-auto" />
+                      <h4 className="text-sm font-bold text-slate-300">No Support Messages in This View</h4>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto">
+                        When users click “Need Help? Chat Us” inside any hub guide and submit the form, their message appears here in real time.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Desktop Table */}
+                      <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-800 bg-slate-950/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                <th className="py-3.5 px-4">Date/Time</th>
+                                <th className="py-3.5 px-4">User Name</th>
+                                <th className="py-3.5 px-4">Phone</th>
+                                <th className="py-3.5 px-4">Hub</th>
+                                <th className="py-3.5 px-4">Subject</th>
+                                <th className="py-3.5 px-4">Message</th>
+                                <th className="py-3.5 px-4">Status</th>
+                                <th className="py-3.5 px-4 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/80 text-sm">
+                              {filteredMessages.map((item) => {
+                                const currentStatus = (item.status || 'New') as 'New' | 'Replied' | 'Closed';
+                                const isUpdating = helpInboxUpdatingId === item.id;
+                                return (
+                                  <tr key={item.id} className="hover:bg-slate-950/50 align-top">
+                                    <td className="py-3.5 px-4 text-xs text-slate-300 whitespace-nowrap tabular-nums">
+                                      {formatTimestamp(item)}
+                                    </td>
+                                    <td className="py-3.5 px-4">
+                                      <p className="font-semibold text-white">{item.userName || 'Guest'}</p>
+                                      {item.userEmail && (
+                                        <p className="text-xs text-slate-400 break-all">{item.userEmail}</p>
+                                      )}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-xs text-slate-200 whitespace-nowrap tabular-nums">
+                                      {item.phone || 'Not provided'}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-xs font-semibold text-indigo-300 whitespace-nowrap">
+                                      {item.hub || 'General'}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-xs font-semibold text-slate-200 whitespace-nowrap">
+                                      {item.subject || 'Other'}
+                                    </td>
+                                    <td className="py-3.5 px-4 text-xs text-slate-200 max-w-sm leading-relaxed whitespace-pre-wrap break-words">
+                                      {item.message}
+                                    </td>
+                                    <td className="py-3.5 px-4 whitespace-nowrap">
+                                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${statusBadgeStyle(currentStatus)}`}>
+                                        {currentStatus}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 whitespace-nowrap text-right">
+                                      <div className="inline-flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating || currentStatus === 'Replied'}
+                                          onClick={() => handleUpdateHelpInboxStatus(item.id, 'Replied')}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition-colors cursor-pointer"
+                                        >
+                                          Mark as Replied
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating || currentStatus === 'Closed'}
+                                          onClick={() => handleUpdateHelpInboxStatus(item.id, 'Closed')}
+                                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-white transition-colors cursor-pointer"
+                                        >
+                                          Mark as Closed
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Mobile Cards */}
+                      <div className="md:hidden space-y-3">
+                        {filteredMessages.map((item) => {
+                          const currentStatus = (item.status || 'New') as 'New' | 'Replied' | 'Closed';
+                          const isUpdating = helpInboxUpdatingId === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold text-white truncate">{item.userName || 'Guest'}</p>
+                                  <p className="text-xs text-slate-400 tabular-nums">{formatTimestamp(item)}</p>
+                                </div>
+                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border shrink-0 ${statusBadgeStyle(currentStatus)}`}>
+                                  {currentStatus}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                                <div>
+                                  <span className="text-slate-500 block">Phone</span>
+                                  <span className="text-slate-200 font-semibold tabular-nums">{item.phone || 'Not provided'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500 block">Hub</span>
+                                  <span className="text-indigo-300 font-semibold">{item.hub || 'General'}</span>
+                                </div>
+                                <div className="col-span-2">
+                                  <span className="text-slate-500 block">Subject</span>
+                                  <span className="text-slate-200 font-semibold">{item.subject || 'Other'}</span>
+                                </div>
+                              </div>
+
+                              <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap break-words">
+                                {item.message}
+                              </p>
+
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  disabled={isUpdating || currentStatus === 'Replied'}
+                                  onClick={() => handleUpdateHelpInboxStatus(item.id, 'Replied')}
+                                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white transition-colors cursor-pointer"
+                                >
+                                  Mark as Replied
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isUpdating || currentStatus === 'Closed'}
+                                  onClick={() => handleUpdateHelpInboxStatus(item.id, 'Closed')}
+                                  className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-white transition-colors cursor-pointer"
+                                >
+                                  Mark as Closed
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              );
+            })()}
           </AnimatePresence>
         </div>
       </div>

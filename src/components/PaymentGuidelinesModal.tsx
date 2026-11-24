@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Lightbulb
 } from 'lucide-react';
+import { openSupportHelpForm } from '../utils/helpSupport';
 
 interface PaymentGuidelinesModalProps {
   isOpen: boolean;
@@ -22,8 +23,10 @@ export const PaymentGuidelinesModal: React.FC<PaymentGuidelinesModalProps> = ({ 
   if (!isOpen) return null;
 
   const handleChatUs = () => {
-    window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: 'Wallet & Payments' } }));
-    onClose();
+    openSupportHelpForm({
+      hub: 'Wallet & Paystack',
+      subject: activeTab === 'payouts' ? 'Withdrawal' : 'Payment Issue',
+    });
   };
 
   return (

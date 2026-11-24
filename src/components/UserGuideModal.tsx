@@ -18,6 +18,7 @@ import {
   Check,
   Lightbulb
 } from 'lucide-react';
+import { openSupportHelpForm, SupportSubject } from '../utils/helpSupport';
 
 interface UserGuideModalProps {
   isOpen: boolean;
@@ -39,9 +40,8 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
     { id: 'advertising' as GuideTab, label: 'Ads & Market', icon: Megaphone },
   ];
 
-  const handleChatUs = (category: string) => {
-    window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category } }));
-    onClose();
+  const handleChatUs = (hubName: string, subject: SupportSubject = 'Other') => {
+    openSupportHelpForm({ hub: hubName, subject });
   };
 
   return (
@@ -179,7 +179,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                       )}
                       <button
                         type="button"
-                        onClick={() => handleChatUs('General Help')}
+                        onClick={() => handleChatUs('Quickstart & General', 'Account')}
                         className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -220,7 +220,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
                     <button
                       type="button"
-                      onClick={() => handleChatUs('Wallet & Payments')}
+                      onClick={() => handleChatUs('Game Zone', 'Game Issue')}
                       className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />
@@ -260,7 +260,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
                     <button
                       type="button"
-                      onClick={() => handleChatUs('Wallet & Payments')}
+                      onClick={() => handleChatUs('Wallet & Paystack', 'Payment Issue')}
                       className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />
@@ -310,7 +310,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                       )}
                       <button
                         type="button"
-                        onClick={() => handleChatUs('Wallet & Payments')}
+                        onClick={() => handleChatUs('Wallet & Paystack', 'Withdrawal')}
                         className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                       >
                         <MessageCircle className="w-4 h-4" />
@@ -350,7 +350,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
                     <button
                       type="button"
-                      onClick={() => handleChatUs('General Help')}
+                      onClick={() => handleChatUs('EFADO Nexus Hub', 'Account')}
                       className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />
@@ -389,7 +389,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
                     <button
                       type="button"
-                      onClick={() => handleChatUs('Technical Hub Issues')}
+                      onClick={() => handleChatUs('Marketplace & Ads', 'Other')}
                       className="min-h-[44px] px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer"
                     >
                       <MessageCircle className="w-4 h-4" />

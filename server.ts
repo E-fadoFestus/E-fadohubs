@@ -21,6 +21,13 @@ import paymentsWithdrawHandler from './api/payments/withdraw';
 import flutterwaveWebhookHandler from './api/webhook/flutterwave';
 import verifyBankHandler from './api/verify-bank.js';
 import { ACTIVE_WALLET_CURRENCIES } from './src/constants/walletCurrencies';
+import {
+  validateAndPrepareAdvert,
+  findPublicAdvertBySlugOrId,
+  trackAdvertMetric,
+  buildDynamicSitemapXml,
+  injectAdvertMetaIntoHtml,
+} from './src/app/api/adverts/service';
 
 async function handleVercelHandler(handler: (req: any, res: any) => Promise<any>, req: express.Request, res: express.Response) {
   try {
@@ -1790,6 +1797,77 @@ app.get(['/api/ceo/ping', '/api/ceo/health'], (req: any, res: any) => {
   });
 });
 
+// ============================================================================
+// EFADO ADVERT & SELL MODULE APIS, DYNAMIC SITEMAP & SEO META INJECTION
+// ============================================================================
+const advertMetricRateLimit = new Map<string, number>();
+
+app.post('/api/adverts/prepare', (req, res) => {
+  const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+  const result = validateAndPrepareAdvert(req.body, ip);
+  if (!result.ok) {
+    return res.status(result.status).json({ success: false, message: result.message });
+  }
+  return res.json({ success: true, slug: result.slug });
+});
+
+app.get('/api/adverts/public/:slugOrId', async (req, res) => {
+  try {
+    const ad = await findPublicAdvertBySlugOrId(req.params.slugOrId);
+    if (!ad) {
+      return res.status(404).json({ success: false, message: 'Advert not found.' });
+    }
+    return res.json({ success: true, advert: ad });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: 'Could not load advert.' });
+  }
+});
+
+app.post('/api/adverts/:id/track', async (req, res) => {
+  const adId = String(req.params.id || '').trim();
+  const event = req.body?.event === 'share' ? 'share' : 'view';
+  const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
+
+  if (event === 'view') {
+    const key = `${adId}_${ip}`;
+    const last = advertMetricRateLimit.get(key) || 0;
+    if (Date.now() - last < 30000) {
+      return res.json({ success: true, throttled: true });
+    }
+    advertMetricRateLimit.set(key, Date.now());
+    if (advertMetricRateLimit.size > 5000) advertMetricRateLimit.clear();
+  }
+
+  await trackAdvertMetric(adId, event);
+  return res.json({ success: true });
+});
+
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+    const host = req.get('host') || 'e-fado.com';
+    const baseUrl = process.env.APP_URL && !String(process.env.APP_URL).includes('MY_APP_URL')
+      ? String(process.env.APP_URL)
+      : `${proto}://${host}`;
+    const xml = await buildDynamicSitemapXml(baseUrl);
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.status(200).send(xml);
+  } catch {
+    return res.status(500).send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+  }
+});
+
+app.get('/robots.txt', (req, res) => {
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  const host = req.get('host') || 'e-fado.com';
+  const baseUrl = process.env.APP_URL && !String(process.env.APP_URL).includes('MY_APP_URL')
+    ? String(process.env.APP_URL).replace(/\/$/, '')
+    : `${proto}://${host}`;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  return res.status(200).send(`User-agent: *\nAllow: /\nAllow: /advert/\nSitemap: ${baseUrl}/sitemap.xml\n`);
+});
+
 // Start server with Vite middleware support
 async function startServer() {
   try {
@@ -1801,9 +1879,40 @@ async function startServer() {
         },
         appType: "spa",
       });
+
+      app.get('/advert/:slug', async (req, res, next) => {
+        try {
+          const indexPath = path.resolve(process.cwd(), 'index.html');
+          let html = fs.readFileSync(indexPath, 'utf-8');
+          html = await vite.transformIndexHtml(req.originalUrl, html);
+          const ad = await findPublicAdvertBySlugOrId(req.params.slug);
+          const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+          const pageUrl = `${proto}://${req.get('host')}${req.originalUrl}`;
+          html = injectAdvertMetaIntoHtml(html, ad, pageUrl);
+          return res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+        } catch (err) {
+          return next(err);
+        }
+      });
+
       app.use(vite.middlewares);
     } else {
       const distPath = path.join(process.cwd(), 'dist');
+
+      app.get('/advert/:slug', async (req, res) => {
+        const indexFile = path.join(distPath, 'index.html');
+        try {
+          let html = fs.readFileSync(indexFile, 'utf-8');
+          const ad = await findPublicAdvertBySlugOrId(req.params.slug);
+          const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+          const pageUrl = `${proto}://${req.get('host')}${req.originalUrl}`;
+          html = injectAdvertMetaIntoHtml(html, ad, pageUrl);
+          return res.status(200).set({ 'Content-Type': 'text/html' }).send(html);
+        } catch {
+          return res.sendFile(indexFile);
+        }
+      });
+
       app.use(express.static(distPath));
       app.get('*', (req, res) => {
         res.sendFile(path.join(distPath, 'index.html'));

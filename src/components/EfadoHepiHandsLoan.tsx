@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { openSupportHelpForm } from '../utils/helpSupport';
 import { 
   LayoutDashboard, 
   FileEdit, 
@@ -624,9 +625,9 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                         type="button"
                         onClick={() => {
                           setShowSystemGuide(false);
-                          window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.loans.helpCategory } }));
+                          openSupportHelpForm({ hub: 'HepiHands Loan Hub', subject: 'Account' });
                         }}
-                        className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all"
+                        className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all cursor-pointer"
                       >
                         Need Help? Chat Us
                       </button>
@@ -846,14 +847,14 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
 
               {/* Anti-Absconding Verification */}
               <section className="space-y-6">
-                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4" /> 03. Tactical Verification Nodes
+                <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> 03. Guarantor Verification
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField 
-                    label="Guarantor Identity Name" 
+                    label="Guarantor Full Name" 
                     error={validationErrors.guarantorName}
-                    hint="Responsible party to verify your integrity."
+                    hint="Trusted person who can confirm your identity."
                   >
                     <input 
                       type="text" 
@@ -866,9 +867,9 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
                     />
                   </FormField>
                   <FormField 
-                    label="Guarantor Strategic Hot-Line" 
+                    label="Guarantor Phone Number" 
                     error={validationErrors.guarantorPhone}
-                    hint="Active mobile number for verification dispatch."
+                    hint="Active phone number for verification."
                   >
                     <input 
                       type="tel" 
@@ -1352,8 +1353,8 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
               <HelpCircle className="w-6 h-6 text-orange-600" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Support</h3>
-              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Tactical Help Desk</p>
+              <h3 className="text-lg font-bold text-gray-900">Support</h3>
+              <p className="text-xs font-medium text-slate-500">Loan Help Desk</p>
             </div>
           </div>
 
@@ -1540,7 +1541,7 @@ export const EfadoHepiHandsLoan: React.FC<EfadoHepiHandsLoanProps> = ({ user }) 
               {[
                 { name: "Silver Pool", price: 1000, capacity: 50000, features: ["Up to $50,000 Lending Pool Cap", "Standard Matchmaking", "Manual API Webhook Integration", "12% Standard ROI Cap"] },
                 { name: "Gold Pool", price: 2500, capacity: 150000, features: ["Up to $150,000 Lending Pool Cap", "Priority Matchmaking Engine", "Real-Time Webhook Dispatches", "15% Maximum ROI Cap", "Automated Escrow Settler"] },
-                { name: "Titanium Elite", price: 5000, capacity: 500000, features: ["Up to $500,000 Lending Pool Cap", "Instant Neural Matching", "Dual-Disbursal Webhooks", "No ROI caps", "Direct Bank settlement splits", "Dedicated AML Support"] }
+                { name: "Titanium Elite", price: 5000, capacity: 500000, features: ["Up to $500,000 Lending Pool Cap", "Priority Borrower Matching", "Dual-Disbursal Webhooks", "No ROI caps", "Direct Bank settlement splits", "Dedicated Compliance Support"] }
               ].map((tier, idx) => (
                 <div key={idx} className={`bg-white border p-8 rounded-3xl relative flex flex-col justify-between ${idx === 1 ? 'border-emerald-500 shadow-xl shadow-emerald-500/5 ring-1 ring-emerald-500/30' : 'border-slate-100 shadow-sm'}`}>
                   {idx === 1 && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-950 font-black uppercase tracking-widest text-[9px] px-3 py-1 rounded-full">Most Selected</span>}

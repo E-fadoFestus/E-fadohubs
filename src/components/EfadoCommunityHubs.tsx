@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { openSupportHelpForm } from '../utils/helpSupport';
 import { 
   Users, 
   TrendingUp, 
@@ -554,9 +555,9 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                   type="button"
                   onClick={() => {
                     setShowGuide(false);
-                    window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.cscc.helpCategory } }));
+                    openSupportHelpForm({ hub: 'CSCC Community Savings', subject: 'Payment Issue' });
                   }}
-                  className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                  className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" /> Need Help? Chat Us
                 </button>
@@ -1051,7 +1052,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                     <input 
                       required
                       type="text" 
-                      placeholder="e.g. Sovereign Merchants Elite"
+                      placeholder="e.g. Lagos Merchants Circle"
                       className="w-full px-6 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl text-sm font-black focus:outline-none focus:border-rose-600 transition-all placeholder:text-gray-500"
                       value={plusFormData.name}
                       onChange={(e) => setPlusFormData({...plusFormData, name: e.target.value})}
@@ -1253,7 +1254,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
 
                 <div className="p-6 bg-indigo-950 rounded-[2rem] text-white space-y-2">
                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">Sovereign Rotation Payout Goal</p>
+                      <p className="text-[10px] font-black text-indigo-300 uppercase tracking-tighter">Total Group Rotation Payout</p>
                       <p className="text-2xl font-black text-emerald-400">
                          {standardFormData.currency === 'USD' ? '$' : standardFormData.currency === 'GBP' ? '£' : standardFormData.currency === 'EUR' ? '€' : '₦'}
                          {(standardFormData.contributionAmount * standardFormData.maxMembers).toLocaleString()}
@@ -1299,7 +1300,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 onClick={() => setShowGuide(true)}
                 className="px-8 py-3 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-500 hover:text-white transition-all shadow-xl shadow-white/5"
               >
-                Access Tactical Guide
+                Open Guide
               </button>
               <button 
                 onClick={() => setActiveTab('CSCC')}
@@ -1324,10 +1325,10 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
             <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
               <ShieldCheck className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-black text-gray-950 uppercase tracking-tight mb-2">Member Health</h3>
-            <p className="text-sm font-black text-gray-800 leading-relaxed uppercase tracking-widest">Efficiency: 98.4%</p>
+            <h3 className="text-xl font-black text-gray-950 uppercase tracking-tight mb-2">Account Status</h3>
+            <p className="text-sm font-semibold text-emerald-700 leading-relaxed">Active & Verified</p>
           </div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-relaxed">System Verification Complete. All security protocols active.</p>
+          <p className="text-xs font-medium text-gray-500 leading-relaxed">Account security checks are active and your group wallet is protected.</p>
         </div>
       </div>
 
@@ -1474,7 +1475,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           </div>
           <h2 className="text-5xl font-black mb-6 tracking-tighter leading-none">Collective Saving <br/><span className="text-indigo-400">Culture Cycle.</span></h2>
           <p className="text-gray-300 text-lg leading-relaxed mb-10">
-            Join a transparent, community-led system managed by military-grade smart protocols. Automated payouts, guaranteed security, and real-time community engagement.
+            Join a transparent, community-led savings system with clear payout schedules, protected contributions, and real-time member updates.
           </p>
           <div className="flex flex-wrap gap-4">
             <motion.button 
@@ -2723,8 +2724,8 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                     )}
                   </div>
 
-                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
-                    * Local Naira bank withdrawals are processed automatically. Other currency withdrawals (USD, GBP, EUR) undergo compliance review and clearance by our tactical operations desk within 12 - 24 hours.
+                  <p className="text-[10px] text-gray-500 font-medium leading-relaxed">
+                    * Local Naira bank withdrawals are processed automatically. Other currency withdrawals (USD, GBP, EUR) undergo verification and clearance by our operations desk within 12 - 24 hours.
                   </p>
 
                   <button 
@@ -2843,7 +2844,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
           )}
         </AnimatePresence>
 
-        {/* Tactical Ledger Logs */}
+        {/* Transaction History */}
         <section className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
           <div className="flex items-center gap-3 mb-8">
             <div className="p-2 bg-slate-50 text-gray-700 rounded-xl">
@@ -3070,7 +3071,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 </button>
                 <button 
                   onClick={() => {
-                    alert("Notifications muted for 8 hours under protocol SECURE_SILENCE_ON");
+                    alert("Notifications muted for 8 hours.");
                     setChatMoreMenuOpen(false);
                   }}
                   className="w-full text-left p-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2 font-bold"
@@ -3079,12 +3080,12 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                 </button>
                 <button 
                   onClick={() => {
-                    alert("Security protocol reports: peer user profile verified and locked across all network nodes.");
+                    alert("Security check complete: member profile verified.");
                     setChatMoreMenuOpen(false);
                   }}
                   className="w-full text-left p-2.5 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2 font-bold"
                 >
-                  Verify Access Nodes
+                  Verify Member Security
                 </button>
               </div>
             )}
@@ -3497,7 +3498,7 @@ export const EfadoCommunityHubs: React.FC<EfadoCommunityHubsProps> = ({ user, on
                       <p className="text-lg font-black text-indigo-600 tracking-tighter">
                         {PHONE_NUMBERS.CONTACT_3}
                       </p>
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Available 24/7 Tactical Support</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Available 24/7 Support</p>
                     </div>
                   </div>
 

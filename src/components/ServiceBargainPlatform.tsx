@@ -185,12 +185,12 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
         bargainId: bargain.id,
         providerId: provider.userId,
         providerName: provider.businessName,
-        providerPhoto: provider.photos?.[0] || `https://picsum.photos/seed/${provider.userId}/200/200`,
+        providerPhoto: provider.photos?.[0] || '',
         clientId: request.clientId || user.uid,
-        clientName: request.clientName || user.displayName || 'Authorized Client',
-        clientPhoto: request.photos?.[0] || `https://picsum.photos/seed/${request.clientId || user.uid}/200/200`,
+        clientName: request.clientName || user.displayName || 'Verified Client',
+        clientPhoto: request.photos?.[0] || '',
         rating,
-        testimonyText: testimonyText.trim() || 'Exceptional tactical coordination and reliable skill execution.',
+        testimonyText: testimonyText.trim() || 'Great communication and reliable service delivery.',
         proficiencyChecks,
         subcategory: request.subcategory || 'Engineering Consult',
         createdAt: Date.now()
@@ -208,7 +208,7 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
         status: 'completed',
         clientTestimony: {
           rating,
-          text: testimonyText.trim() || 'Exceptional tactical coordination and reliable skill execution.',
+          text: testimonyText.trim() || 'Great communication and reliable service delivery.',
           checks: proficiencyChecks,
           timestamp: Date.now()
         }
@@ -242,10 +242,10 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
             <Scale className="w-7 h-7" />
           </div>
           <div>
-            <h3 className="font-black text-2xl tracking-tighter uppercase italic italic-none">Strategic Round Table</h3>
+            <h3 className="font-bold text-xl sm:text-2xl tracking-tight">Service Price Agreement</h3>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-              <p className="text-indigo-400 text-[10px] font-black tracking-widest uppercase opacity-70">Protocol ID: {bargain.id.slice(0, 12)} • Secured Session</p>
+              <p className="text-indigo-300 text-xs font-semibold">Session ID: {bargain.id.slice(0, 12)} • Protected</p>
             </div>
           </div>
         </div>
@@ -264,7 +264,9 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
                 {request.photos?.[0] ? (
                   <img src={request.photos[0]} alt={request.clientName} className="w-full h-full object-cover" />
                 ) : (
-                  <img src={`https://picsum.photos/seed/${request.clientId}/200/200`} alt={request.clientName} className="w-full h-full object-cover" />
+                  <span className="text-xl font-bold text-indigo-700">
+                    {(request.clientName || 'C').charAt(0).toUpperCase()}
+                  </span>
                 )}
               </div>
             </div>
@@ -289,11 +291,13 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
           {/* Provider Side */}
           <div className="flex flex-col items-center gap-3">
             <div className={`w-20 h-20 rounded-[2rem] p-1 border-2 transition-all duration-500 ${bargain.providerAccepted ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-              <div className="w-full h-full rounded-[1.75rem] overflow-hidden bg-slate-200">
+              <div className="w-full h-full rounded-[1.75rem] overflow-hidden bg-slate-200 flex items-center justify-center">
                 {provider.photos?.[0] ? (
                   <img src={provider.photos[0]} alt={provider.businessName} className="w-full h-full object-cover" />
                 ) : (
-                  <img src={`https://picsum.photos/seed/${provider.userId}/200/200`} alt={provider.businessName} className="w-full h-full object-cover" />
+                  <span className="text-xl font-bold text-indigo-700">
+                    {(provider.businessName || 'P').charAt(0).toUpperCase()}
+                  </span>
                 )}
               </div>
             </div>
@@ -502,7 +506,7 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
         <div className="p-8 bg-white border-t border-gray-100 relative">
           <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-white px-4 py-1.5 rounded-full border border-gray-100 shadow-sm flex items-center gap-2">
              <MessageCircle className="w-3 h-3 text-indigo-600" />
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tactical Communication Terminal</span>
+             <span className="text-xs font-semibold text-slate-500">Live Negotiation Chat</span>
           </div>
           
           <div className="flex flex-col md:flex-row gap-6 items-end max-w-4xl mx-auto">
@@ -571,11 +575,17 @@ export const ServiceBargainPlatform: React.FC<ServiceBargainPlatformProps> = ({
 
               <div className="p-6 bg-indigo-950/40 border border-indigo-500/10 rounded-3xl space-y-6 text-left">
                 <div className="flex items-center gap-4">
-                  <img 
-                    src={provider.photos?.[0] || `https://picsum.photos/seed/${provider.userId}/150/150`} 
-                    alt={provider.businessName} 
-                    className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-500"
-                  />
+                  {provider.photos?.[0] ? (
+                    <img
+                      src={provider.photos[0]}
+                      alt={provider.businessName}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-500"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-600 border-2 border-indigo-400 flex items-center justify-center text-white font-bold text-xl shrink-0">
+                      {(provider.businessName || 'P').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-white font-black text-lg">{provider.businessName}</h4>
                     <p className="text-xs text-indigo-300 font-bold uppercase tracking-widest">{request.subcategory || 'Technical Squad'}</p>

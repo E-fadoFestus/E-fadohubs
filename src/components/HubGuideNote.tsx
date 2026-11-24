@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, ChevronDown, ChevronUp, MessageCircle, Lightbulb } from 'lucide-react';
 import { HUB_GUIDES, HubGuideId } from '../data/hubGuides';
+import { getGuideHubLaunch, openSupportHelpForm } from '../utils/helpSupport';
 
 interface HubGuideNoteProps {
   guideId: HubGuideId;
@@ -28,14 +29,7 @@ export const HubGuideNote: React.FC<HubGuideNoteProps> = ({
   const isDark = variant === 'dark';
 
   const handleOpenHelpChat = () => {
-    window.dispatchEvent(
-      new CustomEvent('open-help-chat', {
-        detail: {
-          category: guide.helpCategory,
-          topic: guide.title
-        }
-      })
-    );
+    openSupportHelpForm(getGuideHubLaunch(guideId));
   };
 
   return (

@@ -51,7 +51,7 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
             </div>
             <div>
               <h2 className="text-2xl font-black uppercase tracking-tighter italic">Compliance & Legal Hub</h2>
-              <p className="text-[10px] font-black text-gray-700 uppercase tracking-[0.2em]">EFADO Strategic Operational Manual</p>
+              <p className="text-[10px] font-black text-gray-700 uppercase tracking-[0.2em]">EFADO Terms & Platform Guidelines</p>
             </div>
           </div>
           <button 
@@ -106,11 +106,11 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
 
                   <div className="space-y-6">
                     <LegalSection title="1. Acceptance of Terms">
-                      By accessing EFADO (the "Platform"), you agree to be bound by these strategic operational protocols. If you do not agree with any part, you must immediately cease deployments within our network.
+                      By accessing EFADO (the "Platform"), you agree to follow our terms of service and community guidelines. If you do not agree with any part, please discontinue using the platform.
                     </LegalSection>
 
                     <LegalSection title="2. Account Integrity">
-                      Users are responsible for maintaining the military-grade security of their credentials. You must provide true, accurate business registration details where required. Fake identities will result in permanent blacklisting.
+                      Users are responsible for keeping their login credentials safe and secure. You must provide true, accurate registration details where required. Fake identities will result in account suspension.
                     </LegalSection>
 
                     <LegalSection title="3. Financial Transactions">
@@ -127,17 +127,17 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
               {activeTab === 'PRIVACY' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <header>
-                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic mb-4">Privacy Protocol</h3>
-                    <p className="text-gray-500 text-sm leading-relaxed text-indigo-600 font-bold italic underline">We value your business data sovereignty.</p>
+                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic mb-4">Privacy Policy</h3>
+                    <p className="text-gray-500 text-sm leading-relaxed text-indigo-600 font-bold italic underline">We respect and protect your personal and business data.</p>
                   </header>
 
                   <div className="space-y-6">
                     <LegalSection title="Information Collection">
-                      We collect tactical data including your business email, WhatsApp contact, and registration ID to facilitate secure commerce and communication between vendors and patrons.
+                      We collect essential details including your email, WhatsApp contact, and registration ID to support safe commerce and communication between buyers, sellers, and service providers.
                     </LegalSection>
 
                     <LegalSection title="Data Encryption">
-                      All PI (Personal Information) is encrypted at rest using AES-256 protocols. We do not sell user data to third-party marketing entities.
+                      All Personal Information (PI) is encrypted at rest using industry-standard AES-256 encryption. We never sell your personal data to third-party advertisers.
                     </LegalSection>
 
                     <LegalSection title="Communication">
@@ -165,7 +165,7 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
                         <h4 className="text-sm font-black uppercase tracking-widest">Nigerian Gaming Regulatory Notice</h4>
                       </div>
                       <p className="text-xs text-amber-700 leading-relaxed font-bold">
-                        In accordance with the National Lottery Regulatory Commission (NLRC) of Nigeria and international digital entertainment standards, all participants in the EFADO Gaming Arena (Lucky Spin, DMT, Skill & Strategy challenges) MUST be 18 years or older. Participating under-age is a violation of platform protocols.
+                        In accordance with the National Lottery Regulatory Commission (NLRC) of Nigeria and international digital entertainment standards, all participants in the EFADO Gaming Arena (Lucky Spin, DMT, Skill & Strategy challenges) MUST be 18 years or older. Underage play violates platform rules.
                       </p>
                     </div>
 
@@ -186,7 +186,7 @@ export const LegalHub: React.FC<LegalHubProps> = ({ isOpen, onClose, initialSect
               {activeTab === 'DISCLAIMER' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                   <header>
-                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic mb-4">Strategic Disclaimers</h3>
+                    <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic mb-4">Important Disclaimers</h3>
                   </header>
 
                   <div className="space-y-12">

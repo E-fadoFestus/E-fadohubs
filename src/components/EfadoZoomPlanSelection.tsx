@@ -33,53 +33,53 @@ export const EfadoZoomPlanSelection: React.FC<EfadoZoomPlanSelectionProps> = ({ 
 
   const ZOOM_PLANS: ZoomPlan[] = [
     {
-      name: "Tactical Trial",
+      name: "Free Trial",
       duration: "10 Minutes",
       amount: 0,
-      description: "Quick tactical testing.",
-      features: ["Stage Mode Access", "Basic Chat", "10 Patrons Max"]
+      description: "Quick meeting test.",
+      features: ["Stage Mode Access", "Basic Chat", "10 Participants Max"]
     },
     {
-      name: "Rapid Deployment",
+      name: "Quick Meeting",
       duration: "20 Minutes",
       amount: 2500,
-      description: "Fast-paced briefing.",
-      features: ["Stage Mode Access", "Tactical Voice Notes", "50 Patrons Max", "HD Signal"]
+      description: "Fast team check-in.",
+      features: ["Stage Mode Access", "Voice Notes", "50 Participants Max", "HD Video"]
     },
     {
-      name: "Strategic Hour",
+      name: "Standard Hour",
       duration: "1 Hour",
       amount: 5000,
-      description: "Professional coaching.",
-      features: ["Stage Mode Access", "Voice Notes & Recording", "250 Patrons Max", "Priority Support"]
+      description: "Classes and coaching sessions.",
+      features: ["Stage Mode Access", "Voice Notes & Recording", "250 Participants Max", "Priority Support"]
     },
     {
-      name: "Combat Briefing",
+      name: "Workshop Session",
       duration: "3 Hours",
       amount: 12000,
-      description: "Deep-dive workshops.",
-      features: ["Unlimited Speakers", "Full Recording Access", "1,000 Patrons Max", "YouTube Sync"]
+      description: "Extended classes and workshops.",
+      features: ["Unlimited Speakers", "Full Recording Access", "1,000 Participants Max", "YouTube Sync"]
     },
     {
-      name: "Command Shift",
+      name: "Half-Day Event",
       duration: "6 Hours",
       amount: 20000,
-      description: "Multi-session outreach.",
-      features: ["Custom Branding", "Analytics Intel", "5,000 Patrons Max", "Tactical Moderation"]
+      description: "Multi-session events.",
+      features: ["Custom Branding", "Session Analytics", "5,000 Participants Max", "Host Moderation"]
     },
     {
-      name: "Iron Dome",
+      name: "Full-Day Event",
       duration: "12 Hours",
       amount: 35000,
-      description: "Full-day global event.",
-      features: ["Infinite Replays", "Direct CRM Export", "Unlimited Patrons", "24/7 Expert Support"]
+      description: "Full-day online conference.",
+      features: ["Infinite Replays", "Direct Attendee Export", "Unlimited Participants", "24/7 Support"]
     },
     {
-      name: "Authority Suite",
-      duration: "Enterprise",
+      name: "Enterprise Suite",
+      duration: "Custom",
       amount: -1,
-      description: "Infinite sovereign scale.",
-      features: ["White-label Zoom", "API Infrastructure", "Unlimited Everything", "SLA Guarantee"]
+      description: "Custom scale for organizations.",
+      features: ["Custom Branded Room", "Dedicated Infrastructure", "Unlimited Access", "Priority SLA"]
     }
   ];
 
@@ -88,47 +88,47 @@ export const EfadoZoomPlanSelection: React.FC<EfadoZoomPlanSelectionProps> = ({ 
       <motion.div 
         initial={{ opacity: 0, scale: 0.9, y: 30 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-6xl bg-white rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]"
+        className="w-full max-w-6xl bg-white rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
       >
         {/* Header */}
-        <div className="p-8 md:p-12 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="p-6 md:p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-               <Video className="w-6 h-6 text-indigo-600" />
-               <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Deployment Infrastructure</span>
+            <div className="flex items-center gap-2 mb-2">
+               <Video className="w-5 h-5 text-indigo-600" />
+               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Video Conferencing</span>
             </div>
-            <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">EFADO Zoom <span className="text-indigo-600">Access Plans</span></h2>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs mt-2">Choose your tactical session duration and reach.</p>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">EFADO Zoom <span className="text-indigo-600">Plans</span></h2>
+            <p className="text-slate-500 font-medium text-xs sm:text-sm mt-1">Choose your session duration and participant capacity.</p>
           </div>
           <button 
             onClick={onClose}
-            className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm border border-slate-100"
+            className="w-11 h-11 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm border border-slate-100"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Plans Grid */}
-        <div className="flex-grow overflow-y-auto p-8 md:p-12 custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {ZOOM_PLANS.map((plan, idx) => (
               <motion.div 
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={`flex flex-col p-8 rounded-[2.5rem] border ${plan.amount === 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'} hover:border-indigo-500 hover:shadow-2xl transition-all group relative overflow-hidden`}
+                className={`flex flex-col p-6 rounded-3xl border ${plan.amount === 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-100'} hover:border-indigo-500 hover:shadow-xl transition-all group relative overflow-hidden`}
               >
                 {plan.amount === 0 && (
-                  <div className="absolute top-6 right-6 px-3 py-1 bg-indigo-600 text-white rounded-full text-[8px] font-black uppercase tracking-widest">Initial Intel</div>
+                  <div className="absolute top-4 right-4 px-2.5 py-0.5 bg-indigo-600 text-white rounded-full text-[9px] font-bold uppercase tracking-wider">Free Trial</div>
                 )}
                 
-                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-1">{plan.name}</h4>
-                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-6">{plan.duration}</p>
+                <h4 className="text-lg font-black text-slate-900 tracking-tight mb-1">{plan.name}</h4>
+                <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider mb-5">{plan.duration}</p>
                 
-                <div className="mb-8">
-                  <span className="text-4xl font-black text-slate-900 leading-none">
-                    {plan.amount === 0 ? 'Free' : plan.amount === -1 ? 'Sovereign' : formatPrice(plan.amount)}
+                <div className="mb-6">
+                  <span className="text-3xl font-black text-slate-900 leading-none">
+                    {plan.amount === 0 ? 'Free' : plan.amount === -1 ? 'Custom' : formatPrice(plan.amount)}
                   </span>
                   {plan.amount > 0 && <span className="text-[10px] font-bold text-slate-400 ml-1">/ Session</span>}
                 </div>
@@ -154,7 +154,7 @@ export const EfadoZoomPlanSelection: React.FC<EfadoZoomPlanSelectionProps> = ({ 
                     : 'bg-slate-900 text-white hover:bg-indigo-600'
                   }`}
                 >
-                  Deploy Command
+                  Select Plan
                 </button>
               </motion.div>
             ))}
@@ -162,14 +162,14 @@ export const EfadoZoomPlanSelection: React.FC<EfadoZoomPlanSelectionProps> = ({ 
         </div>
 
         {/* Footer Security Info */}
-        <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-10">
+        <div className="p-8 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-center gap-6 sm:gap-10">
            <div className="flex items-center gap-3">
               <Shield className="w-5 h-5 text-emerald-500" />
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">End-to-End Encrypted Deployment</span>
+              <span className="text-xs font-semibold text-slate-500">End-to-End Encrypted Meetings</span>
            </div>
            <div className="flex items-center gap-3">
               <Zap className="w-5 h-5 text-indigo-500" />
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Strategic Network Synchronisation</span>
+              <span className="text-xs font-semibold text-slate-500">Instant Room Sync</span>
            </div>
         </div>
       </motion.div>

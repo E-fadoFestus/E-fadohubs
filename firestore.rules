@@ -60,6 +60,29 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    match /advert_categories/{catSlug} {
+      allow read: if true;
+      allow create, update: if isAuthenticated()
+        && request.resource.data.keys().hasAll(['slug', 'name', 'submissionCount', 'promoted'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.submissionCount is number
+        && request.resource.data.promoted is bool;
+      allow delete: if isAdmin();
+    }
+
+    match /advert_comments/{commentId} {
+      allow read: if true;
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasAll(['adId', 'userId', 'userName', 'text'])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() >= 2
+        && request.resource.data.text.size() <= 500;
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
     match /ads/{id} {
       allow read: if true;
       allow write: if isAuthenticated();
@@ -172,6 +195,23 @@ service cloud.firestore {
     match /houseListings/{id} { allow read: if true; allow write: if isAuthenticated(); }
     match /cargoShipments/{id} { allow read, write: if isAuthenticated(); }
     match /help_requests/{id} { allow read, write: if isAuthenticated(); }
+    match /help_inbox/{messageId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if request.resource.data.keys().hasAll(['userName', 'hub', 'subject', 'message', 'status'])
+                    && request.resource.data.status == 'New'
+                    && request.resource.data.userName is string
+                    && request.resource.data.userName.size() > 0
+                    && request.resource.data.userName.size() <= 120
+                    && request.resource.data.hub is string
+                    && request.resource.data.hub.size() > 0
+                    && request.resource.data.hub.size() <= 120
+                    && request.resource.data.subject in ['Payment Issue', 'Game Issue', 'Withdrawal', 'Account', 'Other']
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() > 0
+                    && request.resource.data.message.size() <= 3000;
+      allow update: if isAdmin() && request.resource.data.status in ['New', 'Replied', 'Closed'];
+      allow delete: if isAdmin();
+    }
     match /manual_game_pins/{id} { allow read, write: if isAuthenticated(); }
     match /admin_logs/{id} { allow read, write: if isAdmin(); }
     match /cscc_groups/{id} { allow read: if true; allow write: if isAuthenticated(); }

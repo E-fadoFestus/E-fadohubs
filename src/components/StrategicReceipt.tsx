@@ -234,7 +234,7 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
             <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-100 flex flex-col gap-2.5 text-slate-700 text-[10px] font-bold uppercase tracking-wider relative z-10">
               <div className="flex justify-between border-b border-slate-100 pb-1.5">
                 <span className="text-slate-400">Ledger Node:</span>
-                <span className="text-slate-900">EFD-MAINNET-NODE01</span>
+                <span className="text-slate-900">EFADO Ledger #01</span>
               </div>
               <div className="flex justify-between border-b border-slate-100 pb-1.5">
                 <span className="text-slate-400">Digital Hash Index:</span>
@@ -244,7 +244,7 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
               </div>
               <div className="flex justify-between border-b border-slate-100 pb-1.5">
                 <span className="text-slate-400">Verification channel:</span>
-                <span className="text-slate-900">{transaction.method || 'Digital Wallet Protocol'}</span>
+                <span className="text-slate-900">{transaction.method || 'Digital Wallet'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Security PIN Auth:</span>
@@ -303,13 +303,13 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
                 <span className="font-mono">{currSymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
-                <span>Tactical Service Charge</span>
+                <span>Service Charge</span>
                 <span className="font-mono">{currSymbol}{(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="h-px bg-slate-200" />
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Total Sovereign Valuation</p>
+                  <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Total Amount</p>
                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Transaction Ref: {transaction.reference}</p>
                 </div>
                 <div className="flex flex-col items-end">
@@ -343,7 +343,7 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
           <div className="h-4 bg-slate-950 flex items-center justify-center gap-8 px-12 overflow-hidden print:hidden">
             {[1,2,3,4,5].map(i => (
               <span key={i} className="text-[6px] font-black text-slate-700 uppercase tracking-[1em] whitespace-nowrap">
-                EFADO SECURE TRANSACTION PROTOCOL 2026 // IDENTITY VERIFIED // NO REVERSALS
+                EFADO SECURE RECEIPT 2026 // VERIFIED TRANSACTION // NO REVERSALS
               </span>
             ))}
           </div>

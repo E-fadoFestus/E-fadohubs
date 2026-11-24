@@ -99,7 +99,7 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
 
             <div className="flex-1 text-center px-2">
               <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest leading-none">Transaction Receipt</h2>
-              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Sovereign Proof of Equity</p>
+              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Official Payment Record</p>
             </div>
 
             <button 
@@ -122,8 +122,8 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
               {/* Trademark Watermark */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none rotate-[-30deg]">
                 <div className="text-center font-display">
-                  <h1 className="text-8xl font-black text-indigo-900 leading-none">EFADO</h1>
-                  <h2 className="text-3xl font-black text-indigo-900 tracking-[0.5em] uppercase">Hubs Connect</h2>
+                  <h1 className="text-6xl sm:text-8xl font-black text-indigo-900 leading-none">EFADO</h1>
+                  <h2 className="text-2xl sm:text-3xl font-black text-indigo-900 tracking-[0.5em] uppercase">Hubs Connect</h2>
                 </div>
               </div>
 
@@ -133,7 +133,7 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
                 <div className="flex justify-between items-start mb-12 border-b border-gray-100 pb-8">
                   <div>
                     <h1 className="text-2xl font-black text-indigo-900 tracking-tighter italic mb-1">EFADO Hubs Connect</h1>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Digital Ecosystem Command</p>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Official Digital Receipt</p>
                     <p className="text-[9px] text-gray-400 font-medium mt-2">www.efado.connect</p>
                   </div>
                   <div className="text-right">
@@ -176,7 +176,7 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
                     </div>
                   </div>
                   <div>
-                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Command Type</p>
+                    <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Transaction Type</p>
                     <p className="text-xs font-bold text-gray-700 uppercase tracking-tight">{receipt.type}</p>
                   </div>
                   
@@ -196,7 +196,7 @@ export const ReceiptTerminal: React.FC<ReceiptTerminalProps> = ({ receipt, onClo
 
                   {receipt.description && (
                     <div className="col-span-2">
-                      <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Strategic Description</p>
+                      <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1.5">Description</p>
                       <p className="text-xs font-medium text-gray-600 leading-relaxed italic">"{receipt.description}"</p>
                     </div>
                   )}

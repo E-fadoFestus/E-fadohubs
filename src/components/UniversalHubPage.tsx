@@ -153,6 +153,7 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
             onClose={onNavigateHome}
             initialType="ADVERT"
             initialItemId={itemId}
+            onOpenProfile={() => onOpenCashier?.('profile')}
           />
         );
 
@@ -262,45 +263,45 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
         }
         return (
           <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
-              <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
-                <MessageSquare className="w-6 h-6 text-indigo-500" />
-                EFADO NEXUS HUB
+            <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
+                <MessageSquare className="w-6 h-6 text-indigo-400" />
+                EFADO Gist & Social Hub
               </h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Left explanation card */}
-              <div className="md:col-span-2 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-between">
-                <div className="space-y-4">
+              <div className="md:col-span-2 bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between h-full">
+                <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                       <MessageSquare className="w-5 h-5 text-indigo-400" />
                     </div>
-                    <h4 className="text-sm font-black text-white uppercase tracking-wider">What is EFADO Nexus Hub?</h4>
+                    <h4 className="text-base font-bold text-white">About EFADO Gist Hub</h4>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed uppercase tracking-wide">
-                    The <span className="text-indigo-400 font-extrabold">EFADO Nexus Hub</span> establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, 10 action buttons, viral reels, and creator monetization profiles with 100% data integrity.
+                  <p className="text-sm text-slate-300 leading-relaxed">
+                    Connect with friends, join community groups, watch short video reels, chat directly with buyers or sellers, and share stories across EFADO.
                   </p>
                 </div>
-                <div className="pt-4 border-t border-white/5 mt-4 flex items-center justify-between">
-                  <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">● System Status: Secure & Encrypted</span>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Protocol: V3.4</span>
+                <div className="pt-4 border-t border-white/10 mt-5 flex items-center justify-between text-xs text-slate-400">
+                  <span className="text-emerald-400 font-medium">Protected Private Messaging</span>
+                  <span>Live Social Feed</span>
                 </div>
               </div>
 
-              {/* Right small, strategic Action card */}
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-center items-center text-center">
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4">
-                  <MessageSquare className="w-6 h-6 text-indigo-400" />
+              <div className="bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between items-center text-center h-full">
+                <div>
+                  <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-6 h-6 text-indigo-400" />
+                  </div>
+                  <h4 className="text-base font-bold text-white mb-2">Open Gist Hub</h4>
+                  <p className="text-xs text-slate-400 mb-6">Access community feeds, reels, group chats, and voice calls.</p>
                 </div>
-                <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect EFADO Nexus Hub</h4>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats, reels & 10 action buttons</p>
                 <button 
                   onClick={() => setIsNexusSynced(true)}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[9px] border border-indigo-500/30"
+                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
                 >
-                  Synchronize Now
+                  Open Gist Hub
                 </button>
               </div>
             </div>

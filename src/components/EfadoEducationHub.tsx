@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { InternalScrollController } from './education/InternalScrollController';
+import { openSupportHelpForm } from '../utils/helpSupport';
 import { 
   GraduationCap, 
   Search, 
@@ -157,21 +158,21 @@ const educationData: EducationSection[] = [
       {
         title: "WAEC Core Prep & Syllabus",
         icon: FileText,
-        description: "Tactical questions, dynamic solutions, and official subject outlines.",
+        description: "Practice questions, step-by-step solutions, and official subject outlines.",
         tags: ["Most Visited"],
         examType: "WAEC"
       },
       {
-        title: "NECO Strategic Suite",
+        title: "NECO Practice Suite",
         icon: FileCheck,
-        description: "National secondary curriculum preparation node with simulated CBTs.",
+        description: "National secondary curriculum preparation with simulated CBT practice tests.",
         tags: ["Recently Updated"],
         examType: "NECO"
       },
       {
         title: "SIWES Logbook Planner",
         icon: Briefcase,
-        description: "Organize weekly report parameters, departmental codes, and training logs.",
+        description: "Organize weekly report logs, departmental codes, and training summaries.",
         tags: ["Recently Updated"]
       }
     ]
@@ -180,18 +181,18 @@ const educationData: EducationSection[] = [
     id: 'primary',
     title: "Primary Academic Hub",
     icon: Backpack,
-    description: "Tactical study guides, tutorials, and interactive games for elementary candidates.",
+    description: "Easy study guides, tutorials, and interactive learning games for primary students.",
     subCategories: [
       {
         title: "National Common Entrance Guide",
         icon: ClipboardList,
-        description: "CBT simulated questions for top-tier secondary placement exams.",
+        description: "Practice CBT questions for secondary school entrance exams.",
         tags: ["Most Visited"]
       },
       {
         title: "Primary Hub Speed-Math Challenge",
         icon: Gamepad2,
-        description: "An active interactive game testing elementary mental calculation speed.",
+        description: "Fun interactive game testing quick mental arithmetic skills.",
         tags: ["Recently Updated"]
       }
     ]
@@ -205,13 +206,13 @@ const educationData: EducationSection[] = [
       {
         title: "Early Cognitive Milestone Tracker",
         icon: Brain,
-        description: "Interactive developmental domain checklists for tracking preschool adaptation.",
+        description: "Interactive developmental checklists for tracking preschool progress.",
         tags: ["Most Visited"]
       },
       {
         title: "Phonics Core Workbook",
         icon: BookMarked,
-        description: "Fundamental pronunciation and reading guides for toddlers.",
+        description: "Early pronunciation and reading guides for young learners.",
         tags: ["Recently Updated"]
       }
     ]
@@ -225,13 +226,13 @@ const educationData: EducationSection[] = [
       {
         title: "CAPS Cut-offs & Admission Checker",
         icon: Database,
-        description: "Check official university catchment scores and CAPS status logs.",
+        description: "Check university catchment scores and admission status info.",
         tags: ["Most Visited"]
       },
       {
-        title: "Tactical CGPA Calculator",
+        title: "CGPA & Grade Calculator",
         icon: Calculator,
-        description: "Evaluate semester-specific grade point averages and cumulative files.",
+        description: "Calculate semester GPA and cumulative academic standing easily.",
         tags: ["Recently Updated"]
       },
       {
@@ -510,9 +511,9 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
                     type="button"
                     onClick={() => {
                       setShowGuide(false);
-                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.education.helpCategory } }));
+                      openSupportHelpForm({ hub: 'Education Hub', subject: 'Other' });
                     }}
-                    className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all"
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-2xl font-bold text-sm transition-all cursor-pointer"
                   >
                     Need Help? Chat Us
                   </button>
@@ -608,15 +609,15 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
               <Store className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">Sell at EFADO</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Universal Vendor Exchange Protocol active</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Sell at EFADO</h2>
+              <p className="text-xs text-slate-400 mt-1">Promote books, courses, or study supplies to students</p>
             </div>
           </div>
           <button 
             onClick={() => setShowMarketplace(true)}
-            className="px-10 py-5 bg-white text-slate-950 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:scale-[1.05] transition-all shadow-2xl active:scale-95 flex items-center gap-3 decoration-indigo-500 group relative z-10"
+            className="px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-950 rounded-xl font-semibold text-xs transition-all shadow-md flex items-center gap-2 shrink-0 relative z-10"
           >
-            Launch Marketplace Hub <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            Open Marketplace <ArrowRight className="w-4 h-4" />
           </button>
         </motion.div>
 
@@ -624,27 +625,26 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-emerald-600/10 border-2 border-emerald-500/20 rounded-[3rem] p-8 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl relative overflow-hidden group mb-8"
+          className="bg-emerald-600/10 border border-emerald-500/20 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden mb-8"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-600/10 rounded-full blur-[100px] -mr-32 -mt-32 group-hover:bg-emerald-600/20 transition-all duration-1000" />
-          <div className="flex items-center gap-6 relative z-10">
-            <div className="w-16 h-16 bg-emerald-600 rounded-[2rem] flex items-center justify-center shadow-xl shadow-emerald-500/30">
-              <Pickaxe className="w-8 h-8 text-white" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
+              <Pickaxe className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">EFADO Mining Node</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Extract digital assets & accumulate E-F-A-D-O values</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">EFADO Rewards</h2>
+              <p className="text-xs text-slate-400 mt-1">Collect daily platform rewards while you study</p>
             </div>
           </div>
           <button 
             onClick={() => setShowMining(true)}
-            className="px-10 py-5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:scale-[1.05] transition-all shadow-[0_20px_50px_-10px_rgba(5,150,105,0.5)] active:scale-95 flex items-center gap-3 group relative z-10"
+            className="px-6 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white rounded-xl font-semibold text-xs transition-all flex items-center gap-2 shrink-0 relative z-10"
           >
-            Launch Sovereign Node <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+            Open Rewards <Sparkles className="w-4 h-4" />
           </button>
         </motion.div>
 
-        {/* Automatic Intelligence Update Section */}
+        {/* Updates Feed */}
         <motion.div
            initial={{ opacity: 0, scale: 0.98 }}
            animate={{ opacity: 1, scale: 1 }}
@@ -658,26 +658,25 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="bg-gradient-to-r from-[#0A0E3F] via-indigo-950 to-slate-900 border-2 border-amber-400/40 rounded-[3rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl relative overflow-hidden group"
+          className="bg-gradient-to-r from-[#0A0E3F] via-indigo-950 to-slate-900 border border-amber-400/40 rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden"
         >
-          <div className="absolute right-0 top-0 w-64 h-64 bg-amber-400/10 rounded-full blur-[90px] pointer-events-none -mr-32 -mt-32" />
-          <div className="flex items-center gap-6 relative z-10">
-            <div className="w-16 h-16 bg-amber-400/20 border-2 border-amber-400/40 rounded-[2rem] flex items-center justify-center text-amber-300 shadow-xl shrink-0">
-              <CreditCard className="w-8 h-8" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 bg-amber-400/20 border border-amber-400/40 rounded-2xl flex items-center justify-center text-amber-300 shrink-0">
+              <CreditCard className="w-6 h-6" />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <span className="bg-amber-400 text-slate-950 font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-wider">
+                <span className="bg-amber-400 text-slate-950 font-bold text-xs px-2.5 py-0.5 rounded-full">
                   Official WAEC Result PIN
                 </span>
-                <span className="text-emerald-400 font-mono text-xs font-black bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                <span className="text-emerald-400 font-mono text-xs font-bold bg-emerald-950/80 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
                   ₦3,500 Flat Fee
                 </span>
               </div>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tight">
+              <h3 className="text-xl sm:text-2xl font-bold text-white">
                 WAEC Scratch Card & Serial PIN Portal
               </h3>
-              <p className="text-sm text-slate-300 font-medium leading-relaxed max-w-2xl mt-1">
+              <p className="text-sm text-slate-300 leading-relaxed max-w-2xl mt-1">
                 Pay securely with your EFADO Account Profile Wallet or Paystack card/bank checkout to buy your WAEC Scratch Card &amp; Serial PIN for result checks and transcripts.
               </p>
             </div>
@@ -686,50 +685,46 @@ export const EfadoEducationHub: React.FC<{ onClose: () => void; user: UserProfil
           <button 
             type="button"
             onClick={() => setShowWaecCardPortal(true)}
-            className="w-full md:w-auto px-10 py-5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-xs transition-all shadow-[0_15px_30px_rgba(251,191,36,0.3)] hover:scale-[1.05] active:scale-95 flex items-center justify-center gap-3 shrink-0 relative z-10"
+            className="w-full md:w-auto px-7 py-4 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 shrink-0 relative z-10"
           >
             Buy WAEC Scratch Card <ArrowRight className="w-4 h-4" />
           </button>
         </motion.div>
 
-        {/* Prominent Active Launching Button / CTA Card for the Extended AI Study Platform */}
+        {/* Extended AI Study Platform CTA */}
         <motion.div
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-tr from-slate-900 via-indigo-950/70 to-slate-900 p-8 md:p-12 rounded-[3.5rem] border-2 border-indigo-500/25 shadow-[0_20px_60px_rgba(99,102,241,0.15)] flex flex-col lg:flex-row items-center justify-between gap-8 relative overflow-hidden group"
+          className="bg-gradient-to-tr from-slate-900 via-indigo-950/70 to-slate-900 p-6 sm:p-10 rounded-3xl border border-indigo-500/25 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-6 relative overflow-hidden"
         >
-          {/* Neon backdrop flares */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none -mr-40 -mt-40 group-hover:bg-indigo-500/15 transition-all duration-700" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-500/10 rounded-full blur-[120px] pointer-events-none -ml-40 -mb-40 group-hover:bg-violet-500/15 transition-all duration-700" />
-
-          <div className="space-y-4 relative z-10 flex-1 max-w-3xl">
-            <div className="inline-flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-3.5 py-1.5 rounded-full text-[10px] font-black text-indigo-300 uppercase tracking-widest animate-pulse">
-              <Sparkles className="w-3.5 h-3.5" /> Extended Academic Protocol Live
+          <div className="space-y-3 relative z-10 flex-1 max-w-3xl">
+            <div className="inline-flex items-center gap-2 bg-indigo-500/15 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-semibold text-indigo-300">
+              <Sparkles className="w-3.5 h-3.5" /> AI Study Assistant Ready
             </div>
-            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none italic">
-              LAUNCH AI INTELLECTUAL PREP PORTAL
+            <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              AI Study &amp; Exam Prep Portal
             </h2>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-wider leading-relaxed">
-              Activate the ultimate cognitive study node. Dynamic syllabus compilations, real-time examiner analysis, expert chat, and custom-generated test mockups matching <span className="text-indigo-400">JAMB, WAEC, NECO, GCE,</span> and tertiary syllabus protocols.
+            <p className="text-slate-300 text-sm leading-relaxed">
+              Study faster with topic summaries, examiner explanations, practice quizzes, and timed CBT mock tests tailored to <span className="text-indigo-400 font-semibold">JAMB, WAEC, NECO, GCE,</span> and university courses.
             </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
-                ⚡ Real-time Gemini AI Notes
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <span className="text-xs font-medium text-slate-200 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+                Topic Study Notes
               </span>
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
-                ⚡ Dynamic Academic Quiz
+              <span className="text-xs font-medium text-slate-200 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+                Practice Quizzes
               </span>
-              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5 bg-white/5 border border-white/5 px-3.5 py-2 rounded-xl">
-                ⚡ 100% CBT Simulation
+              <span className="text-xs font-medium text-slate-200 bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+                Timed CBT Mode
               </span>
             </div>
           </div>
 
           <button 
             onClick={() => setShowAiStudyPortal(true)}
-            className="w-full lg:w-auto px-12 py-6 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-[1.8rem] text-xs font-black uppercase tracking-[0.25em] shadow-[0_20px_50px_-5px_rgba(99,102,241,0.4)] hover:shadow-[0_20px_50px_rgba(99,102,241,0.6)] hover:scale-[1.05] transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 shrink-0 relative z-10"
+            className="w-full lg:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-sm font-semibold shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 relative z-10"
           >
-            Launch Command Centre <ArrowRight className="w-4 h-4" />
+            Open Study Portal <ArrowRight className="w-4 h-4" />
           </button>
         </motion.div>
 

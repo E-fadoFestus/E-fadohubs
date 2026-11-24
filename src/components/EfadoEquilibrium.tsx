@@ -378,8 +378,8 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
             {/* Stage Selector */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Tactical Stages</span>
-                <span className="text-[10px] font-black text-yellow-500 uppercase">2x Incremental Power</span>
+                <span className="text-xs font-bold text-slate-400">Game Stages</span>
+                <span className="text-xs font-bold text-yellow-500">2x Step Multiplier</span>
               </div>
               <div className="grid grid-cols-5 gap-2 max-h-[160px] overflow-y-auto no-scrollbar p-1">
                 {[...Array(21)].map((_, i) => (
@@ -415,8 +415,8 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
                   exit={{ height: 0, opacity: 0 }}
                   className="bg-slate-800/50 rounded-2xl p-4 border border-white/5 overflow-hidden text-[11px] text-slate-400 leading-normal space-y-2 no-scrollbar"
                 >
-                  <p>• Tactical Stages: 21 tiers (Starter + 20 Stages).</p>
-                  <p>• Incremental Power: Each stage doubles the stake and payouts of the previous one (2x Multiple).</p>
+                  <p>• Game Stages: 21 levels (Starter + 20 Stages).</p>
+                  <p>• Step Multiplier: Each stage doubles the stake and payout of the previous level (2x).</p>
                   <p>• High-Frequency Alignments: Use the Selector to match your risk profile.</p>
                   <p>• Result: 1 → 100, 2 → 200, 3 → 300 (Raw Values).</p>
                 </motion.div>
@@ -505,7 +505,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
               {isSpinning && (
                 <div className="absolute top-0 left-12 right-12 mt-4 space-y-2 z-20">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-yellow-500 uppercase tracking-tighter drop-shadow-md">Synchronizing Neural Patterns</span>
+                    <span className="text-xs font-bold text-yellow-400 drop-shadow-md">Calculating Round Result...</span>
                     <span className="text-xl font-display font-black text-white italic drop-shadow-lg">{timeLeft}s</span>
                   </div>
                   <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden border border-white/5 backdrop-blur-sm">
@@ -651,7 +651,7 @@ export const EfadoEquilibrium: React.FC<EfadoEquilibriumProps> = ({
               
               <div className="flex items-center justify-center gap-3 py-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black text-emerald-500/60 uppercase tracking-[0.3em]">Neural Gaming System Active</span>
+                <span className="text-xs font-semibold text-emerald-400/80">Fair Play Engine Active</span>
               </div>
             </div>
           </div>

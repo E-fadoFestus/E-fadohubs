@@ -246,8 +246,8 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
         accountId: newAccountId,
         sender: 'ceo@efado.com',
         recipients: [emailAddress],
-        subject: 'Welcome to EFADO Mail, Sovereign Specialist!',
-        content: `Dear ${formDisplayName.trim()},\n\nCongratulations on successfully deploying your brand-new secure EFADO Mailbox!\n\nYou have taken dynamic custody of your professional correspondence using EFADO's elite, zero-trust infrastructure. Your mailbox starts with a premium allocation of ${Math.round(selectedPlan.storageLimit / (1024 * 1024))}MB, fully protected on your localized sovereign digital ledger.\n\nHere are your operational guidelines:\n\n1. Secure Real-Time Intra-Sovereign Exchange: You can send messages directly to any other validated "@efado.com" user. Messages instantly register in their live ledger inbox workspace!\n\n2. Customize Signature & Profile Settings: Tap on Settings to adjust your specialized signatures, recovery gateways, and access profiles.\n\n3. Security Customization: Never share your unique secure mailbox authentication PIN as it provides secondary gatekeeping verification for outgoing transfers.\n\nSovereign professional, we are deeply honored to power your communications matrix.\n\nStay secure,\n\nCEO & Strategic Operations Directorate\nEFADO Inc.`,
+        subject: 'Welcome to EFADO Mail!',
+        content: `Dear ${formDisplayName.trim()},\n\nCongratulations on creating your new EFADO Mailbox!\n\nYour mailbox is ready to use with ${Math.round(selectedPlan.storageLimit / (1024 * 1024))}MB of storage.\n\nHere are a few tips to get started:\n\n1. Instant EFADO Messaging: You can send emails directly to any other "@efado.com" or "@e-fado.com" user inside the platform.\n\n2. Customize Your Profile: Open Settings to set your email signature, recovery email, and security preferences.\n\n3. Keep Your PIN Private: Never share your mailbox PIN with anyone—it protects outgoing mail actions.\n\nThank you for using EFADO Mail.\n\nBest regards,\nThe EFADO Team`,
         folder: 'inbox',
         isRead: false,
         hasAttachments: false,
@@ -364,7 +364,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
         customPin: settingsCustomPin.trim()
       }, { merge: true });
 
-      setSettingsStatusMsg("Sovereign profile configurations updated successfully!");
+      setSettingsStatusMsg("Mailbox settings updated successfully!");
       
       // Update active state locally
       setActiveAccount(prev => prev ? {
@@ -444,7 +444,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
           EFADO <span className="text-indigo-600 font-serif lowercase italic tracking-tight">mail</span>
         </h1>
         <p className="text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
-          The sovereign professional messaging framework. Secure end-to-end communication routing, custom corporate signature models, and dynamic dual PIN-gate authentication.
+          Your professional EFADO business email. Enjoy fast messaging, custom signatures, and PIN-protected security.
         </p>
         
         {emailAccounts.length > 0 && (
@@ -463,7 +463,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
                   className="w-full bg-white p-4 rounded-xl border border-indigo-100 hover:border-indigo-400 transition-all text-left flex justify-between items-center group shadow-sm"
                 >
                   <div>
-                    <h5 className="text-sm font-black text-slate-900">{acc.displayName || 'Sovereign Account'}</h5>
+                    <h5 className="text-sm font-black text-slate-900">{acc.displayName || 'EFADO Mailbox'}</h5>
                     <p className="text-xs text-slate-500 font-mono mt-0.5">{acc.emailAddress}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-transform group-hover:translate-x-1" />
@@ -493,7 +493,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-16">
           {[
-            { icon: Shield, title: "Sovereign Security", desc: "Dual verification with customized ledger encryption protection PINs." },
+            { icon: Shield, title: "PIN Protection", desc: "Extra account protection with your personal mailbox security PIN." },
             { icon: Globe, title: "Enterprise Scaling", desc: "Native customized digital routing built for instant message delivery." },
             { icon: Zap, title: "Pro Onboarding", desc: "Instant automated introductory welcoming correspondence for first actions." }
           ].map((feature, i) => (
@@ -536,8 +536,8 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
           {filteredMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <Inbox className="w-10 h-10 opacity-30 mb-3" />
-              <p className="text-xs font-black uppercase tracking-wider italic text-slate-400">Empty Ledger</p>
-              <p className="text-[10px] text-slate-400 mt-1 max-w-xs text-center leading-relaxed">No sovereign transmissions match your active criteria.</p>
+              <p className="text-xs font-bold text-slate-400">No Messages</p>
+              <p className="text-[11px] text-slate-400 mt-1 max-w-xs text-center leading-relaxed">No messages match your search in this folder.</p>
             </div>
           ) : (
             filteredMessages.map((msg) => {
@@ -697,8 +697,8 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm max-w-3xl mx-auto text-left">
       <div className="flex justify-between items-center border-b border-slate-100 pb-5 mb-6">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">New Sovereign Message</h2>
-          <p className="text-xs text-slate-400 font-medium">Compose an intra-sovereign cryptographic mail to standard recipients.</p>
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">New Message</h2>
+          <p className="text-xs text-slate-400 font-medium">Write and send an email to any EFADO Mail address.</p>
         </div>
         <button
           onClick={() => {
@@ -740,7 +740,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
             type="text"
             value={composeSubject}
             onChange={(e) => setComposeSubject(e.target.value)}
-            placeholder="Re-allocating sovereign infrastructure limits"
+            placeholder="Weekly team update"
             className="w-full px-5 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:border-indigo-500 outline-none transition-all"
           />
         </div>
@@ -936,8 +936,8 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
     <div className="max-w-5xl mx-auto py-8 text-left">
       <div className="flex justify-between items-center border-b border-slate-100 pb-5 mb-8">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Sovereign Service Plans</h2>
-          <p className="text-slate-500 text-sm font-medium">Elevate your operational communications with customized digital scaling limit arrays.</p>
+          <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Mailbox Plans</h2>
+          <p className="text-slate-500 text-sm font-medium">Choose a storage plan that fits your personal or business needs.</p>
         </div>
         <button
           onClick={() => setActiveView(activeAccount ? 'dashboard' : 'landing')}
@@ -1007,12 +1007,12 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
         <div className="flex justify-between items-center pb-8 border-b border-slate-100 mb-8">
           <div>
             <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">
-              {creationStep === 'plan' ? 'Choose Communication Plan' : 'Sovereign Mailbox Details'}
+              {creationStep === 'plan' ? 'Choose Email Plan' : 'Mailbox Setup'}
             </h2>
             <p className="text-slate-500 text-xs font-medium">
               {creationStep === 'plan' 
-                ? 'Select the storage footprint tier matching your tactical requirements.' 
-                : 'Setup the security authorizations and displaying elements for your newly created node.'}
+                ? 'Select the storage tier that best suits your needs.' 
+                : 'Enter your display name, address, and security PIN.'}
             </p>
           </div>
           <button 
@@ -1174,11 +1174,11 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
                 {isCreating ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Registering Sovereign...
+                    Creating Mailbox...
                   </>
                 ) : (
                   <>
-                    Deploy Sovereign Mailbox <Check className="w-4 h-4" />
+                    Create Mailbox <Check className="w-4 h-4" />
                   </>
                 )}
               </button>
@@ -1237,7 +1237,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
             )}
 
             <div className="hidden md:flex flex-col items-end">
-              <p className="text-xs font-black text-slate-900 leading-none">{activeAccount.displayName || 'Sovereign Account'}</p>
+              <p className="text-xs font-black text-slate-900 leading-none">{activeAccount.displayName || 'EFADO Mailbox'}</p>
               <p className="text-[10px] text-slate-400 font-bold lowercase mt-1">{activeAccount.emailAddress}</p>
               
               <div className="flex items-center gap-2 mt-1.5">
@@ -1339,7 +1339,7 @@ export const EfadoEmailHub: React.FC<EfadoEmailHubProps> = ({ user, onClose }) =
                     <Shield className="w-3.5 h-3.5 text-indigo-500" />
                     <span>Dual security status</span>
                   </div>
-                  <p className="text-[9.5px] leading-relaxed text-slate-500 font-bold">Encrypted Node ID verification is active on sovereign gateway.</p>
+                  <p className="text-[10px] leading-relaxed text-slate-500 font-medium">Your mailbox is protected with PIN security.</p>
                 </div>
               </div>
             </div>

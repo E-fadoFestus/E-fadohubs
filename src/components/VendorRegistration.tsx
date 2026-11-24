@@ -134,7 +134,7 @@ export const VendorRegistration: React.FC<VendorRegistrationProps> = ({ user, on
         'Unlimited Hub Integration',
         'Full White-Label Support',
         'Global Domain Management',
-        'Custom Security Protocols',
+        'Custom Security Controls',
         'Dedicated Hub Account Manager',
         'Direct CEO Integration'
       ],

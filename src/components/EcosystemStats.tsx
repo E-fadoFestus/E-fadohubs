@@ -44,8 +44,8 @@ export const EcosystemStats: React.FC<EcosystemStatsProps> = ({ stats }) => {
               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Multi-Currency Segregated</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-2xl border border-white/10">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Feed Active</span>
+              <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Live Stats Active</span>
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export const EcosystemStats: React.FC<EcosystemStatsProps> = ({ stats }) => {
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-6">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Ecosystem Protocol Yields</span>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Platform Balances &amp; Revenue</span>
               </div>
               
               <div className="mb-6 space-y-2">
@@ -113,7 +113,7 @@ export const EcosystemStats: React.FC<EcosystemStatsProps> = ({ stats }) => {
                 
                 <p className="text-[10px] text-slate-500 italic flex items-center gap-2 pt-2">
                   <Info className="w-3 h-3 shrink-0" />
-                  * Sovereign vaults are fully segregated. Deposits, earnings, and payouts maintain independent currency ledger accounts.
+                  * Multi-currency accounts are kept separate. Deposits, winnings, and payouts maintain independent ledgers.
                 </p>
               </div>
             </div>

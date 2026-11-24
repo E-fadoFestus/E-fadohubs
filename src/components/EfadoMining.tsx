@@ -330,12 +330,12 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
           </div>
           <div>
             <h1 className="text-xl font-black text-white italic tracking-tighter uppercase">
-              {isFinalSovereign ? 'EFADO Sovereign Node' : 'EFADO Mining Node'}
+              {isFinalSovereign ? 'EFADO Bonus Vault' : 'EFADO Coin Miner'}
             </h1>
             <div className="flex items-center gap-2">
                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
                <span className="text-[9px] font-black text-white uppercase tracking-widest">
-                 {isFinalSovereign ? 'Monetary Direct Credit: Enabled' : 'Protocol Sync Active'}
+                 {isFinalSovereign ? 'Direct Naira Credit: Active' : 'Auto-Save Active'}
                </span>
             </div>
           </div>
@@ -381,7 +381,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <div className="flex-1 text-left">
-                <h5 className="text-xs font-black text-white uppercase italic tracking-tight">Protect Your Nodes & Secure Remote Extraction</h5>
+                <h5 className="text-xs font-black text-white uppercase italic tracking-tight">Keep Your Connection Private & Secure</h5>
                 <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider leading-none">Fast Secure VPN connection starting at $1.99. Register now with 65% discount code.</p>
               </div>
               <a 
@@ -404,7 +404,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
               className="bg-white/5 border border-emerald-500/20 px-8 py-4 rounded-[2rem] backdrop-blur-3xl flex items-center gap-6 shadow-2xl shadow-emerald-500/10"
             >
               <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">Sovereign Session Rewards</span>
+                <span className="text-[10px] font-black text-slate-100 uppercase tracking-widest">Session Rewards</span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-black text-emerald-400 italic tracking-tighter">₦{((sessionCoins || 0) / 100).toFixed(2)}</span>
                   <span className="text-[10px] font-black text-white uppercase animate-pulse">Accumulating</span>
@@ -422,12 +422,12 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
             <div className="w-full space-y-6">
               <div className="flex justify-between items-end px-2">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Operational Cluster</p>
+                  <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Current Level</p>
                   <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter">{stage.name}</h2>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-white italic">{sessionCoins} / {stage.requirement}</p>
-                  <p className="text-[10px] font-black text-white uppercase tracking-widest">Node Capacity</p>
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest">Stage Progress</p>
                 </div>
               </div>
               
@@ -461,9 +461,9 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                  animate={{ scale: 1, opacity: 1 }}
                  className="px-8 py-3 bg-indigo-600 rounded-full inline-block shadow-2xl shadow-indigo-500/20"
                >
-                 <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">Full EFADO Sovereignty Established</span>
+                 <span className="text-[10px] font-black text-white uppercase tracking-[0.4em]">Full EFADO Level Unlocked</span>
                </motion.div>
-               <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter shadow-indigo-500/20">Unlimited Extraction</h2>
+               <h2 className="text-3xl sm:text-5xl font-black text-white italic uppercase tracking-tighter shadow-indigo-500/20">Unlimited Mining</h2>
                <div className="flex items-center justify-center gap-4 text-emerald-400">
                   <Zap className="w-5 h-5 fill-current" />
                   <span className="text-[11px] font-black uppercase tracking-widest italic">100 Coins = ₦1.00 Direct Credit</span>
@@ -509,13 +509,13 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                    )}
                  </motion.div>
                  <span className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] mt-4">
-                   {isFinalSovereign ? 'RFADO' : 'Mine EFADO'}
+                   {isFinalSovereign ? 'EFADO' : 'Mine EFADO'}
                  </span>
               </div>
 
               {/* Floating stage character */}
               <div className="absolute top-4 right-6">
-                <span className="text-8xl font-black text-white/5 italic select-none pointer-events-none uppercase">
+                <span className="text-6xl sm:text-8xl font-black text-white/5 italic select-none pointer-events-none uppercase">
                   {isFinalSovereign ? 'EFADO' : stage.id}
                 </span>
               </div>
@@ -564,8 +564,8 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 >
                   {coin.isCredit ? (
                     <div className="flex flex-col items-center">
-                       <span className="text-8xl font-black text-emerald-400 italic drop-shadow-[0_0_40px_rgba(52,211,153,0.5)]">₦1.000</span>
-                       <span className="text-sm font-black text-white uppercase tracking-[0.5em] mt-4">Sovereign Credit Synced</span>
+                       <span className="text-5xl sm:text-7xl font-black text-emerald-400 italic drop-shadow-[0_0_40px_rgba(52,211,153,0.5)]">₦1.00</span>
+                       <span className="text-sm font-black text-white uppercase tracking-[0.5em] mt-4">₦1.00 Credit Added!</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -579,15 +579,15 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
           </div>
 
           <div className="text-center space-y-2">
-            <p className="text-[11px] font-black text-white uppercase tracking-[0.3em]">Sector Protocol</p>
+            <p className="text-[11px] font-black text-white uppercase tracking-[0.3em]">Current Stage</p>
             <h3 className="text-xl font-black text-white uppercase italic tracking-widest">
-              {isFinalSovereign ? 'EFADO Sovereign Extraction' : stage.id === 'O' ? 'Lord Protocol Engagement' : `${stage.name} Extraction`}
+              {isFinalSovereign ? 'EFADO Max Bonus' : stage.id === 'O' ? 'Lord Stage Bonus' : `${stage.name} Stage`}
             </h3>
           </div>
 
           {/* IN-CONTENT AD: Adaptive Native Article Ad */}
           <div className="w-full max-w-xl p-4 bg-slate-950/80 border border-slate-800 rounded-2xl flex flex-col gap-3 shadow-md relative overflow-hidden group">
-            <span className="absolute top-2 right-3 text-[7px] font-black text-[#DAA520]/50 uppercase tracking-widest">AdSense Premium Node Match</span>
+            <span className="absolute top-2 right-3 text-[7px] font-black text-[#DAA520]/50 uppercase tracking-widest">Sponsored Partner</span>
             <div className="flex items-center gap-4">
               <img 
                 src="https://images.unsplash.com/photo-1621761191319-c6fb62004040?q=80&w=200&auto=format&fit=crop" 
@@ -596,12 +596,12 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 referrerPolicy="no-referrer"
               />
               <div className="flex-1 text-left">
-                <h5 className="text-sm font-black text-white uppercase italic tracking-tight leading-tight">Elite Cloud VPS Hosting - Scaled For Coin Arbitrage</h5>
-                <p className="text-[10px] text-slate-400 font-medium">Get 99.99% uptime powered by blazing-fast CDNs. Perfect for high-volume blockchain traffic extraction hubs.</p>
+                <h5 className="text-sm font-black text-white uppercase italic tracking-tight leading-tight">Fast Cloud VPS Hosting for Creators & Apps</h5>
+                <p className="text-[10px] text-slate-400 font-medium">99.99% uptime powered by global servers. Great for websites, shops, and online projects.</p>
               </div>
             </div>
             <div className="flex justify-between items-center bg-slate-900 px-3 py-2 rounded-xl">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Estimated CPM: $34.50 • Lazy Loading Enabled</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-wider">Partner Offer • Verified Hosting</span>
               <a 
                 href="https://siteground.com/?aff=efado-sovereign-node"
                 target="_blank"
@@ -609,7 +609,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 onClick={() => handleAffiliateClick('siteground-hosting')}
                 className="px-3 py-1.5 bg-[#DAA520] hover:bg-yellow-500 text-slate-950 font-black rounded-lg text-[9px] uppercase tracking-wider transition-all"
               >
-                Deploy Site
+                Visit Site
               </a>
             </div>
           </div>
@@ -653,7 +653,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                             onClick={() => handleAffiliateClick(item.key)}
                             className="px-3 py-1 bg-white text-black hover:bg-[#DAA520] transition-all rounded-lg text-[9px] font-black uppercase tracking-wider"
                          >
-                            Deploy Link
+                            View Offer
                          </a>
                       </div>
                    </div>
@@ -722,7 +722,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
 
                 <p className="text-sm font-black text-slate-950 leading-relaxed italic">
                   {stage.id === 'O' ? (
-                    'The spell is complete. You have established the Full EFADO Sovereign. Final protocol ready.'
+                    'All 5 stages complete! You have unlocked full EFADO mining rewards.'
                   ) : (
                     `Congratulations, you have won the EFADO "${stage.id}" ${
                       stage.id === 'E' ? 'BRONZE' : 
@@ -748,7 +748,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                     </>
                   ) : (
                     <>
-                      Establish Full EFADO Sovereign <Pickaxe className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                      Unlock Full EFADO Bonus <Pickaxe className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                     </>
                   )}
                 </button>
@@ -772,7 +772,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Shield className="w-6 h-6 text-indigo-400" />
-                <h4 className="text-sm font-black text-white uppercase tracking-wider">Privacy & Consent Protocols</h4>
+                <h4 className="text-sm font-black text-white uppercase tracking-wider">Privacy & Ad Consent</h4>
               </div>
               <p className="text-[10.5px] text-slate-400 leading-relaxed font-medium">
                 We utilize essential cookies & strategic display ads (Google AdSense) to fund ongoing servers, WAEC/JAMB simulators, and remote workspace connections. By accepting, you consent to ad personalization & event trackers.
@@ -806,7 +806,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
             className="fixed inset-0 z-[250] bg-slate-950 flex flex-col items-center justify-center p-8 text-center"
           >
             <div className="absolute top-4 right-4 text-[9px] font-mono text-slate-500 uppercase">
-              Sovereign Interstitial Ad Space
+              Sponsored Ad Break
             </div>
             
             <div className="max-w-lg w-full space-y-8">
@@ -819,13 +819,13 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 <h4 className="text-lg font-black text-white uppercase italic tracking-wider px-6">AWS Certified Cloud Practitioner - Premium Course</h4>
                 <p className="text-xs text-slate-400 px-8 mt-1">Accelerate your AWS skills with certified instructors. Access templates, exams, and labs.</p>
                 <div className="absolute bottom-3 right-3 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                  Estimated eCPM: $18.25
+                  Partner Spotlight
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Node Escalation Ad Playing</h3>
-                <p className="text-xs text-slate-400 uppercase tracking-wider">Your next EFADO node tier is unlocking in <span className="text-white font-bold">{interstitialCountdown}s</span>...</p>
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">Short Ad Break</h3>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Your next EFADO stage unlocks in <span className="text-white font-bold">{interstitialCountdown}s</span>...</p>
                 
                 <div className="h-2 w-48 bg-white/5 border border-white/10 rounded-full overflow-hidden mx-auto">
                    <motion.div 
@@ -867,17 +867,17 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                   <Coins className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Premium Coins Node Shop</h3>
-                  <p className="text-[9px] font-black text-[#DAA520] uppercase tracking-widest">Bypass resource limits & buy coin packs directly</p>
+                  <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Coin Boost Shop</h3>
+                  <p className="text-[9px] font-black text-[#DAA520] uppercase tracking-widest">Buy coin booster packs directly</p>
                 </div>
               </div>
 
               {/* Package cards grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 text-left">
                 {[
-                  { id: 'mild', coins: '1,000 Coins', price: '₦1,000', label: 'Starter Pack', desc: 'Credit 1,000 extraction coins instantly' },
-                  { id: 'heavy', coins: '6,000 Coins', price: '₦5,000', label: 'Divine Speed', desc: 'Save ₦1,000. Double mining rates synced' },
-                  { id: 'sovereign', coins: '15,000 Coins', price: '₦12,000', label: 'Eminent Lord', desc: 'Sovereign tier status. Priority direct cashouts' }
+                  { id: 'mild', coins: '1,000 Coins', price: '₦1,000', label: 'Starter Pack', desc: 'Credit 1,000 bonus coins instantly' },
+                  { id: 'heavy', coins: '6,000 Coins', price: '₦5,000', label: 'Pro Boost', desc: 'Save ₦1,000 with faster coin rewards' },
+                  { id: 'sovereign', coins: '15,000 Coins', price: '₦12,000', label: 'EFADO VIP', desc: 'VIP tier status with priority cashouts' }
                 ].map(pkg => (
                   <div 
                     key={pkg.id}
@@ -894,7 +894,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
                       <span className="text-sm font-black text-emerald-400">{pkg.price}</span>
                       <button className="px-3 py-1 bg-white text-slate-900 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                        Procure
+                        Buy Pack
                       </button>
                     </div>
                   </div>
@@ -903,13 +903,13 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
 
               {/* Flutterwave Checkout Active Guidelines block */}
               <div className="bg-slate-900/50 border border-indigo-500/10 rounded-2xl p-6 text-center mt-6">
-                 <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Secure Payment Nodes Connection</h4>
+                 <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Secure Payment Options</h4>
                  <p className="text-[11px] text-slate-350 leading-relaxed max-w-md mx-auto mb-4">
-                   We utilize Flutterwave to securely accept debit cards, instant USSD codes, mobile bank apps, and unique local bank transfers. Click <strong className="text-yellow-500 bg-yellow-550/10 px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Procure</strong> above to select your plan.
+                   Pay safely using debit cards, USSD codes, mobile bank apps, or bank transfers. Click <strong className="text-yellow-500 bg-yellow-550/10 px-1.5 py-0.5 rounded uppercase font-black text-[9px]">Buy Pack</strong> above to choose a plan.
                  </p>
                  <div className="pt-3 border-t border-white/5 flex items-center justify-between text-left">
-                    <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted / PCI-DSS Compliant Flutterwave Engine</p>
-                    <span className="text-[9px] font-black text-emerald-450 uppercase">Instant Activation Active</span>
+                    <p className="text-[8px] font-mono text-slate-500 uppercase">SSL Encrypted Checkout</p>
+                    <span className="text-[9px] font-black text-emerald-450 uppercase">Instant Activation</span>
                  </div>
               </div>
 
@@ -918,8 +918,8 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
                 {isProcessingStripePayment && (
                   <motion.div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 rounded-[2.5rem]">
                      <div className="w-12 h-12 rounded-full border-4 border-[#DAA520] border-t-transparent animate-spin mb-4" />
-                     <h4 className="text-sm font-black text-white uppercase tracking-wider">Contacting Stripe Server Nodes...</h4>
-                     <p className="text-[10px] text-slate-400">Verifying customer balance & secure key release</p>
+                     <h4 className="text-sm font-black text-white uppercase tracking-wider">Processing Payment...</h4>
+                     <p className="text-[10px] text-slate-400">Verifying your payment details</p>
                   </motion.div>
                 )}
                 {stripePaymentSuccess && (
@@ -970,7 +970,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
           <div className="flex items-center gap-3">
             <span className="px-1.5 py-0.5 bg-[#DAA520] text-slate-950 text-[7px] font-black uppercase tracking-widest rounded leading-none">SPONSORED</span>
             <p className="text-[10.5px] font-black text-slate-305 uppercase italic tracking-wide leading-none">
-               Double Your Extractions: Setup premium Cloudflare SSL/CDN on your nodes now! Save 40% globally.
+               Keep your websites faster and safer with Cloudflare CDN & SSL.
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -1007,7 +1007,7 @@ export const EfadoMining: React.FC<{ user: UserProfile; onClose: () => void; onU
          </div>
          
          <div className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] italic">
-           Protected by EFADO Blockchain Integrity Protocol
+           Protected by EFADO Security
          </div>
       </div>
     </motion.div>
@@ -1035,9 +1035,9 @@ export const MiningMiniCard: React.FC<{ user: UserProfile; onOpenFull: () => voi
         </div>
         
         <div>
-          <h4 className="text-sm font-black text-white uppercase italic tracking-tight mb-1">EFADO Mining Core</h4>
+          <h4 className="text-sm font-black text-white uppercase italic tracking-tight mb-1">EFADO Bonus Miner</h4>
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Protocol Ready
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Ready to Mine
           </p>
         </div>
 
@@ -1046,7 +1046,7 @@ export const MiningMiniCard: React.FC<{ user: UserProfile; onOpenFull: () => voi
         </div>
 
         <button className="w-full py-3 bg-[#DAA520] text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg group-hover:scale-105 transition-all">
-          Launch Extraction Unit
+          Start Mining Coins
         </button>
       </div>
     </motion.div>
@@ -1068,13 +1068,13 @@ export const AdvertisingMiniCard: React.FC<AdvertisingMiniCardProps> = ({ onAdve
             <Megaphone className="w-6 h-6" />
           </div>
           <div>
-            <h4 className="text-base font-black text-white uppercase tracking-tighter italic leading-none">Strategic Ads</h4>
-            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">Universal Reach</p>
+            <h4 className="text-base font-black text-white uppercase tracking-tighter italic leading-none">Advertise Products</h4>
+            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">Reach More Buyers</p>
           </div>
         </div>
         
         <p className="text-xs font-black text-slate-300 leading-relaxed uppercase tracking-tighter">
-          Manifest your products & services globally. From hotels to farm products.
+          Promote your products and services globally. From hotels to farm produce.
         </p>
 
         <div className="flex gap-4">

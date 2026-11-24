@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getFlutterwavePublicKey, createFlutterwavePaymentLink } from '../utils/flutterwave';
 import { resolveBankAccount } from '../utils/bankVerification';
 import { useAI } from '../hooks/useAI';
+import { openSupportHelpForm } from '../utils/helpSupport';
 import { 
   ShoppingBag, 
   ChevronRight, 
@@ -493,7 +494,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         orderCode: selectedOrder.orderCode,
         userId: user.uid,
         userName: user.displayName || 'Authorized Buyer',
-        userPhoto: `https://picsum.photos/seed/${user.uid}/100/100`,
+        userPhoto: user.photoURL || '',
         items: selectedOrder.items,
         rating: marketReviewRating,
         testimonyText: marketReviewText.trim() || 'Flawless transaction and perfect product delivery via direct tracking link.',
@@ -540,7 +541,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
       title: ad.title || 'Advertised Product',
       price: Number(ad.price) || 0,
       currency: 'NGN',
-      images: (ad.photos && ad.photos.length > 0) ? ad.photos : [`https://picsum.photos/seed/${ad.id}/600/400`],
+      images: (ad.photos && ad.photos.length > 0) ? ad.photos : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'],
       rating: 5.0,
       reviewsCount: 24,
       vendor: {
@@ -662,7 +663,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         },
         customizations: {
           title: 'EFADO Marketplace (Modern)',
-          description: 'Secure Sovereign Escrow Order Protocol',
+          description: 'Protected EFADO Escrow Order',
           logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=100&q=80'
         }
       });
@@ -885,11 +886,12 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                 
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button 
+                    type="button"
                     onClick={() => {
                       setShowGuide(false);
-                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.marketplace.helpCategory } }));
+                      openSupportHelpForm({ hub: 'Marketplace', subject: 'Payment Issue' });
                     }}
-                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 text-emerald-400" /> Need Help? Chat Us
                   </button>
@@ -909,376 +911,370 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
         className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden"
       >
         {/* Header Block */}
-        <div className="px-6 md:px-10 py-5 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-                <ShoppingBasket className="w-7 h-7 text-white" />
+        <div className="px-4 sm:px-6 md:px-10 py-4 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-md shrink-0">
+                <ShoppingBasket className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h2 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">EFADO <span className="text-cyan-400">Modern Market</span> Hub</h2>
-                <div className="flex flex-wrap items-center gap-3 mt-1">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Zap className="w-3 h-3 text-yellow-400 animate-pulse" /> New + Fairly Used Products Sold
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight truncate">
+                  EFADO <span className="text-cyan-400">Modern Market</span>
+                </h2>
+                <div className="flex flex-wrap items-center gap-2.5 mt-0.5">
+                  <p className="text-xs text-slate-300">
+                    New &amp; fairly used items with buyer protection
                   </p>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => setShowGuide(true)}
-                    className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 hover:text-emerald-300 transition-colors bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/30"
+                    className="text-xs font-semibold text-emerald-300 flex items-center gap-1 hover:text-emerald-200 transition-colors bg-emerald-950/70 px-2.5 py-0.5 rounded-lg border border-emerald-500/30"
                   >
-                    <Info className="w-3 h-3" /> Tactical Guide
+                    <Info className="w-3.5 h-3.5" /> Shopping Guide
                   </button>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Globe className="w-3 h-3 text-blue-400" /> Global & Local
-                  </p>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button 
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-2.5 px-4 py-2.5 text-slate-200 hover:text-white transition-all bg-slate-800 rounded-2xl hover:bg-slate-700 group border border-slate-700"
+                className="relative flex items-center gap-2 px-3.5 py-2 text-slate-100 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700 text-xs font-semibold"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-5 h-5 text-cyan-400" />
+                  <ShoppingBag className="w-4 h-4 text-cyan-400" />
                   {cart.length > 0 && (
-                    <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-blue-500/40 animate-bounce">
+                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
                     </span>
                   )}
                 </div>
-                <div className="text-left hidden sm:block">
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">My Cart</p>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">View & Checkout</p>
-                </div>
+                <span className="hidden sm:inline">Cart</span>
               </button>
 
-              {/* ✨ AI Generate Product Image button with AI Powered badge */}
-              <button 
+              <button
+                type="button"
                 onClick={() => setShowAiImageModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition-all border border-purple-400/30"
-                title="Synthesize custom high-converting product photos using EFADO AI"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-colors"
+                title="Create product photos with AI"
               >
-                <span>✨ AI Generate Product Image</span>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
-                  AI Powered
+                <span>Product Photo Studio</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-950/70 text-purple-200">
+                  AI
                 </span>
               </button>
 
-              <button 
+              <button
+                type="button"
                 onClick={() => setShowRegModal(true)}
-                className="group flex flex-col items-center bg-cyan-600 hover:bg-cyan-500 px-5 py-2 rounded-2xl transition-all shadow-lg shadow-cyan-500/20"
+                className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors"
               >
-                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1.5">
-                  <UserPlus className="w-3 h-3" /> Vendor Registration
-                </span>
-                <span className="text-[8px] font-bold text-cyan-100 uppercase tracking-tighter">Register & Upload Products</span>
+                <UserPlus className="w-4 h-4" />
+                <span>Become a Seller</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-2.5 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-2xl hover:bg-slate-700 border border-slate-700" title="Close Market Hub">
-                <X className="w-6 h-6" />
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 text-slate-300 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700"
+                title="Close Market Hub"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-6 mt-4">
-            <button 
-              onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-            >
-              Browse Market
-            </button>
-            <button 
-              onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
-            >
-              My Orders & Tracking
-            </button>
-          </div>
-
-          {/* Breadcrumb / Selection Path UI */}
-          {activeView === 'browse' && (
-            <div className="flex items-center gap-3 bg-slate-800/90 px-5 py-3 rounded-2xl border border-slate-700/80 mt-3 shadow-sm overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`w-2 h-2 rounded-full ${selectedL1 ? 'bg-blue-400 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
-                {selectedL1 || 'Category'}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`w-2 h-2 rounded-full ${selectedL2 ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL2 ? 'text-white' : 'text-slate-500'}`}>
-                {selectedL2 || 'Section'}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`w-2 h-2 rounded-full ${selectedL3 ? 'bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL3 ? 'text-white' : 'text-slate-500'}`}>
-                {selectedL3 || 'Subcategory'}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`w-2 h-2 rounded-full ${selectedL4 ? 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-slate-600'}`} />
-              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${selectedL4 ? 'text-white' : 'text-slate-500'}`}>
-                {selectedL4 || 'Group'}
-              </span>
-            </div>
-            
-            {selectedL4 && (
-              <motion.div 
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="ml-auto flex items-center gap-2 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/40 shrink-0"
+          <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-800">
+            <div className="flex items-center gap-5">
+              <button
+                type="button"
+                onClick={() => setActiveView('browse')}
+                className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                  activeView === 'browse'
+                    ? 'border-cyan-400 text-cyan-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
               >
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest">Path Complete</span>
-              </motion.div>
+                Browse Products
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveView('orders')}
+                className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                  activeView === 'orders'
+                    ? 'border-cyan-400 text-cyan-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                My Orders &amp; Tracking
+              </button>
+            </div>
+
+            {activeView === 'browse' && (
+              <div className="flex items-center gap-2 text-xs text-slate-300 overflow-x-auto no-scrollbar">
+                <span className={selectedL1 ? 'text-white font-semibold' : 'text-slate-400'}>
+                  {selectedL1 || 'All Categories'}
+                </span>
+                {selectedL2 && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className="text-cyan-300 font-semibold">{selectedL2}</span>
+                  </>
+                )}
+                {selectedL3 && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className="text-emerald-300 font-semibold">{selectedL3}</span>
+                  </>
+                )}
+                {selectedL4 && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className="text-indigo-300 font-semibold">{selectedL4}</span>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
         {/* Main Content Area */}
         {activeView === 'browse' && (
-          <div className="px-4 md:px-10 py-2.5 bg-slate-950 border-b border-slate-800/80 shrink-0">
+          <div className="px-4 sm:px-6 md:px-10 py-2.5 bg-slate-950 border-b border-slate-800/80 shrink-0">
             <HubGuideNote guideId="marketplace" variant="dark" />
           </div>
         )}
-        <div className="flex-grow overflow-hidden relative">
+        <div className="flex-grow overflow-y-auto relative">
           <AnimatePresence mode="wait">
             {activeView === 'browse' ? (
-              <motion.div 
-                key="browse" 
+              <motion.div
+                key="browse"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="h-full flex flex-col lg:flex-row"
+                className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6"
               >
-                {/* Level 1: Category */}
-                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/90">
-                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black">1</span>
-                      Category
+                {/* Compact 4-Step Category Filter Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Level 1: Category */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col">
+                    <h3 className="text-xs font-semibold text-white mb-2.5 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold">1</span>
+                      <span>Category</span>
                     </h3>
-                  </div>
-                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                    {Object.keys(MODERN_CATEGORIES).map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => handleL1Select(cat)}
-                        className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
-                          selectedL1 === cat 
-                            ? 'bg-blue-600 border-blue-400 text-white shadow-xl shadow-blue-500/20 font-black' 
-                            : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                        }`}
-                      >
-                        <div className="relative z-10 flex items-center gap-3">
-                          {cat.includes('Electronics') && <Cpu className="w-4 h-4 text-cyan-400" />}
-                          {cat.includes('Fashion') && <Shirt className="w-4 h-4 text-rose-400" />}
-                          {cat.includes('Home') && <Home className="w-4 h-4 text-emerald-400" />}
-                          <span className="text-xs font-black uppercase tracking-tight leading-tight">{cat}</span>
-                        </div>
-                        <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Level 2: Section */}
-                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/70">
-                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-cyan-600 text-white flex items-center justify-center text-[10px] font-black">2</span>
-                      Section
-                    </h3>
-                  </div>
-                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                    {selectedL1 ? (
-                      Object.keys(MODERN_CATEGORIES[selectedL1]).map(sub => (
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                      {Object.keys(MODERN_CATEGORIES).map((cat) => (
                         <button
-                          key={sub}
-                          onClick={() => handleL2Select(sub)}
-                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
-                            selectedL2 === sub 
-                              ? 'bg-cyan-600 border-cyan-400 text-white shadow-xl shadow-cyan-500/20 font-black' 
-                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
+                          key={cat}
+                          type="button"
+                          onClick={() => handleL1Select(cat)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                            selectedL1 === cat
+                              ? 'bg-blue-600 border-blue-400 text-white'
+                              : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
                           }`}
                         >
-                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{sub}</span>
-                          <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
+                          <div className="flex items-center gap-2 truncate">
+                            {cat.includes('Electronics') && <Cpu className="w-3.5 h-3.5 text-cyan-300 shrink-0" />}
+                            {cat.includes('Fashion') && <Shirt className="w-3.5 h-3.5 text-rose-300 shrink-0" />}
+                            {cat.includes('Home') && <Home className="w-3.5 h-3.5 text-emerald-300 shrink-0" />}
+                            <span className="truncate">{cat}</span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
                         </button>
-                      ))
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
-                          <ArrowRight className="w-6 h-6 text-slate-500" />
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Category First</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Level 3: Subcategory */}
-                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/90">
-                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">3</span>
-                      Subcategory
-                    </h3>
-                  </div>
-                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                    {selectedL2 ? (
-                      Object.keys(MODERN_CATEGORIES[selectedL1!][selectedL2]).map(subSub => (
-                        <button
-                          key={subSub}
-                          onClick={() => handleL3Select(subSub)}
-                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
-                            selectedL3 === subSub 
-                              ? 'bg-emerald-600 border-emerald-400 text-white shadow-xl shadow-emerald-500/20 font-black' 
-                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                          }`}
-                        >
-                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{subSub}</span>
-                          <ChevronRight className={`w-4 h-4 relative z-10 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100'}`} />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
-                          <ArrowRight className="w-6 h-6 text-slate-500" />
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Section First</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Level 4: Group */}
-                <div className="lg:w-1/5 border-r border-slate-800 flex flex-col bg-slate-900/70">
-                  <div className="p-4 border-b border-slate-800 bg-slate-800/60">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black">4</span>
-                      Group
-                    </h3>
-                  </div>
-                  <div className="flex-grow overflow-y-auto p-3 space-y-2 custom-scrollbar">
-                    {selectedL3 ? (
-                      MODERN_CATEGORIES[selectedL1!][selectedL2!][selectedL3].map(group => (
-                        <button
-                          key={group}
-                          onClick={() => handleL4Select(group)}
-                          className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all text-left group relative overflow-hidden ${
-                            selectedL4 === group 
-                              ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20 font-black' 
-                              : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                          }`}
-                        >
-                          <span className="relative z-10 text-xs font-black uppercase tracking-tight leading-tight">{group}</span>
-                          <CheckCircle2 className={`w-4 h-4 relative z-10 transition-all ${selectedL4 === group ? 'scale-110 text-white' : 'opacity-0'}`} />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center mb-3">
-                          <ArrowRight className="w-6 h-6 text-slate-500" />
-                        </div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Select Subcategory First</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Product Feed Area */}
-                <div className="lg:w-1/5 flex flex-col bg-slate-950">
-                  <div className="p-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em]">Live Feed</h3>
-                    <div className="px-2.5 py-0.5 bg-blue-600 rounded-full">
-                      <span className="text-[9px] font-black text-white uppercase tracking-widest">{filteredProducts.length} Items</span>
+                      ))}
                     </div>
                   </div>
-                  <div className="p-3 flex-grow overflow-y-auto space-y-3 custom-scrollbar">
-                    {filteredProducts.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center p-8 opacity-60">
-                        <Package className="w-12 h-12 text-slate-600 mb-3" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">No items found</p>
-                      </div>
-                    ) : (
-                      filteredProducts.map((product, idx) => (
-                        <motion.div 
-                          layout
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.05 }}
+
+                  {/* Level 2: Section */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col">
+                    <h3 className="text-xs font-semibold text-white mb-2.5 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-cyan-600 text-white flex items-center justify-center text-[11px] font-bold">2</span>
+                      <span>Section</span>
+                    </h3>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                      {selectedL1 ? (
+                        Object.keys(MODERN_CATEGORIES[selectedL1]).map((sub) => (
+                          <button
+                            key={sub}
+                            type="button"
+                            onClick={() => handleL2Select(sub)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                              selectedL2 === sub
+                                ? 'bg-cyan-600 border-cyan-400 text-white'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{sub}</span>
+                            <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                          </button>
+                        ))
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center px-3">
+                          <p className="text-xs text-slate-400">Choose a category first</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Level 3: Subcategory */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col">
+                    <h3 className="text-xs font-semibold text-white mb-2.5 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center text-[11px] font-bold">3</span>
+                      <span>Subcategory</span>
+                    </h3>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                      {selectedL2 ? (
+                        Object.keys(MODERN_CATEGORIES[selectedL1!][selectedL2]).map((subSub) => (
+                          <button
+                            key={subSub}
+                            type="button"
+                            onClick={() => handleL3Select(subSub)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                              selectedL3 === subSub
+                                ? 'bg-emerald-600 border-emerald-400 text-white'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{subSub}</span>
+                            <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                          </button>
+                        ))
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center px-3">
+                          <p className="text-xs text-slate-400">Choose a section first</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Level 4: Item Type */}
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 flex flex-col">
+                    <h3 className="text-xs font-semibold text-white mb-2.5 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-indigo-600 text-white flex items-center justify-center text-[11px] font-bold">4</span>
+                      <span>Item Type</span>
+                    </h3>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                      {selectedL3 ? (
+                        MODERN_CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group) => (
+                          <button
+                            key={group}
+                            type="button"
+                            onClick={() => handleL4Select(group)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                              selectedL4 === group
+                                ? 'bg-indigo-600 border-indigo-400 text-white'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{group}</span>
+                            {selectedL4 === group && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center px-3">
+                          <p className="text-xs text-slate-400">Choose a subcategory first</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Spacious Responsive Product Feed */}
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="text-base sm:text-lg font-bold text-white">Available Products</h3>
+                    <span className="px-3 py-1 bg-blue-600/20 text-blue-300 border border-blue-500/30 rounded-lg text-xs font-semibold tabular-nums">
+                      {filteredProducts.length} Items
+                    </span>
+                  </div>
+
+                  {filteredProducts.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl">
+                      <Package className="w-10 h-10 text-slate-500 mb-3" />
+                      <p className="text-sm font-semibold text-slate-300">No items match this filter yet</p>
+                      <p className="text-xs text-slate-400 mt-1">Try selecting another category or clearing your filter.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {filteredProducts.map((product) => (
+                        <div
                           key={product.id}
                           id={`product-${product.id}`}
                           onClick={() => setPreviewProduct(product)}
-                          className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl overflow-hidden group hover:border-cyan-500/50 transition-all cursor-pointer"
+                          className="bg-slate-900 border border-slate-800 hover:border-cyan-500/50 rounded-2xl overflow-hidden group transition-colors cursor-pointer flex flex-col justify-between h-full"
                         >
-                          <div className="aspect-video relative overflow-hidden">
-                            <img 
-                              src={product.photos[0]} 
-                              alt={product.title} 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div className="absolute top-2 right-2 flex flex-col gap-1">
-                              <div className="px-2 py-0.5 bg-slate-900/90 backdrop-blur-md rounded-lg border border-slate-700 shadow-sm">
-                                <span className="text-[10px] font-black text-cyan-400">{formatPrice(product.price, true)}</span>
+                          <div>
+                            <div className="aspect-[4/3] relative overflow-hidden bg-slate-800">
+                              <img
+                                src={product.photos?.[0] || ''}
+                                alt={product.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                            <div className="p-4 pb-2 space-y-2">
+                              <h4 className="text-sm sm:text-base font-bold text-white line-clamp-1">
+                                {product.title}
+                              </h4>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1 text-xs text-slate-400 truncate">
+                                  <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <span className="truncate">{product.location || 'Nigeria'}</span>
+                                </div>
+                                <span className="text-sm font-bold text-cyan-400 tabular-nums shrink-0">
+                                  {formatPrice(product.price, true)}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <div className="p-3">
-                            <h4 className="text-xs font-black text-white uppercase tracking-tight truncate mb-1">{product.title}</h4>
-                            <div className="flex items-center justify-between mb-2.5">
-                              <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
-                                <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
-                                {product.location}
-                              </div>
-                              <span className="text-[10px] font-black text-cyan-400">{formatPrice(product.price, true)}</span>
-                            </div>
-                            
+
+                          <div className="p-4 pt-2 space-y-2">
                             {product.video && (
-                              <button 
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onNavigate?.('GIST', 'REELS');
                                   onClose();
                                 }}
-                                className="w-full mb-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
+                                className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
                               >
-                                <Film className="w-3.5 h-3.5 animate-pulse" /> Watch Product Reel
+                                <Film className="w-3.5 h-3.5" />
+                                <span>Watch Video</span>
                               </button>
                             )}
-                            
+
                             <div className="grid grid-cols-2 gap-2">
-                              <button 
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   addToCart(product);
                                 }}
-                                className="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
+                                className="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 border border-slate-700 transition-colors"
                               >
-                                <Plus className="w-3 h-3 text-cyan-400" /> Cart
+                                <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>Add</span>
                               </button>
-                              <button 
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   addToCart(product);
                                   setShowCart(true);
                                 }}
-                                className="py-2 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-cyan-900/30"
+                                className="py-2 px-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-colors"
                               >
-                                <ShoppingBag className="w-3 h-3" /> Buy Now
+                                <ShoppingBag className="w-3.5 h-3.5" />
+                                <span>Buy Now</span>
                               </button>
                             </div>
 
-                            {/* Deep Linking Share Buttons & Chat Seller */}
-                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
-                              <button 
+                            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onNavigate?.('GIST', 'CHAT', {
@@ -1287,38 +1283,40 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                                       id: product.id,
                                       title: product.title,
                                       price: product.price,
-                                      image: product.images?.[0] || 'https://picsum.photos/seed/market/400/400',
+                                      image: product.images?.[0] || product.photos?.[0] || '',
                                       seller: (product as any).seller || 'Verified Merchant',
-                                      sellerId: (product as any).sellerId || 'seller-1'
-                                    }
+                                      sellerId: (product as any).sellerId || 'seller-1',
+                                    },
                                   });
                                 }}
-                                className="flex-1 py-1.5 px-2 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-indigo-500/40 transition-all"
-                                title="Chat Seller (Bargain Mode)"
+                                className="flex-1 py-1.5 px-2 bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-indigo-500/30 transition-colors"
                               >
-                                <MessageSquare className="w-3 h-3 text-indigo-400" /> Chat Seller
+                                <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>Chat</span>
                               </button>
-                              <button 
+                              <button
+                                type="button"
                                 onClick={(e) => handleShareProduct(product, e)}
-                                className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
-                                title="Copy Direct Share Link"
+                                className="py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-slate-700 transition-colors"
+                                title="Copy link"
                               >
-                                <Share2 className="w-3 h-3 text-cyan-400" /> Share
+                                <Share2 className="w-3.5 h-3.5 text-cyan-400" />
                               </button>
-                              <button 
+                              <button
+                                type="button"
                                 onClick={(e) => handleWhatsAppShare(product, e)}
-                                className="py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
+                                className="py-1.5 px-2.5 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-emerald-500/30 transition-colors"
                                 title="Share on WhatsApp"
                               >
-                                <MessageCircle className="w-3 h-3 text-emerald-400" /> WA
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
                               </button>
                             </div>
                           </div>
-                        </motion.div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
               </motion.div>
             ) : (
               <motion.div 
@@ -1694,8 +1692,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
                     <div className="flex items-center gap-3">
                       <MapPin className="w-5 h-5 text-blue-400" />
                       <div>
-                        <h4 className="text-sm font-black text-white uppercase tracking-widest">Sovereign Logistics Gateway</h4>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-0.5">Select your preferred fulfillment protocol below.</p>
+                        <h4 className="text-sm font-bold text-white">Delivery &amp; Pickup Options</h4>
+                        <p className="text-xs text-slate-400 mt-0.5">Choose how you would like to receive your order.</p>
                       </div>
                     </div>
 
@@ -2565,7 +2563,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({ user, onClose,
               <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
                 <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
                   <img
-                    src={previewProduct.photos[0] || 'https://picsum.photos/seed/item/600/400'}
+                    src={previewProduct.photos[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'}
                     alt={previewProduct.title}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

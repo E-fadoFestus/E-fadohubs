@@ -122,7 +122,7 @@ export const GistStoriesBar: React.FC<GistStoriesBarProps> = ({ user }) => {
       id: `story-my-${Date.now()}`,
       authorId: user.uid,
       authorName: user.displayName || 'You',
-      authorPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      authorPhoto: user.photoURL || '',
       mediaUrl: newStoryMedia.trim(),
       mediaType: newStoryMedia.match(/\.(mp4|webm)/i) ? 'video' : 'image',
       caption: newStoryCaption.trim() || undefined,
@@ -150,13 +150,17 @@ export const GistStoriesBar: React.FC<GistStoriesBarProps> = ({ user }) => {
           className="flex-shrink-0 flex flex-col items-center gap-1.5 cursor-pointer group"
         >
           <div className="relative w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-purple-500 to-cyan-400 group-hover:scale-105 transition-transform shadow-md">
-            <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 border-2 border-slate-950">
-              <img 
-                src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} 
-                alt="My Story" 
-                className="w-full h-full object-cover" 
-                referrerPolicy="no-referrer"
-              />
+            <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 border-2 border-slate-950 flex items-center justify-center text-white font-bold text-lg">
+              {user.photoURL ? (
+                <img 
+                  src={user.photoURL} 
+                  alt="My Story" 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>{(user.displayName || user.email || 'U').charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <div className="absolute bottom-0 right-0 w-5 h-5 bg-purple-600 rounded-full border-2 border-slate-950 flex items-center justify-center text-white">
               <Plus className="w-3 h-3" />
@@ -179,13 +183,17 @@ export const GistStoriesBar: React.FC<GistStoriesBarProps> = ({ user }) => {
                   ? 'bg-slate-700' 
                   : 'bg-gradient-to-tr from-purple-500 via-rose-500 to-cyan-400 animate-pulse'
               }`}>
-                <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 border-2 border-slate-950">
-                  <img 
-                    src={story.authorPhoto || `https://picsum.photos/seed/${story.authorId}/100/100`} 
-                    alt={story.authorName} 
-                    className="w-full h-full object-cover" 
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 border-2 border-slate-950 flex items-center justify-center text-white font-bold text-lg">
+                  {story.authorPhoto ? (
+                    <img 
+                      src={story.authorPhoto} 
+                      alt={story.authorName} 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span>{(story.authorName || 'S').charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
               </div>
               <span className="text-[11px] font-bold text-slate-300 truncate max-w-[68px]">
@@ -251,13 +259,17 @@ export const GistStoriesBar: React.FC<GistStoriesBarProps> = ({ user }) => {
                 {/* Author Info */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full border border-purple-500 overflow-hidden">
-                      <img 
-                        src={stories[activeStoryIndex].authorPhoto || `https://picsum.photos/seed/${stories[activeStoryIndex].authorId}/100/100`} 
-                        alt="Author" 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer"
-                      />
+                    <div className="w-9 h-9 rounded-full border border-purple-500 overflow-hidden bg-slate-800 flex items-center justify-center text-white font-bold text-xs">
+                      {stories[activeStoryIndex].authorPhoto ? (
+                        <img 
+                          src={stories[activeStoryIndex].authorPhoto} 
+                          alt="Author" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span>{(stories[activeStoryIndex].authorName || 'S').charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-white leading-tight">

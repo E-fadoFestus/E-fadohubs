@@ -1,111 +1,212 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, ChevronRight, Play, Info, Zap, ShieldCheck, TrendingUp, ShoppingBag, Gamepad2, Video, MonitorPlay, Activity } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ArrowRight,
+  Gamepad2,
+  ShoppingBag,
+  Megaphone,
+  GraduationCap,
+  Video,
+  Wallet,
+  Globe,
+  BookOpen,
+  ShieldCheck,
+} from 'lucide-react';
 
 interface Slide {
   title: string;
   description: string;
-  image: string;
   tag: string;
-  color: string;
+  gradient: string;
+  accentColor: string;
+  ctaLabel: string;
+  secondaryLabel?: string;
   action?: string;
   subview?: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 interface HubHeroCarouselProps {
-  hubType: 'HOME' | 'DASHBOARD' | 'GAMES' | 'MARKET' | 'GIST' | 'SERVICE_CORPS' | 'COMMUNITY_HUBS' | 'HEPIHANDS_LOAN' | 'DOMAIN_HUB' | 'QUIZ' | 'EDUCATION' | 'ZOOM' | 'TECH' | 'ADVERTISING' | 'PARTNER_HUB' | 'TECH_HUB' | 'FAIRLY_USED';
+  hubType:
+    | 'HOME'
+    | 'DASHBOARD'
+    | 'GAMES'
+    | 'MARKET'
+    | 'GIST'
+    | 'SERVICE_CORPS'
+    | 'COMMUNITY_HUBS'
+    | 'HEPIHANDS_LOAN'
+    | 'DOMAIN_HUB'
+    | 'QUIZ'
+    | 'EDUCATION'
+    | 'ZOOM'
+    | 'TECH'
+    | 'ADVERTISING'
+    | 'PARTNER_HUB'
+    | 'TECH_HUB'
+    | 'FAIRLY_USED';
   onAction?: (view: string, subview?: string) => void;
 }
 
 const DASHBOARD_SLIDES: Slide[] = [
-  { title: "Empower Your Community", description: "Join the movement changing the face of commerce, education, and finance globally.", image: "https://picsum.photos/seed/efado1/1280/720", tag: "Global Leader", color: "from-indigo-900 via-slate-900 to-purple-900", action: 'DASHBOARD' },
-  { title: "Fair Markets Hub", description: "Buy smarter, sell sustainably, and keep value within your community with elite vendors.", image: "https://picsum.photos/seed/efado2/1280/720", tag: "Commerce", color: "from-emerald-900 via-slate-900 to-teal-900", action: 'MARKET' },
-  { title: "Elite Games Arena", description: "Win big, learn fast, and dominate our provably fair gaming environments.", image: "https://picsum.photos/seed/efado3/1280/720", tag: "Gaming Hub", color: "from-orange-800 via-slate-900 to-red-900", action: 'GAMES' },
-  { title: "Universal Educational Hub", description: "From Primary school to PhD levels, access resources that empower your growth.", image: "https://picsum.photos/seed/edu1/1280/720", tag: "Academia", color: "from-indigo-900 via-slate-900 to-slate-950", action: 'EDUCATION' },
-  { title: "EFADO Zoom Live", description: "The ultimate interactive outreach for preachers, teachers, and elite broadcasters.", image: "https://picsum.photos/seed/zoom1/1280/720", tag: "Live Platform", color: "from-indigo-600 via-slate-900 to-indigo-900", action: 'ZOOM' },
-  { title: "HEPIHANDS Loan Hub", description: "Transparent, fast, and community-backed credit to fuel your next venture.", image: "https://picsum.photos/seed/efado4/1280/720", tag: "Finance", color: "from-emerald-600 via-slate-900 to-green-900", action: 'HEPIHANDS_LOAN' },
-  { title: "EFADO Service Corps", description: "Direct access to top-tier technical consultancy and construction professionals.", image: "https://picsum.photos/seed/efado6/1280/720", tag: "Services", color: "from-slate-700 via-slate-900 to-slate-950", action: 'SERVICE_CORPS' },
-  { title: "Global Community Hubs", description: "Synchronize your savings and growth with community-first financial cycles.", image: "https://picsum.photos/seed/efado7/1280/720", tag: "Community", color: "from-purple-900 via-slate-900 to-pink-900", action: 'COMMUNITY_HUBS' },
-  { title: "Domain & Tech Hub", description: "Register global domains and manage your digital identity with military security.", image: "https://picsum.photos/seed/efado9/1280/720", tag: "Digital Assets", color: "from-blue-900 via-slate-900 to-indigo-950", action: 'DOMAIN_HUB' },
-  { title: "EFADO Nexus Hub", description: "10 Action Buttons, WebRTC Video/Voice, Voice Masks, Deep Linking, 500MB Reels, and Creator Fund.", image: "https://picsum.photos/seed/efado10/1280/720", tag: "Nexus Comms", color: "from-indigo-900 via-slate-900 to-purple-950", action: 'GIST' },
-  { title: "Advertisement Center", description: "Reach thousands of verified patrons globally with tactical brand placement.", image: "https://picsum.photos/seed/efado8/1280/720", tag: "Marketing", action: 'GIST', subview: 'ADS', color: "from-indigo-800 via-slate-900 to-purple-950" },
-  { title: "Reward Draw Arena", description: "Participate and achieve milestones in our transparency-backed community challenges.", image: "https://picsum.photos/seed/game14/1280/720", tag: "Rewards", action: 'GAMES', color: "from-orange-700 via-slate-900 to-rose-900" },
-  { title: "Digital Money Trading", description: "Master the charts and multiply your wealth with real-time market logic.", image: "https://picsum.photos/seed/game5/1280/720", tag: "Strategy", action: 'GAMES', color: "from-emerald-800 via-slate-900 to-teal-950" },
-  { title: "Fairly Used Market", description: "Premium pre-owned goods at unbeatable community prices.", image: "https://picsum.photos/seed/market6/1280/720", tag: "Savings", action: 'MARKET', color: "from-slate-800 via-slate-900 to-slate-950" },
-  { title: "Modern Tech Hub", description: "The latest gadgets and electronics directly from the core vendor network.", image: "https://picsum.photos/seed/market3/1280/720", tag: "Innovation", action: 'MARKET', color: "from-blue-600 via-slate-900 to-indigo-900" },
-  { title: "Simple Platform Guide", description: "Step-by-step guides for Paystack funding, Game Zone, VTU, Marketplace, and fast cash-outs.", image: "https://picsum.photos/seed/guide1/1280/720", tag: "User Guide", color: "from-indigo-600 to-slate-900", action: 'USER_GUIDE' },
-  { title: "Founder's Vision Portal", description: "Direct oversight and updates from EFADO leadership ensuring total fairness.", image: "https://picsum.photos/seed/efado16/1280/720", tag: "Executive", color: "from-slate-900 via-slate-900 to-black", action: 'HOME' },
-  { title: "Secure Wallet Ecosystem", description: "Isolated, multi-token wallets protecting your digital wealth 24/7.", image: "https://picsum.photos/seed/efado9/1280/720", tag: "Security", color: "from-slate-950 via-indigo-950 to-black", action: 'DASHBOARD' },
-  { title: "Joint Venture Growth", description: "Pool resources with elite community partners for massive returns.", image: "https://picsum.photos/seed/efado17/1280/720", tag: "Venture", color: "from-indigo-950 via-slate-900 to-purple-950", action: 'COMMUNITY_HUBS' },
-  { title: "Infinite Interactive Feed", description: "Real-time updates, voice notes, and video discourse across all hubs.", image: "https://picsum.photos/seed/zoom2/1280/720", tag: "Interactive", color: "from-blue-900 via-slate-900 to-indigo-950", action: 'ZOOM' },
-  { title: "The Future of Hubs", description: "Sign up today and experience the synchronised ecosystem of tomorrow.", image: "https://picsum.photos/seed/efado20/1280/720", tag: "Coming Soon", color: "from-slate-900 via-slate-900 to-indigo-900", action: 'HOME' },
-  { 
-    title: "EFADO Connects Your World", 
-    description: "In a divided world, EFADO is the North Star Hubs where talent finds a stage and innovation has no limits.", 
-    image: "https://picsum.photos/seed/efado21/1280/720", 
-    tag: "Vision", 
-    color: "from-indigo-600 via-slate-900 to-purple-900", 
-    action: 'HOME' 
+  {
+    title: 'One Account for Every Service',
+    description:
+      'Shop, play games, pay bills, learn online, and promote your business from one simple EFADO account and wallet.',
+    tag: 'Welcome to EFADO',
+    gradient: 'from-slate-900 via-indigo-950 to-slate-900',
+    accentColor: 'text-indigo-300',
+    ctaLabel: 'Open My Wallet',
+    secondaryLabel: 'Browse Guides',
+    action: 'DASHBOARD',
+    icon: Wallet,
+  },
+  {
+    title: 'Shop New & Fairly Used Items',
+    description:
+      'Browse electronics, fashion, phones, and home essentials from verified sellers with buyer protection.',
+    tag: 'Marketplace',
+    gradient: 'from-slate-900 via-emerald-950 to-slate-900',
+    accentColor: 'text-emerald-300',
+    ctaLabel: 'Visit Marketplace',
+    action: 'MARKET',
+    icon: ShoppingBag,
+  },
+  {
+    title: 'Play & Win in the Game Arena',
+    description:
+      'Enjoy 6 fast, clear games using your main deposit wallet, with winnings ready to cash out anytime.',
+    tag: 'Game Arena',
+    gradient: 'from-slate-900 via-cyan-950 to-slate-900',
+    accentColor: 'text-cyan-300',
+    ctaLabel: 'Explore Games',
+    action: 'GAMES',
+    icon: Gamepad2,
+  },
+  {
+    title: 'Promote & Sell to More Buyers',
+    description:
+      'List your property, products, hotel, farm produce, or services in minutes and reach buyers fast.',
+    tag: 'Advertising',
+    gradient: 'from-slate-900 via-amber-950/80 to-slate-900',
+    accentColor: 'text-amber-300',
+    ctaLabel: 'Post an Ad',
+    action: 'ADVERTISING',
+    icon: Megaphone,
+  },
+  {
+    title: 'Study Resources & Live Classes',
+    description:
+      'Prepare for exams, attend live video classes, and explore learning tools from primary school to postgraduate.',
+    tag: 'Education & Live',
+    gradient: 'from-slate-900 via-sky-950 to-slate-900',
+    accentColor: 'text-sky-300',
+    ctaLabel: 'Open Education Hub',
+    action: 'EDUCATION',
+    icon: GraduationCap,
   },
 ];
 
 const EDUCATION_SLIDES: Slide[] = [
-  { title: "Universal Academic Hub", description: "Access world-class resources from Primary school to PhD levels.", image: "https://picsum.photos/seed/edu1/1280/720", tag: "Universal", color: "from-indigo-800 to-slate-900", action: 'EDUCATION' },
-  { title: "JAMB & Admission Guide", description: "Navigate your academic future with our comprehensive admission tracking tools.", image: "https://picsum.photos/seed/edu2/1280/720", tag: "Admissions", color: "from-blue-700 to-indigo-900", action: 'EDUCATION' },
-  { title: "Postgraduate Research", description: "Advanced tools for MSc, MBA, and PhD candidates worldwide.", image: "https://picsum.photos/seed/edu3/1280/720", tag: "Research", color: "from-slate-700 to-indigo-950", action: 'EDUCATION' },
-  { title: "Scholarship Intelligence", description: "Unlock funding opportunities and global academic grants.", image: "https://picsum.photos/seed/edu4/1280/720", tag: "Scholarships", color: "from-emerald-700 to-teal-900", action: 'EDUCATION' },
+  {
+    title: 'Learning Tools for Every Stage',
+    description:
+      'Study guides, practice questions, and school planning resources from nursery and primary through university and postgraduate.',
+    tag: 'Education Hub',
+    gradient: 'from-slate-900 via-sky-950 to-slate-900',
+    accentColor: 'text-sky-300',
+    ctaLabel: 'Start Learning',
+    action: 'EDUCATION',
+    icon: GraduationCap,
+  },
+  {
+    title: 'Exam Prep & Admissions Support',
+    description:
+      'Track JAMB, WAEC, and Post-UTME updates alongside practical admission requirements in one place.',
+    tag: 'Exam Prep',
+    gradient: 'from-slate-900 via-indigo-950 to-slate-900',
+    accentColor: 'text-indigo-300',
+    ctaLabel: 'Open Study Tools',
+    action: 'EDUCATION',
+    icon: BookOpen,
+  },
 ];
 
 const ZOOM_SLIDES: Slide[] = [
-  { title: "Stage-Mode Outreach", description: "Coordinate global sessions with high-reach tactical stage infrastructure.", image: "https://picsum.photos/seed/zoom1/1280/720", tag: "Live", color: "from-indigo-900 to-blue-900", action: 'ZOOM' },
-  { title: "Strategic Discourse", description: "Reach elite communities through interactive video and voice notes.", image: "https://picsum.photos/seed/zoom2/1280/720", tag: "Interactivity", color: "from-slate-900 to-indigo-950", action: 'ZOOM' },
-  { title: "Expert Interviews", description: "Deploy professional interview environments with real-time participation.", image: "https://picsum.photos/seed/zoom3/1280/720", tag: "Professional", color: "from-blue-800 to-slate-900", action: 'ZOOM' },
+  {
+    title: 'Host Live Classes & Meetings',
+    description:
+      'Start interactive video and audio sessions for teaching, community events, interviews, and team meetings.',
+    tag: 'EFADO Live',
+    gradient: 'from-slate-900 via-indigo-950 to-slate-900',
+    accentColor: 'text-indigo-300',
+    ctaLabel: 'Start Session',
+    action: 'ZOOM',
+    icon: Video,
+  },
+  {
+    title: 'Connect Anywhere on Any Device',
+    description:
+      'Clear audio and video rooms designed to work smoothly across phones, tablets, and computers.',
+    tag: 'Live Sessions',
+    gradient: 'from-slate-900 via-blue-950 to-slate-900',
+    accentColor: 'text-sky-300',
+    ctaLabel: 'Join Live Hub',
+    action: 'ZOOM',
+    icon: Globe,
+  },
 ];
 
 const GAMES_SLIDES: Slide[] = [
-  { title: "Elite Spin Arena", description: "The premier interactive skill and prize wheel arena.", image: "https://picsum.photos/seed/game1/1280/720", tag: "Spin", color: "from-indigo-600 to-purple-700", action: 'GAMES' },
-  { title: "Earn Up to 100x", description: "Multiply your challenge points with our elite multiplier tiers.", image: "https://picsum.photos/seed/game2/1280/720", tag: "Rewards", color: "from-yellow-600 to-orange-700", action: 'GAMES' },
-  { title: "Provably Fair Logic", description: "Our algorithms ensure every round is 100% random and transparent.", image: "https://picsum.photos/seed/game3/1280/720", tag: "Fairness", color: "from-blue-600 to-cyan-700", action: 'GAMES' },
-  { title: "Interactive Thrills", description: "Feel the excitement of the arena with every round you play.", image: "https://picsum.photos/seed/game4/1280/720", tag: "Challenge", color: "from-red-600 to-pink-700", action: 'GAMES' },
-  { title: "Master EFADO DMT", description: "Digital Money Trading for the modern strategist.", image: "https://picsum.photos/seed/game5/1280/720", tag: "Trading", color: "from-slate-700 to-slate-900", action: 'GAMES' },
-  { title: "Real-time Market Trends", description: "Watch the charts and predict the next big move.", image: "https://picsum.photos/seed/game6/1280/720", tag: "Analysis", color: "from-blue-500 to-indigo-600", action: 'GAMES' },
-  { title: "Predict and Profit", description: "Your intuition is your greatest asset in the DMT arena.", image: "https://picsum.photos/seed/game7/1280/720", tag: "Strategy", color: "from-emerald-600 to-teal-700", action: 'GAMES' },
-  { title: "Fast-Paced Action", description: "Quick rounds and instant results for the busy trader.", image: "https://picsum.photos/seed/game8/1280/720", tag: "Speed", color: "from-orange-600 to-red-600", action: 'GAMES' },
-  { title: "EFADO Money Card", description: "The classic card shuffling game reimagined.", image: "https://picsum.photos/seed/game9/1280/720", tag: "Cards", color: "from-red-700 to-orange-800", action: 'GAMES' },
-  { title: "Find the Big Win", description: "Keep your eyes on the cards and pick the winner.", image: "https://picsum.photos/seed/game10/1280/720", tag: "Luck", color: "from-yellow-500 to-yellow-700", action: 'GAMES' },
-  { title: "Test Your Intuition", description: "Can you beat the shuffle? Prove your skills today.", image: "https://picsum.photos/seed/game11/1280/720", tag: "Skill", color: "from-purple-600 to-indigo-700", action: 'GAMES' },
-  { title: "Instant Game Payouts", description: "Winnings are credited to your wallet immediately.", image: "https://picsum.photos/seed/game12/1280/720", tag: "Instant", color: "from-green-600 to-emerald-700", action: 'GAMES' },
-  { title: "Global Leaderboards", description: "Compete with players worldwide for the top spot.", image: "https://picsum.photos/seed/game13/1280/720", tag: "Competition", color: "from-blue-600 to-blue-800", action: 'GAMES' },
-  { title: "Daily Bonus Rewards", description: "Log in every day for free credits and bonuses.", image: "https://picsum.photos/seed/game14/1280/720", tag: "Bonuses", color: "from-pink-600 to-rose-700", action: 'GAMES' },
-  { title: "Secure Game Wallets", description: "Your gaming funds are isolated and protected.", image: "https://picsum.photos/seed/game15/1280/720", tag: "Secure", color: "from-slate-800 to-black", action: 'GAMES' },
-  { title: "Immersive Audio", description: "Professional narration and sound effects for every game.", image: "https://picsum.photos/seed/game16/1280/720", tag: "Audio", color: "from-indigo-500 to-purple-500", action: 'GAMES' },
-  { title: "Champion Sprays", description: "Celebrate your big wins with epic visual effects.", image: "https://picsum.photos/seed/game17/1280/720", tag: "Celebration", color: "from-yellow-400 to-orange-500", action: 'GAMES' },
-  { title: "Professional Narration", description: "Hear the excitement with our live game announcers.", image: "https://picsum.photos/seed/game18/1280/720", tag: "Voice", color: "from-blue-400 to-cyan-500", action: 'GAMES' },
-  { title: "Weighted Edge System", description: "A balanced system that ensures long-term sustainability.", image: "https://picsum.photos/seed/game19/1280/720", tag: "System", color: "from-slate-600 to-slate-800", action: 'GAMES' },
-  { title: "Become a Legend", description: "Start your winning streak in the EFADO Game Hub.", image: "https://picsum.photos/seed/game20/1280/720", tag: "Legacy", color: "from-indigo-600 to-purple-600", action: 'GAMES' },
+  {
+    title: '6 Games, One Simple Wallet',
+    description:
+      'Play Deep Sea Jet, Lucky Spin, Digital Money Trading, Money Card, Money Quiz, and Equilibrium from one balance.',
+    tag: 'Game Arena',
+    gradient: 'from-slate-900 via-cyan-950 to-slate-900',
+    accentColor: 'text-cyan-300',
+    ctaLabel: 'Play Now',
+    action: 'GAMES',
+    icon: Gamepad2,
+  },
+  {
+    title: 'Fast Payouts to Your Winning Wallet',
+    description:
+      'Track every round clearly and withdraw your winnings straight from your Account Profile Wallet.',
+    tag: 'Instant Winnings',
+    gradient: 'from-slate-900 via-emerald-950 to-slate-900',
+    accentColor: 'text-emerald-300',
+    ctaLabel: 'Open Wallet',
+    action: 'DASHBOARD',
+    icon: ShieldCheck,
+  },
 ];
 
 const MARKET_SLIDES: Slide[] = [
-  { title: "Modern Market Hub", description: "The ultimate destination for new and pre-owned goods.", image: "https://picsum.photos/seed/market1/1280/720", tag: "Market", color: "from-emerald-600 to-teal-700", action: 'MARKET' },
-  { title: "Thousands of Products", description: "Explore a massive taxonomy across all categories.", image: "https://picsum.photos/seed/market2/1280/720", tag: "Variety", color: "from-blue-600 to-indigo-700", action: 'MARKET' },
-  { title: "Electronics & Gadgets", description: "The latest smartphones, laptops, and smart home tech.", image: "https://picsum.photos/seed/market3/1280/720", tag: "Tech", color: "from-slate-700 to-slate-900", action: 'MARKET' },
-  { title: "Fashion for Everyone", description: "Trendy clothing and accessories for men and women.", image: "https://picsum.photos/seed/market4/1280/720", tag: "Fashion", color: "from-pink-600 to-rose-700", action: 'MARKET' },
-  { title: "Home & Kitchen", description: "Upgrade your living space with modern appliances.", image: "https://picsum.photos/seed/market5/1280/720", tag: "Home", color: "from-orange-600 to-red-700", action: 'MARKET' },
-  { title: "Fairly Used Deals", description: "Quality pre-owned items at a fraction of the cost.", image: "https://picsum.photos/seed/market6/1280/720", tag: "Deals", color: "from-purple-600 to-indigo-700", action: 'MARKET' },
-  { title: "Connect with Vendors", description: "Direct communication between buyers and sellers.", image: "https://picsum.photos/seed/market7/1280/720", tag: "Connect", color: "from-cyan-600 to-blue-700", action: 'MARKET' },
-  { title: "Sell Your Products", description: "Turn your unused items into cash today.", image: "https://picsum.photos/seed/market8/1280/720", tag: "Sell", color: "from-emerald-500 to-green-600", action: 'MARKET' },
-  { title: "Easy Registration", description: "Become a verified vendor in just a few steps.", image: "https://picsum.photos/seed/market9/1280/720", tag: "Vendor", color: "from-indigo-600 to-purple-600", action: 'MARKET' },
-  { title: "Global Categories", description: "Browse international brands and local favorites.", image: "https://picsum.photos/seed/market10/1280/720", tag: "Global", color: "from-blue-500 to-cyan-500", action: 'MARKET' },
-  { title: "Secure Payments", description: "Your transactions are protected by EFADO escrow.", image: "https://picsum.photos/seed/market11/1280/720", tag: "Secure", color: "from-slate-800 to-black", action: 'MARKET' },
-  { title: "Verified Conditions", description: "Every item is graded for transparency and trust.", image: "https://picsum.photos/seed/market12/1280/720", tag: "Quality", color: "from-emerald-400 to-teal-500", action: 'MARKET' },
-  { title: "Detailed Descriptions", description: "Know exactly what you're buying with full specs.", image: "https://picsum.photos/seed/market13/1280/720", tag: "Info", color: "from-indigo-500 to-blue-500", action: 'MARKET' },
-  { title: "High-Res Photos", description: "See every detail with our multi-photo listings.", image: "https://picsum.photos/seed/market14/1280/720", tag: "Visual", color: "from-purple-500 to-pink-500", action: 'MARKET' },
-  { title: "Responsive Support", description: "Our market moderators are here to help you.", image: "https://picsum.photos/seed/market15/1280/720", tag: "Support", color: "from-blue-400 to-indigo-500", action: 'MARKET' },
-  { title: "Join the Community", description: "Be part of the fastest growing digital market.", image: "https://picsum.photos/seed/market16/1280/720", tag: "Community", color: "from-emerald-600 to-green-700", action: 'MARKET' },
-  { title: "Modern Furniture", description: "Stylish pieces for your office and home.", image: "https://picsum.photos/seed/market17/1280/720", tag: "Style", color: "from-orange-500 to-yellow-600", action: 'MARKET' },
-  { title: "Sports & Fitness", description: "Get active with our wide range of gym gear.", image: "https://picsum.photos/seed/market18/1280/720", tag: "Fitness", color: "from-red-500 to-orange-600", action: 'MARKET' },
-  { title: "Musical Instruments", description: "From guitars to keyboards, find your sound.", image: "https://picsum.photos/seed/market19/1280/720", tag: "Music", color: "from-indigo-700 to-purple-800", action: 'MARKET' },
-  { title: "Start Shopping", description: "Your next great find is just a click away.", image: "https://picsum.photos/seed/market20/1280/720", tag: "Shop Now", color: "from-emerald-600 to-teal-600", action: 'MARKET' },
+  {
+    title: 'Shop New & Pre-Owned Products',
+    description:
+      'Discover gadgets, fashion, appliances, and everyday items from verified EFADO merchants.',
+    tag: 'EFADO Market',
+    gradient: 'from-slate-900 via-emerald-950 to-slate-900',
+    accentColor: 'text-emerald-300',
+    ctaLabel: 'Browse Products',
+    action: 'MARKET',
+    icon: ShoppingBag,
+  },
+  {
+    title: 'Protected Checkout & Order Tracking',
+    description:
+      'Pay easily with your wallet, card, or bank transfer and follow every order from dispatch to delivery.',
+    tag: 'Buyer Protection',
+    gradient: 'from-slate-900 via-indigo-950 to-slate-900',
+    accentColor: 'text-indigo-300',
+    ctaLabel: 'View Marketplace',
+    action: 'MARKET',
+    icon: ShieldCheck,
+  },
 ];
 
 export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAction }) => {
@@ -114,24 +215,37 @@ export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAct
 
   const slides = React.useMemo(() => {
     switch (hubType) {
-      case 'GAMES': 
-      case 'QUIZ': return GAMES_SLIDES;
-      case 'MARKET': return MARKET_SLIDES;
-      case 'EDUCATION': return EDUCATION_SLIDES;
-      case 'ZOOM': return ZOOM_SLIDES;
+      case 'GAMES':
+      case 'QUIZ':
+        return GAMES_SLIDES;
+      case 'MARKET':
+      case 'FAIRLY_USED':
+        return MARKET_SLIDES;
+      case 'EDUCATION':
+        return EDUCATION_SLIDES;
+      case 'ZOOM':
+        return ZOOM_SLIDES;
       case 'HOME':
       case 'DASHBOARD':
-      default: return DASHBOARD_SLIDES;
+      default:
+        return DASHBOARD_SLIDES;
     }
   }, [hubType]);
 
   useEffect(() => {
-    if (!isAutoPlaying) return;
+    setCurrentIndex(0);
+  }, [hubType]);
+
+  useEffect(() => {
+    if (!isAutoPlaying || slides.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [isAutoPlaying, slides.length]);
+
+  const currentSlide = slides[currentIndex] || slides[0];
+  const SlideIcon = currentSlide.icon;
 
   const nextSlide = () => {
     setIsAutoPlaying(false);
@@ -144,161 +258,104 @@ export const HubHeroCarousel: React.FC<HubHeroCarouselProps> = ({ hubType, onAct
   };
 
   return (
-    <div className="relative w-full h-[400px] sm:h-[460px] md:h-[520px] lg:h-[580px] rounded-2xl sm:rounded-3xl md:rounded-[3rem] overflow-hidden shadow-2xl mb-6 sm:mb-10 group border-2 sm:border-4 border-white/5">
+    <div className="relative w-full min-h-[300px] sm:min-h-[360px] md:min-h-[400px] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl border border-white/10 bg-slate-900">
       <AnimatePresence mode="wait">
         <motion.div
-          key={currentIndex}
+          key={`${hubType}-${currentIndex}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.8 }}
-          className="absolute inset-0"
+          transition={{ duration: 0.35 }}
+          className={`relative w-full min-h-[300px] sm:min-h-[360px] md:min-h-[400px] bg-gradient-to-br ${currentSlide.gradient} flex flex-col justify-between p-5 sm:p-8 md:p-12`}
         >
-          {/* Background Image with Cinematic Ken Burns Effect - Optimized */}
-          <motion.div
-            initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
-            transition={{ duration: 15, repeat: Infinity, repeatType: "reverse", ease: "linear" }}
-            className="absolute inset-0"
-            style={{ willChange: 'transform' }}
-          >
-            <img
-              src={slides[currentIndex].image}
-              alt={slides[currentIndex].title}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </motion.div>
+          {/* Subtle Ambient Glow */}
+          <div className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl" />
 
-          {/* Cinematic Overlays */}
-          <div className={`absolute inset-0 bg-gradient-to-r ${slides[currentIndex].color} opacity-75 mix-blend-multiply`} />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent opacity-95" />
-          
-          {/* Live Indicator Overlay (Advert Mode) */}
-          <div className="absolute top-4 sm:top-8 left-4 sm:left-8 z-20 flex items-center gap-2 sm:gap-3">
-             <div className="px-3 py-1 bg-rose-600/90 backdrop-blur-md text-white rounded-full flex items-center gap-1.5 shadow-md">
-                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                <span className="text-[9px] font-black uppercase tracking-wider mt-0.5">Live Broadcast</span>
-             </div>
-             <div className="hidden xs:flex items-center gap-1.5 text-white/70">
-                <Activity className="w-3.5 h-3.5" />
-                <span className="text-[9px] font-bold uppercase tracking-wider">Feed Active</span>
-             </div>
+          {/* Top Bar inside Hero */}
+          <div className="relative z-10 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 text-xs font-semibold text-white">
+              <SlideIcon className={`w-4 h-4 ${currentSlide.accentColor}`} />
+              <span>{currentSlide.tag}</span>
+            </span>
+
+            {slides.length > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={prevSlide}
+                  aria-label="Previous slide"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={nextSlide}
+                  aria-label="Next slide"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/10 transition-colors cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="absolute inset-0 flex flex-col justify-end pb-6 sm:pb-10 md:pb-14 px-4 sm:px-8 md:px-16">
-            <div className="max-w-3xl">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="flex items-center gap-2.5 sm:gap-3 mb-2 sm:mb-4"
+          {/* Center/Bottom Content */}
+          <div className="relative z-10 max-w-2xl my-6 sm:my-8">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight mb-3">
+              {currentSlide.title}
+            </h1>
+            <p className="text-sm sm:text-base text-slate-200 leading-relaxed max-w-xl mb-6">
+              {currentSlide.description}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => onAction && onAction(currentSlide.action || 'DASHBOARD', currentSlide.subview)}
+                className="min-h-[44px] px-5 sm:px-6 py-2.5 bg-white hover:bg-slate-100 text-slate-950 rounded-xl font-semibold text-sm shadow-lg transition-colors flex items-center gap-2 cursor-pointer"
               >
-                <div className="px-3 py-1 bg-white/10 backdrop-blur-xl border border-white/20 rounded-lg">
-                  <span className="text-[9px] sm:text-[10px] font-black text-white uppercase tracking-[0.2em]">
-                    {slides[currentIndex].tag}
-                  </span>
-                </div>
-                <div className="h-px w-12 sm:w-16 bg-gradient-to-r from-white/40 to-transparent" />
-                <MonitorPlay className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/60" />
-              </motion.div>
-
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 120 }}
-                className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-black text-white uppercase tracking-tight mb-2 sm:mb-4 leading-tight drop-shadow-2xl"
-              >
-                {slides[currentIndex].title.split(" ").map((word, i) => (
-                  <span key={i} className={i % 2 === 1 ? 'text-indigo-400' : ''}>{word} </span>
-                ))}
-              </motion.h2>
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="text-xs sm:text-sm md:text-base text-slate-300 font-medium max-w-xl mb-4 sm:mb-6 leading-relaxed line-clamp-2 sm:line-clamp-3 drop-shadow"
-              >
-                {slides[currentIndex].description}
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                className="flex flex-wrap items-center gap-4"
-              >
-                <button 
-                  onClick={() => onAction && onAction(slides[currentIndex].action || 'DASHBOARD', slides[currentIndex].subview)}
-                  className="min-h-[48px] px-6 sm:px-8 py-3 bg-white text-slate-950 rounded-xl font-bold uppercase tracking-wider text-base shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                <span>{currentSlide.ctaLabel}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              {currentSlide.secondaryLabel && (
+                <button
+                  type="button"
+                  onClick={() => onAction && onAction('MARKET')}
+                  className="min-h-[44px] px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl font-semibold text-sm transition-colors cursor-pointer"
                 >
-                  <Play className="w-4 h-4 fill-current" /> Enter Arena
+                  Browse Hubs
                 </button>
-                <button 
-                  onClick={() => onAction && onAction(slides[currentIndex].action || 'GIST', slides[currentIndex].subview)}
-                  className="min-h-[48px] px-6 sm:px-8 py-3 bg-white/10 backdrop-blur-2xl text-white border border-white/20 rounded-xl font-bold uppercase tracking-wider text-base hover:bg-white/20 transition-all flex items-center justify-center gap-2 group cursor-pointer"
-                >
-                  <Video className="w-4 h-4 text-indigo-400 group-hover:text-white transition-colors" /> View Intel
-                </button>
-              </motion.div>
+              )}
             </div>
           </div>
+
+          {/* Slide Dots + Counter */}
+          {slides.length > 1 && (
+            <div className="relative z-10 flex items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {slides.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Go to slide ${i + 1}`}
+                    onClick={() => {
+                      setIsAutoPlaying(false);
+                      setCurrentIndex(i);
+                    }}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      currentIndex === i ? 'w-8 bg-white' : 'w-3 bg-white/30 hover:bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-xs font-mono text-slate-300 tabular-nums shrink-0">
+                {currentIndex + 1} / {slides.length}
+              </span>
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
-
-      {/* Modern Navigation Controls */}
-      <div className="absolute inset-y-0 left-0 w-32 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={prevSlide}
-          className="p-6 bg-black/20 backdrop-blur-2xl border border-white/10 rounded-full text-white hover:bg-white/20 transition-all"
-        >
-          <ChevronLeft className="w-8 h-8" />
-        </button>
-      </div>
-      <div className="absolute inset-y-0 right-0 w-32 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={nextSlide}
-          className="p-6 bg-black/20 backdrop-blur-2xl border border-white/10 rounded-full text-white hover:bg-white/20 transition-all"
-        >
-          <ChevronRight className="w-8 h-8" />
-        </button>
-      </div>
-
-      {/* Cinematic Slide Indicators */}
-      <div className="absolute bottom-12 right-24 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setIsAutoPlaying(false);
-                setCurrentIndex(i);
-              }}
-              className="group relative px-1 py-4"
-            >
-              <div className={`h-1 transition-all rounded-full ${
-                currentIndex === i ? 'w-12 bg-indigo-500' : 'w-4 bg-white/20 group-hover:bg-white/40'
-              }`} />
-            </button>
-          ))}
-        </div>
-        <div className="h-px w-12 bg-white/20 mx-4" />
-        <span className="text-white/60 font-mono text-sm tracking-widest">
-          {String(currentIndex + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
-        </span>
-      </div>
-
-      {/* Floating Status Widgets */}
-      <div className="absolute top-10 right-12 flex items-center gap-4 pointer-events-none">
-        <div className="glass-card p-4 rounded-2xl flex flex-col items-end">
-           <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Ecosystem Status</span>
-           <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-white">SYNC ACTIVE</span>
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-           </div>
-        </div>
-      </div>
     </div>
   );
 };

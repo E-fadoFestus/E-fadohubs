@@ -98,7 +98,7 @@ export const LoanVendorRegistration: React.FC<LoanVendorRegistrationProps> = ({ 
     },
     {
       id: 'gold',
-      name: 'Gold Sovereign Pool',
+      name: 'Gold Partner Pool',
       price: 10000,
       limit: 100000,
       fee: '0.5%',

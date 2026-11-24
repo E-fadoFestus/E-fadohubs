@@ -69,12 +69,12 @@ const DEFAULT_COMMUNITIES: CommunityGroup[] = [
     name: 'Web3, Crypto & FX Traders',
     tag: '#Crypto',
     category: 'Finance',
-    description: 'Market analysis, sovereign digital tokens, P2P safety, and decentralized finance education.',
+    description: 'Market updates, digital assets, P2P safety tips, and crypto education.',
     avatarUrl: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?auto=format&fit=crop&w=200&q=80',
     bannerUrl: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=800&q=80',
     membersCount: 29400,
     members: [],
-    moderators: ['Crypto Victor', 'Sovereign Desk'],
+    moderators: ['Crypto Victor', 'Community Desk'],
     rules: ['DYOR - Do Your Own Research', 'No unsolicited DMs', 'Share verified charts']
   },
   {
@@ -148,8 +148,8 @@ export const GistCommunities: React.FC<GistCommunitiesProps> = ({ user, onSelect
       tag: formattedTag,
       category: newCommCategory,
       description: newCommDesc.trim(),
-      avatarUrl: `https://picsum.photos/seed/${Date.now()}/200/200`,
-      bannerUrl: `https://picsum.photos/seed/${Date.now() + 1}/800/400`,
+      avatarUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=200&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=800&q=80',
       membersCount: 1,
       members: [user.uid],
       moderators: [user.displayName || 'Creator'],
@@ -191,7 +191,7 @@ export const GistCommunities: React.FC<GistCommunitiesProps> = ({ user, onSelect
               Connect, Trade & Gist in Specialized Circles
             </h2>
             <p className="text-sm text-slate-300 font-normal mt-2 max-w-2xl leading-relaxed">
-              Join active interest groups or create your own sovereign hub to build an audience, host discussions, and monetize your influence.
+              Join active interest groups or start your own community group to build an audience, host discussions, and grow together.
             </p>
           </div>
 
@@ -352,7 +352,7 @@ export const GistCommunities: React.FC<GistCommunitiesProps> = ({ user, onSelect
                   <Users className="w-7 h-7 text-white" />
                 </div>
                 <h3 className="text-xl font-bold">Create EFADO Community</h3>
-                <p className="text-xs text-slate-400 mt-1">Lead a sovereign tribe and grow recurring traffic for your topics!</p>
+                <p className="text-xs text-slate-400 mt-1">Start a thriving community group around the topics you care about!</p>
               </div>
 
               <form onSubmit={handleCreateCommunity} className="space-y-4">

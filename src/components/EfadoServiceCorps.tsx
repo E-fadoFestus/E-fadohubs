@@ -351,35 +351,35 @@ const PRE_SEEDED_TESTIMONIES = [
   {
     id: 'seed-1',
     clientName: 'Sarah Jenkins',
-    clientPhoto: 'https://picsum.photos/seed/sarah/200/200',
-    providerName: 'Delta Mech-Squad',
+    clientPhoto: '',
+    providerName: 'Delta Solar & Electricals',
     subcategory: 'Solar panel installation',
     rating: 5,
-    testimonyText: 'Successfully transitioned our entire distribution warehouse to clean Solar energy. Vetted high-skill execution and absolute execution trust!',
+    testimonyText: 'Successfully installed clean solar power for our entire warehouse on schedule with clear pricing.',
     createdAt: Date.now() - 3600000 * 2,
-    proficiencyChecks: ['High-Skill Execution', 'Absolute Transparency']
+    proficiencyChecks: ['Verified Work', 'Clear Pricing']
   },
   {
     id: 'seed-2',
     clientName: 'Captain Adebayo',
-    clientPhoto: 'https://picsum.photos/seed/adebayo/200/200',
-    providerName: 'Sovereign Marine Inc.',
+    clientPhoto: '',
+    providerName: 'Coastal Marine Engineering',
     subcategory: 'Marine systems inspection',
     rating: 5,
-    testimonyText: 'Top-tier marine diagnostics and process optimization. Handshake verification secured our operation with flawless reliability!',
+    testimonyText: 'Reliable inspection and maintenance work. Protected milestone approval gave us full peace of mind.',
     createdAt: Date.now() - 3600000 * 12,
-    proficiencyChecks: ['Double-Secured Validation', 'Intrusion-Safe Verification']
+    proficiencyChecks: ['Verified Quality', 'Milestone Protected']
   },
   {
     id: 'seed-3',
     clientName: 'Liam Gallagher',
-    clientPhoto: 'https://picsum.photos/seed/liam/200/200',
+    clientPhoto: '',
     providerName: 'Apex Structural Group',
     subcategory: 'Structural planning support',
     rating: 5,
-    testimonyText: 'Elite mobilization speed for cost analysis and feasibility mapping. Recommending this system for global operations.',
+    testimonyText: 'Fast site visit and clear cost breakdown for our commercial building project. Highly recommended.',
     createdAt: Date.now() - 3600000 * 24,
-    proficiencyChecks: ['Punctual Delivery', 'Exemplary Coordination']
+    proficiencyChecks: ['On-Time Delivery', 'Great Communication']
   }
 ];
 
@@ -516,47 +516,32 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
           <>
             <HubGuideNote guideId="serviceCorps" variant="dark" className="mb-8" />
             {/* Header */}
-            <div className="mb-20 text-center relative">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="inline-flex items-center gap-3 px-6 py-2 bg-indigo-500/10 text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-[0.4em] mb-8 border border-white/5 backdrop-blur-3xl shadow-[0_0_40px_rgba(99,102,241,0.1)]"
-          >
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            Strategic Operations Center
-          </motion.div>
+          <div className="mb-12 text-center relative">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-500/10 text-indigo-300 rounded-full text-xs font-semibold mb-5 border border-indigo-500/20">
+            Verified Professionals Directory
+          </div>
           
-          <div className="relative inline-block mb-8">
-            <h1 className="text-6xl md:text-9xl font-black text-white tracking-tighter leading-[0.8] mb-4">
-              Service <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-400">CORPS</span>
+          <div className="mb-4">
+            <h1 className="text-3xl sm:text-5xl font-bold text-white tracking-tight">
+              EFADO <span className="text-indigo-400">Service Corps</span>
             </h1>
-            <div className="absolute -right-12 top-0 rotate-12 hidden md:block">
-              <div className="px-4 py-1 bg-white/5 border border-white/10 backdrop-blur-xl rounded-lg">
-                <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">v2.0 Neural Link</span>
-              </div>
-            </div>
           </div>
 
-          <p className="text-slate-500 max-w-3xl mx-auto text-lg md:text-xl font-medium leading-relaxed mb-12 opacity-80">
-            Access a vetted global network of tactical experts across <span className="text-white">14 elite service families</span>. 
-            From deep-stack engineering to strategic consultancy—deploy intelligence at scale.
+          <p className="text-slate-300 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed mb-8">
+            Hire skilled tradespeople, technicians, and verified professionals across <span className="text-white font-semibold">14 service categories</span>, or register to get hired by local and international clients.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <button 
               onClick={() => {
                 setRegistrationType('PROVIDER');
                 setPrefilledData(null);
                 setShowRegistration(true);
               }}
-              className="group relative px-12 py-6 bg-white text-slate-950 rounded-[2rem] font-black tracking-tighter text-sm overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
+              className="px-7 py-4 bg-white hover:bg-slate-100 text-slate-950 rounded-2xl font-semibold text-sm transition-all shadow-lg flex items-center gap-2.5"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-white via-slate-100 to-white group-hover:translate-x-full transition-transform duration-1000" />
-              <span className="relative flex items-center gap-4">
-                <UserPlus className="w-5 h-5" />
-                MANIFEST AS PROVIDER
-              </span>
+              <UserPlus className="w-5 h-5" />
+              Register as a Provider
             </button>
             <button 
               onClick={() => {
@@ -564,12 +549,10 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
                 setPrefilledData(null);
                 setShowRegistration(true);
               }}
-              className="group px-12 py-6 bg-slate-900 border border-white/5 backdrop-blur-3xl text-white rounded-[2rem] font-black tracking-tighter text-sm hover:bg-slate-800 transition-all shadow-2xl flex items-center gap-4"
+              className="px-7 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-semibold text-sm transition-all shadow-lg flex items-center gap-2.5"
             >
-              <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors">
-                <ClipboardList className="w-5 h-5 text-indigo-400" />
-              </div>
-              STRATEGIC DEPLOYMENT
+              <ClipboardList className="w-5 h-5" />
+              Request a Service
             </button>
           </div>
         </div>
@@ -875,15 +858,21 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <img 
-                            src={testimony.clientPhoto || `https://picsum.photos/seed/${testimony.clientId || 'client'}/100/100`} 
-                            alt={testimony.clientName} 
-                            className="w-10 h-10 rounded-xl object-cover border border-white/10"
-                            referrerPolicy="no-referrer"
-                          />
+                          {testimony.clientPhoto ? (
+                            <img 
+                              src={testimony.clientPhoto} 
+                              alt={testimony.clientName} 
+                              className="w-10 h-10 rounded-xl object-cover border border-white/10"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-sm font-bold text-indigo-300 shrink-0">
+                              {(testimony.clientName || 'U').charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div className="min-w-0">
-                            <h5 className="text-xs font-black text-white truncate uppercase tracking-wider">{testimony.clientName}</h5>
-                            <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-widest truncate">Verified Beneficiary</p>
+                            <h5 className="text-xs font-bold text-white truncate">{testimony.clientName}</h5>
+                            <p className="text-xs text-slate-400 truncate">Verified Client</p>
                           </div>
                         </div>
                       </div>
@@ -902,10 +891,10 @@ export const EfadoServiceCorps: React.FC<EfadoServiceCorpsProps> = ({ user, onCl
             >
               <button 
                 onClick={() => setSelectedFamily(null)}
-                className="flex items-center gap-2 text-slate-500 hover:text-white font-bold tracking-tight text-xs transition-colors group"
+                className="flex items-center gap-2 text-slate-400 hover:text-white font-semibold text-sm transition-colors group"
               >
                 <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                Return to Intelligence
+                Back to All Services
               </button>
 
               <div className={`relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-gradient-to-br from-indigo-900/60 to-slate-900/80 backdrop-blur-3xl p-12 mb-12 shadow-2xl`}>

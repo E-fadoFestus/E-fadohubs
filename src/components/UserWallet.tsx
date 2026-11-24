@@ -741,7 +741,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
           status: 'completed',
           credited: true,
           creditedPocket: `wallets/${user.uid}/NGN/depositWallet`,
-          method: 'Internal Sovereign Swap',
+          method: 'Internal Currency Swap',
           hub: 'WALLET',
           purpose: 'Currency Swap to Stakes',
           reference,
@@ -797,7 +797,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, { photoURL: base64String });
         setProfileMessage({
-          text: 'Sovereign Avatar Node updated and stored successfully.',
+          text: 'Profile photo updated and saved successfully.',
           type: 'success'
         });
       } catch (err: any) {
@@ -1137,7 +1137,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                                   const userRef = doc(db, 'users', user.uid);
                                   await updateDoc(userRef, { photoURL: avatar.url });
                                   setProfileMessage({
-                                    text: `Sovereign Avatar updated to preset [${avatar.name}] successfully.`,
+                                    text: `Profile photo updated to [${avatar.name}].`,
                                     type: 'success'
                                   });
                                 } catch (err: any) {
@@ -1222,7 +1222,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   {/* FORM CARD 1: User Identity Statement */}
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <User className="w-4 h-4 text-indigo-500" /> 01. Cryptographic Identity & Status
+                      <User className="w-4 h-4 text-indigo-500" /> 01. Personal Profile Details
                     </h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1279,7 +1279,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   {/* FORM CARD 2: Bank Details */}
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <Building2 className="w-4 h-4 text-indigo-500" /> 02. Sovereign Bank Payout Account (Cash Out Route)
+                      <Building2 className="w-4 h-4 text-indigo-500" /> 02. Linked Bank Payout Account (For Withdrawals)
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1328,7 +1328,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   {/* FORM CARD 3: Mobile Money / Crypto */}
                   <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
                     <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <Smartphone className="w-4 h-4 text-indigo-500" /> 03. Decentralized Mobile Money & Crypto Wallets
+                      <Smartphone className="w-4 h-4 text-indigo-500" /> 03. Mobile Money & Crypto Wallets
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1415,14 +1415,14 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                     <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="space-y-3 text-left">
                         <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Canonical Sovereign Asset Node</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Main EFADO Account Wallet</span>
                           <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Total NGN Account Balance</h4>
                         </div>
                         <h3 className="text-3xl md:text-5xl font-black font-display text-white tracking-tight italic">
                           ₦{((user.walletPockets?.NGN ?? user.depositWallet ?? 0) + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}
                         </h3>
                         <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
-                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Single Canonical Ledger Active
+                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Central Wallet Active
                         </div>
                       </div>
 
@@ -1908,16 +1908,12 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                   )}
                 </div>
 
-                <div className="mt-8 flex items-center justify-center gap-12 border-t border-gray-50 pt-8">
-                  <div className="flex items-center gap-2 opacity-30 grayscale hover:grayscale-0 transition-all cursor-crosshair">
-                    <img src="https://picsum.photos/seed/visa/100/40" alt="Visa" className="h-6 object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex items-center gap-2 opacity-30 grayscale hover:grayscale-0 transition-all cursor-crosshair">
-                    <img src="https://picsum.photos/seed/mastercard/100/40" alt="Mastercard" className="h-6 object-contain" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="flex items-center gap-2 opacity-30 grayscale hover:grayscale-0 transition-all cursor-crosshair">
-                    <img src="https://picsum.photos/seed/secure/100/40" alt="Secure" className="h-6 object-contain" referrerPolicy="no-referrer" />
-                  </div>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-gray-100 pt-8">
+                  <span className="px-4 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-black tracking-wider text-slate-700">VISA</span>
+                  <span className="px-4 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-black tracking-wider text-slate-700">Mastercard</span>
+                  <span className="px-4 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-black tracking-wider text-emerald-700 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" /> SSL Secured Checkout
+                  </span>
                 </div>
               </motion.div>
             )}
@@ -2531,7 +2527,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-md">
                   <ArrowRightLeft className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Sovereign Currency Swap Hub</h3>
+                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Currency Converter</h3>
                 <p className="text-xs text-gray-500 font-medium leading-relaxed">
                   Convert funds from any of your segregated vaults directly into 🏦 Deposit Stakes for immediate gaming and lottery gameplay.
                 </p>
@@ -2574,7 +2570,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, o
                 {/* Live Rate Badge */}
                 {['usd_balance', 'gbp_balance', 'eur_balance'].includes(swapSource) && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-                    <span className="text-[10px] font-bold text-emerald-800">Sovereign Exchange Rate</span>
+                    <span className="text-[10px] font-bold text-emerald-800">Current Exchange Rate</span>
                     <span className="text-xs font-black text-emerald-700 font-mono">
                       {swapSource === 'usd_balance' && '1 USD = ₦1,500'}
                       {swapSource === 'gbp_balance' && '1 GBP = ₦1,900'}

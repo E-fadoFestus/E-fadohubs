@@ -158,7 +158,7 @@ export const HUB_GUIDES: Record<HubGuideId, HubGuideContent> = {
     steps: [
       'Need help? Search by skill or browse the 14 service categories, pick a service, and describe what you need.',
       'Agree on a fair price inside the live bargain screen and confirm your location.',
-      'Have a trade or skill? Tap "Manifest as Provider" to register your specialty, area, and experience so customers find you.',
+      'Have a trade or skill? Tap "Register as Provider" to add your specialty, area, and experience so customers can find you.',
       'Switch to the "EFADOworks Online" tab at the top anytime if you offer online remote skills.'
     ],
     whatHappensNext:

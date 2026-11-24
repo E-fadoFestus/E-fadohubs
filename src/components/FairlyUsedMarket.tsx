@@ -370,7 +370,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
       title: ad.title || 'Pre-Owned Asset',
       price: Number(ad.price) || 0,
       currency: 'NGN',
-      images: (ad.photos && ad.photos.length > 0) ? ad.photos : [`https://picsum.photos/seed/${ad.id}/600/400`],
+      images: (ad.photos && ad.photos.length > 0) ? ad.photos : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'],
       rating: 5.0,
       reviewsCount: 12,
       vendor: {
@@ -500,7 +500,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         },
         customizations: {
           title: 'EFADO Marketplace (Used)',
-          description: 'Secure Sovereign Escrow Order Protocol',
+          description: 'Protected EFADO Escrow Order',
           logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=100&q=80'
         }
       });
@@ -694,63 +694,79 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden"
       >
         {/* Header */}
-        <div className="px-6 md:px-10 py-5 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <ShoppingBag className="w-6 h-6 text-white" />
+        <div className="px-4 sm:px-6 md:px-10 py-4 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
+                <ShoppingBag className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h2 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">EFADO <span className="text-indigo-400">Fairly Used</span> Market Hub</h2>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Where Fairly Used Products Find New Homes</p>
+              <div className="min-w-0">
+                <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight truncate">
+                  EFADO <span className="text-indigo-400">Fairly Used Market</span>
+                </h2>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Quality pre-owned items from verified sellers
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button 
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
                 onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-2.5 px-4 py-2.5 text-slate-200 hover:text-white transition-all bg-slate-800 rounded-2xl hover:bg-slate-700 group border border-slate-700"
+                className="relative flex items-center gap-2 px-3.5 py-2 text-slate-100 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700 text-xs font-semibold"
               >
                 <div className="relative">
-                  <ShoppingBag className="w-5 h-5 text-indigo-400" />
+                  <ShoppingBag className="w-4 h-4 text-indigo-400" />
                   {cart.length > 0 && (
-                    <span className="absolute -top-2 -right-2 w-5 h-5 bg-indigo-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40">
+                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-indigo-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
                       {cart.reduce((sum, item) => sum + item.quantity, 0)}
                     </span>
                   )}
                 </div>
-                <div className="text-left hidden sm:block">
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">My Cart</p>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">View & Checkout</p>
-                </div>
+                <span className="hidden sm:inline">Cart</span>
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={() => setShowRegModal(true)}
-                className="group flex flex-col items-center bg-indigo-600 hover:bg-indigo-500 px-5 py-2 rounded-2xl transition-all shadow-lg shadow-indigo-500/20"
+                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors"
               >
-                <span className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-1.5">
-                  <UserPlus className="w-3 h-3" /> Vendor Registration
-                </span>
-                <span className="text-[8px] font-bold text-indigo-200 uppercase tracking-tighter">Register & Upload Products</span>
+                <UserPlus className="w-4 h-4" />
+                <span>Become a Seller</span>
               </button>
               <CurrencySelector />
-              <button onClick={onClose} className="p-2.5 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-2xl hover:bg-slate-700 border border-slate-700" title="Close Hub">
-                <X className="w-6 h-6" />
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 text-slate-300 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700"
+                title="Close Hub"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-6 mt-4">
-            <button 
+          <div className="flex items-center gap-5 mt-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
               onClick={() => setActiveView('browse')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'browse' ? 'border-indigo-400 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                activeView === 'browse'
+                  ? 'border-indigo-400 text-indigo-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
             >
               Browse Items
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => setActiveView('orders')}
-              className={`pb-2 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeView === 'orders' ? 'border-indigo-400 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+              className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                activeView === 'orders'
+                  ? 'border-indigo-400 text-indigo-400'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
             >
-              My Orders & Tracking
+              My Orders &amp; Tracking
             </button>
           </div>
         </div>
@@ -759,283 +775,300 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
         <div className="flex-grow overflow-hidden relative">
           <AnimatePresence mode="wait">
             {activeView === 'browse' ? (
-              <motion.div 
+              <motion.div
                 key="browse"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="h-full flex flex-col p-4 sm:p-6 md:p-8 overflow-y-auto custom-scrollbar"
+                className="h-full overflow-y-auto custom-scrollbar"
               >
-                <HubGuideNote guideId="marketplace" variant="dark" className="mb-4 shrink-0" />
-                {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 mb-6 bg-slate-900 px-5 py-3 rounded-2xl border border-slate-800 self-start shadow-sm">
-            <ShoppingBag className="w-4 h-4 text-indigo-400" />
-            <ChevronRight className="w-3 h-3 text-slate-600" />
-            <span className={`text-xs font-black uppercase tracking-widest ${selectedL1 ? 'text-white' : 'text-slate-500'}`}>
-              {selectedL1 || 'Select Category'}
-            </span>
-            {selectedL2 && (
-              <>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL2}</span>
-              </>
-            )}
-            {selectedL3 && (
-              <>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-black text-white uppercase tracking-widest">{selectedL3}</span>
-              </>
-            )}
-            {selectedL4 && (
-              <>
-                <ChevronRight className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-black text-indigo-400 uppercase tracking-widest">{selectedL4}</span>
-              </>
-            )}
-          </div>
+                <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6">
+                  <HubGuideNote guideId="marketplace" variant="dark" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Level 1: Category */}
-            <div className="space-y-3 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
-                <span>1. Category</span>
-                <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center">1</span>
-              </h3>
-              <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                {Object.keys(CATEGORIES).map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setSelectedL1(cat);
-                      setSelectedL2(null);
-                      setSelectedL3(null);
-                      setSelectedL4(null);
-                    }}
-                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
-                      selectedL1 === cat 
-                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/20 font-black' 
-                        : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                    }`}
-                  >
-                    <span className="text-xs uppercase tracking-tight leading-tight">{cat}</span>
-                    <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL1 === cat ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Level 2: Section */}
-            <div className="space-y-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
-              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
-                <span>2. Section</span>
-                <span className="w-5 h-5 rounded-lg bg-purple-600 text-white text-[10px] font-black flex items-center justify-center">2</span>
-              </h3>
-              {selectedL1 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                  {Object.keys(CATEGORIES[selectedL1]).map(sub => (
-                    <button
-                      key={sub}
-                      onClick={() => {
-                        setSelectedL2(sub);
-                        setSelectedL3(null);
-                        setSelectedL4(null);
-                      }}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
-                        selectedL2 === sub 
-                          ? 'bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-500/20 font-black' 
-                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-xs uppercase tracking-tight leading-tight">{sub}</span>
-                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL2 === sub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
-                  <Info className="w-6 h-6 mb-2 text-slate-600" />
-                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Category First</p>
-                </div>
-              )}
-            </div>
-
-            {/* Level 3: Subcategory */}
-            <div className="space-y-3 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
-                <span>3. Subcategory</span>
-                <span className="w-5 h-5 rounded-lg bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">3</span>
-              </h3>
-              {selectedL2 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                  {Object.keys(CATEGORIES[selectedL1!][selectedL2]).map(subSub => (
-                    <button
-                      key={subSub}
-                      onClick={() => {
-                        setSelectedL3(subSub);
-                        setSelectedL4(null);
-                      }}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
-                        selectedL3 === subSub 
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20 font-black' 
-                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-xs uppercase tracking-tight leading-tight">{subSub}</span>
-                      <ChevronRight className={`w-3.5 h-3.5 transition-transform ${selectedL3 === subSub ? 'translate-x-1' : 'opacity-0 group-hover:opacity-100 text-slate-400'}`} />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
-                  <Info className="w-6 h-6 mb-2 text-slate-600" />
-                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Section First</p>
-                </div>
-              )}
-            </div>
-
-            {/* Level 4: Group */}
-            <div className="space-y-3 bg-slate-900/70 p-3 rounded-2xl border border-slate-800">
-              <h3 className="text-[11px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex items-center justify-between">
-                <span>4. Group</span>
-                <span className="w-5 h-5 rounded-lg bg-emerald-600 text-white text-[10px] font-black flex items-center justify-center">4</span>
-              </h3>
-              {selectedL3 ? (
-                <div className="grid grid-cols-1 gap-2 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                  {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group, idx) => (
-                    <button
-                      key={`group-${group}-${idx}`}
-                      onClick={() => setSelectedL4(group)}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border transition-all text-left group ${
-                        selectedL4 === group 
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-500/20 font-black' 
-                          : 'bg-slate-800/80 border-slate-700 text-slate-200 font-extrabold hover:bg-slate-700 hover:border-slate-500 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-xs uppercase tracking-tight leading-tight">{group}</span>
-                      <CheckCircle2 className={`w-3.5 h-3.5 transition-all ${selectedL4 === group ? 'scale-110 text-emerald-400' : 'opacity-0 text-slate-400'}`} />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="h-48 flex flex-col items-center justify-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-500">
-                  <Info className="w-6 h-6 mb-2 text-slate-600" />
-                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Select Subcategory First</p>
-                </div>
-              )}
-            </div>
-
-            {/* Product Display Area */}
-            <div className="lg:col-span-1 space-y-3 bg-slate-950 p-3 rounded-2xl border border-slate-800">
-              <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] pb-2 border-b border-slate-800 flex justify-between items-center">
-                <span>Products</span>
-                <span className="bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full text-[9px] font-black border border-indigo-500/30">{filteredProducts.length} Items</span>
-              </h3>
-              <div className="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
-                {filteredProducts.length === 0 ? (
-                  <div className="p-6 text-center bg-slate-900 rounded-2xl border border-dashed border-slate-800">
-                    <Package className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">No items in this category yet</p>
+                  {/* Breadcrumbs */}
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-800 text-xs">
+                    <ShoppingBag className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                    <span className={selectedL1 ? 'text-white font-semibold' : 'text-slate-400'}>
+                      {selectedL1 || 'All Categories'}
+                    </span>
+                    {selectedL2 && (
+                      <>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-white font-semibold">{selectedL2}</span>
+                      </>
+                    )}
+                    {selectedL3 && (
+                      <>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-white font-semibold">{selectedL3}</span>
+                      </>
+                    )}
+                    {selectedL4 && (
+                      <>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-indigo-300 font-semibold">{selectedL4}</span>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  filteredProducts.map(product => (
-                    <motion.div 
-                       layout
-                       initial={{ opacity: 0, scale: 0.9 }}
-                       animate={{ opacity: 1, scale: 1 }}
-                       key={product.id}
-                       id={`used-product-${product.id}`}
-                       onClick={() => setPreviewProduct(product)}
-                       className="bg-slate-900 border border-slate-800 shadow-md rounded-2xl p-3 group hover:border-indigo-500/50 transition-all cursor-pointer"
-                    >
-                      <div className="relative aspect-video rounded-xl overflow-hidden mb-2.5">
-                        <img 
-                          src={product.photos[0]} 
-                          alt={product.title} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute top-2 right-2 flex flex-col gap-1">
-                          <div className="px-2 py-0.5 bg-slate-900/90 backdrop-blur-md rounded-lg border border-slate-700 shadow-sm">
-                            <span className="text-[10px] font-black text-indigo-400">${product.price}</span>
-                          </div>
-                        </div>
-                        <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-indigo-600 rounded-lg text-[8px] font-black text-white uppercase tracking-widest">
-                          {product.condition}
-                        </div>
+
+                  {/* 4-Step Category Filter Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {/* Level 1 */}
+                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">1</span>
+                        <span>Category</span>
+                      </h3>
+                      <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                        {Object.keys(CATEGORIES).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setSelectedL1(cat);
+                              setSelectedL2(null);
+                              setSelectedL3(null);
+                              setSelectedL4(null);
+                            }}
+                            className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                              selectedL1 === cat
+                                ? 'bg-indigo-600 border-indigo-400 text-white'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">{cat}</span>
+                            <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                          </button>
+                        ))}
                       </div>
-                      <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">{product.title}</h4>
-                      <div className="flex items-center justify-between mt-1 mb-2.5">
-                        <div className="flex items-center gap-1.5 text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[100px]">
-                          <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
-                          {product.location}
+                    </div>
+
+                    {/* Level 2 */}
+                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center">2</span>
+                        <span>Section</span>
+                      </h3>
+                      {selectedL1 ? (
+                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                          {Object.keys(CATEGORIES[selectedL1]).map((sub) => (
+                            <button
+                              key={sub}
+                              type="button"
+                              onClick={() => {
+                                setSelectedL2(sub);
+                                setSelectedL3(null);
+                                setSelectedL4(null);
+                              }}
+                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                                selectedL2 === sub
+                                  ? 'bg-purple-600 border-purple-400 text-white'
+                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                              }`}
+                            >
+                              <span className="truncate">{sub}</span>
+                              <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                            </button>
+                          ))}
                         </div>
-                        <span className="text-[10px] font-black text-indigo-400">{formatPrice(product.price, true)}</span>
-                      </div>
-                      
-                      {product.video && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigate?.('GIST', 'REELS');
-                            onClose();
-                          }}
-                          className="w-full mb-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-rose-500 text-black font-black text-[9px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-md"
-                        >
-                          <Film className="w-3.5 h-3.5 animate-pulse" /> Watch Product Reel
-                        </button>
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
+                          Choose a category first
+                        </div>
                       )}
+                    </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                          }}
-                          className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
-                        >
-                          <Plus className="w-3 h-3 text-indigo-400" /> Add
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                            setShowCart(true);
-                          }}
-                          className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all shadow-md shadow-indigo-900/30"
-                        >
-                          <ShoppingBag className="w-3 h-3" /> Buy Now
-                        </button>
+                    {/* Level 3 */}
+                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">3</span>
+                        <span>Subcategory</span>
+                      </h3>
+                      {selectedL2 ? (
+                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                          {Object.keys(CATEGORIES[selectedL1!][selectedL2]).map((subSub) => (
+                            <button
+                              key={subSub}
+                              type="button"
+                              onClick={() => {
+                                setSelectedL3(subSub);
+                                setSelectedL4(null);
+                              }}
+                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                                selectedL3 === subSub
+                                  ? 'bg-blue-600 border-blue-400 text-white'
+                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                              }`}
+                            >
+                              <span className="truncate">{subSub}</span>
+                              <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
+                          Choose a section first
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Level 4 */}
+                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
+                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center">4</span>
+                        <span>Item Type</span>
+                      </h3>
+                      {selectedL3 ? (
+                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+                          {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group, idx) => (
+                            <button
+                              key={`group-${group}-${idx}`}
+                              type="button"
+                              onClick={() => setSelectedL4(group)}
+                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
+                                selectedL4 === group
+                                  ? 'bg-emerald-600 border-emerald-400 text-white'
+                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
+                              }`}
+                            >
+                              <span className="truncate">{group}</span>
+                              {selectedL4 === group && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
+                          Choose a subcategory first
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Product Grid */}
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                      <h3 className="text-base sm:text-lg font-bold text-white">Pre-Owned Items</h3>
+                      <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg text-xs font-semibold border border-indigo-500/30 tabular-nums">
+                        {filteredProducts.length} Items
+                      </span>
+                    </div>
+
+                    {filteredProducts.length === 0 ? (
+                      <div className="py-16 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
+                        <Package className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+                        <p className="text-sm font-semibold text-slate-300">No items in this category yet</p>
                       </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {filteredProducts.map((product) => (
+                          <div
+                            key={product.id}
+                            id={`used-product-${product.id}`}
+                            onClick={() => setPreviewProduct(product)}
+                            className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl overflow-hidden group transition-colors cursor-pointer flex flex-col justify-between h-full"
+                          >
+                            <div>
+                              <div className="relative aspect-[4/3] bg-slate-800 overflow-hidden">
+                                <img
+                                  src={product.photos?.[0] || ''}
+                                  alt={product.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  referrerPolicy="no-referrer"
+                                />
+                                <div className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 bg-indigo-600/95 rounded-lg text-xs font-semibold text-white">
+                                  {product.condition}
+                                </div>
+                              </div>
+                              <div className="p-4 pb-2 space-y-2">
+                                <h4 className="text-sm sm:text-base font-bold text-white line-clamp-1">
+                                  {product.title}
+                                </h4>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1 text-xs text-slate-400 truncate">
+                                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                    <span className="truncate">{product.location || 'Nigeria'}</span>
+                                  </div>
+                                  <span className="text-sm font-bold text-indigo-400 tabular-nums shrink-0">
+                                    {formatPrice(product.price, true)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
 
-                      {/* Deep Linking Share Buttons */}
-                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
-                        <button 
-                          onClick={(e) => handleShareProduct(product, e)}
-                          className="flex-1 py-1 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-slate-700 transition-all"
-                          title="Copy Direct Share Link"
-                        >
-                          <Share2 className="w-3 h-3 text-indigo-400" /> Share
-                        </button>
-                        <button 
-                          onClick={(e) => handleWhatsAppShare(product, e)}
-                          className="flex-1 py-1 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 hover:text-white rounded-xl text-[9px] font-bold uppercase tracking-wider flex items-center justify-center gap-1 border border-emerald-500/40 transition-all"
-                          title="Share on WhatsApp"
-                        >
-                          <MessageCircle className="w-3 h-3 text-emerald-400" /> WhatsApp
-                        </button>
+                            <div className="p-4 pt-2 space-y-2">
+                              {product.video && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onNavigate?.('GIST', 'REELS');
+                                    onClose();
+                                  }}
+                                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                                >
+                                  <Film className="w-3.5 h-3.5" />
+                                  <span>Watch Video</span>
+                                </button>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToCart(product);
+                                  }}
+                                  className="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 border border-slate-700 transition-colors"
+                                >
+                                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>Add</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addToCart(product);
+                                    setShowCart(true);
+                                  }}
+                                  className="py-2 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-colors"
+                                >
+                                  <ShoppingBag className="w-3.5 h-3.5" />
+                                  <span>Buy Now</span>
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleShareProduct(product, e)}
+                                  className="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-slate-700 transition-colors"
+                                >
+                                  <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+                                  <span>Share</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleWhatsAppShare(product, e)}
+                                  className="flex-1 py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-emerald-500/30 transition-colors"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>WhatsApp</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </motion.div>
-                  ))
-                )}
-              </div>
+                    )}
 
-              {/* Google AdSense Sponsored Marketplace Placement */}
-              <div className="mt-4 mb-2">
-                <AdSenseBanner label="Marketplace Featured Commercial Ads" />
-              </div>
-            </div>
-          </div>
-        </motion.div>
+                    {/* Google AdSense Sponsored Marketplace Placement */}
+                    <div className="pt-2">
+                      <AdSenseBanner label="Marketplace Featured Commercial Ads" />
+                    </div>
+                  </section>
+                </div>
+              </motion.div>
       ) : (
         <motion.div 
           key="orders"
@@ -1400,7 +1433,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           <FormField label="Full Legal Name" error={validationErrors.fullName} hint="Official name as shown on national identity documents.">
                             <input 
                               type="text" 
-                              placeholder="Tactical Full Name" 
+                              placeholder="Full Legal Name" 
                               value={deliveryAddress.fullName}
                               onChange={(e) => {
                                 setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
@@ -1546,7 +1579,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] space-y-2">
                             <div className="flex items-center gap-2 text-amber-500">
                               <Info className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">Independent Pickup Protocol</span>
+                              <span className="text-xs font-bold">Direct Seller Pickup</span>
                             </div>
                             <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
                               eFADO operates as a decentralized network. All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
@@ -1590,7 +1623,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                           <FormField label="Full Name of Authorized Recipient" error={validationErrors.fullName} hint="The full name of the authorized individual arriving to pick up the item.">
                             <input 
                               type="text" 
-                              placeholder="Tactical Full Name" 
+                              placeholder="Recipient Full Name" 
                               value={deliveryAddress.fullName}
                               onChange={(e) => {
                                 setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
@@ -1905,7 +1938,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
                     <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Holisitic Transaction Sec</h4>
                     <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest animate-pulse">{paymentStatusText}</p>
                     <div className="mt-12 bg-white/5 p-6 rounded-3xl border border-white/5 w-full">
-                       <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-4">Security Protocol Diagnosis</p>
+                       <p className="text-xs font-semibold text-slate-400 mb-4">Security Verification Checks</p>
                        <div className="space-y-3">
                           <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
                              <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Identity Logic Check</span>
@@ -2139,7 +2172,7 @@ export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClos
               <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
                 <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
                   <img
-                    src={previewProduct.photos[0] || 'https://picsum.photos/seed/item/600/400'}
+                    src={previewProduct.photos[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'}
                     alt={previewProduct.title}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

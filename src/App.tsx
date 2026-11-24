@@ -54,7 +54,7 @@ import { UniversalHubPage } from './components/UniversalHubPage';
 import { HUBS, getHubBySlug } from './config/hubs';
 import { EfadoTechHub } from './components/tech/EfadoTechHub';
 import { EfadoZoom } from './components/EfadoZoom';
-import { EfadoHelpChat } from './components/EfadoHelpChat';
+import { SupportHelpModal } from './components/SupportHelpModal';
 import { EfadoZoomPlanSelection } from './components/EfadoZoomPlanSelection';
 import { EfadoLogo } from './components/EfadoLogo';
 import { EfadoPartnerHub } from './components/EfadoPartnerHub';
@@ -64,13 +64,13 @@ import { HubHeroCarousel } from './components/HubHeroCarousel';
 import { UserWallet } from './components/UserWallet';
 import { EfadoMining } from './components/EfadoMining';
 import { EfadoAdvertisingHub } from './components/EfadoAdvertisingHub';
+import { PublicAdvertPage } from './components/PublicAdvertPage';
 import { EfadoCosmicWelcome } from './components/EfadoCosmicWelcome';
 import { EfadoIntelligenceFeed } from './components/EfadoIntelligenceFeed';
 import { UserGuideModal } from './components/UserGuideModal';
 import { LegalHub } from './components/LegalHub';
 import { AboutCeoModal } from './components/AboutCeoModal';
 import { IosInstallGuideModal } from './components/IosInstallGuideModal';
-import { DiagnosticModal } from './components/DiagnosticModal';
 import { PaymentCallback } from './components/PaymentCallback';
 import { getBackendUrl } from './config/backend';
 import { AdSenseBanner } from './components/AdSenseBanner';
@@ -500,6 +500,25 @@ function AppContent() {
   const [showCeoPortal, setShowCeoPortal] = useState(false);
   const [showCeoVerification, setShowCeoVerification] = useState(false);
   const [isCeoVerified, setIsCeoVerified] = useState(false);
+  const [newHelpInboxCount, setNewHelpInboxCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      setNewHelpInboxCount(0);
+      return;
+    }
+    const q = query(collection(db, 'help_inbox'), where('status', '==', 'New'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setNewHelpInboxCount(snap.size);
+      },
+      (err) => {
+        console.warn('Help inbox badge listener:', err.message);
+      }
+    );
+    return () => unsub();
+  }, [user?.uid, user?.role]);
   const [showMarketHub, setShowMarketHub] = useState(false);
   const [showModernMarket, setShowModernMarket] = useState(false);
   const [showGistHub, setShowGistHub] = useState(false);
@@ -581,7 +600,6 @@ function AppContent() {
   const [showAdvertisingHub, setShowAdvertisingHub] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [showAboutCeo, setShowAboutCeo] = useState(false);
-  const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [adInitialType, setAdInitialType] = useState<'ADVERT' | 'SELL'>('ADVERT');
   const [globalAdListings, setGlobalAdListings] = useState<any[]>([]);
   const [showBrowserAddonModal, setShowBrowserAddonModal] = useState(false);
@@ -815,6 +833,16 @@ function AppContent() {
       setActiveHub('GIST');
       navigate('/home');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (hub === 'ADVERTISING') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setVerticalHubSlug(null);
+      setHubItemId(null);
+      setShowVerticalHubsDirectory(false);
+      setAdInitialType(subview === 'SELL' ? 'SELL' : 'ADVERT');
+      setShowAdvertisingHub(true);
       return;
     }
 
@@ -2345,8 +2373,8 @@ function AppContent() {
           </div>
           
           <div className="text-center space-y-1">
-            <h3 className="text-xs font-black tracking-[0.3em] text-indigo-400 uppercase">EFADO CONNECT</h3>
-            <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Sovereign Link Active...</p>
+            <h3 className="text-xs font-bold tracking-widest text-indigo-400 uppercase">EFADO Hubs Connect</h3>
+            <p className="text-xs text-slate-400">Loading your account...</p>
           </div>
         </div>
       </div>
@@ -2361,6 +2389,32 @@ function AppContent() {
           setIsPaymentCallback(false);
           window.history.replaceState({}, document.title, '/');
           openWalletWithTab('overview');
+        }}
+      />
+    );
+  }
+
+  // Public SEO-friendly Advert & Sell Product Landing Route (Accessible without login)
+  const publicAdvertSlug = location.pathname.toLowerCase().startsWith('/advert/')
+    ? location.pathname.slice('/advert/'.length).split('/')[0].split('?')[0].trim()
+    : null;
+  if (publicAdvertSlug) {
+    return (
+      <PublicAdvertPage
+        slugOrId={decodeURIComponent(publicAdvertSlug)}
+        user={user}
+        onLogin={() => {
+          navigate('/');
+        }}
+        onNavigateHome={handleNavigateHome}
+        onOpenAdvertise={(mode) => {
+          if (user) {
+            setAdInitialType(mode === 'SELL' ? 'SELL' : 'ADVERT');
+            setShowAdvertisingHub(true);
+            navigate('/home');
+          } else {
+            navigate('/');
+          }
         }}
       />
     );
@@ -2690,16 +2744,6 @@ function AppContent() {
           
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              {/* Temporary Diagnosis Button */}
-              <button 
-                onClick={() => setShowDiagnosis(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/25 text-amber-300 rounded-xl text-[9px] sm:text-[10px] font-black tracking-widest hover:bg-amber-500/40 transition-all shadow-lg border border-amber-500/60 uppercase"
-                title="System Diagnosis & Environment Info"
-              >
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <span>DIAGNOSIS</span>
-              </button>
-
               {/* PWA Install Button */}
               {(isInstallable || isIOS) && (
                 <button 
@@ -2732,11 +2776,16 @@ function AppContent() {
               {user.role === 'admin' && (
                 <button 
                   onClick={() => isCeoVerified ? setShowCeoPortal(true) : setShowCeoVerification(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-indigo-500 transition-all shadow-lg"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] sm:text-[10px] font-bold tracking-widest hover:bg-indigo-500 transition-all shadow-lg relative"
                 >
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">CEO Portal</span>
                   <span className="sm:hidden">CEO</span>
+                  {newHelpInboxCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black leading-none tabular-nums">
+                      {newHelpInboxCount}
+                    </span>
+                  )}
                 </button>
               )}
 
@@ -3067,46 +3116,34 @@ function AppContent() {
                  {/* Strategic Intelligence Alert */}
                 <EfadoIntelligenceFeed mode="ticker-only" />
 
-                {/* Sovereign Confidential & Encrypted Workspace Banner */}
-                <div className="p-6 bg-slate-900/80 backdrop-blur-3xl border-2 border-emerald-500/20 rounded-3xl relative overflow-hidden shadow-2xl">
-                  {/* Glowing background aura */}
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-                  
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-                    <div className="flex items-start sm:items-center gap-4">
-                      <div className="w-12 h-12 bg-emerald-950/80 rounded-2xl border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/50 shrink-0 mt-1 sm:mt-0">
-                        <Lock className="w-6 h-6 text-emerald-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] bg-emerald-950/55 border border-emerald-500/20 px-2 py-0.5 rounded-full inline-flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Sovereign Private Port
-                          </span>
-                          <span className="text-[9px] font-mono text-slate-500 select-none hidden sm:inline">[NODE PORT: 443_SSL_TLS]</span>
-                        </div>
-                        <h2 className="text-lg font-black text-white tracking-tight uppercase mt-1">CONFIDENTIAL USER PORTAL</h2>
-                        <p className="text-xs text-slate-400 font-medium leading-relaxed mt-1">
-                          Active Account: <span className="text-emerald-300 font-bold font-mono">{user.email}</span>. Your wallets, transactions, gaming history, and account logs are dynamically encrypted to prevent outside access. This dashboard is <span className="text-emerald-400 font-bold underline">100% CONFIDENTIAL</span> and strictly hidden from other network users, ensuring private sovereign navigation.
-                        </p>
-                      </div>
+                {/* Private Account Summary Banner */}
+                <div className="p-5 sm:p-6 bg-slate-900/90 border border-emerald-500/25 rounded-2xl shadow-lg">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="w-11 h-11 bg-emerald-950/80 rounded-xl border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <Lock className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-emerald-400">Private Account Dashboard</span>
+                      <h2 className="text-lg font-bold text-white mt-0.5">Your Account Summary</h2>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-1">
+                        Signed in as <span className="text-emerald-300 font-semibold">{user.email}</span>. Your wallets, deposits, winnings, and order history are private to your account.
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Wallets */}
-                {/* Wallet Section */}
                 <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-black text-white flex items-center gap-3 tracking-tighter">
-                      <Wallet className="w-6 h-6 text-indigo-500" />
-                      Financial Status
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2.5">
+                      <Wallet className="w-5 h-5 text-indigo-400" />
+                      Your Wallet Balance
                     </h2>
                     <button 
                       onClick={() => openWalletWithTab('overview')}
-                      className="px-6 py-2.5 bg-white/5 backdrop-blur-xl border border-white/10 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all shadow-xl"
+                      className="px-4 py-2 bg-white/5 border border-white/10 text-slate-200 rounded-xl text-xs font-semibold hover:bg-white/10 hover:text-white transition-colors"
                     >
-                      Management
+                      Manage Wallet
                     </button>
                   </div>
                   <WalletGrid wallets={user} isAdmin={false} />
@@ -3114,50 +3151,58 @@ function AppContent() {
 
                 {/* Quick Access Hubs */}
                 <section>
-                  <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 border-b border-white/5 pb-4">Tactical Quick Access</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <h2 className="text-sm font-semibold text-slate-400 mb-4 pb-2 border-b border-white/10">Quick Access Hubs</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button 
                       onClick={() => setActiveHub('GAMES')}
-                      className="glass-card-ultra p-8 rounded-[2rem] text-left group transition-all border-l-4 border-l-orange-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                      className="bg-slate-900/80 border border-white/10 hover:border-orange-500/40 p-6 rounded-2xl text-left group transition-all flex flex-col justify-between h-full"
                     >
-                      <div className="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-orange-500 transition-all">
-                        <Gamepad2 className="w-7 h-7 text-orange-500 group-hover:text-white" />
+                      <div className="w-12 h-12 bg-orange-500/15 rounded-xl flex items-center justify-center mb-4 group-hover:bg-orange-500 transition-colors">
+                        <Gamepad2 className="w-6 h-6 text-orange-400 group-hover:text-white" />
                       </div>
-                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-orange-400 transition-colors">Game Arena</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Engage in interactive spinning, trading, and tactical challenge arenas.</p>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-orange-400 transition-colors">Game Arena</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">Play 6 interactive games with instant rewards sent to your Winning Wallet.</p>
+                      </div>
                     </button>
 
                     <button 
                       onClick={() => setActiveHub('MARKET')}
-                      className="glass-card-ultra p-8 rounded-[2rem] text-left group transition-all border-l-4 border-l-emerald-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                      className="bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 p-6 rounded-2xl text-left group transition-all flex flex-col justify-between h-full"
                     >
-                      <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-emerald-500 transition-all">
-                        <ShoppingBag className="w-7 h-7 text-emerald-500 group-hover:text-white" />
+                      <div className="w-12 h-12 bg-emerald-500/15 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-500 transition-colors">
+                        <ShoppingBag className="w-6 h-6 text-emerald-400 group-hover:text-white" />
                       </div>
-                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-emerald-400 transition-colors">Digital Market</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Exchange modern tech and pre-owned value across the global hub.</p>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-emerald-400 transition-colors">EFADO Marketplace</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">Shop new and fairly used items from verified sellers with buyer protection.</p>
+                      </div>
                     </button>
 
                     <button 
                       onClick={() => setActiveHub('GIST')}
-                      className="glass-card-ultra p-8 rounded-[2rem] text-left group transition-all border-l-4 border-l-indigo-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                      className="bg-slate-900/80 border border-white/10 hover:border-indigo-500/40 p-6 rounded-2xl text-left group transition-all flex flex-col justify-between h-full"
                     >
-                      <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-500 transition-all">
-                        <MessageSquare className="w-7 h-7 text-indigo-500 group-hover:text-white" />
+                      <div className="w-12 h-12 bg-indigo-500/15 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-500 transition-colors">
+                        <MessageSquare className="w-6 h-6 text-indigo-400 group-hover:text-white" />
                       </div>
-                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">EFADO Nexus Hub</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Encrypted social discourse, 10 action buttons, viral reels, and creator monetization fund.</p>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-indigo-400 transition-colors">EFADO Social &amp; Reels</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">Connect with friends, share updates, watch short videos, and chat with sellers.</p>
+                      </div>
                     </button>
 
                     <button 
                       onClick={() => setActiveHub('EDUCATION')}
-                      className="glass-card-ultra p-8 rounded-[2rem] text-left group transition-all border-l-4 border-l-indigo-500 hover:shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                      className="bg-slate-900/80 border border-white/10 hover:border-sky-500/40 p-6 rounded-2xl text-left group transition-all flex flex-col justify-between h-full"
                     >
-                      <div className="w-14 h-14 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-500 transition-all">
-                        <GraduationCap className="w-7 h-7 text-indigo-500 group-hover:text-white" />
+                      <div className="w-12 h-12 bg-sky-500/15 rounded-xl flex items-center justify-center mb-4 group-hover:bg-sky-500 transition-colors">
+                        <GraduationCap className="w-6 h-6 text-sky-400 group-hover:text-white" />
                       </div>
-                      <h3 className="text-xl font-black text-white tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">Education Hub</h3>
-                      <p className="text-slate-500 text-xs font-medium leading-relaxed">Universal academic ecosystem for all levels from Primary to Ph.D.</p>
+                      <div>
+                        <h3 className="text-lg font-bold text-white mb-1.5 group-hover:text-sky-400 transition-colors">Education Hub</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed">Exam prep, study tools, and school resources from primary to postgraduate.</p>
+                      </div>
                     </button>
                   </div>
                 </section>
@@ -3169,137 +3214,130 @@ function AppContent() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 tracking-tighter">
-                    <Gamepad2 className="w-8 h-8 text-orange-500" />
-                    Elite Game Arena
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <Gamepad2 className="w-7 h-7 text-orange-500" />
+                    EFADO Game Zone
                   </h2>
-                  <div className="px-4 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-[10px] font-black text-orange-400 uppercase tracking-widest animate-pulse">
-                    Live Stakes Active
+                  <div className="px-3.5 py-1.5 bg-orange-500/10 border border-orange-500/20 rounded-full text-xs font-semibold text-orange-300">
+                    All 6 Games Ready
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Lucky Spin Arena Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-indigo-600" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-500">
-                        <Coins className="w-10 h-10 text-indigo-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-indigo-600/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <Coins className="w-7 h-7 text-indigo-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight">Elite Spin</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Tier-based prize architecture with multiplier achievements. Earn up to 100x rewards.</p>
-                      <button 
-                        onClick={() => setShowSpinWheel(true)}
-                        className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Launch Arena
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Lucky Spin</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Spin the prize wheel to win multiplier rewards based on your stake.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowSpinWheel(true)}
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Play Lucky Spin
+                    </button>
                   </div>
 
                   {/* EFADO Money Card Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-amber-600" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-amber-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-amber-600 transition-all duration-500">
-                        <CreditCard className="w-10 h-10 text-amber-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-amber-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-amber-600/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <CreditCard className="w-7 h-7 text-amber-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight">Money Card</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Master the tactical shuffle. High-velocity card guessing with multiple stages.</p>
-                      <button 
-                        onClick={() => setShowMoneyCard(true)}
-                        className="w-full py-5 bg-amber-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(217,119,6,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Enter Arena
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Money Card</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Follow the shuffle and pick the winning card across quick rounds.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowMoneyCard(true)}
+                      className="w-full py-3.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Play Money Card
+                    </button>
                   </div>
 
                   {/* Digital Money Trading Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-blue-600" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-blue-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500">
-                        <Zap className="w-10 h-10 text-blue-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-blue-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-blue-600/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <Zap className="w-7 h-7 text-blue-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight uppercase">Tactical DMT</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Master high-frequency trends with real-time digital intelligence.</p>
-                      <button 
-                        onClick={() => setShowTradingGame(true)}
-                        className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(37,99,235,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Enter Terminal
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Digital Money Trading</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Predict live market price direction within the countdown to win payouts.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowTradingGame(true)}
+                      className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Play Trading Game
+                    </button>
                   </div>
 
                   {/* EFADO Money Quiz Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-purple-600" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-purple-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-purple-600 transition-all duration-500">
-                        <Brain className="w-10 h-10 text-purple-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-purple-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-purple-600/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <Brain className="w-7 h-7 text-purple-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight">Money Quiz</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Test your tactical intelligence across several categories for major payouts.</p>
-                      <button 
-                        onClick={() => setShowMoneyQuiz(true)}
-                        className="w-full py-5 bg-purple-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(147,51,234,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Initiate Quiz
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Money Quiz</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Answer timed general knowledge questions correctly to earn cash rewards.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowMoneyQuiz(true)}
+                      className="w-full py-3.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Play Money Quiz
+                    </button>
                   </div>
 
                   {/* EFADO Equilibrium Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-yellow-600" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-yellow-600/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-yellow-600 transition-all duration-500">
-                        <Dices className="w-10 h-10 text-yellow-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-yellow-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-yellow-600/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <Dices className="w-7 h-7 text-yellow-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight">Equilibrium</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">A round-based matching game. Align the tactical values for high-frequency rewards.</p>
-                      <button 
-                        onClick={() => setShowEquilibrium(true)}
-                        className="w-full py-5 bg-yellow-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(202,138,4,0.3)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Enter Terminal
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Equilibrium</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Match balanced numbers across quick rounds for steady prize multipliers.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowEquilibrium(true)}
+                      className="w-full py-3.5 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Play Equilibrium
+                    </button>
                   </div>
 
-                  {/* Deep Sea Jet Card - Efado Crash Mechanics */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group border border-cyan-500/30 hover:border-cyan-400/60 transition-all shadow-[0_10px_40px_rgba(6,182,212,0.15)]">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-gradient-to-r from-cyan-500 via-teal-400 to-blue-600" />
-                    <div className="absolute top-4 right-4 px-2.5 py-1 bg-cyan-500/20 border border-cyan-500/40 rounded-full text-[9px] font-black text-cyan-300 uppercase tracking-widest flex items-center gap-1.5 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                      Efado Crash
-                    </div>
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-cyan-500/10 border border-cyan-500/20 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:shadow-[0_0_30px_rgba(6,182,212,0.6)] transition-all duration-500">
-                        <Waves className="w-10 h-10 text-cyan-400 group-hover:text-slate-950 transition-colors" />
+                  {/* Deep Sea Jet Card */}
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full border border-cyan-500/30">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 via-teal-400 to-blue-600 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-cyan-500/15 border border-cyan-500/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <Waves className="w-7 h-7 text-cyan-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight flex items-center justify-center gap-1.5">
-                        <span className="text-cyan-400 font-mono">$</span>deep sea jet
-                      </h3>
-                      <div className="flex items-center justify-center gap-2 mb-3">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">60 FPS Dive</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-950/60 border border-teal-800/60 text-teal-300">Dual Helm</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-950/60 border border-blue-800/60 text-blue-300">SHA-256 Fair</span>
+                      <h3 className="text-xl font-bold text-white mb-2">Deep Sea Jet</h3>
+                      <div className="flex items-center justify-center gap-1.5 mb-3 flex-wrap">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-800/60 text-cyan-300">Live Multiplier</span>
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-teal-950/60 border border-teal-800/60 text-teal-300">Dual Bet</span>
                       </div>
-                      <p className="text-slate-400 mb-8 text-sm font-medium leading-relaxed">
-                        Submerge into the abyss where multiplier acceleration surges with depth. Stake dual helms, monitor live fleet radar, and cash out before catastrophic hull breach.
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                        Watch the multiplier climb as you dive deeper and cash out before the round ends.
                       </p>
-                      <button 
-                        onClick={() => setShowDeepSeaJet(true)}
-                        className="w-full py-5 bg-gradient-to-r from-cyan-600 via-teal-600 to-blue-600 text-white font-black rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.35)] hover:shadow-[0_15px_40px_rgba(6,182,212,0.5)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-2 group-hover:brightness-110"
-                      >
-                        <Compass className="w-4 h-4" />
-                        Launch Deep Sea Jet
-                      </button>
                     </div>
+                    <button 
+                      onClick={() => setShowDeepSeaJet(true)}
+                      className="w-full py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-xl transition-all text-sm flex items-center justify-center gap-2"
+                    >
+                      <Compass className="w-4 h-4" />
+                      Play Deep Sea Jet
+                    </button>
                   </div>
                 </div>
               </motion.section>
@@ -3310,50 +3348,50 @@ function AppContent() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
-                    <ShoppingBag className="w-8 h-8 text-emerald-500" />
-                    Global Market Hubs
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <ShoppingBag className="w-7 h-7 text-emerald-500" />
+                    EFADO Market Hubs
                   </h2>
-                  <div className="px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] font-black text-emerald-400 uppercase tracking-widest">
-                    Vetted Vendors Only
+                  <div className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-xs font-semibold text-emerald-400">
+                    Verified Sellers & Escrow
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* EFADO Fairly Used Market Hub Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-emerald-500" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-emerald-500/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-emerald-500 transition-all duration-500">
-                        <ShoppingBag className="w-10 h-10 text-emerald-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-emerald-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <ShoppingBag className="w-7 h-7 text-emerald-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight uppercase">Circular Market</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">Sustainable exchange for pre-owned assets. Quality-graded and trusted listings.</p>
-                      <button 
-                        onClick={() => setShowMarketHub(true)}
-                        className="w-full py-5 bg-emerald-500 text-slate-950 font-black rounded-2xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] hover:bg-white transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Enter Marketplace
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Fairly Used Market</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Buy and sell quality pre-owned phones, electronics, and household items with buyer protection.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowMarketHub(true)}
+                      className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Open Fairly Used Market
+                    </button>
                   </div>
 
                   {/* EFADO Modern Market Hub Card */}
-                  <div className="glass-card-ultra golden-card-border p-10 rounded-[2.5rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-cyan-500" />
-                    <div className="relative z-10">
-                      <div className="w-20 h-20 bg-cyan-500/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 group-hover:scale-110 group-hover:bg-cyan-500 transition-all duration-500">
-                        <ShoppingBasket className="w-10 h-10 text-cyan-400 group-hover:text-white" />
+                  <div className="glass-card-ultra golden-card-border p-7 rounded-2xl text-center relative flex flex-col justify-between h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 rounded-t-2xl" />
+                    <div>
+                      <div className="w-14 h-14 bg-cyan-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                        <ShoppingBasket className="w-7 h-7 text-cyan-400" />
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-3 tracking-tight uppercase">Modern Hub</h3>
-                      <p className="text-slate-500 mb-10 text-sm font-medium leading-relaxed">The pinnacle of next-gen retail. Explore a vast taxonomy of premium products.</p>
-                      <button 
-                        onClick={() => setShowModernMarket(true)}
-                        className="w-full py-5 bg-cyan-500 text-slate-950 font-black rounded-2xl shadow-[0_10px_30px_rgba(6,182,212,0.3)] hover:bg-white transition-all uppercase tracking-[0.2em] text-[11px]"
-                      >
-                        Explore Modern
-                      </button>
+                      <h3 className="text-xl font-bold text-white mb-2">Modern Market</h3>
+                      <p className="text-slate-400 mb-6 text-sm leading-relaxed">Shop brand-new products across fashion, gadgets, home goods, and everyday essentials.</p>
                     </div>
+                    <button 
+                      onClick={() => setShowModernMarket(true)}
+                      className="w-full py-3.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Open Modern Market
+                    </button>
                   </div>
                 </div>
               </motion.section>
@@ -3365,45 +3403,45 @@ function AppContent() {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-6"
               >
-                <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
-                  <h2 className="text-2xl font-black text-white flex items-center gap-3 uppercase tracking-tighter">
-                    <MessageSquare className="w-6 h-6 text-indigo-500" />
-                    EFADO NEXUS HUB
+                <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <MessageSquare className="w-6 h-6 text-indigo-400" />
+                    Gist Hub & Social Feed
                   </h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
-                  {/* Left explanation card */}
-                  <div className="md:col-span-2 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-between">
-                    <div className="space-y-4">
+                  <div className="md:col-span-2 bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between h-full">
+                    <div className="space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
                           <MessageSquare className="w-5 h-5 text-indigo-400" />
                         </div>
-                        <h4 className="text-sm font-black text-white uppercase tracking-wider">What is EFADO Nexus Hub?</h4>
+                        <h4 className="text-base font-bold text-white">About EFADO Gist Hub</h4>
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed uppercase tracking-wide">
-                        The <span className="text-indigo-400 font-extrabold">EFADO Nexus Hub</span> establishes a real-time secure communication socket between your current device and our decentralized cloud servers. This synchronizes your private chats, direct messages, blog channels, sovereign groups, 10 action buttons, viral reels, and creator monetization profiles with 100% data integrity.
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        Stay connected with friends, join community groups, watch short video reels, chat directly with buyers or sellers, and share stories in real time.
                       </p>
                     </div>
-                    <div className="pt-4 border-t border-white/5 mt-4 flex items-center justify-between">
-                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">● System Status: Secure & Encrypted</span>
-                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Protocol: V3.4</span>
+                    <div className="pt-4 border-t border-white/10 mt-5 flex items-center justify-between text-xs text-slate-400">
+                      <span className="text-emerald-400 font-medium">Protected Private Messaging</span>
+                      <span>Live Social Feed</span>
                     </div>
                   </div>
 
-                  {/* Right small, strategic Action card */}
-                  <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 p-8 rounded-3xl flex flex-col justify-center items-center text-center">
-                    <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4">
-                      <MessageSquare className="w-6 h-6 text-indigo-400" />
+                  <div className="bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between items-center text-center h-full">
+                    <div>
+                      <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <MessageSquare className="w-6 h-6 text-indigo-400" />
+                      </div>
+                      <h4 className="text-base font-bold text-white mb-2">Open Gist Hub</h4>
+                      <p className="text-xs text-slate-400 mb-6">Access community feeds, reels, group chats, and voice calls.</p>
                     </div>
-                    <h4 className="text-xs font-black text-white uppercase tracking-wider mb-2">Connect EFADO Nexus Hub</h4>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-6">Access secure feeds, real-time chats, reels & 10 action buttons</p>
                     <button 
                       onClick={() => setShowGistHub(true)}
-                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[9px] border border-indigo-500/30"
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
                     >
-                      Synchronize Now
+                      Open Gist Hub
                     </button>
                   </div>
                 </div>
@@ -3414,149 +3452,144 @@ function AppContent() {
               <motion.section
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-8"
+                className="space-y-6"
               >
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 tracking-tighter uppercase italic">
-                    <GraduationCap className="w-8 h-8 text-indigo-500" />
-                    Universal Academic Hubs
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <GraduationCap className="w-7 h-7 text-indigo-400" />
+                    Education Hub
                   </h2>
                   <button
                     onClick={() => openEducationHubWithSection(undefined)}
-                    className="px-5 py-2.5 bg-indigo-600/10 border border-indigo-500/20 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    className="px-4 py-2 bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold transition-all"
                   >
-                    Open Master Portal
+                    Open All Programs
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Card 1: JAMB */}
-                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-indigo-600" />
-                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-600/10 transition-all duration-750" />
+                  <div className="glass-card-ultra golden-card-border p-6 sm:p-7 rounded-2xl flex flex-col justify-between relative h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600 rounded-t-2xl" />
                     <div>
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-16 h-16 bg-indigo-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-600 transition-all duration-500 shadow-md">
-                          <GraduationCap className="w-8 h-8 text-indigo-400 group-hover:text-white" />
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 bg-indigo-600/15 rounded-xl flex items-center justify-center">
+                          <GraduationCap className="w-6 h-6 text-indigo-400" />
                         </div>
-                        <span className="text-[9px] font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic animate-pulse">
-                          Agent Connected
+                        <span className="text-xs font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg">
+                          JAMB Support
                         </span>
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">JAMB UTME COMMAND</h3>
-                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
-                        Complete candidate registration lifecycle: NIN validation, profile codes, secure e-PIN procurement, course changes, and central CAPS status tracking. Supports high-velocity multi-candidate Agent Console management.
+                      <h3 className="text-xl font-bold text-white mb-2">JAMB UTME Support</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        Get step-by-step guidance for NIN verification, profile codes, e-PINs, course changes, and admission status checks.
                       </p>
                     </div>
                     <button 
                       onClick={() => openEducationHubWithSection('jamb')}
-                      className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(79,70,229,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
                     >
-                      Launch Command Console
+                      Open JAMB Portal
                     </button>
                   </div>
 
                   {/* Card 2: Post-UTME */}
-                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-emerald-600" />
-                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-emerald-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-600/10 transition-all duration-750" />
+                  <div className="glass-card-ultra golden-card-border p-6 sm:p-7 rounded-2xl flex flex-col justify-between relative h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600 rounded-t-2xl" />
                     <div>
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-16 h-16 bg-emerald-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-600 transition-all duration-500 shadow-md">
-                          <Award className="w-8 h-8 text-emerald-400 group-hover:text-white" />
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 bg-emerald-600/15 rounded-xl flex items-center justify-center">
+                          <Award className="w-6 h-6 text-emerald-400" />
                         </div>
-                        <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
-                          Academic Screening
+                        <span className="text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                          Screening Prep
                         </span>
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POST-UTME SCREENING HUB</h3>
-                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
-                        Simulate rigorous university entry examinations with authentic past question banks. Verify institutional eligibility with active admission requirement matrices and national cut-off score databases.
+                      <h3 className="text-xl font-bold text-white mb-2">Post-UTME Practice</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        Practice university screening exams with past questions and check school cut-off marks and course requirements.
                       </p>
                     </div>
                     <button 
                       onClick={() => openEducationHubWithSection('post_utme')}
-                      className="w-full py-4 bg-emerald-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition-all text-sm"
                     >
-                      Launch Screening Portal
+                      Open Screening Portal
                     </button>
                   </div>
 
                   {/* Card 3: Polytechnic */}
-                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-amber-600" />
-                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-600/10 transition-all duration-750" />
+                  <div className="glass-card-ultra golden-card-border p-6 sm:p-7 rounded-2xl flex flex-col justify-between relative h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-amber-600 rounded-t-2xl" />
                     <div>
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-16 h-16 bg-amber-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-amber-600 transition-all duration-500 shadow-md">
-                          <Building className="w-8 h-8 text-amber-400 group-hover:text-white" />
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 bg-amber-600/15 rounded-xl flex items-center justify-center">
+                          <Building className="w-6 h-6 text-amber-400" />
                         </div>
-                        <span className="text-[9px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
-                          Technical & Voc
+                        <span className="text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                          ND / HND & SIWES
                         </span>
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POLYTECHNIC & TECHNICAL</h3>
-                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
-                        Navigate ND, HND, and technical training pathways. Log SIWES industrial assignments in real-time with supervisor auto-approvals, and access Direct Entry syllabus-alignment tracking grids.
+                      <h3 className="text-xl font-bold text-white mb-2">Polytechnic & Technical</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        Follow ND, HND, and technical training requirements, log SIWES attachments, and review Direct Entry study guides.
                       </p>
                     </div>
                     <button 
                       onClick={() => openEducationHubWithSection('polytechnic')}
-                      className="w-full py-4 bg-amber-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(217,119,6,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                      className="w-full py-3.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition-all text-sm"
                     >
-                      Launch Technical Portal
+                      Open Technical Portal
                     </button>
                   </div>
 
                   {/* Card 4: Postgraduate */}
-                  <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] flex flex-col justify-between relative group overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-[6px] bg-rose-600" />
-                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-rose-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-rose-600/10 transition-all duration-750" />
+                  <div className="glass-card-ultra golden-card-border p-6 sm:p-7 rounded-2xl flex flex-col justify-between relative h-full">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-rose-600 rounded-t-2xl" />
                     <div>
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="w-16 h-16 bg-rose-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-rose-600 transition-all duration-500 shadow-md">
-                          <BookOpen className="w-8 h-8 text-rose-400 group-hover:text-white" />
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 bg-rose-600/15 rounded-xl flex items-center justify-center">
+                          <BookOpen className="w-6 h-6 text-rose-400" />
                         </div>
-                        <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-md uppercase tracking-widest italic">
-                          Ph.D. & Master's
+                        <span className="text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                          Master's & Ph.D.
                         </span>
                       </div>
-                      <h3 className="text-2xl font-black text-white mb-2 tracking-tight">POSTGRADUATE & RESEARCH</h3>
-                      <p className="text-slate-400 text-xs font-semibold leading-relaxed mb-8 uppercase tracking-tight">
-                        Structure Master's and Ph.D. dissertations with dynamic roadmap planners. Utilize automated APA/Harvard reference formatting tools, and simulate oral defenses with interactive mock viva panels.
+                      <h3 className="text-xl font-bold text-white mb-2">Postgraduate & Research</h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-6">
+                        Plan Master's and doctoral theses, format APA or Harvard citations, and prepare for proposal and oral defenses.
                       </p>
                     </div>
                     <button 
                       onClick={() => openEducationHubWithSection('postgraduate')}
-                      className="w-full py-4 bg-rose-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(225,29,72,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px]"
+                      className="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl transition-all text-sm"
                     >
-                      Launch Research Portal
+                      Open Research Portal
                     </button>
                   </div>
                 </div>
 
-                {/* Card 5: Full Academic Overview & General Hub */}
-                <div className="glass-card-ultra golden-card-border p-8 rounded-[2.5rem] relative group overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-[6px] bg-blue-600" />
-                  <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-600/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-600/10 transition-all duration-750" />
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-                    <div className="flex items-center gap-6">
-                      <div className="w-16 h-16 bg-blue-600/10 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:bg-blue-600 transition-all duration-500 shadow-md shrink-0">
-                        <Cpu className="w-8 h-8 text-blue-400 group-hover:text-white" />
+                {/* Card 5: General Hub */}
+                <div className="glass-card-ultra golden-card-border p-6 sm:p-7 rounded-2xl relative">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-blue-600 rounded-t-2xl" />
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                    <div className="flex items-start sm:items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-600/15 rounded-xl flex items-center justify-center shrink-0">
+                        <Cpu className="w-6 h-6 text-blue-400" />
                       </div>
                       <div>
-                        <span className="text-[8px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded uppercase tracking-wider">Universal Learning Suite</span>
-                        <h3 className="text-xl font-black text-white tracking-tight mt-1">O'LEVEL, PRIMARY & NURSERY EDUCATION</h3>
-                        <p className="text-slate-400 text-xs font-semibold uppercase tracking-tight mt-1 max-w-xl">
-                          Explore O'Level preparation, nursery milestone trackers, interactive mental arithmetic challenges, and our advanced AI-powered intellectual study node.
+                        <span className="text-xs font-semibold text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2.5 py-0.5 rounded-md">All Ages</span>
+                        <h3 className="text-lg font-bold text-white mt-1.5">O'Level, Primary & Nursery Learning</h3>
+                        <p className="text-slate-400 text-sm mt-1 max-w-xl">
+                          Explore O'Level exam prep, early-learning milestones, practice quizzes, and guided AI study help.
                         </p>
                       </div>
                     </div>
                     <button 
                       onClick={() => openEducationHubWithSection(undefined)}
-                      className="px-8 py-4 bg-blue-600 text-white font-black rounded-xl shadow-[0_10px_30px_rgba(37,99,235,0.25)] hover:bg-white hover:text-slate-950 transition-all uppercase tracking-[0.2em] text-[10px] shrink-0"
+                      className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all text-sm shrink-0"
                     >
-                      Open Main Academy
+                      Open Learning Hub
                     </button>
                   </div>
                 </div>
@@ -3568,29 +3601,25 @@ function AppContent() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
-                  <h2 className="text-3xl font-black text-white flex items-center gap-3 tracking-tighter">
-                    <HardHat className="w-8 h-8 text-slate-400" />
-                    Expert Corps Hub
+                <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3 tracking-tight">
+                    <HardHat className="w-7 h-7 text-slate-300" />
+                    Service Corps
                   </h2>
                 </div>
                 <div className="max-w-3xl mx-auto">
-                  {/* EFADO Service Corps Card */}
-                  <div className="glass-card-ultra golden-card-border p-12 rounded-[3rem] text-center relative group">
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-500/5 to-slate-900/5" />
-                    <div className="relative z-10">
-                      <div className="w-24 h-24 bg-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 group-hover:scale-110 group-hover:bg-white group-hover:text-slate-950 transition-all duration-700">
-                        <HardHat className="w-12 h-12 text-slate-400 group-hover:text-slate-950" />
-                      </div>
-                      <h3 className="text-3xl font-black text-white mb-4 tracking-tight">Service Corps</h3>
-                      <p className="text-slate-400 mb-12 text-lg font-medium leading-relaxed max-w-xl mx-auto">Vetted professional deployments across 14 tactical families. Direct connection to verified human capital.</p>
-                      <button 
-                        onClick={() => setShowServiceCorps(true)}
-                        className="px-12 py-5 bg-white text-slate-950 font-black rounded-2xl shadow-[0_10px_40px_rgba(255,255,255,0.3)] hover:scale-105 transition-all uppercase tracking-[0.3em] text-[11px]"
-                      >
-                        Deploy Experts
-                      </button>
+                  <div className="glass-card-ultra golden-card-border p-8 sm:p-10 rounded-2xl text-center relative">
+                    <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                      <HardHat className="w-8 h-8 text-slate-200" />
                     </div>
+                    <h3 className="text-2xl font-bold text-white mb-3">Hire Verified Professionals</h3>
+                    <p className="text-slate-300 mb-8 text-sm sm:text-base leading-relaxed max-w-xl mx-auto">Find skilled tradespeople, technicians, builders, and consultants across 14 service categories.</p>
+                    <button 
+                      onClick={() => setShowServiceCorps(true)}
+                      className="px-8 py-3.5 bg-white hover:bg-slate-100 text-slate-950 font-semibold rounded-xl transition-all text-sm"
+                    >
+                      Browse Service Providers
+                    </button>
                   </div>
                 </div>
               </motion.section>
@@ -3793,6 +3822,7 @@ function AppContent() {
                   onClose={() => setShowAdvertisingHub(false)} 
                   initialType={adInitialType}
                   onNavigate={handleNavigate}
+                  onOpenProfile={() => openWalletWithTab('profile')}
                 />
               )}
 
@@ -3886,14 +3916,18 @@ function AppContent() {
                               key={`${ad.id || 'ad'}-${adIdx}`}
                               className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex gap-4 hover:border-indigo-500/50 transition-all group"
                             >
-                              <div className="w-28 h-28 bg-slate-900 rounded-xl overflow-hidden shrink-0 relative">
-                                <img 
-                                  src={ad.photos?.[0] || `https://picsum.photos/seed/${ad.id}/300/300`} 
-                                  alt={ad.title} 
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                                <span className={`absolute top-1 left-1 px-2 py-0.5 rounded text-[8px] font-black uppercase text-white ${ad.type === 'SELL' ? 'bg-rose-600' : 'bg-indigo-600'}`}>
-                                  {ad.type || 'ADVERT'}
+                              <div className="w-28 h-28 bg-slate-900 rounded-xl overflow-hidden shrink-0 relative flex items-center justify-center">
+                                {ad.photos?.[0] ? (
+                                  <img 
+                                    src={ad.photos[0]} 
+                                    alt={ad.title} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <ShoppingBag className="w-8 h-8 text-slate-500" />
+                                )}
+                                <span className={`absolute top-1 left-1 px-2 py-0.5 rounded text-[10px] font-semibold text-white ${ad.type === 'SELL' ? 'bg-rose-600' : 'bg-indigo-600'}`}>
+                                  {ad.type === 'SELL' ? 'For Sale' : 'Advert'}
                                 </span>
                               </div>
 
@@ -3968,11 +4002,6 @@ function AppContent() {
                 isOpen={showIosInstallGuide}
                 onClose={() => setShowIosInstallGuide(false)}
               />
-
-              <DiagnosticModal 
-                isOpen={showDiagnosis}
-                onClose={() => setShowDiagnosis(false)}
-              />
             </AnimatePresence>
 
             {activeHub === 'COMMUNITY_HUBS' && user && (
@@ -3980,19 +4009,18 @@ function AppContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <div className="bg-gradient-to-br from-purple-600 to-indigo-700 p-8 rounded-3xl shadow-xl text-white text-center relative overflow-hidden group border border-white/5 golden-card-border">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-                  <div className="relative z-10">
-                    <Users className="w-16 h-16 text-purple-300 mx-auto mb-4 animate-pulse" />
-                    <h3 className="text-2xl font-black mb-2 tracking-tight">EFADO Community Hubs</h3>
-                    <p className="text-purple-100 mb-6 text-sm">Join community-led collective saving cycles. Grow together with transparent, rotating payouts.</p>
-                    <button 
-                      onClick={() => setShowCommunityHub(true)}
-                      className="w-full py-4 bg-white text-purple-600 font-black rounded-2xl shadow-lg shadow-white/20 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest text-sm"
-                    >
-                      Enter Community Hub
-                    </button>
+                <div className="bg-gradient-to-br from-purple-600 to-indigo-700 p-8 sm:p-10 rounded-2xl shadow-xl text-white text-center border border-white/10 max-w-2xl mx-auto">
+                  <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-7 h-7 text-purple-100" />
                   </div>
+                  <h3 className="text-2xl font-bold mb-2">Community Savings (CSCC)</h3>
+                  <p className="text-purple-100 mb-6 text-sm leading-relaxed">Join community savings circles with transparent schedules and rotating payouts.</p>
+                  <button 
+                    onClick={() => setShowCommunityHub(true)}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white hover:bg-purple-50 text-purple-700 font-semibold rounded-xl shadow-md transition-all text-sm"
+                  >
+                    Open Community Hub
+                  </button>
                 </div>
               </motion.section>
             )}
@@ -4026,19 +4054,18 @@ function AppContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 rounded-3xl shadow-xl text-white text-center relative overflow-hidden group border border-white/5 golden-card-border">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-                  <div className="relative z-10">
-                    <HandCoins className="w-16 h-16 text-emerald-300 mx-auto mb-4 animate-pulse" />
-                    <h3 className="text-2xl font-black mb-2 tracking-tight">EFADO HEPIHANDS LOAN</h3>
-                    <p className="text-emerald-100 mb-6 text-sm">Empowering your growth with transparent, accessible credit. Instant verification and flexible repayments.</p>
-                    <button 
-                      onClick={() => setShowHepiHandsLoan(true)}
-                      className="w-full py-4 bg-white text-emerald-600 font-black rounded-2xl shadow-lg shadow-white/20 hover:scale-105 active:scale-95 transition-all uppercase tracking-widest text-sm"
-                    >
-                      Enter Loan Hub
-                    </button>
+                <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 sm:p-10 rounded-2xl shadow-xl text-white text-center border border-white/10 max-w-2xl mx-auto">
+                  <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <HandCoins className="w-7 h-7 text-emerald-100" />
                   </div>
+                  <h3 className="text-2xl font-bold mb-2">HEPIHANDS Loan</h3>
+                  <p className="text-emerald-100 mb-6 text-sm leading-relaxed">Apply for transparent member loans with clear repayment schedules and quick verification.</p>
+                  <button 
+                    onClick={() => setShowHepiHandsLoan(true)}
+                    className="w-full sm:w-auto px-8 py-3.5 bg-white hover:bg-emerald-50 text-emerald-700 font-semibold rounded-xl shadow-md transition-all text-sm"
+                  >
+                    Open Loan Hub
+                  </button>
                 </div>
               </motion.section>
             )}
@@ -4057,19 +4084,18 @@ function AppContent() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-800 p-12 rounded-[3rem] text-white text-center relative overflow-hidden shadow-2xl golden-card-border">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-                  <div className="relative z-10 space-y-6">
-                    <Globe className="w-20 h-20 text-indigo-300 mx-auto mb-4 animate-pulse" />
-                    <h2 className="text-4xl font-black tracking-tighter">EFADO DomainHub</h2>
-                    <p className="text-indigo-100 max-w-xl mx-auto">Find and register your perfect domain with top global registrars. Earn commissions and grow your digital presence.</p>
-                    <button 
-                      onClick={() => setShowDomainHub(true)}
-                      className="px-12 py-5 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
-                    >
-                      Enter Domain Marketplace
-                    </button>
+                <div className="bg-gradient-to-br from-indigo-600 to-blue-800 p-8 sm:p-10 rounded-2xl text-white text-center shadow-xl max-w-2xl mx-auto border border-white/10">
+                  <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Globe className="w-7 h-7 text-indigo-100" />
                   </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-2">Domain & China Sourcing Hub</h2>
+                  <p className="text-indigo-100 max-w-xl mx-auto text-sm leading-relaxed mb-6">Register web domains or request wholesale factory sourcing and shipping from China.</p>
+                  <button 
+                    onClick={() => setShowDomainHub(true)}
+                    className="px-8 py-3.5 bg-white hover:bg-indigo-50 text-indigo-700 rounded-xl font-semibold text-sm shadow-md transition-all"
+                  >
+                    Open Domain & Sourcing Hub
+                  </button>
                 </div>
               </motion.section>
             )}
@@ -4079,19 +4105,18 @@ function AppContent() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="bg-gradient-to-br from-cyan-600 to-teal-850 p-12 rounded-[3rem] text-white text-center relative overflow-hidden shadow-2xl golden-card-border">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-                  <div className="relative z-10 space-y-6">
-                    <Cpu className="w-20 h-20 text-cyan-300 mx-auto mb-4 animate-bounce" style={{ animationDuration: '3s' }} />
-                    <h2 className="text-4xl font-black tracking-tighter">EFADO TechHub</h2>
-                    <p className="text-cyan-100 max-w-xl mx-auto">Explore high-quality state-of-the-art technological resources, system engineering tutorials, programming modules, and software innovation assets.</p>
-                    <button 
-                      onClick={() => setShowTechHub(true)}
-                      className="px-12 py-5 bg-white text-cyan-700 hover:text-cyan-800 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
-                    >
-                      Enter Tech Marketplace & Portal
-                    </button>
+                <div className="bg-gradient-to-br from-cyan-600 to-teal-800 p-8 sm:p-10 rounded-2xl text-white text-center shadow-xl max-w-2xl mx-auto border border-white/10">
+                  <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Cpu className="w-7 h-7 text-cyan-100" />
                   </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-2">EFADO Tech Hub</h2>
+                  <p className="text-cyan-100 max-w-xl mx-auto text-sm leading-relaxed mb-6">Explore coding tutorials, AI tools, digital project kits, and developer resources.</p>
+                  <button 
+                    onClick={() => setShowTechHub(true)}
+                    className="px-8 py-3.5 bg-white hover:bg-cyan-50 text-cyan-800 rounded-xl font-semibold text-sm shadow-md transition-all"
+                  >
+                    Open Tech Hub
+                  </button>
                 </div>
               </motion.section>
             )}
@@ -4101,19 +4126,18 @@ function AppContent() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
               >
-                <div className="bg-gradient-to-br from-indigo-700 to-slate-900 p-12 rounded-[3rem] text-white text-center relative overflow-hidden shadow-2xl golden-card-border">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none" />
-                  <div className="relative z-10 space-y-6">
-                    <Package className="w-20 h-20 text-indigo-300 mx-auto mb-4 animate-bounce" style={{ animationDuration: '3.5s' }} />
-                    <h2 className="text-4xl font-black tracking-tighter">EFADO FairlyUsed Market</h2>
-                    <p className="text-indigo-100 max-w-xl mx-auto">List or purchase certified pre-owned gadgets, electronics, and tech resources from verified sellers in the EFADO community.</p>
-                    <button 
-                      onClick={() => setShowMarketHub(true)}
-                      className="px-12 py-5 bg-white text-indigo-800 hover:text-indigo-900 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl hover:scale-105 active:scale-95 transition-all text-slate-900"
-                    >
-                      Enter Fairly Used Marketplace
-                    </button>
+                <div className="bg-gradient-to-br from-indigo-700 to-slate-900 p-8 sm:p-10 rounded-2xl text-white text-center shadow-xl max-w-2xl mx-auto border border-white/10">
+                  <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Package className="w-7 h-7 text-indigo-100" />
                   </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold mb-2">Fairly Used Market</h2>
+                  <p className="text-indigo-100 max-w-xl mx-auto text-sm leading-relaxed mb-6">Buy or list pre-owned phones, electronics, and household items from verified sellers.</p>
+                  <button 
+                    onClick={() => setShowMarketHub(true)}
+                    className="px-8 py-3.5 bg-white hover:bg-slate-100 text-indigo-800 rounded-xl font-semibold text-sm shadow-md transition-all"
+                  >
+                    Open Fairly Used Market
+                  </button>
                 </div>
               </motion.section>
             )}
@@ -4877,7 +4901,7 @@ function AppContent() {
         initialSection={legalHubSection}
       />
 
-      {user && <EfadoHelpChat user={user} />}
+      <SupportHelpModal user={user} />
       {renderWalletModal()}
     </div>
   );

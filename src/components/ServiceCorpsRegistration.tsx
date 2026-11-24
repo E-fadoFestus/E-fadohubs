@@ -37,10 +37,10 @@ interface ServiceCorpsRegistrationProps {
 }
 
 const REGISTRATION_PLANS = [
-  { id: 'Free', name: 'Standard Relief', price: 0, description: 'Basic entry into the Hub. Limited exposure.', icon: <User className="w-5 h-5" />, accent: 'border-slate-200' },
-  { id: 'Basic', name: 'Strategic Basic', price: 500, description: 'Enhanced visibility. Verified badge after 3 jobs.', icon: <Zap className="w-5 h-5 text-amber-500" />, accent: 'border-amber-200 bg-amber-50/30' },
-  { id: 'Express', name: 'Tactical Express', price: 1500, description: 'Priority listing. Instant Verification badge. 24/7 Support.', icon: <Zap className="w-5 h-5 text-indigo-500" fill="currentColor" />, accent: 'border-indigo-200 bg-indigo-50/30' },
-  { id: 'Corporate', name: 'Sovereign Corporate', price: 3500, description: 'Company profile. Multi-service listing. Direct CEO pipeline.', icon: <Building2 className="w-5 h-5 text-purple-600" />, accent: 'border-purple-200 bg-purple-50/30' }
+  { id: 'Free', name: 'Free Starter', price: 0, description: 'Basic entry into the Hub. Standard visibility.', icon: <User className="w-5 h-5" />, accent: 'border-slate-200' },
+  { id: 'Basic', name: 'Verified Basic', price: 500, description: 'Enhanced visibility. Verified badge after 3 jobs.', icon: <Zap className="w-5 h-5 text-amber-500" />, accent: 'border-amber-200 bg-amber-50/30' },
+  { id: 'Express', name: 'Priority Express', price: 1500, description: 'Priority listing. Instant verification badge. 24/7 support.', icon: <Zap className="w-5 h-5 text-indigo-500" fill="currentColor" />, accent: 'border-indigo-200 bg-indigo-50/30' },
+  { id: 'Corporate', name: 'Business & Corporate', price: 3500, description: 'Company profile. Multi-service listing. Direct priority support.', icon: <Building2 className="w-5 h-5 text-purple-600" />, accent: 'border-purple-200 bg-purple-50/30' }
 ];
 
 const RECOGNITION_PRESETS = [
@@ -221,21 +221,21 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
       if (step === 2) {
         if (!providerData.state) errors.state = "State location is mandatory for regional logistics.";
         if (!providerData.city) errors.city = "City identity required. Clients search for local hubs.";
-        if (!providerData.address) errors.address = "Detailed street orientation is required for tactical deployment.";
-        if (!providerData.contactPhone) errors.contactPhone = "Direct hot-line required. Must be a valid mobile node.";
-        if (!providerData.whatsapp) errors.whatsapp = "WhatsApp synchronization node required for coordination.";
+        if (!providerData.address) errors.address = "Detailed street address is required so clients can verify your service area.";
+        if (!providerData.contactPhone) errors.contactPhone = "Direct phone number is required.";
+        if (!providerData.whatsapp) errors.whatsapp = "WhatsApp number is required for client coordination.";
       }
     } else {
       if (step === 1) {
-        if (!seekerData.familyId) errors.familyId = "Resource domain required. Tell us what category of relief you seek.";
-        if (seekerData.familyId && !seekerData.subcategory) errors.subcategory = "Specialized focus required for expert matching.";
-        if (!seekerData.description) errors.description = "Mission briefing required. Describe your situation or need in detail.";
+        if (!seekerData.familyId) errors.familyId = "Service category is required. Tell us what type of help you need.";
+        if (seekerData.familyId && !seekerData.subcategory) errors.subcategory = "Please select a specific skill for better matching.";
+        if (!seekerData.description) errors.description = "Request details are required. Describe what you need done.";
       }
       if (step === 2) {
-        if (!seekerData.state) errors.state = "Regional location required.";
-        if (!seekerData.city) errors.city = "Urban sector identity required.";
-        if (!seekerData.address) errors.address = "Tactical destination address required for expert deployment.";
-        if (!seekerData.whatsapp) errors.whatsapp = "Communication node required for field contact.";
+        if (!seekerData.state) errors.state = "State or region is required.";
+        if (!seekerData.city) errors.city = "City is required.";
+        if (!seekerData.address) errors.address = "Service destination address is required for on-site visits.";
+        if (!seekerData.whatsapp) errors.whatsapp = "WhatsApp number is required for contact.";
       }
     }
 
@@ -296,8 +296,8 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
         >
           <CheckCircle2 className="w-10 h-10" />
         </motion.div>
-        <h2 className="text-2xl font-black text-gray-900 mb-2">Sovereign Connection Established!</h2>
-        <p className="text-gray-600 max-w-sm mx-auto">Your {regType === 'PROVIDER' ? 'profile' : 'request'} is now live across the global relief network.</p>
+        <h2 className="text-2xl font-black text-gray-900 mb-2">Registration Successful!</h2>
+        <p className="text-gray-600 max-w-sm mx-auto">Your {regType === 'PROVIDER' ? 'provider profile' : 'service request'} is now live on EFADO Service Corps.</p>
       </div>
     );
   }
@@ -446,7 +446,7 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                       <div className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
                     </div>
                     <div className="space-y-2 text-center md:text-left flex-1">
-                      <h4 className="text-sm font-black uppercase tracking-wider text-indigo-400">Tactical Recognition Selfie / Photo</h4>
+                      <h4 className="text-sm font-bold text-indigo-400">Verification Profile Photo</h4>
                       <p className="text-xs text-slate-300 leading-relaxed">
                         Security requirement: Upload a clear, front-facing headshot. This is verified by the client prior to entry into their premises to prevent intrusion.
                       </p>
@@ -633,8 +633,8 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" /> Sovereign Pitch / Capabilities
+                  <label className="text-xs font-bold text-gray-500 flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5" /> About Your Skills &amp; Experience
                   </label>
                   <textarea 
                     required
@@ -710,9 +710,9 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
                       onChange={e => setSeekerData({...seekerData, urgency: e.target.value as any})}
                     >
                       <option value="Low">Low - Within a week</option>
-                      <option value="Medium">Tactical - Within 72h</option>
-                      <option value="High">Priority - Within 24h</option>
-                      <option value="Emergency">CRITICAL - Instant Deployment</option>
+                      <option value="Medium">Standard - Within 72 hours</option>
+                      <option value="High">Priority - Within 24 hours</option>
+                      <option value="Emergency">Urgent - Same Day</option>
                     </select>
                   </FormField>
 
@@ -920,9 +920,9 @@ export const ServiceCorpsRegistration: React.FC<ServiceCorpsRegistrationProps> =
           disabled={loading}
           className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
         >
-          {loading ? 'Processing Sovereign Node...' : (
+          {loading ? 'Submitting...' : (
             <>
-              {step === (regType === 'PROVIDER' ? 3 : 2) ? 'Initiate Deployment' : 'Next Protocol'}
+              {step === (regType === 'PROVIDER' ? 3 : 2) ? 'Complete Registration' : 'Continue'}
               <ArrowRight className="w-4 h-4" />
             </>
           )}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, BookOpen, Anchor, DollarSign, Lightbulb, MessageCircle } from 'lucide-react';
+import { openSupportHelpForm } from '../utils/helpSupport';
 
 interface RulesModalProps {
   onClose: () => void;
@@ -7,8 +8,7 @@ interface RulesModalProps {
 
 export const RulesModal: React.FC<RulesModalProps> = ({ onClose }) => {
   const handleHelp = () => {
-    window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: 'Wallet & Payments' } }));
-    onClose();
+    openSupportHelpForm({ hub: 'Game Zone', subject: 'Game Issue' });
   };
 
   return (

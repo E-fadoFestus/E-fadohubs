@@ -230,8 +230,8 @@ export const GameManualPayment: React.FC<GameManualPaymentProps> = ({ user, onSu
             <FileText className="w-4 h-4 text-slate-950" />
             <span>📖 Activator & Payment Guide</span>
           </button>
-          <div className="px-3.5 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl text-[9px] font-black uppercase tracking-widest text-orange-400">
-            Manual Settle Protocol
+          <div className="px-3.5 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl text-xs font-bold text-orange-400">
+            Manual Payment Verification
           </div>
         </div>
       </div>
@@ -329,7 +329,7 @@ export const GameManualPayment: React.FC<GameManualPaymentProps> = ({ user, onSu
           <div className="bg-orange-500/5 border border-orange-500/10 rounded-3xl p-5 flex gap-4 items-start">
             <ShieldCheck className="w-6 h-6 text-orange-500 flex-shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <h5 className="text-xs font-black uppercase text-slate-200">Security Guard Protocol</h5>
+              <h5 className="text-xs font-bold text-slate-200">Payment Security Guidelines</h5>
               <p className="text-slate-400 text-[11px] leading-relaxed">
                 Ensure the deposit matches the exact generated amount below. Codes expire after 2 hours. If any issue arises, contact technical support at <span className="text-orange-400 font-mono">efadofestus@gmail.com</span> with your generated pin code.
               </p>

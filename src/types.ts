@@ -849,8 +849,14 @@ export interface TechCreator {
 export interface AdListing {
   id: string;
   vendorId: string;
+  userId?: string;
+  ownerName?: string;
+  hub?: string;
   type: 'ADVERT' | 'SELL';
-  category: 'HOTEL' | 'FARM' | 'LAND' | 'HOUSING' | 'RESTAURANT' | 'VEHICLE' | 'STORES' | 'LEGAL' | 'RELIGIOUS_EVENTS' | 'TRAVEL' | 'TECH';
+  category: string;
+  groupId?: string;
+  customCategoryName?: string;
+  slug?: string;
   title: string;
   description: string;
   price: number;
@@ -870,10 +876,37 @@ export interface AdListing {
     whatsapp?: string;
     email?: string;
   };
-  plan: 'Free' | 'Weekly' | 'Monthly' | 'Quarterly' | 'BiAnnual' | 'Yearly' | 'Express';
+  plan: 'Free' | 'Weekly' | 'Monthly' | 'Quarterly' | 'BiAnnual' | 'Yearly' | 'Express' | string;
   expiryDate: any;
-  status: 'active' | 'expired' | 'pending' | 'sold_out';
+  status: 'active' | 'expired' | 'pending' | 'sold_out' | 'finished' | 'deleted';
+  viewsCount?: number;
+  sharesCount?: number;
+  likes?: string[];
+  commentsCount?: number;
+  syndication?: any;
   createdAt: any;
+  updatedAt?: any;
+}
+
+export interface AdvertComment {
+  id?: string;
+  adId: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: any;
+}
+
+export interface CustomAdvertCategory {
+  id: string;
+  slug: string;
+  name: string;
+  groupId: string;
+  submissionCount: number;
+  submitters?: string[];
+  promoted: boolean;
+  createdAt: any;
+  updatedAt?: any;
 }
 
 export interface AdPlan {

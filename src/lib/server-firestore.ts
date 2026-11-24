@@ -1,14 +1,25 @@
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import path from 'path';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, FieldValue as AdminFieldValue } from 'firebase-admin/firestore';
 import { initializeApp as initializeClientApp, getApps as getClientApps } from 'firebase/app';
 import { initializeFirestore as initializeClientFirestore, getFirestore as getClientFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp as clientServerTimestamp } from 'firebase/firestore';
+import bundledFirebaseConfig from '../../firebase-applet-config.json';
 
-const cfg = JSON.parse(
-  fs.readFileSync(fileURLToPath(new URL('../../firebase-applet-config.json', import.meta.url)), 'utf8')
-);
+function loadFirebaseConfig(): any {
+  try {
+    const cwdPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(cwdPath)) {
+      return JSON.parse(fs.readFileSync(cwdPath, 'utf8'));
+    }
+  } catch {
+    // Fall back to statically bundled config
+  }
+  return bundledFirebaseConfig;
+}
+
+const cfg = loadFirebaseConfig();
 
 function hasServiceAccount(): boolean {
   return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_SERVICE_ACCOUNT);

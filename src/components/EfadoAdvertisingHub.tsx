@@ -1,65 +1,65 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  motion, 
-  AnimatePresence 
-} from 'motion/react';
-import { 
-  Megaphone, 
-  ShoppingBag, 
-  Hotel, 
-  Sprout, 
-  Map, 
-  Home, 
-  Utensils, 
-  Car, 
-  Store,
-  Mic2,
-  Hammer,
-  ChevronRight, 
-  ChevronLeft,
-  X,
-  Upload,
-  Zap,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Search,
-  Filter,
-  Plus,
-  Landmark,
-  Plane,
-  Laptop,
-  Gavel,
-  Calendar,
-  Heart,
-  BookOpen,
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  ArrowLeft,
   ArrowRight,
-  TrendingUp,
-  Package,
-  Truck,
-  Phone,
-  Mail,
-  MessageCircle,
-  Info,
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  Download,
+  Edit3,
+  Eye,
+  Home,
+  LayoutList,
   MapPin,
-  Shield,
-  ShieldCheck,
-  LayoutGrid,
-  Globe,
-  Video,
-  Film,
+  Megaphone,
+  MessageCircle,
+  Phone,
+  Plus,
+  Search,
+  Send,
   Share2,
+  ShoppingBag,
   Sparkles,
-  Download
+  Trash2,
+  TrendingUp,
+  User as UserIcon,
+  Video,
+  X,
 } from 'lucide-react';
-import { UserProfile, AdListing, AdPlan } from '../types';
+import {
+  db,
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  onSnapshot,
+} from '../firebase';
+import { AdListing, AdPlan, CustomAdvertCategory, UserProfile } from '../types';
 import { useAI } from '../hooks/useAI';
-import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
 import { useCurrency } from '../lib/CurrencyContext';
-import { CurrencySelector } from './CurrencySelector';
+import {
+  ADVERT_GROUPS,
+  ADVERT_PLANS,
+  ALL_SUB_CATEGORIES,
+  AdvertGroupConfig,
+  AdvertGroupId,
+  CONTEXTUAL_FIELDS,
+  findGroupForCategory,
+  getCategoryLabel,
+} from '../constants/advertCategories';
+import {
+  AdvertSubmissionInput,
+  efadoAdvertApi,
+  getPublicAdvertUrl,
+  validateAdvertSubmission,
+} from '../services/efadoAdvertApi';
 import { PaymentPlatform } from './PaymentPlatform';
 import { EfadoPromoKit } from './EfadoPromoKit';
 import { HubGuideNote } from './HubGuideNote';
+import { AdvertCard } from './AdvertCard';
+import { AdvertShareBar } from './AdvertShareBar';
 
 interface EfadoAdvertisingHubProps {
   user: UserProfile;
@@ -67,1810 +67,2304 @@ interface EfadoAdvertisingHubProps {
   onNavigate?: (hub: any, subview?: any) => void;
   initialType?: 'ADVERT' | 'SELL';
   initialItemId?: string;
+  onOpenProfile?: () => void;
 }
 
-const AD_CATEGORIES = [
-  { id: 'HOTEL', label: 'Hotel Advertising', icon: Hotel, description: 'Luxury stays, resort rooms, motels, eateries, and guest houses.' },
-  { id: 'FARM', label: 'Farmers & Agri-Hub', icon: Sprout, description: 'Crops, livestock, poultry, fishery, and raw produce from rural & urban farms.' },
-  { id: 'TALENT', label: 'Voice & Talents', icon: Mic2, description: 'Musicians, voice artists, actors, and creative talents globally.' },
-  { id: 'ARTISAN', label: 'Artisans & Handcraft', icon: Hammer, description: 'Weavers, potters, blacksmiths, tailors, and local craftsmen.' },
-  { id: 'CHURCH', label: 'Church & Programs', icon: Landmark, description: 'Religious events, church programs, crusades, and anniversaries.' },
-  { id: 'EVENTS', label: 'Events & Functions', icon: Calendar, description: 'Weddings, birthdays, burials, parties, and anniversaries.' },
-  { id: 'PROPERTIES', label: 'Landed Properties', icon: Map, description: 'Land, houses, apartments, and commercial properties.' },
-  { id: 'RENTALS', label: 'Logistics & Rentals', icon: Truck, description: 'Trucks, trailers, vehicles, tractors, bikes, and machinery.' },
-  { id: 'BUSINESS', label: 'Retail & Business', icon: Store, description: 'Supermarkets, eateris, buka, retailers, and warehouses.' },
-  { id: 'MORTGAGE', label: 'Mortgage & Housing', icon: Home, description: 'House mortgaging, room renting, and property leasing.' },
-  { id: 'EDUCATION', label: 'Educational Services', icon: BookOpen, description: 'Schools, coaching centers, online courses, and book shops.' },
-  { id: 'TECHNICAL', label: 'Technical & Engineering', icon: Zap, description: 'Electricians, plumbers, tech repairs, and engineering services.' },
-  { id: 'TRANSPORT', label: 'Transportation Hub', icon: Car, description: 'Inter-state travel, local taxis, car hire, and flight bookings.' },
-  { id: 'AUCTION', label: 'Auction & Gavel', icon: Gavel, description: 'Live auctions, bidding wars, and rapid asset liquidation.' },
-  { id: 'MEDICAL', label: 'Medical & Health', icon: Heart, description: 'Hospitals, clinics, pharmacies, and health consultancy.' },
-  { id: 'FASHION', label: 'Fashion & Style', icon: ShoppingBag, description: 'Clothing, accessories, fashion designers, and boutiques.' },
-  { id: 'LEGAL', label: 'Legal & Judiciary', icon: Shield, description: 'Lawyers, legal advice, notary public, and chambers.' },
-  { id: 'SECURITY', label: 'Security Protocols', icon: ShieldCheck, description: 'Private security, alarms, surveillance, and guard services.' },
-  { id: 'CONSULTANCY', label: 'Consultancy Hub', icon: Info, description: 'Professional advice, business strategy, and experts.' },
-  { id: 'OTHER', label: 'Other Specializations', icon: Globe, description: 'Type your area of specialization directly into the form.' },
-];
+type HubView = 'DOOR' | 'CATEGORY_PREVIEW' | 'FORM' | 'SUCCESS' | 'MY_ADS' | 'PROMO';
 
-const AD_PLANS: AdPlan[] = [
-  { id: 'Free', name: 'Free Protocol', price: 0, durationDays: 3, features: ['3 Day Visibility', 'Basic Listing'] },
-  { id: 'Weekly', name: 'Tactical Week', price: 2000, durationDays: 7, features: ['7 Day Visibility', 'Standard Ranking'] },
-  { id: 'Monthly', name: 'Strategic Month', price: 7500, durationDays: 30, features: ['30 Day Visibility', 'Priority Listing'] },
-  { id: 'Quarterly', name: 'Elite 3-Month', price: 20000, durationDays: 90, features: ['90 Day Visibility', 'Enhanced Exposure'] },
-  { id: 'BiAnnual', name: 'Sovereign 6-Month', price: 35000, durationDays: 180, features: ['180 Day Visibility', 'Maximum Reach'] },
-  { id: 'Yearly', name: 'Universal Year', price: 60000, durationDays: 365, features: ['365 Day Visibility', 'Infinite Re-listing'] },
-  { id: 'Express', name: 'Express Viral', price: 5000, durationDays: 3, features: ['Instant Propagation', 'Top of Category Search'] },
-];
+async function compressAdvertPhoto(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read selected image.'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+        resolve(dataUrl);
+        return;
+      }
+      const img = new Image();
+      img.onerror = () => resolve(dataUrl);
+      img.onload = () => {
+        const maxSide = 1080;
+        let { width, height } = img;
+        if (width > maxSide || height > maxSide) {
+          const ratio = Math.min(maxSide / width, maxSide / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.78));
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
-// ... (AD_CATEGORIES and AD_PLANS stay same)
+async function uploadAdvertVideo(file: File, userId: string): Promise<string> {
+  if (file.size <= 420 * 1024) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(new Error('Could not read selected video.'));
+      r.onload = () => resolve(String(r.result || ''));
+      r.readAsDataURL(file);
+    });
+  }
 
-const CATEGORY_FIELDS: Record<string, { label: string; type: string; placeholder: string; key: string; optional?: boolean; options?: string[] }[]> = {
-  HOTEL: [
-    { label: 'Room Category', type: 'text', placeholder: 'Single, Suite, Studio, Penthouse', key: 'roomCategory' },
-    { label: 'Hotel Facilities', type: 'text', placeholder: 'WiFi, Pool, Restaurant, Spa', key: 'facilities', optional: true },
-    { label: 'Check-in Time', type: 'text', placeholder: 'Standard check-in time (e.g. 2:00 PM)', key: 'checkIn', optional: true }
-  ],
-  FARM: [
-    { label: 'Farming Vertical', type: 'text', placeholder: 'Crop Farming, Poultry, Fishery, Cattle, Snailery, Bee Keeping', key: 'farmingType' },
-    { label: 'Specific Product/Produce', type: 'text', placeholder: 'Maize, Eggs, Catfish, Cow, Honey, Cocoa, etc.', key: 'product' },
-    { label: 'Bulk Quantity Available', type: 'text', placeholder: 'e.g. 50 Bags, 100 Birds, 5 Tons', key: 'quantity' },
-    { label: 'Harvest Date / Age', type: 'text', placeholder: 'When was it harvested? Or age of livestock', key: 'age', optional: true },
-    { label: 'Farm Location Type', type: 'select', placeholder: 'Rural Farm, Urban Farm, Greenhouse', key: 'locType', options: ['Rural Farm', 'Urban Farm', 'Home Based', 'Greenhouse'], optional: true },
-    { label: 'Certifications', type: 'text', placeholder: 'Organic, NAFDAC, Local Market Board (If any)', key: 'certs', optional: true },
-    { label: 'Logistics Options', type: 'text', placeholder: 'Pickup only, Delivery available, Group shipping?', key: 'logistics', optional: true }
-  ],
-  TALENT: [
-    { label: 'Talent Category', type: 'text', placeholder: 'Vocalist, Instrumentalist, Voice-over, Actor', key: 'talentType' },
-    { label: 'Experience Level', type: 'text', placeholder: 'Beginner, Intermediate, Pro', key: 'level', optional: true },
-    { label: 'YouTube/Portfolio Link', type: 'text', placeholder: 'Link to your work (Optional)', key: 'link', optional: true }
-  ],
-  ARTISAN: [
-    { label: 'Craft Type', type: 'text', placeholder: 'Tailoring, Carpentry, Blacksmithing, etc.', key: 'craftType' },
-    { label: 'Material Source', type: 'text', placeholder: 'Local materials, Imported, etc.', key: 'source', optional: true },
-    { label: 'Production Time', type: 'text', placeholder: 'How long to complete an order', key: 'leadTime', optional: true }
-  ],
-  CHURCH: [
-    { label: 'Program Name', type: 'text', placeholder: 'Annual Convention, Crusade, Service', key: 'programName' },
-    { label: 'Ministers Involved', type: 'text', placeholder: 'Host and Guest Speakers', key: 'ministers', optional: true },
-    { label: 'Program Theme', type: 'text', placeholder: 'The main theme of the event', key: 'theme', optional: true }
-  ],
-  EVENTS: [
-    { label: 'Function Type', type: 'text', placeholder: 'Wedding, Birthday, Burial, Reunion', key: 'functionType' },
-    { label: 'Guest Capacity', type: 'text', placeholder: 'Number of expected attendees', key: 'capacity', optional: true },
-    { label: 'Special Requirements', type: 'text', placeholder: 'Food, Music, Hall type', key: 'needs', optional: true }
-  ],
-  PROPERTIES: [
-    { label: 'Property Class', type: 'text', placeholder: 'Residential, Commercial, Industrial', key: 'propClass' },
-    { label: 'Title Documents', type: 'text', placeholder: 'C of O, Survey, Deed (If available)', key: 'titleDocs', optional: true },
-    { label: 'Land Size', type: 'text', placeholder: 'Square meters or Acres', key: 'size' }
-  ],
-  RENTALS: [
-    { label: 'Vehicle/Machinery Type', type: 'text', placeholder: 'Trucks, Trailers, Tractors, Wheelbarrows', key: 'assetType' },
-    { label: 'Rental Duration', type: 'text', placeholder: 'Daily, Hourly, Per Trip', key: 'duration' },
-    { label: 'Inclusions', type: 'text', placeholder: 'Driver, Fuel, Maintenance included?', key: 'inc', optional: true }
-  ],
-  BUSINESS: [
-    { label: 'Business Vertical', type: 'text', placeholder: 'Eatery, Computer Store, Phone Shop', key: 'vertical' },
-    { label: 'Stock Description', type: 'text', placeholder: 'Retail individual items or bulk warehouse', key: 'stockDesc', optional: true },
-    { label: 'RC Number / Reg', type: 'text', placeholder: 'CAC Registration (Optional)', key: 'rcNumber', optional: true }
-  ],
-  MORTGAGE: [
-    { label: 'Plan Type', type: 'text', placeholder: 'Mortgage, Renting, Short-let', key: 'planType' },
-    { label: 'Financial Terms', type: 'text', placeholder: 'Upfront, Installments, Monthly', key: 'terms', optional: true },
-    { label: 'Down Payment', type: 'text', placeholder: 'Minimum required deposit', key: 'deposit', optional: true }
-  ],
-  EDUCATION: [
-    { label: 'Service Category', type: 'text', placeholder: 'Pre-school, University, Skills training', key: 'serviceCat' },
-    { label: 'Curriculum', type: 'text', placeholder: 'British, American, Nigerian, Hybrid', key: 'curriculum', optional: true },
-    { label: 'Govt Approval No', type: 'text', placeholder: 'Registration No (Optional)', key: 'govNo', optional: true }
-  ],
-  TECHNICAL: [
-    { label: 'Specialty Area', type: 'text', placeholder: 'Solar, Plumbing, Software, Mechanical', key: 'specialty' },
-    { label: 'Certifications', type: 'text', placeholder: 'Trade test, BSc, COREN (Optional)', key: 'certs', optional: true }
-  ],
-  TRANSPORT: [
-    { label: 'Transport Route', type: 'text', placeholder: 'Lagos to Abuja, Local courier, etc.', key: 'route' },
-    { label: 'Fleet Type', type: 'text', placeholder: 'Minibus, Luxury bus, Bike, Air', key: 'fleet' },
-    { label: 'License Class', type: 'text', placeholder: 'Professional, Commercial, etc.', key: 'license', optional: true }
-  ],
-  AUCTION: [
-    { label: 'Auction Type', type: 'text', placeholder: 'Public, Timed, Sealed bid', key: 'auctionType' },
-    { label: 'Official Gavel Date', type: 'date', placeholder: 'The scheduled day of auction', key: 'auctionDate' }
-  ],
-  MEDICAL: [
-    { label: 'Facility Type', type: 'text', placeholder: 'General Hospital, Clinic, Pharmacy, Labs', key: 'facilityType' },
-    { label: 'Specializations', type: 'text', placeholder: 'Cardiology, Surgery, Pediatrics, etc.', key: 'specialties', optional: true },
-    { label: 'Operating Hours', type: 'text', placeholder: 'e.g. 24/7 or 8am - 5pm', key: 'hours', optional: true }
-  ],
-  FASHION: [
-    { label: 'Brand Name', type: 'text', placeholder: 'Your fashion house name', key: 'brandName' },
-    { label: 'Category', type: 'text', placeholder: 'Menswear, Womenswear, Kids, Accessories', key: 'fashionCat' },
-    { label: 'Custom Orders', type: 'text', placeholder: 'Do you take bespoke/custom orders?', key: 'bespoke', optional: true }
-  ],
-  LEGAL: [
-    { label: 'Practice Area', type: 'text', placeholder: 'Criminal, Civil, Corporate, Property Law', key: 'practiceArea' },
-    { label: 'Years of Bar', type: 'text', placeholder: 'e.g. 10 years experience', key: 'exp', optional: true },
-    { label: 'Consultation Fee', type: 'text', placeholder: 'Initial consultation charge (Optional)', key: 'refFee', optional: true }
-  ],
-  SECURITY: [
-    { label: 'Service Scope', type: 'text', placeholder: 'Personnel, Electronic, Rapid Response', key: 'scope' },
-    { label: 'Certification', type: 'text', placeholder: 'Licensed security agent, etc.', key: 'cert', optional: true }
-  ],
-  CONSULTANCY: [
-    { label: 'Expertise', type: 'text', placeholder: 'IT, Finance, Strategy, Human Resources', key: 'expertise' },
-    { label: 'Consultation Format', type: 'text', placeholder: 'Online, Physical, Hybrid', key: 'format', optional: true }
-  ],
-  OTHER: [
-    { label: 'Your Specific Specialization', type: 'text', placeholder: 'Type your area of specialization here', key: 'otherType' },
-    { label: 'Overview of Offering', type: 'text', placeholder: 'Describe your unique reach or product', key: 'overview' },
-    { label: 'Relevant Details', type: 'text', placeholder: 'Any other information you want to add', key: 'details', optional: true }
-  ]
-};
+  const chunkSize = 350 * 1024;
+  const totalChunks = Math.ceil(file.size / chunkSize);
+  const uploadId = `advid_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, onClose, onNavigate, initialType, initialItemId }) => {
+  for (let i = 0; i < totalChunks; i++) {
+    const slice = file.slice(i * chunkSize, (i + 1) * chunkSize);
+    const chunkBase64 = await new Promise<string>((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('Video upload failed while reading file.'));
+      fr.onload = () => resolve(String(fr.result || ''));
+      fr.readAsDataURL(slice);
+    });
+
+    const resp = await fetch('/api/uploadReelChunk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uploadId,
+        chunkIndex: i,
+        totalChunks,
+        chunkData: chunkBase64,
+        fileName: file.name,
+        mimeType: file.type || 'video/mp4',
+        userId,
+      }),
+    });
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok || !data?.success) {
+      throw new Error(data?.error || 'Could not upload video right now.');
+    }
+    if (data.completed && data.videoUrl) {
+      return data.videoUrl;
+    }
+  }
+  return `/api/reels/stream/${uploadId}`;
+}
+
+export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({
+  user,
+  onClose,
+  onNavigate,
+  initialType,
+  initialItemId,
+  onOpenProfile,
+}) => {
   const { formatPrice } = useCurrency();
-  const [view, setView] = useState<'BROWSE' | 'REGISTER' | 'PROMO'>(initialItemId ? 'BROWSE' : 'REGISTER');
+  const { generateImage, dailyUsage } = useAI();
+
+  const [view, setView] = useState<HubView>(
+    initialType === 'SELL' ? 'FORM' : 'DOOR'
+  );
   const [adType, setAdType] = useState<'ADVERT' | 'SELL'>(initialType || 'ADVERT');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [registerStep, setRegisterStep] = useState<'CATEGORY' | 'DETAILS' | 'PREVIEW' | 'PLAN'>('CATEGORY');
+  const [selectedGroup, setSelectedGroup] = useState<AdvertGroupConfig>(ADVERT_GROUPS[0]);
+  const [expandedGroupId, setExpandedGroupId] = useState<AdvertGroupId | null>(null);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('BUSINESS');
+  const [customOthersName, setCustomOthersName] = useState('');
+  const [showOthersInput, setShowOthersInput] = useState(false);
+
+  // Live listings & auto-promoted custom categories
   const [listings, setListings] = useState<AdListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [shareToast, setShareToast] = useState<string | null>(null);
-  const [showPayment, setShowPayment] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<AdPlan | null>(null);
+  const [promotedCustomCategories, setPromotedCustomCategories] = useState<CustomAdvertCategory[]>([]);
+  const [loadingListings, setLoadingListings] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Photo uploading refs and handlers
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-
-  // Engagement modal / terminal states
-  const [selectedAdForEngagement, setSelectedAdForEngagement] = useState<AdListing | null>(null);
-  const [engagementMessage, setEngagementMessage] = useState('');
-  const [engagementSending, setEngagementSending] = useState(false);
-  const [engagementSuccess, setEngagementSuccess] = useState(false);
-
-  useEffect(() => {
-    if (!initialItemId || listings.length === 0) return;
-    const cleanId = String(initialItemId).toLowerCase().trim();
-    const match = listings.find(l => String(l.id).toLowerCase() === cleanId);
-    if (match) {
-      setView('BROWSE');
-      setSelectedAdForEngagement(match);
-      setEngagementMessage(`Hi! I am interested in your listed asset: "${match.title}". Please advise on physical alignment or transaction options.`);
-      setTimeout(() => {
-        const el = document.getElementById(`ad-${match.id}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 400);
-    }
-  }, [initialItemId, listings]);
-
-  const handleShareAd = (ad: AdListing, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const shareUrl = `${window.location.origin}/hub/advertisement/${ad.id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        setShareToast(`Ad link copied to clipboard! Share on WhatsApp.`);
-        setTimeout(() => setShareToast(null), 3000);
-      }).catch(() => {
-        prompt('Copy ad link:', shareUrl);
-      });
-    } else {
-      prompt('Copy ad link:', shareUrl);
-    }
-  };
-
-  const handleWhatsAppShareAd = (ad: AdListing, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const shareUrl = `${window.location.origin}/hub/advertisement/${ad.id}`;
-    const text = `Check out this listing on EFADO Advertising: "${ad.title}" (${formatPrice(ad.price)}):\n${shareUrl}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-  };
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          const base64Data = reader.result;
-          setFormData(prev => ({
-            ...prev,
-            photos: [...prev.photos, base64Data]
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("This video file is larger than 5MB. A shorter or smaller video clip is recommended for optimal performance.");
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          const base64Data = reader.result;
-          setFormData(prev => ({
-            ...prev,
-            video: base64Data
-          }));
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const SELLER_BENEFITS = [
-    { title: "Global Neural Reach", desc: "Instantly propagate your assets to millions of active nodes in 190+ jurisdictions.", icon: Globe },
-    { title: "Escrow Secured", desc: "All transactions are shielded by EFADO's tactical escrow protocols for total peace of mind.", icon: Shield },
-    { title: "Unified Inventory", desc: "List once, appear everywhere. Gist Hub, Market Hubs, and search results synchronously.", icon: LayoutGrid },
-    { title: "Instant Liquidity", desc: "Convert assets to capital rapidly with our high-velocity patronage matching engine.", icon: TrendingUp }
-  ];
-
-  const MARKETPLACE_HUBS = [
-    { id: 'MODERN_MARKET', name: 'Tactical Modern Market', desc: 'Premium retail & high-end consumer goods.', icon: ShoppingBag, hub: 'MARKET' },
-    { id: 'FAIRLY_USED', name: 'Sovereign Used Market', desc: 'Pre-owned assets with vetted history.', icon: Package, hub: 'FAIRLY_USED' },
-    { id: 'AGRI_HUB', name: 'Agri-Sovereign Hub', desc: 'Direct connection to rural & urban farm produce.', icon: Sprout, hub: 'AGRI_HUB' },
-    { id: 'TALENT_HUB', name: 'Voice & Talent Hub', icon: Mic2, desc: 'Global stage for reachable creative voices.', hub: 'TALENT_HUB' },
-    { id: 'DOMAIN_HUB', name: 'Digital Domain Hub', desc: 'Virtual real-estate & digital assets.', icon: Globe, hub: 'DOMAIN_HUB' }
-  ];
-
-  // Handle type switching within the component
-  const handleTypeSwitch = (type: 'ADVERT' | 'SELL') => {
-    setAdType(type);
-    setFormData({
-      ...formData,
-      category: '',
-      details: {}
-    });
-    setSelectedCategory(null);
-    setRegisterStep('CATEGORY');
-    setView('REGISTER');
-  };
-
-  // Form State
+  // 3-step form + review state
+  const [formStep, setFormStep] = useState<1 | 2 | 3 | 4>(1);
+  const [editingAdId, setEditingAdId] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<AdPlan>(ADVERT_PLANS[0]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     state: '',
     city: '',
-    village: '',
     address: '',
     landmark: '',
-    phone: '',
-    whatsapp: '',
-    email: '',
-    category: '',
-    details: {} as any,
+    phone: user?.phoneNumber || '',
+    whatsapp: user?.phoneNumber || '',
+    email: user?.email || '',
+    details: {} as Record<string, any>,
     photos: [] as string[],
     video: '',
-    isReelPromotion: false
   });
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [boostingAd, setBoostingAd] = useState<AdListing | null>(null);
 
-  const { generateImage, searchWithGrounding, dailyUsage } = useAI();
+  // Success celebration state
+  const [publishedAd, setPublishedAd] = useState<AdListing | null>(null);
+
+  // My Adverts tab state
+  const [myAdsFilter, setMyAdsFilter] = useState<'active' | 'pending' | 'finished'>('active');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [myAdsStatusMsg, setMyAdsStatusMsg] = useState<string | null>(null);
+  const [shareModalAd, setShareModalAd] = useState<AdListing | null>(null);
+  const [showEfadoShareModal, setShowEfadoShareModal] = useState(false);
+
+  // Contact Seller modal state
+  const [contactAd, setContactAd] = useState<AdListing | null>(null);
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactSending, setContactSending] = useState(false);
+  const [contactResult, setContactResult] = useState<string | null>(null);
+
+  // Inline Profile Drawer fallback when no parent onOpenProfile handler
+  const [showInlineProfile, setShowInlineProfile] = useState(false);
+
+  // AI Ad Photo Generator modal
   const [showAiImageModal, setShowAiImageModal] = useState(false);
   const [aiAdPrompt, setAiAdPrompt] = useState('');
   const [aiGeneratedAdImg, setAiGeneratedAdImg] = useState<string | null>(null);
   const [isGeneratingAiAd, setIsGeneratingAiAd] = useState(false);
   const [aiAdError, setAiAdError] = useState<string | null>(null);
 
-  const [syndicationData, setSyndicationData] = useState<{
-    googleAds: { headline: string; description: string; keywords: string[] } | null;
-    socialMedia: { postText: string; hashtags: string } | null;
-    seo: { title: string; metaDescription: string } | null;
-  }>({ googleAds: null, socialMedia: null, seo: null });
-  const [isGeneratingCampaign, setIsGeneratingCampaign] = useState(false);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [broadcastStep, setBroadcastStep] = useState(0);
-  const [broadcastLogs, setBroadcastLogs] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
-  const generateCampaignAssets = async () => {
-    if (!formData.title || !formData.description) return;
-    setIsGeneratingCampaign(true);
+  // Real-time listings listener
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'ad_listings')),
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as AdListing));
+        docs.sort((a, b) => {
+          const tA = a.createdAt?.seconds || 0;
+          const tB = b.createdAt?.seconds || 0;
+          return tB - tA;
+        });
+        setListings(docs);
+        setLoadingListings(false);
+      },
+      () => {
+        setLoadingListings(false);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  // Real-time auto-promoted custom categories listener (5+ unique submissions)
+  useEffect(() => {
+    const qCats = query(collection(db, 'advert_categories'), where('promoted', '==', true));
+    const unsub = onSnapshot(
+      qCats,
+      (snap) => {
+        setPromotedCustomCategories(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() } as CustomAdvertCategory))
+        );
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, []);
+
+  // Handle direct deep-link item selection
+  useEffect(() => {
+    if (!initialItemId || listings.length === 0) return;
+    const lower = String(initialItemId).toLowerCase().trim();
+    const match = listings.find(
+      (l) => l.id.toLowerCase() === lower || String(l.slug || '').toLowerCase() === lower
+    );
+    if (match) {
+      const grp = findGroupForCategory(match.category);
+      setSelectedGroup(grp);
+      setSelectedSubCategory(match.category || 'BUSINESS');
+      setView('CATEGORY_PREVIEW');
+      setContactAd(match);
+      setContactMessage(`Hello! I saw your listing "${match.title}" on EFADO. Is it still available?`);
+    }
+  }, [initialItemId, listings]);
+
+  const activeListings = useMemo(() => {
+    const now = Date.now();
+    return listings.filter((l) => {
+      if (l.status === 'deleted' || l.status === 'finished' || l.status === 'expired') return false;
+      if (l.status === 'pending') return false;
+      if (l.expiryDate && l.expiryDate < now && l.status === 'active') return false;
+      return true;
+    });
+  }, [listings]);
+
+  const myListings = useMemo(() => {
+    const uid = user?.uid;
+    if (!uid) return [];
+    return listings.filter((l) => l.vendorId === uid || l.userId === uid);
+  }, [listings, user?.uid]);
+
+  const filteredMyListings = useMemo(() => {
+    const now = Date.now();
+    return myListings.filter((l) => {
+      const isExpired = Boolean(l.expiryDate && l.expiryDate < now);
+      if (myAdsFilter === 'active') return l.status === 'active' && !isExpired;
+      if (myAdsFilter === 'pending') return l.status === 'pending';
+      return l.status === 'finished' || l.status === 'expired' || l.status === 'sold_out' || isExpired;
+    });
+  }, [myListings, myAdsFilter]);
+
+  const searchResults = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return { categories: [], customCategories: [], ads: [] };
+
+    const categories = ALL_SUB_CATEGORIES.filter(
+      (c) =>
+        c.label.toLowerCase().includes(term) ||
+        c.description.toLowerCase().includes(term) ||
+        c.keywords.some((k) => k.toLowerCase().includes(term))
+    );
+
+    const customCategories = promotedCustomCategories.filter((c) =>
+      c.name.toLowerCase().includes(term)
+    );
+
+    const ads = activeListings.filter(
+      (a) =>
+        a.title?.toLowerCase().includes(term) ||
+        a.description?.toLowerCase().includes(term) ||
+        a.category?.toLowerCase().includes(term) ||
+        a.customCategoryName?.toLowerCase().includes(term) ||
+        a.location?.city?.toLowerCase().includes(term) ||
+        a.location?.state?.toLowerCase().includes(term)
+    );
+
+    return { categories, customCategories, ads };
+  }, [searchQuery, promotedCustomCategories, activeListings]);
+
+  const categoryPreviewAds = useMemo(() => {
+    const upper = selectedSubCategory.toUpperCase();
+    const customLower = customOthersName.trim().toLowerCase();
+    return activeListings.filter((a) => {
+      if (customLower) {
+        return (
+          String(a.customCategoryName || '').toLowerCase() === customLower ||
+          String(a.category || '').toLowerCase() === customLower
+        );
+      }
+      if (a.category?.toUpperCase() === upper) return true;
+      if (a.groupId === selectedGroup.id && !ALL_SUB_CATEGORIES.some((s) => s.id === upper)) {
+        return true;
+      }
+      return false;
+    });
+  }, [activeListings, selectedSubCategory, customOthersName, selectedGroup.id]);
+
+  const resetForm = (nextType: 'ADVERT' | 'SELL' = adType) => {
+    setEditingAdId(null);
+    setFormError(null);
+    setFormStep(1);
+    setSelectedPlan(ADVERT_PLANS[0]);
+    setAdType(nextType);
+    setFormData({
+      title: '',
+      description: '',
+      price: '',
+      state: '',
+      city: '',
+      address: '',
+      landmark: '',
+      phone: user?.phoneNumber || '',
+      whatsapp: user?.phoneNumber || '',
+      email: user?.email || '',
+      details: {},
+      photos: [],
+      video: '',
+    });
+  };
+
+  const startWizard = (mode: 'ADVERT' | 'SELL', group: AdvertGroupConfig, subCatId: string, customName = '') => {
+    setAdType(mode);
+    setSelectedGroup(group);
+    setSelectedSubCategory(subCatId);
+    setCustomOthersName(customName);
+    resetForm(mode);
+    setView('FORM');
+  };
+
+  const openCategoryPreview = (group: AdvertGroupConfig, subCatId: string, customName = '') => {
+    setSelectedGroup(group);
+    setSelectedSubCategory(subCatId);
+    setCustomOthersName(customName);
+    setView('CATEGORY_PREVIEW');
+  };
+
+  const openEditAd = (ad: AdListing) => {
+    const grp = findGroupForCategory(ad.category);
+    setEditingAdId(ad.id);
+    setAdType(ad.type || 'ADVERT');
+    setSelectedGroup(grp);
+    setSelectedSubCategory(grp.id === 'OTHERS' ? 'OTHER' : ad.category);
+    setCustomOthersName(ad.customCategoryName || (grp.id === 'OTHERS' ? ad.category : ''));
+    setFormData({
+      title: ad.title || '',
+      description: ad.description || '',
+      price: String(ad.price ?? ''),
+      state: ad.location?.state || '',
+      city: ad.location?.city || '',
+      address: ad.location?.address || '',
+      landmark: ad.location?.landmark || '',
+      phone: ad.contact?.phone || '',
+      whatsapp: ad.contact?.whatsapp || '',
+      email: ad.contact?.email || '',
+      details: ad.details || {},
+      photos: Array.isArray(ad.photos) ? ad.photos : [],
+      video: ad.video || '',
+    });
+    const matchedPlan = ADVERT_PLANS.find((p) => p.id === ad.plan) || ADVERT_PLANS[0];
+    setSelectedPlan(matchedPlan);
+    setFormStep(1);
+    setFormError(null);
+    setView('FORM');
+  };
+
+  const handlePhotoFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const remainingSlots = Math.max(0, 4 - formData.photos.length);
+    if (remainingSlots === 0) {
+      setFormError('You already added 4 photos (maximum allowed).');
+      return;
+    }
+    setMediaBusy(true);
+    setFormError(null);
     try {
-      const res = await searchWithGrounding(`Generate 3 marketing SEO keywords and Google Ad headline for: "${formData.title}" - ${formData.description}`);
-      setSyndicationData({
-        googleAds: {
-          headline: formData.title.substring(0, 30),
-          description: formData.description.substring(0, 90),
-          keywords: res.searchQueries && res.searchQueries.length > 0 ? res.searchQueries.slice(0, 5) : [formData.category.toLowerCase() || 'ads', 'efado', 'marketplace', 'nigeria', 'buysell']
-        },
-        socialMedia: {
-          postText: `🚀 NEW LISTING: ${formData.title}! ${formData.description}`,
-          hashtags: "#EFADO #GlobalMarkets #Deals #Classifieds"
-        },
-        seo: {
-          title: `${formData.title} | EFADO Sovereign Hub`,
-          metaDescription: formData.description.substring(0, 150)
-        }
-      });
-    } catch (err) {
-      console.error("Failed to generate campaign assets:", err);
-      setSyndicationData({
-        googleAds: {
-          headline: formData.title.substring(0, 30),
-          description: formData.description.substring(0, 90),
-          keywords: [formData.category.toLowerCase() || 'ads', 'efado', 'marketplace', 'nigeria', 'buysell']
-        },
-        socialMedia: {
-          postText: `🚀 NEW LISTING: ${formData.title}! ${formData.description}`,
-          hashtags: "#EFADO #GlobalMarkets #Deals #Classifieds"
-        },
-        seo: {
-          title: `${formData.title} | EFADO Sovereign Hub`,
-          metaDescription: formData.description.substring(0, 150)
-        }
-      });
+      const selected = Array.from(files).slice(0, remainingSlots);
+      const compressed = await Promise.all(selected.map((f) => compressAdvertPhoto(f)));
+      setFormData((prev) => ({
+        ...prev,
+        photos: [...prev.photos, ...compressed].slice(0, 4),
+      }));
+    } catch (err: any) {
+      setFormError(err?.message || 'Could not process one of the selected photos.');
     } finally {
-      setIsGeneratingCampaign(false);
+      setMediaBusy(false);
+      e.target.value = '';
     }
   };
 
-  useEffect(() => {
-    const q = query(collection(db, 'ad_listings'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AdListing));
-      setListings(docs);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleCreateAd = async () => {
-    if (!selectedPlan) return;
-    
-    setIsBroadcasting(true);
-    setBroadcastStep(0);
-    setBroadcastLogs(["[00:01] Connecting to EFADO Global Connection Engine..."]);
-
-    const steps = [
-      { log: "[00:03] Optimizing layout parameters and rendering SEO headers...", delay: 800 },
-      { log: "[00:06] Synchronizing syndication coordinates with Google Ads Network...", delay: 1600 },
-      { log: "[00:10] Propagating Meta (Facebook & Instagram) sponsored pipelines...", delay: 2400 },
-      { log: "[00:13] Launching XML Sitemap indexing broadcast & search engine pings...", delay: 3200 },
-      { log: "[00:16] Broadcasting schema-markup tags across local and global web CDNs...", delay: 4000 },
-      { log: "[00:19] Active listing syndication successfully deployed web-wide!", delay: 4800 }
-    ];
-
-    steps.forEach((step, index) => {
-      setTimeout(() => {
-        setBroadcastStep(index + 1);
-        setBroadcastLogs(prev => [...prev, step.log]);
-      }, step.delay);
-    });
-
-    setTimeout(async () => {
-      try {
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + selectedPlan.durationDays);
-
-        await addDoc(collection(db, 'ad_listings'), {
-          vendorId: user.uid,
-          type: adType,
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          category: formData.category,
-          location: {
-            state: formData.state,
-            city: formData.city,
-            village: formData.village,
-            address: formData.address,
-            landmark: formData.landmark
-          },
-          contact: {
-            phone: formData.phone,
-            whatsapp: formData.whatsapp,
-            email: formData.email
-          },
-          details: formData.details,
-          photos: formData.photos,
-          video: formData.video || '',
-          isReelPromotion: formData.isReelPromotion || false,
-          plan: selectedPlan.id,
-          expiryDate: expiryDate.getTime(),
-          status: 'active',
-          createdAt: serverTimestamp(),
-          syndication: syndicationData
-        });
-
-        if (formData.isReelPromotion && formData.video) {
-          await addDoc(collection(db, 'reels'), {
-            authorId: user.uid,
-            authorName: user.displayName || user.email || 'EFADO Advertiser',
-            authorPhoto: user.photoURL || '',
-            videoUrl: formData.video,
-            caption: `🔥 Featured Ad: ${formData.title}! \n\n${formData.description} \n\nStarting at ${formatPrice(parseFloat(formData.price))} #advertising #viral #reels #featured`,
-            likes: [],
-            comments: [],
-            shares: 0,
-            createdAt: serverTimestamp()
-          });
-        }
-        
-        setIsBroadcasting(false);
-        setSyndicationData({ googleAds: null, socialMedia: null, seo: null });
-        setFormData({
-          title: '',
-          description: '',
-          price: '',
-          state: '',
-          city: '',
-          village: '',
-          address: '',
-          landmark: '',
-          phone: '',
-          whatsapp: '',
-          email: '',
-          category: '',
-          details: {},
-          photos: [],
-          video: '',
-          isReelPromotion: false
-        });
-        setSelectedCategory(null);
-        setView('BROWSE');
-      } catch (err) {
-        console.error("Error creating ad:", err);
-        setIsBroadcasting(false);
-      }
-    }, 5500);
+  const handleVideoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      setFormError('Video file is too big. Please choose a clip under 25MB.');
+      return;
+    }
+    setMediaBusy(true);
+    setFormError(null);
+    try {
+      const url = await uploadAdvertVideo(file, user.uid);
+      setFormData((prev) => ({ ...prev, video: url }));
+    } catch (err: any) {
+      setFormError(err?.message || 'Not sent, please try again.');
+    } finally {
+      setMediaBusy(false);
+      e.target.value = '';
+    }
   };
 
+  const handleNextStep = () => {
+    setFormError(null);
+    if (formStep === 1) {
+      if (formData.title.trim().length < 3) {
+        setFormError('Please enter a clear name for what you are promoting or selling.');
+        return;
+      }
+      const priceVal = Number(formData.price === '' ? 0 : formData.price);
+      if (!Number.isFinite(priceVal) || priceVal < 0) {
+        setFormError('Please enter a valid price (or 0 if price depends on choice).');
+        return;
+      }
+      if (selectedGroup.id === 'OTHERS' && !customOthersName.trim()) {
+        setFormError('Please write what you want to advertise in your own words.');
+        return;
+      }
+      setFormStep(2);
+      return;
+    }
+    if (formStep === 2) {
+      if (formData.state.trim().length < 2 || formData.city.trim().length < 2 || formData.address.trim().length < 3) {
+        setFormError('Please enter the State, Town / City, and Full Address.');
+        return;
+      }
+      setFormStep(3);
+      return;
+    }
+    if (formStep === 3) {
+      if (formData.photos.length === 0) {
+        setFormError('Please add at least 1 photo so buyers can see your offer clearly.');
+        return;
+      }
+      const digits = formData.phone.replace(/\D/g, '');
+      if (digits.length < 7) {
+        setFormError('Please enter a valid phone number so buyers can reach you.');
+        return;
+      }
+      setFormStep(4);
+    }
+  };
+
+  const commitAdvertSave = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const numericPrice = Number(formData.price === '' ? 0 : formData.price);
+      const submission: AdvertSubmissionInput = {
+        type: adType,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        price: numericPrice,
+        category: selectedGroup.id === 'OTHERS' && customOthersName.trim() ? customOthersName.trim() : selectedSubCategory,
+        groupId: selectedGroup.id,
+        customCategoryName: customOthersName.trim(),
+        state: formData.state.trim(),
+        city: formData.city.trim(),
+        address: formData.address.trim(),
+        landmark: formData.landmark.trim(),
+        phone: formData.phone.trim(),
+        whatsapp: (formData.whatsapp || formData.phone).trim(),
+        email: formData.email.trim(),
+        details: formData.details,
+        photos: formData.photos.slice(0, 4),
+        video: formData.video,
+        plan: selectedPlan,
+      };
+
+      const invalid = validateAdvertSubmission(submission);
+      if (invalid) {
+        setFormError(invalid);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (editingAdId) {
+        await efadoAdvertApi.updateAdvert(editingAdId, user.uid, {
+          type: submission.type,
+          title: submission.title,
+          description:
+            submission.description ||
+            `${submission.title} available in ${submission.city}, ${submission.state}.`,
+          price: submission.price,
+          category: submission.category,
+          groupId: submission.groupId,
+          customCategoryName: submission.customCategoryName,
+          location: {
+            state: submission.state,
+            city: submission.city,
+            address: submission.address,
+            landmark: submission.landmark,
+          },
+          contact: {
+            phone: submission.phone,
+            whatsapp: submission.whatsapp,
+            email: submission.email,
+          },
+          details: submission.details,
+          photos: submission.photos,
+          video: submission.video,
+        });
+        const updatedExisting = listings.find((l) => l.id === editingAdId);
+        setPublishedAd(
+          updatedExisting
+            ? {
+                ...updatedExisting,
+                title: submission.title,
+                price: submission.price,
+                location: { state: submission.state, city: submission.city, address: submission.address },
+              }
+            : null
+        );
+        setEditingAdId(null);
+        setMyAdsStatusMsg('Your advert changes have been saved.');
+        setView('MY_ADS');
+      } else {
+        const created = await efadoAdvertApi.createAdvert(user, submission);
+        setPublishedAd(created);
+        setView('SUCCESS');
+      }
+    } catch (err: any) {
+      setFormError(err?.message || 'Not sent, please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReviewSubmit = () => {
+    setFormError(null);
+    if (!editingAdId && selectedPlan.price > 0) {
+      setBoostingAd(null);
+      setShowPayment(true);
+      return;
+    }
+    void commitAdvertSave();
+  };
+
+  const handleDeleteAdvert = async (adId: string) => {
+    setMyAdsStatusMsg(null);
+    try {
+      await efadoAdvertApi.deleteAdvert(adId, user.uid);
+      setConfirmDeleteId(null);
+      setMyAdsStatusMsg('Advert deleted.');
+    } catch (err: any) {
+      setMyAdsStatusMsg(err?.message || 'Not sent, please try again.');
+    }
+  };
+
+  const handleSendContactInquiry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactAd || !contactMessage.trim()) return;
+    setContactSending(true);
+    setContactResult(null);
+    try {
+      const targetUserId = contactAd.vendorId || contactAd.userId;
+      if (targetUserId) {
+        await addDoc(collection(db, 'efado_notifications'), {
+          userId: targetUserId,
+          senderId: user?.uid || 'guest',
+          senderName: user?.fullName || user?.displayName || 'Interested Buyer',
+          senderPhone: user?.phoneNumber || '',
+          hub: 'ADVERTISING',
+          type: 'ADVERT_INQUIRY',
+          title: `New message on "${contactAd.title}"`,
+          message: contactMessage.trim(),
+          link: `/advert/${contactAd.slug || contactAd.id}`,
+          isRead: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+      setContactResult('Your message was sent to the seller!');
+      setContactMessage('');
+    } catch {
+      setContactResult('Not sent, please try again.');
+    } finally {
+      setContactSending(false);
+    }
+  };
+
+  const activeCategoryFields =
+    CONTEXTUAL_FIELDS[selectedSubCategory] || CONTEXTUAL_FIELDS.OTHER;
+
+  const activeCategoryTitle =
+    selectedGroup.id === 'OTHERS' && customOthersName.trim()
+      ? customOthersName.trim()
+      : getCategoryLabel(selectedSubCategory, customOthersName);
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] bg-white overflow-y-auto custom-scrollbar"
+      className="fixed inset-0 z-[60] bg-white text-slate-900 overflow-y-auto custom-scrollbar"
     >
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-gray-100 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${adType === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'} text-white shadow-lg shadow-indigo-200`}>
-              {adType === 'ADVERT' ? <Megaphone className="w-6 h-6" /> : <ShoppingBag className="w-6 h-6" />}
-            </div>
+      {/* Clean White Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {view !== 'DOOR' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormError(null);
+                  setView('DOOR');
+                }}
+                className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back</span>
+              </button>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center shrink-0">
+                <Megaphone className="w-5 h-5" />
+              </div>
+            )}
             <div>
-              <h2 className="text-xl font-black text-gray-900 uppercase tracking-tighter italic">
-                {adType === 'ADVERT' ? 'Advert at EFADO' : 'Sell it at EFADO'}
-              </h2>
-              <p className="text-[10px] font-black text-gray-950 uppercase tracking-[0.2em]">Sovereign Connection Engine</p>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-tight">
+                Promote or Sell on EFADO
+              </h1>
+              <p className="text-xs text-slate-600">
+                Simple steps to reach buyers across EFADO, WhatsApp, and web search
+              </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 md:gap-4">
-            {/* ✨ AI Generate Product Image button with AI Powered badge */}
-            <button 
-              onClick={() => setShowAiImageModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-wider shadow-md hover:scale-105 transition-all border border-purple-400/30"
-              title="Generate product and advertising visuals with AI"
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowEfadoShareModal(true)}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <span>✨ AI Generate Product Image</span>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-500/40 uppercase">
-                AI Powered
-              </span>
+              <Share2 className="w-4 h-4" />
+              <span>Share EFADO</span>
             </button>
 
-            <button 
-              onClick={() => setView(view === 'PROMO' ? 'BROWSE' : 'PROMO')}
-              className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all hover:scale-105 duration-300 ${view === 'PROMO' ? 'bg-gradient-to-r from-amber-500 to-indigo-600 text-white shadow-lg shadow-amber-500/20 animate-pulse' : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'}`}
+            <button
+              type="button"
+              onClick={() => setShowAiImageModal(true)}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 text-xs sm:text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer"
             >
-              🚀 Global Promo Kit
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">AI Ad Photo</span>
             </button>
-            <button 
-              onClick={() => {
-                setView('REGISTER');
-                setRegisterStep('CATEGORY');
-              }}
-              className={`hidden md:flex items-center gap-2 px-6 py-2 ${adType === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'} text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-indigo-100`}
+
+            <button
+              type="button"
+              onClick={() => setView(view === 'PROMO' ? 'DOOR' : 'PROMO')}
+              className={`min-h-[44px] px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-semibold cursor-pointer ${
+                view === 'PROMO'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-sky-50 hover:bg-sky-100 text-sky-900 border-sky-200'
+              }`}
             >
-              <Plus className="w-4 h-4" /> Register {adType === 'ADVERT' ? 'Ad' : 'Listing'}
+              {view === 'PROMO' ? 'Back to Hub' : 'Promo Materials'}
             </button>
-            <div className="flex bg-gray-200 p-1 rounded-xl">
-               <button 
-                onClick={() => {
-                  setView('BROWSE');
-                  handleTypeSwitch('ADVERT');
-                }}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${view === 'BROWSE' && adType === 'ADVERT' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
-              >
-                Advertise
-              </button>
-              <button 
-                onClick={() => {
-                  setView('BROWSE');
-                  handleTypeSwitch('SELL');
-                }}
-                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${view === 'BROWSE' && adType === 'SELL' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-950 hover:text-black'}`}
-              >
-                Sell Now
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <CurrencySelector />
-              <button 
-                onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6 text-gray-950" />
-              </button>
-            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close Promote or Sell page"
+              className="min-h-[44px] min-w-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <HubGuideNote guideId="advertising" variant="light" className="mb-6" />
-        {view === 'BROWSE' ? (
-          <div className="space-y-12">
-            {/* Hero Section */}
-            <div className="relative rounded-[2rem] md:rounded-[4rem] bg-gray-950 p-8 md:p-16 overflow-hidden min-h-[450px] flex flex-col justify-center">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 via-transparent to-rose-500/10" />
-              <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] -mr-64 -mt-64" />
-              
-                <div className="relative z-10 max-w-4xl mx-auto">
-                   <motion.div 
-                     initial={{ opacity: 0, y: 20 }}
-                     animate={{ opacity: 1, y: 0 }}
-                     className={`inline-block px-4 py-2 ${adType === 'SELL' ? 'bg-rose-600' : 'bg-indigo-600'} text-white rounded-full text-[10px] font-black uppercase tracking-[0.3em] mb-8 shadow-lg`}
-                   >
-                     {adType === 'SELL' ? 'Universal Marketplace Protocol' : 'Global Reach Protocol'}
-                   </motion.div>
-                   <h1 className="text-4xl md:text-8xl font-black text-white uppercase tracking-tighter italic leading-none mb-8">
-                      {adType === 'SELL' ? (
-                        <>Monetize Your <span className="text-transparent bg-clip-text bg-linear-to-r from-rose-400 to-amber-400">Inventory</span> Globally.</>
-                      ) : (
-                        <>Targeted <span className="text-transparent bg-clip-text bg-linear-to-r from-amber-400 to-indigo-400">Visibility</span> For Missions.</>
-                      )}
-                   </h1>
-                   <p className="text-gray-300 text-sm md:text-xl font-bold mb-12 leading-relaxed max-w-2xl">
-                     {adType === 'SELL' 
-                       ? "The world's first decentralized tactical marketplace. Connect your products to high-intent global buyers with sovereign security and instant payout settlement."
-                       : "Connect your programs, services, and events to millions of active nodes across the EFADO ecosystem. Precision impact, hyper-growth propagation."}
-                   </p>
+      {/* Main Content Container (padded at bottom so persistent bar never covers buttons) */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28 space-y-8">
+        <HubGuideNote
+          guideId="advertising"
+          variant="light"
+        />
 
-                   {adType === 'SELL' && (
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-                        {SELLER_BENEFITS.map((benefit, i) => (
-                          <div key={i} className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2.5rem] group hover:bg-white/10 transition-all">
-                             <benefit.icon className="w-8 h-8 text-rose-500 mb-4 group-hover:scale-110 transition-transform" />
-                             <h4 className="text-[12px] font-black text-white uppercase tracking-tight mb-2">{benefit.title}</h4>
-                             <p className="text-[10px] text-gray-300 font-black leading-relaxed">{benefit.desc}</p>
-                          </div>
+        {/* ==================== 1. ONE DOOR + SEARCH + 6 GROUPS ==================== */}
+        {view === 'DOOR' && (
+          <div className="space-y-8">
+            {/* One Door Intro Card */}
+            <section className="p-6 sm:p-8 rounded-3xl bg-purple-50/70 border border-purple-200 space-y-6">
+              <div className="space-y-2 text-center sm:text-left">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                  Promote or Sell on EFADO
+                </h2>
+                <p className="text-base sm:text-lg font-medium text-slate-700">
+                  What do you want to do today?
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => startWizard('ADVERT', ADVERT_GROUPS[0], 'BUSINESS')}
+                  className="p-6 rounded-2xl bg-white hover:bg-sky-50 border-2 border-indigo-300 text-left flex flex-col justify-between gap-3 shadow-sm transition-all cursor-pointer h-full"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-800 flex items-center justify-center shrink-0">
+                      <Megaphone className="w-6 h-6" />
+                    </div>
+                    <span className="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold">
+                      Advertise
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                      I want many people to see my business
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      <strong>Advertise means:</strong> Pay to promote your business so many people can see it.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => startWizard('SELL', ADVERT_GROUPS[0], 'BUSINESS')}
+                  className="p-6 rounded-2xl bg-white hover:bg-pink-50 border-2 border-rose-300 text-left flex flex-col justify-between gap-3 shadow-sm transition-all cursor-pointer h-full"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-800 flex items-center justify-center shrink-0">
+                      <ShoppingBag className="w-6 h-6" />
+                    </div>
+                    <span className="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-semibold">
+                      Sell Now
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-900">
+                      I want to sell something now
+                    </h3>
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                      <strong>Sell means:</strong> List your product so someone can buy it from you.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </section>
+
+            {/* Top Search Bar */}
+            <section className="space-y-4">
+              <div className="relative">
+                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search what you want to buy, sell, or promote (e.g. land, phones, salon, goat farming)..."
+                  className="w-full min-h-[52px] pl-12 pr-12 py-3 bg-slate-50 border border-slate-300 focus:border-indigo-500 focus:bg-white rounded-2xl text-base text-slate-900 placeholder:text-slate-500 outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label="Clear search"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Live Search Results */}
+              {searchQuery.trim() && (
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-5">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Search results for &ldquo;{searchQuery.trim()}&rdquo;
+                  </h3>
+
+                  {(searchResults.categories.length > 0 || searchResults.customCategories.length > 0) && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-600">Matching Categories</p>
+                      <div className="flex flex-wrap gap-2">
+                        {searchResults.categories.map((cat) => {
+                          const grp = ADVERT_GROUPS.find((g) => g.id === cat.groupId) || ADVERT_GROUPS[0];
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => openCategoryPreview(grp, cat.id)}
+                              className={`min-h-[44px] px-4 py-2 rounded-xl border text-sm font-semibold cursor-pointer ${grp.cardBg} ${grp.cardBorder} ${grp.accentText}`}
+                            >
+                              {cat.label}
+                            </button>
+                          );
+                        })}
+                        {searchResults.customCategories.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => openCategoryPreview(ADVERT_GROUPS[5], 'OTHER', c.name)}
+                            className="min-h-[44px] px-4 py-2 rounded-xl border bg-indigo-50 border-indigo-200 text-indigo-900 text-sm font-semibold cursor-pointer"
+                          >
+                            {c.name}
+                          </button>
                         ))}
-                     </div>
-                   )}
-
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <button 
-                        onClick={() => { 
-                          setAdType('ADVERT'); 
-                          setFormData({ ...formData, category: '' });
-                          setSelectedCategory(null);
-                          setRegisterStep('CATEGORY');
-                          setView('REGISTER'); 
-                        }}
-                        className={`px-10 py-7 rounded-[2.5rem] font-black uppercase tracking-widest text-[14px] shadow-2xl hover:scale-[1.03] active:scale-95 transition-all flex items-center justify-center gap-4 group ${adType === 'ADVERT' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-white/20 text-white backdrop-blur-xl border border-white/20'}`}
-                      >
-                        <Megaphone className="w-7 h-7 group-hover:rotate-12 transition-transform" /> 
-                        <div className="text-left">
-                          <span className="block text-[9px] text-indigo-200">Boost Impact</span>
-                          Advertise @ EFADO
-                        </div>
-                      </button>
-                      <button 
-                        onClick={() => { 
-                          setAdType('SELL'); 
-                          setFormData({ ...formData, category: '' });
-                          setSelectedCategory(null);
-                          setRegisterStep('CATEGORY');
-                          setView('REGISTER'); 
-                        }}
-                        className={`px-10 py-7 rounded-[2.5rem] font-black uppercase tracking-widest text-[14px] shadow-2xl hover:scale-[1.03] active:scale-95 transition-all flex items-center justify-center gap-4 group ${adType === 'SELL' ? 'bg-rose-600 text-white shadow-rose-600/20' : 'bg-white/20 text-white backdrop-blur-xl border border-white/20'}`}
-                      >
-                        <ShoppingBag className="w-7 h-7 group-hover:rotate-12 transition-transform" /> 
-                        <div className="text-left">
-                          <span className="block text-[9px] text-rose-200">Monetize Now</span>
-                          Sell @ EFADO
-                        </div>
-                      </button>
-                   </div>
-                </div>
-            </div>
-
-            {/* Categories Carousel/Grid */}
-            <section className="space-y-8">
-               <div className="flex items-center justify-between px-4">
-                  <div className="space-y-1">
-                    <h3 className="text-2xl font-black text-black uppercase tracking-tighter italic">Strategic Domains</h3>
-                    <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest">Select an area to register your advertisement</p>
-                  </div>
-                  <div className="flex gap-2">
-                     <button className="p-3 border border-gray-100 rounded-2xl hover:bg-gray-50 text-gray-900 hover:text-black"><Filter className="w-5 h-5" /></button>
-                     <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-900" />
-                        <input 
-                          type="text" 
-                          placeholder="Search Adverts..." 
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className={`pl-12 pr-6 py-3 bg-gray-50 border-none rounded-2xl w-64 focus:ring-2 focus:ring-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} focus:bg-white transition-all text-sm font-black text-gray-950 placeholder:text-gray-400`}
-                        />
-                     </div>
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                 {AD_CATEGORIES.map((cat) => (
-                   <motion.button
-                     key={cat.id}
-                     whileHover={{ y: -5 }}
-                     onClick={() => {
-                        setSelectedCategory(cat.id);
-                        setFormData({ ...formData, category: cat.id });
-                        setRegisterStep('DETAILS');
-                        setView('REGISTER');
-                     }}
-                     className={`p-6 rounded-[2.5rem] border transition-all text-left group bg-white border-gray-100 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:shadow-xl`}
-                   >
-                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all bg-gray-100 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} text-gray-950 group-hover:text-white shadow-sm ring-1 ring-gray-100`}>
-                        <cat.icon className="w-6 h-6" />
-                     </div>
-                     <span className={`text-[10px] font-black uppercase tracking-widest block mb-1 ${adType === 'ADVERT' ? 'text-indigo-700' : 'text-rose-700'}`}>DOMAIN</span>
-                     <span className="text-[12px] font-black uppercase tracking-tight leading-tight text-gray-950">{cat.label}</span>
-                   </motion.button>
-                 ))}
-               </div>
-            </section>
-
-            {/* Marketplace Connect Section */}
-            <section className="space-y-8 pt-12 border-t border-gray-100">
-               <div className="text-center space-y-4 max-w-2xl mx-auto mb-12">
-                  <h3 className="text-3xl font-black text-gray-950 uppercase tracking-tighter italic">Strategic Convergence</h3>
-                  <p className="text-[11px] font-black text-gray-950 uppercase tracking-widest leading-relaxed">
-                    Once your assets are registered, they are instantly propagated to our high-velocity marketplace hubs. Explore where your products will live.
-                  </p>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                 {MARKETPLACE_HUBS.map((hub) => (
-                   <div key={hub.id} className={`p-8 bg-gray-50 rounded-[3rem] border border-gray-100 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} transition-all hover:bg-white group cursor-pointer`}>
-                      <div className={`w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-md ring-1 ring-gray-100 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} group-hover:text-white transition-all`}>
-                        <hub.icon className="w-7 h-7" />
                       </div>
-                      <h4 className="text-lg font-black text-gray-950 uppercase tracking-tight mb-2">{hub.name}</h4>
-                      <p className="text-[10px] text-gray-950 font-black uppercase tracking-widest mb-6">{hub.desc}</p>
-                      <button 
-                        onClick={() => {
-                          if (onNavigate) {
-                            onNavigate(hub.hub);
-                            onClose();
+                    </div>
+                  )}
+
+                  {searchResults.ads.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-slate-600">
+                        Live Listings ({searchResults.ads.length})
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {searchResults.ads.map((ad) => (
+                          <AdvertCard
+                            key={ad.id}
+                            ad={ad}
+                            user={user}
+                            onContact={(target) => {
+                              setContactAd(target);
+                              setContactResult(null);
+                              setContactMessage(`Hello! I saw "${target.title}" on EFADO. Is it available?`);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    searchResults.categories.length === 0 &&
+                    searchResults.customCategories.length === 0 && (
+                      <div className="p-5 bg-white border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                          <p className="text-base font-bold text-slate-900">
+                            No existing category matched &ldquo;{searchQuery.trim()}&rdquo;
+                          </p>
+                          <p className="text-sm text-slate-600">
+                            You can promote or sell anything under Others right away.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            startWizard('ADVERT', ADVERT_GROUPS[5], 'OTHER', searchQuery.trim())
                           }
-                        }}
-                        className={`flex items-center gap-2 text-[10px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-[0.2em] group-hover:gap-4 transition-all`}
-                      >
-                        Enter Hub <ArrowRight className="w-4 h-4" />
-                      </button>
-                   </div>
-                 ))}
-               </div>
+                          className="min-h-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shrink-0 cursor-pointer"
+                        >
+                          Advertise &ldquo;{searchQuery.trim()}&rdquo;
+                        </button>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </section>
 
-            {/* Ad Grid Section Header */}
-            <div className="flex items-center justify-between px-4 pt-12 border-t border-gray-100">
-               <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter italic">Live Strategic Intel</h3>
-               <div className="flex items-center gap-4 text-[10px] font-black text-gray-950 uppercase tracking-widest">
-                  <span className="flex items-center gap-2"><div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.3)]" /> Global Live Feed</span>
-               </div>
-            </div>
+            {/* Auto-Promoted Popular Custom Categories (5+ unique users) */}
+            {promotedCustomCategories.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-base font-bold text-slate-900">
+                  Popular Member Categories
+                </h3>
+                <div className="flex flex-wrap gap-2.5">
+                  {promotedCustomCategories.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => openCategoryPreview(ADVERT_GROUPS[5], 'OTHER', c.name)}
+                      className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-sm font-semibold cursor-pointer"
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            {/* Ad Grid */}
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-               {loading ? (
-                 [1,2,3].map(i => <div key={i} className="h-80 bg-gray-100 rounded-[3rem] animate-pulse" />)
-               ) : listings.filter(l => !selectedCategory || l.category === selectedCategory).length > 0 ? (
-                 listings.filter(l => !selectedCategory || l.category === selectedCategory).map((ad) => (
-                   <motion.div 
-                    layout
-                    key={ad.id}
-                    id={`ad-${ad.id}`}
-                    className="bg-white border border-gray-100 rounded-[3.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-gray-200 transition-all duration-500"
-                   >
-                     <div className="aspect-video relative overflow-hidden group-hover:brightness-90 transition-all duration-700">
-                        <img 
-                          src={ad.photos[0] || `https://picsum.photos/seed/${ad.id}/600/400`} 
-                          alt={ad.title} 
-                          className="w-full h-full object-cover rounded-t-[3.5rem]" 
-                        />
-                        <div className="absolute top-6 left-6 flex gap-2 flex-wrap">
-                           <span className="px-3 py-1 bg-white/90 backdrop-blur text-[9px] font-black uppercase tracking-widest rounded-full">{ad.category}</span>
-                           <span className={`px-3 py-1 text-white text-[9px] font-black uppercase tracking-widest rounded-full ${ad.type === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'}`}>
-                             {ad.type}
-                           </span>
-                           {ad.status === 'sold_out' && (
-                             <span className="px-3 py-1 bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-widest rounded-full shadow-lg">
-                               SOLD OUT
-                             </span>
-                           )}
+            {/* 5 Grouped Categories + 6th Others */}
+            <section className="space-y-5">
+              <div className="space-y-1">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  Choose a Category
+                </h3>
+                <p className="text-sm sm:text-base text-slate-600">
+                  Pick a group to see real listings inside it, or write your own under Others.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {ADVERT_GROUPS.map((group) => {
+                  const isExpanded = expandedGroupId === group.id;
+                  return (
+                    <div
+                      key={group.id}
+                      className={`rounded-2xl border ${group.cardBg} ${group.cardBorder} overflow-hidden flex flex-col justify-between h-full shadow-sm`}
+                    >
+                      <div>
+                        <div className="aspect-[4/3] w-full overflow-hidden bg-white">
+                          <img
+                            src={group.image}
+                            alt={group.title}
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <button className="absolute bottom-6 right-6 p-4 bg-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 duration-500">
-                           <Heart className="w-5 h-5 text-rose-500" />
-                        </button>
-                     </div>
-                     <div className="p-10">
-                        <h4 className="text-xl font-black text-gray-950 uppercase tracking-tighter italic mb-4">{ad.title}</h4>
-                        <p className="text-gray-900 text-sm font-black line-clamp-2 mb-6">{ad.description}</p>
-                        
-                        {/* Strategic Details */}
-                        {ad.details && Object.keys(ad.details).length > 0 && (
-                           <div className="flex flex-wrap gap-2 mb-6">
-                              {Object.entries(ad.details).map(([key, val]) => (
-                                 <div key={key} className="px-3 py-2 bg-indigo-50 border-2 border-indigo-100 rounded-xl">
-                                    <p className="text-[9px] font-black text-black uppercase tracking-widest leading-none mb-1">{key.replace(/([A-Z])/g, ' $1')}</p>
-                                    <p className="text-[10px] font-black text-indigo-700 uppercase transition-all line-clamp-1">{val as string}</p>
-                                 </div>
-                              ))}
-                           </div>
+                        <div className="p-5 space-y-2">
+                          <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${group.pillBg}`}>
+                            Category {group.number}
+                          </span>
+                          <h4 className={`text-lg font-bold leading-snug ${group.accentText}`}>
+                            {group.title}
+                          </h4>
+                          <p className="text-sm text-slate-700 leading-relaxed">
+                            {group.subtitle}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="px-5 pb-5 space-y-3">
+                        {group.id === 'OTHERS' ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowOthersInput((prev) => !prev)}
+                            className="w-full min-h-[46px] px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <span>Write What You Want to Advertise</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedGroupId(isExpanded ? null : group.id)
+                            }
+                            className="w-full min-h-[46px] px-4 py-2.5 bg-white hover:bg-slate-900 hover:text-white text-slate-900 border border-slate-300 rounded-xl text-sm font-semibold flex items-center justify-between cursor-pointer transition-colors"
+                          >
+                            <span>{isExpanded ? 'Hide Options' : 'See Options Inside'}</span>
+                            <ChevronRight
+                              className={`w-4 h-4 transition-transform ${
+                                isExpanded ? 'rotate-90' : ''
+                              }`}
+                            />
+                          </button>
                         )}
 
-                        <div className="flex items-center justify-between py-6 border-t-2 border-gray-100">
-                           <div>
-                              <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-1">Starting At</p>
-                              <p className="text-lg font-black text-gray-950 italic tracking-tighter">{formatPrice(ad.price)}</p>
-                           </div>
-                           {ad.status === 'sold_out' ? (
-                             <button 
-                               disabled
-                               className="px-8 py-4 bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed"
-                             >
-                               SOLD OUT
-                             </button>
-                           ) : (
-                             <button 
-                               onClick={() => {
-                                  setSelectedAdForEngagement(ad);
-                                  setEngagementMessage(`Hi! I am interested in your listed asset: "${ad.title}". Please advise on physical alignment or transaction options.`);
-                                  setEngagementSuccess(false);
-                                  setEngagementSending(false);
-                               }}
-                               className="px-8 py-4 bg-gray-950 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-xl shadow-gray-200"
-                             >
-                               Engage Now
-                             </button>
-                           )}
-                        </div>
-
-                        {/* Direct Deep Linking Share Buttons */}
-                        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                          <button
-                            onClick={(e) => handleShareAd(ad, e)}
-                            className="flex-1 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                            title="Copy Direct Share Link"
-                          >
-                            <Share2 className="w-3.5 h-3.5 text-indigo-600" /> Share Link
-                          </button>
-                          <button
-                            onClick={(e) => handleWhatsAppShareAd(ad, e)}
-                            className="flex-1 py-3 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                            title="Share on WhatsApp"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
-                          </button>
-                        </div>
-                     </div>
-                   </motion.div>
-                 ))
-               ) : (
-                 <div className="col-span-full py-32 text-center bg-gray-50 border border-dashed border-gray-200 rounded-[5rem]">
-                    <Megaphone className="w-20 h-20 text-gray-200 mx-auto mb-8 animate-pulse" />
-                    <h4 className="text-2xl font-black text-gray-400 uppercase tracking-tighter italic">No Strategic Intel Found</h4>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-4">Be the first to secure this territory.</p>
-                 </div>
-               )}
-            </section>
-          </div>
-        ) : view === 'PROMO' ? (
-          <EfadoPromoKit user={user} onClose={() => setView('BROWSE')} />
-        ) : (
-          <div className="max-w-4xl mx-auto">
-             <header className="mb-12 text-center">
-                <div className="inline-block px-6 py-2 bg-indigo-100 text-indigo-600 rounded-full text-[11px] font-black uppercase tracking-[0.3em] mb-4">
-                   Step {{ CATEGORY: '1', DETAILS: '2', PREVIEW: '3', PLAN: '4' }[registerStep]} of 4: {{ CATEGORY: 'Strategic Domain', DETAILS: 'Mission Details', PREVIEW: 'Audit Preview', PLAN: 'Deployment Plan' }[registerStep]}
-                </div>
-                {/* Tactical Progress Bar */}
-                <div className="max-w-xs mx-auto flex gap-1 mb-8 h-1.5 px-4">
-                  {['CATEGORY', 'DETAILS', 'PREVIEW', 'PLAN'].map((s, idx) => {
-                    const steps = ['CATEGORY', 'DETAILS', 'PREVIEW', 'PLAN'];
-                    const currentIdx = steps.indexOf(registerStep);
-                    return (
-                      <div 
-                        key={s} 
-                        className={`flex-grow rounded-full transition-all duration-500 ${idx <= currentIdx ? 'bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.5)]' : 'bg-gray-100'}`}
-                        style={{ height: idx === currentIdx ? '6px' : '4px', marginTop: idx === currentIdx ? '-1px' : '0' }}
-                      />
-                    );
-                  })}
-                </div>
-                <h3 className="text-4xl font-black text-gray-900 uppercase tracking-tighter italic mb-4">
-                   {adType === 'ADVERT' ? 'Advertise at EFADO' : 'Sell at EFADO'}
-                </h3>
-                <p className="text-gray-950 font-black uppercase tracking-widest text-[11px]">
-                   {{ 
-                     CATEGORY: 'Select what you want to advertise in the EFADO network.',
-                     DETAILS: 'Provide full details to attract premium global patronage.',
-                     PREVIEW: 'Review your tactical data before public deployment.',
-                     PLAN: 'Select the best plan to amplify your strategic visibility.'
-                   }[registerStep]}
-                </p>
-             </header>
-
-             <div className="grid grid-cols-1 gap-12">
-                {registerStep === 'CATEGORY' ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {AD_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => {
-                          setSelectedCategory(cat.id);
-                          setFormData({ ...formData, category: cat.id });
-                          setRegisterStep('DETAILS');
-                        }}
-                        className={`p-6 rounded-3xl border border-gray-100 bg-white hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:shadow-xl transition-all text-left group`}
-                      >
-                        <div className={`w-12 h-12 rounded-xl bg-gray-100/50 group-hover:bg-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} text-gray-950 group-hover:text-white flex items-center justify-center mb-4 transition-all ring-1 ring-gray-100`}>
-                          <cat.icon className="w-6 h-6" />
-                        </div>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} mb-1`}>Domain</p>
-                        <p className="text-[13px] font-black uppercase tracking-tight text-gray-950">{cat.label}</p>
-                      </button>
-                    ))}
-                  </div>
-                ) : registerStep === 'DETAILS' ? (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-10 shadow-2xl space-y-8">
-                       <div className="space-y-4">
-                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                            {adType === 'ADVERT' ? 'Listing Heading (Title)' : 'Item Name / Portfolio Title'}
-                          </label>
-                          <input 
-                            type="text" 
-                            placeholder={adType === 'ADVERT' ? "e.g. 5-Star Hotel Reservation in Abuja" : "e.g. 10 Hectares of Farm Land in Oyo"}
-                            className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 rounded-2xl text-base font-black transition-all shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                            value={formData.title}
-                            onChange={(e) => setFormData({...formData, title: e.target.value})}
-                          />
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                                {adType === 'ADVERT' ? 'Base Pricing Strategies (NGN)' : 'Selling Price / Valuation (NGN)'}
-                             </label>
-                             <input 
-                               type="number" 
-                               placeholder="Price"
-                               className="w-full px-6 py-5 bg-slate-50 border-2 border-slate-200 focus:border-indigo-600 focus:bg-white text-slate-900 rounded-2xl text-base font-black transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                               value={formData.price}
-                               onChange={(e) => setFormData({...formData, price: e.target.value})}
-                             />
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Domain</label>
-                             <div className="w-full px-6 py-5 bg-slate-100 border-2 border-slate-200 rounded-2xl flex items-center justify-between text-sm font-black text-slate-900">
-                               {AD_CATEGORIES.find(c => c.id === formData.category)?.label || 'None'}
-                               <button onClick={() => setRegisterStep('CATEGORY')} className="text-indigo-600 text-[11px] uppercase tracking-widest font-black hover:underline">Change</button>
-                             </div>
-                          </div>
-                       </div>
-
-                       {adType === 'SELL' && (
-                          <div className="p-8 bg-rose-50 border-2 border-rose-200 rounded-3xl space-y-6">
-                             <div className="flex items-center gap-3">
-                                <Shield className="w-5 h-5 text-rose-700" />
-                                <h4 className="text-[12px] font-black text-rose-950 uppercase tracking-widest">Business Trust Credentials</h4>
-                             </div>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
-                                   <label className="text-[10px] font-black text-rose-950 uppercase tracking-widest">Shop / Business Name</label>
-                                   <input 
-                                      type="text"
-                                      placeholder="e.g. EFADO Global Merchants"
-                                      className="w-full px-6 py-4 bg-white border-2 border-rose-200 rounded-2xl text-sm font-black text-slate-900 focus:border-rose-600 transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                      value={formData.details.businessName || ''}
-                                      onChange={(e) => setFormData({
-                                         ...formData,
-                                         details: { ...formData.details, businessName: e.target.value }
-                                      })}
-                                    />
-                                 </div>
-                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-rose-950 uppercase tracking-widest">Vendor Tier</label>
-                                    <select 
-                                       className="w-full px-6 py-4 bg-white border-2 border-rose-200 rounded-2xl text-sm font-black text-slate-900 focus:border-rose-600 transition-all focus:outline-none"
-                                       value={formData.details.vendorTier || 'Standard'}
-                                       onChange={(e) => setFormData({
-                                          ...formData,
-                                          details: { ...formData.details, vendorTier: e.target.value }
-                                       })}
-                                    >
-                                       <option>Standard Vendor</option>
-                                       <option>Verified Tactical Merchant</option>
-                                       <option>Global Sovereign Enterprise</option>
-                                    </select>
-                                 </div>
-                              </div>
-                           </div>
-                       )}
-
-                       {/* Dynamic Category Fields */}
-                       {formData.category && CATEGORY_FIELDS[formData.category] && (
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
-                           {CATEGORY_FIELDS[formData.category].map((field) => (
-                             <div key={field.key} className="space-y-4">
-                               <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center justify-between">
-                                 {field.label}
-                                 {field.optional && <span className="text-[9px] text-indigo-600 font-bold tracking-normal italic">(Optional)</span>}
-                               </label>
-                               <input 
-                                 type={field.type}
-                                 placeholder={field.placeholder}
-                                 className="w-full px-6 py-4 bg-indigo-50 border-2 border-indigo-200 rounded-2xl text-sm font-black text-slate-900 focus:border-indigo-600 focus:bg-white transition-all shadow-sm placeholder:text-indigo-400 focus:outline-none focus:ring-0"
-                                 value={formData.details[field.key] || ''}
-                                 onChange={(e) => setFormData({
-                                   ...formData, 
-                                   details: { ...formData.details, [field.key]: e.target.value }
-                                 })}
-                               />
-                             </div>
-                           ))}
-                         </div>
-                       )}
-
-                       <div className="space-y-4">
-                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                            {adType === 'ADVERT' ? 'Mission Description' : 'Asset Details / Narrative'}
-                          </label>
-                          <textarea 
-                            placeholder={adType === 'ADVERT' ? "What makes this offer unique? Feature list, benefits, etc." : "Condition, usage history, features, and selling points."}
-                            className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-bold text-slate-900 focus:border-indigo-600 focus:bg-white transition-all h-32 resize-none placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                            value={formData.description}
-                            onChange={(e) => setFormData({...formData, description: e.target.value})}
-                          />
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-8 border-t border-slate-200">
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">State / Region</label>
-                             <input 
-                                type="text" 
-                                placeholder="e.g. Lagos, Abuja, New York"
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                value={formData.state}
-                                onChange={(e) => setFormData({...formData, state: e.target.value})}
-                             />
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                Town / City
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <input 
-                                type="text" 
-                                placeholder="e.g. Ikeja, Manhattan"
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                value={formData.city}
-                                onChange={(e) => setFormData({...formData, city: e.target.value})}
-                             />
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                Locality / Village
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <input 
-                                type="text" 
-                                placeholder="Specific village or community"
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                value={formData.village}
-                                onChange={(e) => setFormData({...formData, village: e.target.value})}
-                             />
-                          </div>
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8 border-b border-slate-200">
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                Full Address
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <input 
-                                type="text" 
-                                placeholder="Street number and name"
-                                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                value={formData.address}
-                                onChange={(e) => setFormData({...formData, address: e.target.value})}
-                             />
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                Outstanding Landmark
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <div className="relative">
-                               <Landmark className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                               <input 
-                                  type="text" 
-                                  placeholder="e.g. Near ABC School, Opposite XYZ Port"
-                                  className="w-full pl-12 pr-6 py-4 bg-indigo-50/50 border-2 border-indigo-200 rounded-2xl text-sm font-black text-slate-900 focus:border-indigo-600 focus:bg-white transition-all placeholder:text-indigo-400 focus:outline-none focus:ring-0"
-                                  value={formData.landmark}
-                                  onChange={(e) => setFormData({...formData, landmark: e.target.value})}
-                               />
-                             </div>
-                          </div>
-                       </div>
-
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 pb-8 border-b border-slate-200">
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Phone Number</label>
-                             <div className="relative">
-                               <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                               <input 
-                                  type="tel" 
-                                  placeholder="+234..."
-                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                  value={formData.phone}
-                                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                               />
-                             </div>
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                WhatsApp Number
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <div className="relative">
-                               <MessageCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
-                               <input 
-                                  type="tel" 
-                                  placeholder="WhatsApp Number"
-                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                  value={formData.whatsapp}
-                                  onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-                               />
-                             </div>
-                          </div>
-                          <div className="space-y-4">
-                             <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex justify-between">
-                                Contact Email
-                                <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest leading-none">(Optional)</span>
-                             </label>
-                             <div className="relative">
-                               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                               <input 
-                                  type="email" 
-                                  placeholder="Email Address"
-                                  className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-sm font-black text-slate-900 shadow-sm focus:border-indigo-600 focus:bg-white transition-all font-mono placeholder:text-slate-400 focus:outline-none focus:ring-0"
-                                  value={formData.email}
-                                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                               />
-                             </div>
-                          </div>
-                       </div>
-
-                       {/* Global Marketing Syndication Channels Section */}
-                       <div className={`p-8 bg-gradient-to-br ${adType === 'ADVERT' ? 'from-indigo-50/70 via-indigo-100/10' : 'from-rose-50/70 via-rose-100/10'} to-amber-50/70 border-2 ${adType === 'ADVERT' ? 'border-indigo-200/50' : 'border-rose-200/50'} rounded-[2.5rem] space-y-6`}>
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                             <div className="flex items-center gap-3">
-                                <Globe className={`w-6 h-6 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} animate-pulse`} />
-                                <div>
-                                   <h4 className={`text-xs font-black ${adType === 'ADVERT' ? 'text-indigo-950' : 'text-rose-950'} uppercase tracking-widest`}>Global Marketing Syndication Channels</h4>
-                                   <p className={`text-[9px] ${adType === 'ADVERT' ? 'text-indigo-700' : 'text-rose-700'} font-bold uppercase`}>Auto-propagating your campaign across global high-intent pipelines</p>
-                                </div>
-                             </div>
-                             <span className={`self-start sm:self-auto px-3 py-1 ${adType === 'ADVERT' ? 'bg-indigo-600' : 'bg-rose-600'} text-white text-[8px] font-black uppercase rounded-full tracking-widest animate-pulse`}>Neural Active</span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
-                                <div className="flex items-center justify-between">
-                                   <span className="text-[10px] font-black text-slate-900 uppercase">Google Ads Network</span>
-                                   <div className="relative inline-flex items-center">
-                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
-                                   </div>
-                                </div>
-                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Syncs target keywords, headline variations, and automated daily bidding routing.</p>
-                             </div>
-
-                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
-                                <div className="flex items-center justify-between">
-                                   <span className="text-[10px] font-black text-slate-900 uppercase">Social Media Pipelines</span>
-                                   <div className="relative inline-flex items-center">
-                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
-                                   </div>
-                                </div>
-                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Simultaneous scheduling and sponsor post formatting across Meta channels & WhatsApp grids.</p>
-                             </div>
-
-                             <div className="p-5 bg-white border border-indigo-100 rounded-2xl space-y-3 shadow-xs">
-                                <div className="flex items-center justify-between">
-                                   <span className="text-[10px] font-black text-slate-900 uppercase">Global Web & SEO Nodes</span>
-                                   <div className="relative inline-flex items-center">
-                                      <input type="checkbox" defaultChecked disabled className={`rounded ${adType === 'ADVERT' ? 'text-indigo-600 focus:ring-indigo-500 bg-indigo-50 border-indigo-300' : 'text-rose-600 focus:ring-rose-500 bg-rose-50 border-rose-300'} h-4 w-4`} />
-                                   </div>
-                                </div>
-                                <p className="text-[9px] text-gray-700 leading-normal font-medium">Auto-indexes via real-time XML sitemaps, semantic JSON-LD structures, and global CDN caching.</p>
-                             </div>
-                          </div>
-                       </div>
-
-                       <div className="space-y-4">
-                          <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Tactical Assets (Photos)</label>
-                          <div className="grid grid-cols-4 gap-4">
-                             <button 
+                        {/* Sub-items for groups 1-5 */}
+                        {group.id !== 'OTHERS' && isExpanded && (
+                          <div className="space-y-2 pt-1">
+                            {group.subCategories.map((sub) => (
+                              <button
+                                key={sub.id}
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className={`aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center text-slate-500 hover:border-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} hover:text-${adType === 'ADVERT' ? 'indigo-600' : 'rose-600'} transition-all`}
-                             >
-                                <Upload className="w-6 h-6 mb-2" />
-                                <span className="text-[9px] font-black uppercase">Upload</span>
-                             </button>
-                             <input 
-                                type="file" 
-                                ref={fileInputRef} 
-                                className="hidden" 
-                                accept="image/*" 
-                                multiple 
-                                onChange={handlePhotoUpload} 
-                             />
-                             {formData.photos.map((photo, index) => (
-                                <div key={index} className="aspect-square bg-slate-50 border border-slate-200 rounded-3xl relative overflow-hidden group animate-in fade-in zoom-in-95">
-                                   <img src={photo} alt={`Asset ${index + 1}`} className="w-full h-full object-cover" />
-                                   <button 
-                                      type="button"
-                                      onClick={() => {
-                                         setFormData(prev => ({
-                                            ...prev,
-                                            photos: prev.photos.filter((_, i) => i !== index)
-                                         }));
-                                      }}
-                                      className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-all shadow-md"
-                                   >
-                                      <X className="w-3 h-3" />
-                                   </button>
+                                onClick={() => openCategoryPreview(group, sub.id)}
+                                className="w-full p-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-left flex items-center justify-between gap-2 cursor-pointer"
+                              >
+                                <div>
+                                  <p className="text-sm font-bold text-slate-900">{sub.label}</p>
+                                  <p className="text-xs text-slate-600">{sub.description}</p>
                                 </div>
-                             ))}
-                             {formData.photos.length === 0 && (
-                                <div className="aspect-square bg-indigo-50 border border-indigo-100 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden group animate-pulse">
-                                   <img src={`https://picsum.photos/seed/adp1/300/300`} alt="Sample" className="w-full h-full object-cover opacity-50" />
-                                   <span className={`absolute inset-0 flex items-center justify-center text-[8px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-widest`}>Select Photos</span>
-                                </div>
-                             )}
-                          </div>
-                          <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest italic flex items-center gap-2">
-                             <Info className={`w-3 h-3 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} animate-bounce`} /> high-fidelity images increase conversion by 85%
-                           </p>
-                        </div>
-
-                        {/* Optional Video Upload and Reels Promotion */}
-                        <div className="space-y-4 border-t border-slate-100 pt-6">
-                           <label className="text-[11px] font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                              <Video className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} /> Promotional Video (Optional)
-                           </label>
-                           <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
-                              Add an optional high-impact promotional video to showcase your property, product, or offer in motion. You can upload a file or paste a direct video link.
-                           </p>
-
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Option A: Video File Upload</span>
-                                 <div className="flex gap-4 items-center">
-                                    <button 
-                                       type="button"
-                                       onClick={() => videoInputRef.current?.click()}
-                                       className={`px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl flex items-center gap-2 text-slate-500 hover:text-indigo-600 hover:border-indigo-600 transition-all`}
-                                    >
-                                       <Upload className="w-4 h-4" />
-                                       <span className="text-[9px] font-black uppercase">Browse Video</span>
-                                    </button>
-                                    <input 
-                                       type="file" 
-                                       ref={videoInputRef} 
-                                       className="hidden" 
-                                       accept="video/*" 
-                                       onChange={handleVideoUpload} 
-                                    />
-                                    {formData.video && formData.video.startsWith('data:video') && (
-                                       <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-black uppercase">
-                                          <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
-                                          <button 
-                                             type="button"
-                                             onClick={() => setFormData(prev => ({ ...prev, video: '' }))}
-                                             className="text-red-500 hover:text-red-600 font-bold ml-2"
-                                          >
-                                             Remove
-                                          </button>
-                                       </div>
-                                    )}
-                                 </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Option B: Video URL Link</span>
-                                 <input 
-                                    type="text"
-                                    placeholder="https://example.com/my-promo-video.mp4"
-                                    value={formData.video.startsWith('data:video') ? '' : formData.video}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, video: e.target.value }))}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 focus:border-indigo-500 outline-none transition-all font-bold placeholder:italic placeholder:font-normal text-xs"
-                                 />
-                              </div>
-                           </div>
-
-                           {formData.video && (
-                              <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-3xl space-y-2">
-                                 <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] flex items-center gap-1.5">
-                                       <Film className="w-4 h-4 text-amber-600 animate-pulse" /> Promote via EFADO Reels Feed
-                                    </span>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                       <input 
-                                          type="checkbox" 
-                                          checked={formData.isReelPromotion} 
-                                          onChange={(e) => setFormData(prev => ({ ...prev, isReelPromotion: e.target.checked }))} 
-                                          className="sr-only peer" 
-                                       />
-                                       <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
-                                       <span className="ml-2.5 text-[10px] font-black uppercase text-slate-700 tracking-wider">Enable Reels</span>
-                                    </label>
-                                 </div>
-                                 <p className="text-[10px] text-slate-600 leading-relaxed">
-                                    Enabling this lets you showcase your ad natively inside the **EFADO Reels Feed** in Gist Hub. When users click on the Reel, they are redirected instantly to your ad!
-                                  </p>
-                               </div>
-                            )}
-                        </div>
-                     </div>
-
-                     <div className="flex gap-4">
-                       <button 
-                         onClick={() => setRegisterStep('CATEGORY')}
-                         className="flex-1 py-5 border border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-                       >
-                         <ChevronLeft className="w-4 h-4" /> Back
-                       </button>
-                      <button 
-                        disabled={!formData.title || !formData.category || !formData.price}
-                        onClick={() => {
-                          setRegisterStep('PREVIEW');
-                          generateCampaignAssets();
-                        }}
-                        className={`flex-[2] py-5 ${adType === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group`}
-                      >
-                        Review Audit Preview <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
-                  </div>
-                ) : registerStep === 'PREVIEW' ? (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white border border-gray-100 rounded-[3.5rem] overflow-hidden shadow-2xl">
-                      <div className="aspect-[21/9] bg-gray-950 relative">
-                        <img 
-                          src={formData.photos[0] || `https://picsum.photos/seed/${formData.title}/1200/500`} 
-                          alt="Preview" 
-                          className="w-full h-full object-cover opacity-50" 
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <h4 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter italic text-center px-8">
-                            {formData.title || 'Mission Heading'}
-                          </h4>
-                        </div>
-                      </div>
-                      
-                      <div className="p-12 grid grid-cols-1 md:grid-cols-3 gap-12">
-                        <div className="md:col-span-2 space-y-8">
-                          <div className="space-y-4">
-                            <h5 className={`text-[10px] font-black ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} uppercase tracking-widest`}>Tactical Description</h5>
-                            <p className="text-gray-600 font-medium leading-relaxed">{formData.description || 'No description provided.'}</p>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            {Object.entries(formData.details).map(([key, val]) => (
-                               <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                  <p className="text-[8px] font-black text-gray-700 uppercase tracking-widest mb-1">{key.replace(/([A-Z])/g, ' $1')}</p>
-                                  <p className="text-[11px] font-bold text-gray-900 uppercase">{val as string}</p>
-                               </div>
+                                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                              </button>
                             ))}
                           </div>
-                        </div>
-                        
-                        <div className="space-y-8 bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100">
-                          <div className="space-y-2">
-                                 <p className="text-[10px] font-black text-gray-700 uppercase tracking-widest leading-none">Valuation / Price</p>
-                             <p className="text-3xl font-black text-gray-900 italic tracking-tighter">{formatPrice(parseFloat(formData.price) || 0)}</p>
-                          </div>
-                          
-                          <div className="space-y-4 pt-6 border-t border-gray-200">
-                            <div className="flex items-center gap-3">
-                              <MapPin className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />
-                              <div>
-                                <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Global Location</p>
-                                <p className="text-[10px] font-bold text-gray-900 uppercase">{formData.city}, {formData.state}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Phone className={`w-4 h-4 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />
-                              <div>
-                                <p className="text-[9px] font-black text-gray-700 uppercase tracking-widest">Secure Contact</p>
-                                <p className="text-[10px] font-bold text-gray-900 uppercase">{formData.phone}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* AI Campaign Previews */}
-                    <div className={`bg-slate-900 border-2 ${adType === 'ADVERT' ? 'border-indigo-500/20' : 'border-rose-500/20'} rounded-[3.5rem] p-8 md:p-12 space-y-8 text-white`}>
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-                        <div className="flex items-center gap-3">
-                          <Zap className={`w-6 h-6 ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} animate-pulse`} />
-                          <div>
-                            <h4 className="text-lg font-black uppercase tracking-tight">AI Syndicated Campaign Mockups</h4>
-                            <p className={`text-[10px] ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase tracking-widest`}>Neural copy variants formatted for global advertising channels</p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={generateCampaignAssets}
-                          disabled={isGeneratingCampaign}
-                          className={`px-5 py-2.5 ${adType === 'ADVERT' ? 'bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/50 hover:border-indigo-500 text-indigo-100' : 'bg-rose-600/30 hover:bg-rose-600 border border-rose-500/50 hover:border-rose-500 text-rose-100'} text-[10px] font-black uppercase tracking-widest rounded-full transition-all disabled:opacity-50`}
-                        >
-                          {isGeneratingCampaign ? 'Re-Generating...' : '⚡ Regenerate Copy'}
-                        </button>
-                      </div>
-
-                      {isGeneratingCampaign ? (
-                        <div className="py-12 flex flex-col items-center justify-center space-y-4">
-                          <div className={`w-12 h-12 rounded-full border-4 ${adType === 'ADVERT' ? 'border-indigo-500/30 border-t-indigo-500' : 'border-rose-500/30 border-t-rose-500'} animate-spin`} />
-                          <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-black uppercase tracking-widest animate-pulse`}>EFADO Neural Engine compiling copy variants...</p>
-                        </div>
-                      ) : syndicationData.googleAds ? (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                          {/* Google Search Ad Variant */}
-                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
-                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Google Sponsored Search</span>
-                              <span className="px-2 py-0.5 bg-slate-800 text-[8px] font-black uppercase text-slate-300 rounded">Ad</span>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center text-[10px] text-black font-black">G</div>
-                                <span className="text-[10px] text-slate-400">https://efado.net &gt; connect</span>
-                              </div>
-                              <h5 className="text-md font-extrabold text-blue-400 hover:underline cursor-pointer leading-tight">
-                                {syndicationData.googleAds.headline}
-                              </h5>
-                              <p className="text-xs text-slate-300 leading-normal">
-                                {syndicationData.googleAds.description}
-                              </p>
-                              <div className="flex flex-wrap gap-1.5 pt-2">
-                                {syndicationData.googleAds.keywords.map((kw, i) => (
-                                  <span key={i} className={`px-2 py-0.5 bg-slate-900 text-[9px] ${adType === 'ADVERT' ? 'text-indigo-300 border-indigo-950' : 'text-rose-300 border-rose-950'} border rounded-full font-bold`}>
-                                    #{kw}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Facebook Mobile Feed Post */}
-                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
-                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meta Mobile Feed</span>
-                              <span className={`px-2 py-0.5 ${adType === 'ADVERT' ? 'bg-indigo-900/40 text-indigo-300' : 'bg-rose-900/40 text-rose-300'} text-[8px] font-black uppercase rounded`}>Sponsored</span>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${adType === 'ADVERT' ? 'from-indigo-600 to-indigo-400' : 'from-rose-600 to-rose-400'} flex items-center justify-center text-[10px] font-black text-white`}>EF</div>
-                                <div>
-                                  <h6 className="text-[11px] font-black uppercase tracking-tight">EFADO Connection Engine</h6>
-                                  <p className="text-[8px] text-slate-400 uppercase tracking-widest">Sponsored · Active Now</p>
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-200 leading-normal font-medium">
-                                {syndicationData.socialMedia?.postText} <span className={adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'}>{syndicationData.socialMedia?.hashtags}</span>
-                              </p>
-                              <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-900">
-                                <img src={formData.photos[0] || `https://picsum.photos/seed/${formData.title}/600/350`} alt="Meta Ad" className="w-full h-40 object-cover" />
-                                <div className="p-4 flex items-center justify-between">
-                                  <div>
-                                    <span className={`text-[8px] font-black ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} uppercase tracking-widest`}>EFADO.NET</span>
-                                    <h6 className="text-xs font-black uppercase tracking-tight text-white line-clamp-1">{formData.title}</h6>
-                                  </div>
-                                  <span className="px-3 py-1.5 bg-slate-800 text-[9px] font-black uppercase rounded text-slate-200 border border-slate-700">Learn More</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Organic Search SEO snippet */}
-                          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 space-y-4">
-                            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Organic Web Indexes</span>
-                              <span className="px-2 py-0.5 bg-emerald-950 text-[8px] font-black uppercase text-emerald-300 rounded">SEO Optimized</span>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-1.5">
-                                <Globe className="w-3.5 h-3.5 text-emerald-500" />
-                                <span className="text-[10px] text-slate-400">efado.net &gt; listings &gt; {formData.category.toLowerCase()}</span>
-                              </div>
-                              <h5 className="text-md font-extrabold text-blue-400 hover:underline cursor-pointer leading-tight">
-                                {syndicationData.seo?.title}
-                              </h5>
-                              <p className="text-xs text-slate-300 leading-normal">
-                                {syndicationData.seo?.metaDescription}
-                              </p>
-                              <div className="p-3 bg-slate-900 border border-slate-850 rounded-xl">
-                                <span className="text-[8px] font-black text-slate-400 uppercase block mb-1">Index Coordinates</span>
-                                <span className="font-mono text-[9px] text-emerald-400 block break-all">XML_PING: GOOGLE, BING, DUCKDUCKGO SUCCESSFUL</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                          <AlertCircle className={`w-8 h-8 ${adType === 'ADVERT' ? 'text-indigo-400' : 'text-rose-400'} animate-bounce`} />
-                          <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase`}>Ready to compile optimal campaign assets.</p>
-                          <button onClick={generateCampaignAssets} className={`px-6 py-2.5 ${adType === 'ADVERT' ? 'bg-indigo-600 shadow-indigo-600/20' : 'bg-rose-600 shadow-rose-600/20'} text-white font-black uppercase tracking-widest text-[10px] rounded-full`}>
-                            ⚡ Trigger Campaign Optimization
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => setRegisterStep('DETAILS')}
-                        className="flex-1 py-5 border border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-                      >
-                        <ChevronLeft className="w-4 h-4" /> Edit Details
-                      </button>
-                      <button 
-                        onClick={() => setRegisterStep('PLAN')}
-                        className={`flex-[2] py-5 ${adType === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 group`}
-                      >
-                        Proceed to Selection Plans <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
+              {/* 6th Group: "Others - Advertise Something Different" Unlimited Prompt */}
+              {showOthersInput && (
+                <div className="p-6 sm:p-7 rounded-2xl bg-indigo-50 border-2 border-indigo-300 space-y-4">
+                  <div className="space-y-1">
+                    <h4 className="text-lg sm:text-xl font-bold text-indigo-950">
+                      What do you want to advertise? Write the name in your own words.
+                    </h4>
+                    <p className="text-sm text-indigo-900">
+                      Examples: Goat Farming, Catering Training, Car Wash Machine, Home Tutoring, Solar Borehole.
+                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {AD_PLANS.map(plan => (
-                        <button 
-                          key={plan.id}
-                          onClick={() => setSelectedPlan(plan)}
-                          className={`p-8 rounded-[3rem] border transition-all text-left relative overflow-hidden group ${selectedPlan?.id === plan.id ? (adType === 'ADVERT' ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xl shadow-indigo-500/30' : 'bg-rose-600 border-rose-600 text-white shadow-2xl shadow-rose-500/30') : (adType === 'ADVERT' ? 'bg-white border-gray-100 hover:border-indigo-100 hover:bg-gray-50' : 'bg-white border-gray-100 hover:border-rose-100 hover:bg-gray-50')}`}
-                        >
-                          {selectedPlan?.id === plan.id && (
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16" />
-                          )}
-                          <div className="flex items-center justify-between mb-6">
-                            <div className={`p-3 rounded-2xl ${selectedPlan?.id === plan.id ? 'bg-white/20' : (adType === 'ADVERT' ? 'bg-indigo-50' : 'bg-rose-50')} transition-all`}>
-                               {plan.id === 'Express' ? <Zap className="w-5 h-5 text-amber-400" /> : <Clock className={`w-5 h-5 ${adType === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'}`} />}
-                            </div>
-                            {selectedPlan?.id === plan.id && <CheckCircle2 className="w-5 h-5 text-white" />}
-                          </div>
-                          
-                          <h4 className="text-xl font-black uppercase tracking-tighter mb-1">{plan.name}</h4>
-                          <p className={`text-[10px] font-black uppercase tracking-widest mb-6 ${selectedPlan?.id === plan.id ? (adType === 'ADVERT' ? 'text-indigo-100' : 'text-rose-100') : 'text-gray-600'}`}>
-                            {plan.durationDays} Day Deployment
-                          </p>
-                          
-                          <div className="text-3xl font-black mb-8 italic">
-                            {plan.price === 0 ? 'FREE' : formatPrice(plan.price)}
-                          </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      value={customOthersName}
+                      onChange={(e) => setCustomOthersName(e.target.value)}
+                      placeholder="Write your category or business type here..."
+                      className="flex-1 min-h-[48px] px-4 py-3 bg-white border border-indigo-200 focus:border-indigo-600 rounded-xl text-base text-slate-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const clean = customOthersName.trim();
+                        if (!clean) return;
+                        startWizard('ADVERT', ADVERT_GROUPS[5], 'OTHER', clean);
+                      }}
+                      disabled={!customOthersName.trim()}
+                      className="min-h-[48px] px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Continue to Step 1</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
 
-                          <div className="space-y-3">
-                             {plan.features.map((f, i) => (
-                               <p key={i} className={`text-[9px] font-black flex items-center gap-2 ${selectedPlan?.id === plan.id ? 'text-white' : 'text-gray-700'}`}>
-                                  <CheckCircle2 className="w-3 h-3 shrink-0" /> {f}
-                               </p>
-                             ))}
-                          </div>
-                        </button>
+            {/* Recent Live Listings Feed */}
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                    Recent Live Adverts &amp; Products
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    Real listings shared by EFADO members right now
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startWizard('SELL', ADVERT_GROUPS[0], 'BUSINESS')}
+                  className="min-h-[44px] px-5 py-2.5 bg-slate-900 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Post Yours Now</span>
+                </button>
+              </div>
+
+              {loadingListings ? (
+                <div className="p-10 text-center text-slate-600 bg-slate-50 rounded-2xl border border-slate-200">
+                  Loading live adverts...
+                </div>
+              ) : activeListings.length === 0 ? (
+                <div className="p-10 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <p className="text-base font-bold text-slate-900">No active adverts in this view yet</p>
+                  <p className="text-sm text-slate-600">Be the first person to post your business or product today.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {activeListings.slice(0, 12).map((ad) => (
+                    <AdvertCard
+                      key={ad.id}
+                      ad={ad}
+                      user={user}
+                      onContact={(target) => {
+                        setContactAd(target);
+                        setContactResult(null);
+                        setContactMessage(`Hello! I saw "${target.title}" on EFADO. Is it available?`);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ==================== 2. CATEGORY PREVIEW VIEW ==================== */}
+        {view === 'CATEGORY_PREVIEW' && (
+          <div className="space-y-6">
+            <div className={`p-6 sm:p-8 rounded-3xl border ${selectedGroup.cardBg} ${selectedGroup.cardBorder} flex flex-col md:flex-row md:items-center justify-between gap-5`}>
+              <div className="space-y-1.5">
+                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${selectedGroup.pillBg}`}>
+                  {selectedGroup.title}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {activeCategoryTitle}
+                </h2>
+                <p className="text-sm sm:text-base text-slate-700">
+                  See how existing adverts look in this category, then post yours in 3 easy steps.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  startWizard(adType, selectedGroup, selectedSubCategory, customOthersName)
+                }
+                className="min-h-[50px] px-6 py-3 bg-slate-900 hover:bg-indigo-700 text-white rounded-xl text-sm sm:text-base font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              >
+                <Megaphone className="w-4 h-4" />
+                <span>Advertise Like This - Start Here</span>
+              </button>
+            </div>
+
+            {categoryPreviewAds.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {categoryPreviewAds.map((ad) => (
+                  <AdvertCard
+                    key={ad.id}
+                    ad={ad}
+                    user={user}
+                    onContact={(target) => {
+                      setContactAd(target);
+                      setContactResult(null);
+                      setContactMessage(`Hello! I saw "${target.title}" on EFADO. Is it available?`);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="p-10 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-4">
+                <h3 className="text-lg font-bold text-slate-900">
+                  No adverts posted in &ldquo;{activeCategoryTitle}&rdquo; yet
+                </h3>
+                <p className="text-sm text-slate-600 max-w-md mx-auto">
+                  Your advert will appear right at the top when people open this category.
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    startWizard(adType, selectedGroup, selectedSubCategory, customOthersName)
+                  }
+                  className="min-h-[46px] px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold cursor-pointer"
+                >
+                  Advertise Like This - Start Here
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== 3. SIMPLE 3-STEP FORM + REVIEW ==================== */}
+        {view === 'FORM' && (
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* Step Progress Strip */}
+            <div className="p-5 rounded-2xl bg-purple-50 border border-purple-200 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-purple-800 uppercase tracking-wide">
+                    {editingAdId
+                      ? 'Edit Your Advert'
+                      : formStep === 4
+                      ? 'Final Check Before Publishing'
+                      : `Step ${formStep} of 3`}
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">
+                    {formStep === 1 &&
+                      (adType === 'SELL' ? 'What are you selling?' : 'What do you want to promote?')}
+                    {formStep === 2 && 'Where is it?'}
+                    {formStep === 3 && 'Photos, video, and contact'}
+                    {formStep === 4 && 'Review and confirm'}
+                  </h2>
+                </div>
+
+                {/* Quick mode toggle */}
+                {!editingAdId && (
+                  <div className="flex rounded-xl bg-white border border-purple-200 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setAdType('ADVERT')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                        adType === 'ADVERT' ? 'bg-indigo-600 text-white' : 'text-slate-600'
+                      }`}
+                    >
+                      Advertise
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdType('SELL')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                        adType === 'SELL' ? 'bg-rose-600 text-white' : 'text-slate-600'
+                      }`}
+                    >
+                      Sell
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((s) => (
+                  <div
+                    key={s}
+                    className={`h-2 rounded-full transition-colors ${
+                      formStep >= s ? 'bg-indigo-600' : 'bg-purple-200'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {formError && (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold">
+                {formError}
+              </div>
+            )}
+
+            {/* STEP 1: WHAT ARE YOU SELLING? */}
+            {formStep === 1 && (
+              <div className="p-6 sm:p-7 rounded-2xl bg-white border border-slate-200 space-y-5 shadow-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-800 block">
+                      Category Group
+                    </label>
+                    <select
+                      value={selectedGroup.id}
+                      onChange={(e) => {
+                        const grp =
+                          ADVERT_GROUPS.find((g) => g.id === e.target.value) || ADVERT_GROUPS[0];
+                        setSelectedGroup(grp);
+                        setSelectedSubCategory(grp.subCategories[0]?.id || 'OTHER');
+                        setFormData((prev) => ({ ...prev, details: {} }));
+                      }}
+                      className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-500"
+                    >
+                      {ADVERT_GROUPS.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.title}
+                        </option>
                       ))}
-                    </div>
+                    </select>
+                  </div>
 
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={() => setRegisterStep('PREVIEW')}
-                        className="flex-1 py-5 border border-gray-100 text-gray-400 rounded-3xl font-black uppercase tracking-widest text-[11px] hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+                  {selectedGroup.id === 'OTHERS' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-slate-800 block">
+                        Write What You Are Promoting
+                      </label>
+                      <input
+                        type="text"
+                        value={customOthersName}
+                        onChange={(e) => setCustomOthersName(e.target.value)}
+                        placeholder="e.g. Goat Farming, Catering Training"
+                        className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-slate-800 block">
+                        Specific Kind
+                      </label>
+                      <select
+                        value={selectedSubCategory}
+                        onChange={(e) => {
+                          setSelectedSubCategory(e.target.value);
+                          setFormData((prev) => ({ ...prev, details: {} }));
+                        }}
+                        className="w-full min-h-[48px] px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-500"
                       >
-                        <ChevronLeft className="w-4 h-4" /> Back to Preview
-                      </button>
-                      <button 
-                        disabled={!selectedPlan}
-                        onClick={() => (selectedPlan?.price === 0 || user?.is_super_admin) ? handleCreateAd() : setShowPayment(true)}
-                        className={`flex-[2] py-5 bg-gray-950 text-white rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-2xl ${adType === 'ADVERT' ? 'hover:bg-indigo-600' : 'hover:bg-rose-600'} hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2 group`}
-                      >
-                        Deploy Strategy <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
-                      </button>
+                        {selectedGroup.subCategories.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-800 block">
+                    {adType === 'SELL' ? 'Item Name' : 'Business or Offer Name'}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder={
+                      adType === 'SELL'
+                        ? 'e.g. Fresh Broilers, iPhone 13 Pro, 2-Bedroom Flat'
+                        : 'e.g. Grace Catering & Pastries, Sunrise Solar Repairs'
+                    }
+                    className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-800 block">
+                    Price (₦)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    placeholder="e.g. 15000 (enter 0 if price depends on order)"
+                    className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                {/* Contextual Fields Matching Selected Item */}
+                {activeCategoryFields.length > 0 && (
+                  <div className="p-4 rounded-xl bg-sky-50 border border-sky-200 space-y-4">
+                    <p className="text-sm font-bold text-sky-950">
+                      Helpful details for {activeCategoryTitle}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {activeCategoryFields.map((field) => (
+                        <div key={field.key} className="space-y-1.5">
+                          <label className="text-xs font-semibold text-slate-700 block">
+                            {field.label} {field.optional ? '(Optional)' : ''}
+                          </label>
+                          {field.type === 'select' && field.options ? (
+                            <select
+                              value={formData.details[field.key] || ''}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  details: { ...formData.details, [field.key]: e.target.value },
+                                })
+                              }
+                              className="w-full min-h-[44px] px-3 py-2 bg-white border border-sky-200 rounded-xl text-sm text-slate-900 outline-none"
+                            >
+                              <option value="">{field.placeholder}</option>
+                              {field.options.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type={field.type === 'date' ? 'date' : 'text'}
+                              value={formData.details[field.key] || ''}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  details: { ...formData.details, [field.key]: e.target.value },
+                                })
+                              }
+                              placeholder={field.placeholder}
+                              className="w-full min-h-[44px] px-3 py-2 bg-white border border-sky-200 rounded-xl text-sm text-slate-900 outline-none"
+                            />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-             </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-800 block">
+                    Short Description (Tell buyers why they should choose yours)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Write clear details buyers should know..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500 resize-none"
+                  />
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="min-h-[48px] px-7 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-base font-semibold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>Next: Where is it?</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: WHERE IS IT? */}
+            {formStep === 2 && (
+              <div className="p-6 sm:p-7 rounded-2xl bg-white border border-slate-200 space-y-5 shadow-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-800 block">
+                      State
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      placeholder="e.g. Lagos, Oyo, Abuja"
+                      className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-800 block">
+                      Town / City
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      placeholder="e.g. Ikeja, Bodija, Wuse"
+                      className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-800 block">
+                    Full Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Street name, market area, or estate"
+                    className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-800 block">
+                    Nearby Landmark (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.landmark}
+                    onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
+                    placeholder="e.g. Opposite Total Filling Station"
+                    className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(1)}
+                    className="min-h-[48px] px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="min-h-[48px] px-7 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-base font-semibold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>Next: Photos &amp; Contact</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: PHOTOS, VIDEO & CONTACT */}
+            {formStep === 3 && (
+              <div className="p-6 sm:p-7 rounded-2xl bg-white border border-slate-200 space-y-6 shadow-sm">
+                {/* Photos */}
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Photos (Add 1 to 4 clear photos)
+                      </h3>
+                      <p className="text-xs text-slate-600">
+                        {formData.photos.length} of 4 added
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAiImageModal(true)}
+                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Make Photo with AI</span>
+                    </button>
+                  </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoFiles}
+                    className="hidden"
+                  />
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {formData.photos.map((photo, idx) => (
+                      <div
+                        key={idx}
+                        className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                      >
+                        <img
+                          src={photo}
+                          alt={`Selected photo ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              photos: prev.photos.filter((_, i) => i !== idx),
+                            }))
+                          }
+                          aria-label="Remove photo"
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-slate-900/80 text-white flex items-center justify-center cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {formData.photos.length < 4 && (
+                      <button
+                        type="button"
+                        disabled={mediaBusy}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="aspect-[4/3] rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/60 hover:bg-indigo-50 text-indigo-900 flex flex-col items-center justify-center gap-1.5 p-3 cursor-pointer"
+                      >
+                        <Camera className="w-6 h-6" />
+                        <span className="text-xs font-semibold">
+                          {mediaBusy ? 'Adding...' : 'Add Photo'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Optional Video / Reel */}
+                <div className="p-4 rounded-xl bg-orange-50 border border-orange-200 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-orange-950">
+                        Optional Short Video or Reel
+                      </h4>
+                      <p className="text-xs text-orange-900">
+                        If you add a video, it will also show automatically inside EFADO Reels.
+                      </p>
+                    </div>
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoFile}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      disabled={mediaBusy}
+                      onClick={() => videoInputRef.current?.click()}
+                      className="min-h-[42px] px-4 py-2 bg-white hover:bg-orange-100 border border-orange-300 text-orange-950 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span>{formData.video ? 'Change Video' : 'Add Video'}</span>
+                    </button>
+                  </div>
+
+                  {formData.video && (
+                    <div className="flex items-center justify-between gap-3 bg-white border border-orange-200 rounded-xl p-3">
+                      <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Video ready to show in your advert and EFADO Reels
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, video: '' }))}
+                        className="text-xs font-semibold text-rose-700 hover:underline cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Phone & WhatsApp */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-semibold text-slate-800 block">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="e.g. 08031234567"
+                      className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold text-slate-800">
+                        WhatsApp Number
+                      </label>
+                      {formData.phone && formData.whatsapp !== formData.phone && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData((p) => ({ ...p, whatsapp: p.phone }))}
+                          className="text-xs font-semibold text-indigo-700 hover:underline cursor-pointer"
+                        >
+                          Same as Phone
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="tel"
+                      value={formData.whatsapp}
+                      onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                      placeholder="e.g. 08031234567"
+                      className="w-full min-h-[48px] px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-base text-slate-900 outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Visibility Plan Selection */}
+                {!editingAdId && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
+                    <h4 className="text-base font-bold text-slate-900">
+                      Choose How Long Your Advert Runs
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {ADVERT_PLANS.map((plan) => {
+                        const active = selectedPlan.id === plan.id;
+                        return (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            onClick={() => setSelectedPlan(plan)}
+                            className={`p-4 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
+                              active
+                                ? 'bg-indigo-50 border-indigo-600'
+                                : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-sm text-slate-900">{plan.name}</span>
+                              <span className="font-bold text-base text-indigo-800">
+                                {plan.price === 0 ? 'Free' : formatPrice(plan.price)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {plan.features.join(' • ')}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(2)}
+                    className="min-h-[48px] px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    className="min-h-[48px] px-7 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-base font-semibold inline-flex items-center gap-2 cursor-pointer"
+                  >
+                    <span>Preview &amp; Check Price</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: PRE-PAYMENT REVIEW CARD */}
+            {formStep === 4 && (
+              <div className="space-y-6">
+                <div className="p-6 sm:p-7 rounded-2xl bg-green-50 border border-green-200 space-y-5">
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-slate-900">
+                      This is how your advert will look
+                    </h3>
+                    <p className="text-sm text-slate-700">
+                      You can edit it after you publish.
+                    </p>
+                  </div>
+
+                  {/* Preview Card */}
+                  <div className="max-w-sm bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="aspect-[4/3] bg-slate-100">
+                      {formData.photos[0] && (
+                        <img
+                          src={formData.photos[0]}
+                          alt={formData.title}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                    <div className="p-5 space-y-2">
+                      <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-semibold ${selectedGroup.pillBg}`}>
+                        {activeCategoryTitle}
+                      </span>
+                      <h4 className="text-lg font-bold text-slate-900">{formData.title}</h4>
+                      <p className="text-sm text-slate-600 line-clamp-2">
+                        {formData.description || `${formData.title} available in ${formData.city}, ${formData.state}.`}
+                      </p>
+                      <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>{formData.city}, {formData.state}</span>
+                      </p>
+                      <p className="text-lg font-bold text-slate-900 pt-2 border-t border-slate-100">
+                        {Number(formData.price || 0) > 0
+                          ? formatPrice(Number(formData.price))
+                          : 'Ask Seller'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Who will see it & How much it costs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-white border border-green-200 space-y-1">
+                      <p className="text-xs font-bold text-emerald-800 uppercase">
+                        This is who will see it
+                      </p>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        People browsing EFADO Home, searching by keyword, opening your category, watching Reels (if you added video), and anyone opening your public share link on WhatsApp or Google.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white border border-green-200 space-y-1">
+                      <p className="text-xs font-bold text-emerald-800 uppercase">
+                        This is how much it will cost
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {editingAdId
+                          ? 'Free Edit (₦0)'
+                          : selectedPlan.price === 0
+                          ? 'Free (₦0)'
+                          : formatPrice(selectedPlan.price)}
+                      </p>
+                      <p className="text-xs text-slate-600">
+                        {editingAdId ? 'Saving changes to your live advert' : selectedPlan.name}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setFormStep(3)}
+                    className="min-h-[48px] px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-sm font-semibold cursor-pointer"
+                  >
+                    Back to Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleReviewSubmit}
+                    className="min-h-[50px] px-8 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-base font-semibold cursor-pointer"
+                  >
+                    {isSubmitting
+                      ? 'Saving...'
+                      : editingAdId
+                      ? 'Save Changes'
+                      : selectedPlan.price > 0
+                      ? `Pay ${formatPrice(selectedPlan.price)} & Publish`
+                      : 'Publish Advert Now'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </main>
 
-      <AnimatePresence>
-        {isBroadcasting && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-md"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className={`bg-slate-900 border-2 ${adType === 'ADVERT' ? 'border-indigo-500/30' : 'border-rose-500/30'} w-full max-w-xl rounded-[3rem] shadow-2xl p-8 md:p-12 text-center space-y-8`}
-            >
-              <div className="relative w-24 h-24 mx-auto">
-                <div className={`absolute inset-0 rounded-full border-2 ${adType === 'ADVERT' ? 'border-indigo-500' : 'border-rose-500'} animate-ping opacity-40`} />
-                <div className="absolute -inset-2 rounded-full border-2 border-amber-500 animate-ping opacity-25" style={{ animationDelay: '0.5s' }} />
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
-                  <Globe className="w-10 h-10 text-white animate-spin-slow" />
-                </div>
+        {/* ==================== 4. POST-PUBLISH CELEBRATION ==================== */}
+        {view === 'SUCCESS' && publishedAd && (
+          <div className="max-w-3xl mx-auto p-6 sm:p-8 rounded-3xl bg-emerald-50 border border-emerald-200 space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-7 h-7" />
               </div>
-
-              <div className="space-y-3">
-                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter italic">Broadcasting Campaign</h3>
-                <p className={`text-xs ${adType === 'ADVERT' ? 'text-indigo-300' : 'text-rose-300'} font-bold uppercase tracking-widest`}>Deploying marketing assets to global network node sitemaps...</p>
+              <div className="space-y-1">
+                <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  Your advert is live! Now let people see it.
+                </h2>
+                <p className="text-base text-slate-700">
+                  <strong>{publishedAd.title}</strong> is now live on EFADO and has its own public link:
+                </p>
+                <a
+                  href={`/advert/${publishedAd.slug || publishedAd.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-sm font-semibold text-indigo-700 hover:underline break-all"
+                >
+                  {getPublicAdvertUrl(publishedAd)}
+                </a>
               </div>
+            </div>
 
-              <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
-                <motion.div 
-                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-500 h-full"
-                  initial={{ width: '0%' }}
-                  animate={{ width: `${(broadcastStep / 6) * 100}%` }}
-                  transition={{ duration: 0.3 }}
-                />
+            <div className="p-5 rounded-2xl bg-white border border-emerald-200 space-y-4">
+              <h3 className="text-base font-bold text-slate-900">
+                Share Your Advert Anywhere (7 Ways)
+              </h3>
+              <AdvertShareBar ad={publishedAd} />
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setView('MY_ADS')}
+                className="min-h-[46px] px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold cursor-pointer"
+              >
+                Go to My Adverts
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm('ADVERT');
+                  setView('DOOR');
+                }}
+                className="min-h-[46px] px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl text-sm font-semibold cursor-pointer"
+              >
+                Back to Categories
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 5. MY ADVERTS ==================== */}
+        {view === 'MY_ADS' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">My Adverts</h2>
+                <p className="text-sm text-slate-600">
+                  See views and shares, edit details, boost visibility, or share again.
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => startWizard('ADVERT', ADVERT_GROUPS[0], 'BUSINESS')}
+                className="min-h-[44px] px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold inline-flex items-center gap-2 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create New Advert</span>
+              </button>
+            </div>
 
-              <div className="bg-black/80 border border-slate-800 rounded-2xl p-6 h-48 overflow-y-auto font-mono text-left text-xs space-y-2 custom-scrollbar">
-                {broadcastLogs.map((log, index) => (
-                  <p key={index} className={index === broadcastLogs.length - 1 ? "text-amber-400 font-extrabold animate-pulse" : "text-emerald-400 font-medium"}>
-                    {log}
-                  </p>
+            {myAdsStatusMsg && (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-semibold">
+                {myAdsStatusMsg}
+              </div>
+            )}
+
+            {/* Status Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { id: 'active', label: 'Active' },
+                  { id: 'pending', label: 'Pending' },
+                  { id: 'finished', label: 'Finished' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setMyAdsFilter(tab.id)}
+                  className={`min-h-[44px] px-5 py-2 rounded-xl text-sm font-semibold border cursor-pointer ${
+                    myAdsFilter === tab.id
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {filteredMyListings.length === 0 ? (
+              <div className="p-10 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+                <p className="text-base font-bold text-slate-900">
+                  No {myAdsFilter} adverts right now
+                </p>
+                <p className="text-sm text-slate-600">
+                  When you publish an advert or sell an item, you can manage it right here.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {filteredMyListings.map((ad) => (
+                  <div
+                    key={ad.id}
+                    className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between gap-4 shadow-sm"
+                  >
+                    <div className="flex gap-4">
+                      <img
+                        src={ad.photos?.[0] || findGroupForCategory(ad.category).image}
+                        alt={ad.title}
+                        className="w-24 h-24 rounded-xl object-cover bg-slate-100 shrink-0"
+                      />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <span className="inline-block px-2.5 py-0.5 rounded-lg bg-purple-100 text-purple-900 text-xs font-semibold">
+                          {getCategoryLabel(ad.category, ad.customCategoryName)}
+                        </span>
+                        <h3 className="text-base font-bold text-slate-900 truncate">{ad.title}</h3>
+                        <p className="text-sm font-bold text-slate-900">
+                          {Number(ad.price || 0) > 0 ? formatPrice(ad.price) : 'Ask Seller'}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs font-semibold text-slate-600 pt-1">
+                          <span className="inline-flex items-center gap-1">
+                            <Eye className="w-3.5 h-3.5" /> {Number(ad.viewsCount || 0)} views
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Share2 className="w-3.5 h-3.5" /> {Number(ad.sharesCount || 0)} shares
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => openEditAd(ad)}
+                        className="min-h-[42px] px-3 py-2 bg-sky-50 hover:bg-sky-100 text-sky-900 border border-sky-200 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBoostingAd(ad);
+                          setSelectedPlan(ADVERT_PLANS[1]);
+                          setShowPayment(true);
+                        }}
+                        className="min-h-[42px] px-3 py-2 bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" /> Boost
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShareModalAd(ad)}
+                        className="min-h-[42px] px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Share2 className="w-3.5 h-3.5" /> Share Again
+                      </button>
+
+                      {confirmDeleteId === ad.id ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAdvert(ad.id)}
+                          className="min-h-[42px] px-3 py-2 bg-rose-600 text-white rounded-xl text-xs font-semibold cursor-pointer"
+                        >
+                          Confirm Delete
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(ad.id)}
+                          className="min-h-[42px] px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
-
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Do not close this gateway. Campaign is being registered with 100% data integrity.</p>
-            </motion.div>
-          </motion.div>
+            )}
+          </div>
         )}
-      </AnimatePresence>
 
+        {/* ==================== 6. PROMO MATERIALS ==================== */}
+        {view === 'PROMO' && <EfadoPromoKit user={user} onClose={() => setView('DOOR')} />}
+      </main>
+
+      {/* ==================== PERSISTENT BOTTOM NAVIGATION BAR ==================== */}
+      <nav
+        aria-label="Advert and Sell Navigation"
+        className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 py-2 shadow-lg"
+      >
+        <div className="max-w-3xl mx-auto grid grid-cols-5 gap-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-[46px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            <Home className="w-4 h-4" />
+            <span>Home</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setAdType('ADVERT');
+              setView('DOOR');
+            }}
+            className={`min-h-[46px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold cursor-pointer ${
+              (view === 'DOOR' || view === 'CATEGORY_PREVIEW' || (view === 'FORM' && adType === 'ADVERT'))
+                ? 'bg-purple-100 text-purple-900'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Megaphone className="w-4 h-4" />
+            <span>Advertise</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => startWizard('SELL', ADVERT_GROUPS[0], 'BUSINESS')}
+            className={`min-h-[46px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold cursor-pointer ${
+              view === 'FORM' && adType === 'SELL'
+                ? 'bg-rose-100 text-rose-900'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <ShoppingBag className="w-4 h-4" />
+            <span>Sell</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setView('MY_ADS')}
+            className={`min-h-[46px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold cursor-pointer ${
+              view === 'MY_ADS'
+                ? 'bg-sky-100 text-sky-900'
+                : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <LayoutList className="w-4 h-4" />
+            <span>My Adverts</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenProfile) {
+                onOpenProfile();
+              } else {
+                setShowInlineProfile(true);
+              }
+            }}
+            className="min-h-[46px] flex flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            <UserIcon className="w-4 h-4" />
+            <span>Profile</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ==================== PAID ADVERT PAYMENT WRAPPER (ABOVE HUB Z-INDEX) ==================== */}
       <AnimatePresence>
         {showPayment && selectedPlan && (
-           <PaymentPlatform 
-             user={user}
-             type="deposit"
-             amount={selectedPlan.price}
-             purpose={`Ad Plan: ${selectedPlan.name}`}
-             hub="ADVERTISING"
-             onSuccess={() => {
-               setShowPayment(false);
-               handleCreateAd();
-             }}
-             onCancel={() => setShowPayment(false)}
-             onClose={() => setShowPayment(false)}
-           />
+          <div className="fixed inset-0 z-[120]">
+            <PaymentPlatform
+              user={user}
+              type="deposit"
+              amount={selectedPlan.price}
+              purpose={
+                boostingAd
+                  ? `Boost Advert: ${boostingAd.title} (${selectedPlan.name})`
+                  : `Ad Plan: ${selectedPlan.name}`
+              }
+              hub="ADVERTISING"
+              onSuccess={async () => {
+                setShowPayment(false);
+                if (boostingAd) {
+                  try {
+                    await efadoAdvertApi.boostAdvert(boostingAd.id, user.uid, selectedPlan);
+                    setMyAdsStatusMsg(`"${boostingAd.title}" was boosted for ${selectedPlan.durationDays} days.`);
+                  } catch (err: any) {
+                    setMyAdsStatusMsg(err?.message || 'Not sent, please try again.');
+                  } finally {
+                    setBoostingAd(null);
+                  }
+                } else {
+                  await commitAdvertSave();
+                }
+              }}
+              onCancel={() => {
+                setShowPayment(false);
+                setBoostingAd(null);
+              }}
+              onClose={() => {
+                setShowPayment(false);
+                setBoostingAd(null);
+              }}
+            />
+          </div>
         )}
       </AnimatePresence>
 
+      {/* ==================== CONTACT SELLER MODAL ==================== */}
       <AnimatePresence>
-        {selectedAdForEngagement && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-gray-950/85 backdrop-blur-sm"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden"
-            >
-              <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        {contactAd && (
+          <div className="fixed inset-0 z-[110] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50'} px-3 py-1 rounded-full`}>{selectedAdForEngagement.category}</span>
-                  <h3 className="text-xl font-black text-gray-950 uppercase tracking-tighter italic mt-2">Sovereign Engagement Gate</h3>
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-purple-100 text-purple-900">
+                    {getCategoryLabel(contactAd.category, contactAd.customCategoryName)}
+                  </span>
+                  <h3 className="text-xl font-bold text-slate-900 mt-2">{contactAd.title}</h3>
+                  <p className="text-base font-bold text-indigo-700 mt-0.5">
+                    {Number(contactAd.price || 0) > 0 ? formatPrice(contactAd.price) : 'Ask Seller'}
+                  </p>
                 </div>
-                <button 
-                  onClick={() => setSelectedAdForEngagement(null)}
-                  className="w-10 h-10 bg-white border border-gray-100 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-950 hover:bg-gray-50 transition-all shadow-sm"
+                <button
+                  type="button"
+                  onClick={() => setContactAd(null)}
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-8 space-y-6">
-                <div>
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Target Asset</p>
-                  <p className="text-sm font-black text-gray-950 uppercase">{selectedAdForEngagement.title}</p>
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{selectedAdForEngagement.description}</p>
-                </div>
-
-                {engagementSuccess ? (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="p-6 bg-teal-50 border border-teal-100 rounded-3xl text-center space-y-3"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {contactAd.contact?.phone && (
+                  <a
+                    href={`tel:${contactAd.contact.phone}`}
+                    className="min-h-[48px] px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
                   >
-                    <CheckCircle2 className="w-12 h-12 text-teal-600 mx-auto" />
-                    <h4 className="text-md font-black text-teal-950 uppercase tracking-tight">Transmission Successful</h4>
-                    <p className="text-xs text-teal-800 font-bold uppercase tracking-wide">Your tactical intent has been dispatched to the listed owner. They will align coordinates shortly.</p>
-                    <button 
-                      onClick={() => {
-                        setSelectedAdForEngagement(null);
-                        setEngagementSuccess(false);
-                      }}
-                      className="mt-2 px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white text-[10px] uppercase font-black tracking-widest rounded-xl transition-all shadow-md"
-                    >
-                      Dismiss Portal
-                    </button>
-                  </motion.div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex gap-3">
-                      {selectedAdForEngagement.contact?.phone && (
-                        <a 
-                          href={`tel:${selectedAdForEngagement.contact.phone}`}
-                          className={`flex-1 p-4 bg-gray-50 ${selectedAdForEngagement.type === 'ADVERT' ? 'hover:bg-indigo-50 hover:border-indigo-200' : 'hover:bg-rose-50 hover:border-rose-200'} border border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group`}
-                        >
-                          <Phone className={`w-5 h-5 text-gray-600 group-hover:${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} group-hover:scale-110 transition-all`} />
-                          <span className={`text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:${selectedAdForEngagement.type === 'ADVERT' ? 'text-indigo-600' : 'text-rose-600'} mt-1`}>Direct Call</span>
-                          <span className="text-[10px] font-mono font-bold text-gray-950 mt-1">{selectedAdForEngagement.contact.phone}</span>
-                        </a>
-                      )}
-
-                      {selectedAdForEngagement.contact?.whatsapp && (
-                        <a 
-                          href={`https://wa.me/${selectedAdForEngagement.contact.whatsapp.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 p-4 bg-gray-50 hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 rounded-2xl flex flex-col items-center justify-center text-center gap-1 transition-all group"
-                        >
-                          <MessageCircle className="w-5 h-5 text-gray-600 group-hover:text-emerald-600 group-hover:scale-110 transition-all" />
-                          <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 group-hover:text-emerald-600 mt-1">WhatsApp</span>
-                          <span className="text-[10px] font-mono font-bold text-gray-950 mt-1">{selectedAdForEngagement.contact.whatsapp}</span>
-                        </a>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest block">Dispatch Simulated Intent (Offline Mesh Network)</label>
-                      <textarea 
-                        value={engagementMessage}
-                        onChange={(e) => setEngagementMessage(e.target.value)}
-                        placeholder="Type your strategic inquiry..."
-                        rows={3}
-                        className={`w-full p-4 bg-gray-50 border-2 border-gray-100 focus:border-${selectedAdForEngagement.type === 'ADVERT' ? 'indigo-600' : 'rose-600'} rounded-2xl text-xs font-bold font-mono resize-none focus:outline-none transition-all`}
-                      />
-                    </div>
-
-                    <button 
-                      onClick={() => {
-                        setEngagementSending(true);
-                        setTimeout(() => {
-                          setEngagementSending(false);
-                          setEngagementSuccess(true);
-                        }, 1200);
-                      }}
-                      disabled={!engagementMessage || engagementSending}
-                      className={`w-full py-4 ${selectedAdForEngagement.type === 'ADVERT' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'} text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                    >
-                      {engagementSending ? "Propagating Signal..." : "Transmit Signal"} 
-                      <Zap className="w-4 h-4 text-amber-300" />
-                    </button>
-
-                    <div className="flex items-center gap-2 pt-2">
-                      <button
-                        onClick={() => handleWhatsAppShareAd(selectedAdForEngagement)}
-                        className="flex-1 py-3 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5 text-white" /> Share on WhatsApp
-                      </button>
-                      <button
-                        onClick={() => handleShareAd(selectedAdForEngagement)}
-                        className="flex-1 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-2xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
-                      >
-                        <Share2 className="w-3.5 h-3.5 text-indigo-600" /> Copy Direct Link
-                      </button>
-                    </div>
-                  </div>
+                    <Phone className="w-4 h-4" /> Call {contactAd.contact.phone}
+                  </a>
+                )}
+                {contactAd.contact?.whatsapp && (
+                  <a
+                    href={`https://wa.me/${contactAd.contact.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello! I saw "${contactAd.title}" on EFADO (${getPublicAdvertUrl(contactAd)}).`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-h-[48px] px-4 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" /> WhatsApp Seller
+                  </a>
                 )}
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* Share Toast Banner */}
-      <AnimatePresence>
-        {shareToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-wider shadow-2xl flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-4 h-4 text-white" />
-            <span>{shareToast}</span>
-          </motion.div>
+
+              <form onSubmit={handleSendContactInquiry} className="space-y-3">
+                <label className="text-sm font-semibold text-slate-800 block">
+                  Send a Message on EFADO
+                </label>
+                <textarea
+                  rows={3}
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Write your question for the seller..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm text-slate-900 outline-none focus:border-indigo-500 resize-none"
+                />
+                {contactResult && (
+                  <p className="text-sm font-semibold text-emerald-700">{contactResult}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={contactSending || !contactMessage.trim()}
+                  className="w-full min-h-[46px] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{contactSending ? 'Sending...' : 'Send Message'}</span>
+                </button>
+              </form>
+            </div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* ✨ AI Product & Ad Image Generator Modal */}
+      {/* ==================== SHARE AGAIN MODAL ==================== */}
+      <AnimatePresence>
+        {shareModalAd && (
+          <div className="fixed inset-0 z-[110] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900">
+                  Share &ldquo;{shareModalAd.title}&rdquo;
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShareModalAd(null)}
+                  className="p-2 rounded-xl bg-slate-100 text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <AdvertShareBar ad={shareModalAd} />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== TOP "SHARE EFADO" MODAL ==================== */}
+      <AnimatePresence>
+        {showEfadoShareModal && (
+          <div className="fixed inset-0 z-[110] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Share EFADO With Friends</h3>
+                  <p className="text-xs text-slate-600">
+                    Invite buyers and business owners to EFADO Promote or Sell
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEfadoShareModal(false)}
+                  className="p-2 rounded-xl bg-slate-100 text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <AdvertShareBar
+                ad={{
+                  id: 'efado-platform',
+                  slug: 'efado-platform',
+                  title: 'Promote or Sell on EFADO',
+                  price: 0,
+                  location: { city: 'Lagos', state: 'Nigeria', address: 'EFADO Hubs Connect' },
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== INLINE PROFILE FALLBACK MODAL ==================== */}
+      <AnimatePresence>
+        {showInlineProfile && (
+          <div className="fixed inset-0 z-[110] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-900">My Account</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowInlineProfile(false)}
+                  className="p-2 rounded-xl bg-slate-100 text-slate-600 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 space-y-1">
+                <p className="text-base font-bold text-slate-900">
+                  {user?.fullName || user?.displayName || 'EFADO Member'}
+                </p>
+                <p className="text-xs text-slate-700">{user?.email || user?.phoneNumber}</p>
+                <p className="text-sm font-semibold text-indigo-800 pt-2">
+                  Deposit Wallet: {formatPrice(user?.depositWallet || 0)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInlineProfile(false);
+                    setView('MY_ADS');
+                  }}
+                  className="flex-1 min-h-[44px] bg-slate-900 text-white rounded-xl text-sm font-semibold cursor-pointer"
+                >
+                  My Adverts ({myListings.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInlineProfile(false);
+                    onNavigate?.('DASHBOARD');
+                  }}
+                  className="flex-1 min-h-[44px] bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-xl text-sm font-semibold cursor-pointer"
+                >
+                  Open Wallet
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ==================== AI AD PHOTO GENERATOR MODAL ==================== */}
       <AnimatePresence>
         {showAiImageModal && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="max-w-lg w-full bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 space-y-5 text-white shadow-2xl relative"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+            <div className="max-w-lg w-full bg-white border border-purple-200 rounded-3xl p-6 space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-purple-600/20 border border-purple-400/40 flex items-center justify-center text-purple-400">
+                  <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center">
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-black text-sm uppercase text-white flex items-center gap-2">
-                      AI Ad Photo Generator
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-500/40">AI Powered</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-400">{dailyUsage.usageText}</p>
+                    <h3 className="font-bold text-base text-slate-900">AI Ad Photo Generator</h3>
+                    <p className="text-xs text-slate-600">{dailyUsage.usageText}</p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowAiImageModal(false)}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                  className="p-2 rounded-xl bg-slate-100 text-slate-600 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {aiAdError && (
-                <div className="p-3 bg-rose-950/60 border border-rose-500/30 rounded-xl text-rose-300 text-xs">
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold">
                   {aiAdError}
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-slate-300">Listing or Product Ad Brief</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-800 block">
+                  Describe the photo you want to create
+                </label>
                 <textarea
                   value={aiAdPrompt}
                   onChange={(e) => setAiAdPrompt(e.target.value)}
-                  placeholder="e.g. Modern Toyota SUV in showroom, dramatic cinematic lighting, billboard advertisement quality"
+                  placeholder="e.g. Clean leather shoes displayed neatly on a bright wooden table"
                   rows={3}
-                  className="w-full bg-slate-950 border border-white/10 rounded-2xl p-3 text-xs text-white placeholder:text-slate-600 focus:border-purple-500 outline-none resize-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-sm text-slate-900 outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
 
               <button
+                type="button"
                 onClick={async () => {
                   if (!aiAdPrompt.trim()) return;
                   setIsGeneratingAiAd(true);
@@ -1879,46 +2373,46 @@ export const EfadoAdvertisingHub: React.FC<EfadoAdvertisingHubProps> = ({ user, 
                   if (res.success && res.imageUrl) {
                     setAiGeneratedAdImg(res.imageUrl);
                   } else {
-                    setAiAdError(res.error || 'Failed to synthesize advertisement visual.');
+                    setAiAdError(res.error || 'Could not create photo right now.');
                   }
                   setIsGeneratingAiAd(false);
                 }}
                 disabled={isGeneratingAiAd || !aiAdPrompt.trim()}
-                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-purple-600/30"
+                className="w-full min-h-[46px] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold text-sm rounded-xl cursor-pointer"
               >
-                {isGeneratingAiAd ? 'Synthesizing with Gemini...' : 'Generate Ad Visual Now'}
+                {isGeneratingAiAd ? 'Creating Photo...' : 'Create Photo Now'}
               </button>
 
               {aiGeneratedAdImg && (
                 <div className="space-y-3 pt-2">
-                  <div className="w-full h-48 bg-slate-950 rounded-2xl overflow-hidden border border-purple-500/30 flex items-center justify-center">
+                  <div className="w-full h-48 bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center">
                     <img src={aiGeneratedAdImg} alt="AI Ad Visual" className="h-full object-contain" />
                   </div>
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={() => {
-                        setFormData((prev: any) => ({
+                        setFormData((prev) => ({
                           ...prev,
-                          photos: [...prev.photos, aiGeneratedAdImg]
+                          photos: [...prev.photos, aiGeneratedAdImg].slice(0, 4),
                         }));
                         setShowAiImageModal(false);
-                        alert('Visual added directly to your advert photo catalog!');
                       }}
-                      className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                      className="flex-1 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Attach to Ad
+                      <Plus className="w-4 h-4" /> Use This Photo
                     </button>
                     <a
                       href={aiGeneratedAdImg}
                       download="efado-ad-photo.png"
-                      className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5"
+                      className="flex-1 min-h-[44px] bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-semibold text-sm flex items-center justify-center gap-1.5"
                     >
-                      <Download className="w-3.5 h-3.5" /> Download
+                      <Download className="w-4 h-4" /> Download
                     </a>
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>

@@ -500,8 +500,8 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
         jobId: selectedJob.id,
         jobTitle: selectedJob.title,
         freelancerId: user.uid,
-        freelancerName: freelancerProfile?.displayName || user.displayName || 'Tactical Freelancer',
-        freelancerTitle: freelancerProfile?.title || 'Expert Agent',
+        freelancerName: freelancerProfile?.displayName || user.displayName || 'Freelancer',
+        freelancerTitle: freelancerProfile?.title || 'Verified Specialist',
         freelancerRating: freelancerProfile?.rating || 5,
         coverLetter: proposalCover,
         bidAmount: Number(proposalAmount),
@@ -890,7 +890,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
               EFADOworks <span className="text-fuchsia-700">Online</span>
             </h1>
             <p className="text-slate-700 text-sm font-semibold">
-              E-fado's decentralized professional hub connecting tactical experts with strategic clients.
+              EFADOworks brings together skilled freelancers and clients with safe escrow protection.
             </p>
           </div>
 
@@ -969,7 +969,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
                   <Briefcase className="w-7 h-7 text-indigo-600" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase group-hover:text-indigo-600 transition-colors">Manifest as Freelancer</h3>
+                <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase group-hover:text-indigo-600 transition-colors">Join as a Freelancer</h3>
                 <p className="text-slate-600 text-xs font-semibold leading-relaxed mb-6">
                   Offer professional skills, bid on posted jobs, submit milestone deliverables, and receive secure payouts immediately.
                 </p>
@@ -987,7 +987,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                 <div className="w-14 h-14 rounded-2xl bg-fuchsia-50 border border-fuchsia-100 flex items-center justify-center mb-6 group-hover:scale-110 transition-all">
                   <User className="w-7 h-7 text-fuchsia-600" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase group-hover:text-fuchsia-600 transition-colors">Manifest as Client</h3>
+                <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase group-hover:text-fuchsia-600 transition-colors">Hire as a Client</h3>
                 <p className="text-slate-600 text-xs font-semibold leading-relaxed mb-6">
                   Post high-skill projects, invite bids, hire world-class talent, configure escrow milestones, and secure delivery.
                 </p>
@@ -1307,7 +1307,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                     )) : (
                       <div className="col-span-2 py-20 text-center border-2 border-dashed border-slate-300 bg-white/50 rounded-[3rem]">
                         <Briefcase className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                        <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Scanning open project nodes...</p>
+                        <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Loading open projects...</p>
                       </div>
                     )}
                   </div>
@@ -1374,8 +1374,8 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                 >
                   <div className="p-8 rounded-[2.5rem] bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl space-y-6">
                     <div className="border-b border-slate-100 pb-4">
-                      <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">Deploy Freelance Project Node</h3>
-                      <p className="text-slate-600 text-xs font-semibold mt-1">Specify parameters to broadcast your project to our vetted freelancer network.</p>
+                      <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">Post a Freelance Job</h3>
+                      <p className="text-slate-600 text-xs font-semibold mt-1">Share your project details with verified freelancers on EFADOworks.</p>
                     </div>
 
                     <form onSubmit={handlePostJob} className="space-y-6">
@@ -1657,7 +1657,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                             onClick={() => setShowProposalForm(true)}
                             className="px-8 py-3.5 bg-gradient-to-r from-fuchsia-600 to-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-md hover:opacity-95"
                           >
-                            Submit Tactical Proposal
+                            Submit Proposal
                           </button>
                         ) : (
                           <motion.form 
@@ -1770,7 +1770,7 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
                       {jobBids.length === 0 && (
                         <div className="py-12 text-center border-2 border-dashed border-slate-300 bg-white/50 rounded-[3rem]">
                           <MessageSquare className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                          <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Awaiting tactical bid submissions...</p>
+                          <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Waiting for freelancer proposals...</p>
                         </div>
                       )}
                     </div>
@@ -2068,8 +2068,8 @@ export const EfadoworksOnline: React.FC<EfadoworksOnlineProps> = ({ user }) => {
               <X className="w-5 h-5" />
             </button>
             <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">Onboard Freelance Talent Profile</h3>
-              <p className="text-slate-600 text-xs font-semibold mt-1">Specify your professional details to manifest on the community network.</p>
+              <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">Create Your Freelancer Profile</h3>
+              <p className="text-slate-600 text-xs font-semibold mt-1">Add your skills and experience to get hired by clients.</p>
             </div>
             
             <form onSubmit={handleOnboardFreelancer} className="space-y-4">

@@ -65,7 +65,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
       setMode('CAMERA');
     } catch (err) {
       console.error("Camera access failed:", err);
-      alert("Please allow camera permissions to create tactical reels.");
+      alert("Please allow camera access to record short reels.");
     }
   };
 
@@ -168,7 +168,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
       setMode('EDIT');
     } catch (err) {
       console.error("AI Generation failed:", err);
-      setCaption(`Manifesting: ${aiPrompt} 🚀 #EFADO #AI`);
+      setCaption(`${aiPrompt} 🚀 #EFADO #Reels`);
       setVideoUrl('https://videos.pexels.com/video-files/3163534/3163534-uhd_2160_3840_30fps.mp4');
       setMode('EDIT');
     } finally {
@@ -184,7 +184,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
       setCaption(text);
     } catch (err) {
       console.error("AI Generation failed:", err);
-      setCaption("Tactical flow engaged. 🚀 #EFADO #ViralGist #Reels");
+      setCaption("New reel shared on EFADO. 🚀 #EFADO #ViralGist #Reels");
     } finally {
       setIsGeneratingCaption(false);
     }
@@ -192,7 +192,7 @@ export const ReelCreator: React.FC<ReelCreatorProps> = ({ user, onClose, onPost 
 
   const performChunkedUpload = async (blob: Blob, filename: string) => {
     try {
-      setUploadStatusText('Transmitting video chunks via EFADO streaming protocol...');
+      setUploadStatusText('Uploading video chunks to EFADO...');
       const CHUNK_SIZE = 1024 * 1024; // 1 MB chunk slices
       const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
       const uploadId = `reel_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;

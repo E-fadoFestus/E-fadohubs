@@ -145,7 +145,7 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] px-2">Navigation</h3>
               {[
-                { id: 'ALL', label: 'All Protocols', icon: Globe },
+                { id: 'ALL', label: 'All Items', icon: Globe },
                 { id: 'EXAM_CARDS', label: 'Academic Pins', icon: Tag },
                 { id: 'GIFT_CARDS', label: 'Gift Assets', icon: Gift },
                 { id: 'AIRTIME_DATA', label: 'Network Data', icon: Wifi },
@@ -181,8 +181,8 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
           <div className="max-w-6xl mx-auto space-y-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div>
-                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase mb-2">Available Assets</h2>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Operational Exchange Nodes</p>
+                <h2 className="text-3xl font-black text-white italic tracking-tighter uppercase mb-2">Available Items</h2>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Verified Vendor Listings</p>
               </div>
               
               <div className="relative w-full md:w-96">
@@ -252,7 +252,7 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
           <div className="mb-10 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <ShoppingBag className="w-5 h-5 text-indigo-400" />
-              <h3 className="text-sm font-black text-white uppercase tracking-widest">Protocol Cart</h3>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest">Your Cart</h3>
             </div>
             <span className="px-3 py-1 bg-indigo-600 rounded-full text-[10px] font-black text-white">{cart.length}</span>
           </div>
@@ -330,8 +330,8 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
                      <div className="w-16 h-16 bg-slate-950 rounded-3xl flex items-center justify-center text-white shadow-2xl mb-8">
                         <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                      </div>
-                     <h2 className="text-4xl font-black italic tracking-tighter uppercase mb-2">Final Clearance</h2>
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-10">Transaction protocol ready for deployment</p>
+                     <h2 className="text-4xl font-black italic tracking-tighter uppercase mb-2">Final Confirmation</h2>
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-10">Your order is ready to confirm</p>
 
                      <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 space-y-4 mb-10">
                         <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-slate-400">
@@ -344,7 +344,7 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
                         </div>
                         <div className="h-0.5 bg-slate-200 w-full" />
                         <div className="flex justify-between items-center text-sm font-black uppercase tracking-widest">
-                           <span>Tactical Balance</span>
+                           <span>Remaining Balance</span>
                            <span className="text-indigo-600">₦{(user.depositWallet - totalAmount).toLocaleString()}</span>
                         </div>
                      </div>
@@ -354,19 +354,19 @@ export const VendorMarketplace: React.FC<{ user: UserProfile; onClose: () => voi
                           onClick={() => setShowCheckout(false)}
                           className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-200 transition-all"
                         >
-                          Abort
+                          Cancel
                         </button>
                         <button 
                           onClick={() => {
                             // Logic for successful exchange
-                            alert(`SUCCESS: Assets deployed to terminal. Operation ID: EFX-${Math.random().toString(36).substring(7).toUpperCase()}`);
+                            alert(`SUCCESS: Order completed. Reference ID: EFX-${Math.random().toString(36).substring(7).toUpperCase()}`);
                             setShowCheckout(false);
                             setCart([]);
                             onClose();
                           }}
                           className="flex-3 py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-indigo-100 hover:bg-indigo-500 transition-all hover:scale-[1.02] active:scale-95"
                         >
-                          Confirm Tactical Purchase
+                          Confirm Purchase
                         </button>
                      </div>
                   </div>

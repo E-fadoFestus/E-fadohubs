@@ -108,13 +108,13 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
     }
   }, [isBroadcasting, isScreenSharing]);
   
-  // Mock participants
+  // Meeting participants
   const [participants] = useState<Participant[]>([
-    { id: 'host', name: hostName, avatar: `https://picsum.photos/seed/${hostName}/200/200`, isHost: true, isSpeaker: true },
-    { id: '2', name: 'Dr. Sarah Amadi', avatar: 'https://picsum.photos/seed/sarah/200/200', isSpeaker: true },
-    { id: '3', name: 'Engr. Mike', avatar: 'https://picsum.photos/seed/mike/200/200' },
-    { id: '4', name: 'Sister Grace', avatar: 'https://picsum.photos/seed/grace/200/200' },
-    { id: '5', name: 'Brother John', avatar: 'https://picsum.photos/seed/john/200/200' },
+    { id: 'host', name: hostName, avatar: '', isHost: true, isSpeaker: true },
+    { id: '2', name: 'Dr. Sarah Amadi', avatar: '', isSpeaker: true },
+    { id: '3', name: 'Engr. Mike', avatar: '' },
+    { id: '4', name: 'Sister Grace', avatar: '' },
+    { id: '5', name: 'Brother John', avatar: '' },
   ]);
 
   useEffect(() => {
@@ -206,7 +206,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
     // Add beautiful styled alert inside messages
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      sender: "Synergy Protocol",
+      sender: "Session Update",
       text: `🎉 You contributed ₦${amount.toLocaleString()}! Message: "${giftMsg}"`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isSystem: true,
@@ -216,7 +216,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
 
     // Show golden floating banner overlay
     setGiftBanner({
-      sender: "You (Candidate)",
+      sender: "You",
       amount: amount,
       message: giftMsg
     });
@@ -230,7 +230,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
       setGiftBanner(null);
     }, 5500);
 
-    // Simulate random other candidates contributing occasionally to make the system feel alive
+    // Simulate other participants contributing
     setTimeout(() => {
       const otherNames = ["Sarah", "Engr. Mike", "Brother John", "Chinedu", "Amina"];
       const randomName = otherNames[Math.floor(Math.random() * otherNames.length)];
@@ -238,7 +238,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
-        sender: "Synergy Protocol",
+        sender: "Session Update",
         text: `🎉 ${randomName} contributed ₦${randomAmt.toLocaleString()}!`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isSystem: true,
@@ -283,7 +283,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
 
         <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-2xl border border-white/5">
            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{onlineCount} Active Patrons</span>
+           <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">{onlineCount} Active Attendees</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -308,13 +308,13 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
             
             {/* Host Banner Overlay */}
             <div className="absolute top-6 left-6 z-10 flex items-center gap-3 bg-slate-900/80 backdrop-blur-md p-3 rounded-2xl border border-white/10">
-               <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-[#DAA520]">
-                  <img src={`https://picsum.photos/seed/${hostName}/100/100`} alt={hostName} className="w-full h-full object-cover" />
+               <div className="w-10 h-10 rounded-xl overflow-hidden border-2 border-[#DAA520] bg-indigo-600 flex items-center justify-center text-white font-black text-sm">
+                  {hostName.charAt(0).toUpperCase()}
                </div>
                <div>
                   <p className="text-[10px] font-black uppercase tracking-tighter">{hostName}</p>
                   <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-                    <Award className="w-3 h-3" /> Strategic Host
+                    <Award className="w-3 h-3" /> Session Host
                   </p>
                </div>
             </div>
@@ -327,8 +327,8 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
                        <Share2 className="w-16 h-16 text-indigo-500 animate-pulse" />
                        <div className="absolute -top-3 -right-3 px-3 py-1 bg-indigo-600 rounded-lg text-[8px] font-black uppercase tracking-widest">Live Sharing</div>
                     </div>
-                    <h3 className="text-2xl font-black uppercase tracking-widest text-white">System Feed Integrated</h3>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Propagating tactical screen data to all nodes</p>
+                    <h3 className="text-2xl font-black uppercase tracking-widest text-white">Screen Share Active</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-2">Sharing host screen with everyone in this room</p>
                  </div>
                ) : youtubeLink ? (
                  <div className="w-full h-full">
@@ -347,8 +347,8 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
                       <div className="relative text-center p-6 bg-slate-950/80 backdrop-blur-md rounded-3xl border border-white/5 max-w-sm">
                          <Tv className="w-12 h-12 text-[#DAA520] mx-auto mb-3 animate-pulse" />
                          <h3 className="text-xs font-black uppercase tracking-wider text-rose-500">Broadcasting Off</h3>
-                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-2 leading-relaxed">
-                           Tactical screen synchronization terminated. Waiting for the Host to initiate the transmission stream.
+                         <p className="text-[10px] text-slate-400 font-semibold mt-2 leading-relaxed">
+                           Screen sharing is paused. Waiting for the host to start presenting.
                          </p>
                          <button 
                            onClick={() => setIsBroadcasting(true)}
@@ -362,11 +362,11 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
                          
                          <div className="flex items-center justify-between mb-4">
-                            <span className="text-[7.5px] font-black tracking-widest uppercase bg-indigo-600/15 text-indigo-400 px-2.5 py-1 rounded-full border border-indigo-500/20 flex items-center gap-1.5 animate-pulse">
-                              <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" /> Simulated Slide Deck
+                            <span className="text-[8px] font-bold tracking-wider uppercase bg-indigo-600/15 text-indigo-400 px-2.5 py-1 rounded-full border border-indigo-500/20">
+                              Live Slides
                             </span>
-                            <span className="text-[7.5px] font-black tracking-widest text-[#DAA520] uppercase border border-[#DAA520]/20 px-2 py-0.5 rounded-md">
-                              EFADO ACADEMY PROTOCOL
+                            <span className="text-[8px] font-bold tracking-wider text-[#DAA520] uppercase border border-[#DAA520]/20 px-2 py-0.5 rounded-md">
+                              EFADO ACADEMY
                             </span>
                          </div>
 
@@ -546,22 +546,22 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
                       </div>
                       {isVoiceRecording && (
                         <div className="absolute -top-12 left-0 right-0 py-2 bg-rose-500 text-white rounded-xl text-center animate-pulse">
-                           <p className="text-[10px] font-black uppercase tracking-widest">Recording Tactical Audio...</p>
+                           <p className="text-[10px] font-black uppercase tracking-widest">Recording Voice Note...</p>
                         </div>
                       )}
                    </div>
                 </div>
               )}
 
-              {/* Patrons list tab */}
+              {/* Participants list tab */}
               {sidebarTab === 'PATRONS' && (
                 <div className="flex-grow p-6 overflow-y-auto space-y-4">
-                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Active Presence Intelligence</p>
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Active Participants</p>
                    {participants.map(p => (
                      <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                         <div className="flex items-center gap-4">
-                           <div className="w-12 h-12 rounded-xl overflow-hidden">
-                              <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                           <div className="w-12 h-12 rounded-xl overflow-hidden bg-indigo-600/30 border border-indigo-500/30 flex items-center justify-center text-white font-black text-sm">
+                              {p.avatar ? <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" /> : p.name.charAt(0).toUpperCase()}
                            </div>
                            <div>
                               <p className="text-xs font-black uppercase tracking-tight">{p.name}</p>
@@ -649,9 +649,9 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
                 <div className="flex-grow p-6 overflow-y-auto space-y-5 scrollbar-hide text-left">
                    <div className="text-center p-4 bg-gradient-to-br from-indigo-950/40 to-slate-950/80 rounded-2xl border border-white/5">
                       <Coins className="w-10 h-10 text-[#DAA520] mx-auto mb-2 animate-bounce" />
-                      <h4 className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Faculty Support Node</h4>
-                      <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-1 leading-relaxed">
-                        Send token inputs to appreciate faculty efforts and support stream hosting architecture.
+                      <h4 className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Support Speaker</h4>
+                      <p className="text-[9px] font-medium text-slate-400 mt-1 leading-relaxed">
+                        Send a tip to appreciate the host and support this session.
                       </p>
                    </div>
 
@@ -816,7 +816,7 @@ export const EfadoZoom: React.FC<EfadoZoomProps> = ({
             />
          </div>
          <span className={`text-[7px] font-black uppercase tracking-widest transition-colors ${networkLatency > 100 ? 'text-rose-500' : networkLatency > 50 ? 'text-amber-500' : 'text-slate-600'}`}>
-           Synch Latency: {networkLatency}ms • Tactical Speed: Optimal
+           Connection Latency: {networkLatency}ms • Status: Good
          </span>
       </div>
 

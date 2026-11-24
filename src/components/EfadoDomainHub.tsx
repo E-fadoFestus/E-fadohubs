@@ -439,7 +439,7 @@ const GLOBAL_VENDING_COUNTRIES: Country[] = [
         plans: [
           { id: 'saf_ke_1', name: '1GB Daily Safaricom Pass', priceNGN: 900, priceUSD: 0.60, dataAllowance: '1 GB', validity: '24 Hours' },
           { id: 'saf_ke_2', name: '8GB Weekly Max Extra', priceNGN: 2800, priceUSD: 1.85, dataAllowance: '8 GB', validity: '7 Days' },
-          { id: 'saf_ke_3', name: '30GB Monthly Sovereign', priceNGN: 7500, priceUSD: 5.00, dataAllowance: '30 GB', validity: '30 Days' }
+          { id: 'saf_ke_3', name: '30GB Monthly Super', priceNGN: 7500, priceUSD: 5.00, dataAllowance: '30 GB', validity: '30 Days' }
         ]
       },
       {
@@ -816,7 +816,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
       } else if (selectedPlan === 'vip') {
         totalCostNGN = 65000;
         totalCostUSD = 43;
-        courseName = 'Sovereign VIP Mentorship & AI Automation';
+        courseName = 'VIP Mentorship & AI Automation';
       }
       
       if (paymentMethod === 'win_wallet' || paymentMethod === 'deposit_wallet') {
@@ -3638,7 +3638,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                         <div>
                           <div className="flex items-center justify-between">
                             <span className="text-[9px] font-black uppercase tracking-wider bg-purple-950 text-purple-400 border border-purple-800/40 px-3 py-1 rounded-full">
-                              Sovereign VIP Elite
+                              VIP Elite Plan
                             </span>
                             <span className="text-[10px] font-mono text-purple-300 font-bold">1-on-1 Mentorship</span>
                           </div>
@@ -3795,7 +3795,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                         </div>
 
                         <div className="pt-6 border-t border-slate-50 mt-6 flex items-center justify-between">
-                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">Sovereign Source</span>
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">Verified Tool</span>
                           <button
                             type="button"
                             onClick={() => window.open(tool.link, '_blank')}
@@ -4703,10 +4703,10 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                       <div className="space-y-2">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500/15 border border-emerald-500/20 rounded-full">
                           <Coins className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Efado Sovereign OTC Pipeline</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">EFADO OTC Exchange</span>
                         </div>
                         <h2 className="text-3xl md:text-4xl font-black tracking-tight uppercase">
-                          Sovereign Crypto <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-400">OTC Desk</span> & Convert Hub
+                          Crypto <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-400">OTC Desk</span> & Convert Hub
                         </h2>
                         <p className="text-xs text-slate-400 font-medium max-w-2xl leading-relaxed">
                           Exchange tokens for local fiat or global bank transfers instantly with instant rate quotes, dual liquidity provider bridges, and 100% compliant secure custody.
@@ -5024,7 +5024,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                               <div className="bg-indigo-50/70 border border-indigo-150 p-4 rounded-xl flex items-start gap-3">
                                 <Coins className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
                                 <div>
-                                  <h4 className="text-[10px] font-black text-indigo-950 uppercase tracking-wider">CEO / Admin Brokerage Protocol Rules</h4>
+                                  <h4 className="text-[10px] font-black text-indigo-950 uppercase tracking-wider">Platform Fee Information</h4>
                                   <p className="text-[10px] text-indigo-700 leading-relaxed font-semibold mt-0.5">
                                     The 5.0% service charge goes directly to the EFADO platform treasury settlement ledger for processing and liquidity. This is clearly shown and deducted before payout dispatch.
                                   </p>
@@ -5086,7 +5086,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                 <div className="md:col-span-8 space-y-4">
                                   <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 text-white space-y-2">
                                     <div className="flex justify-between items-center text-[9px] uppercase tracking-wider font-bold text-slate-400">
-                                      <span>Transfer Network Protocol</span>
+                                      <span>Transfer Network</span>
                                       <span className="text-emerald-400 font-bold font-mono">
                                         {otcTokens.find(t => t.symbol === otcSellCrypto)?.chain || 'ERC-20 / TRC-20 Network'}
                                       </span>
@@ -5244,7 +5244,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                   <span className="text-[11px] font-black text-emerald-700 font-mono tracking-wide">
                                     {otcConfirmations === 0 && otcProgress === 0 && 'Waiting Payout Confirmation'}
                                     {otcProgress > 0 && otcProgress < 100 && `${otcConfirmations}/3 Blocks Validated`}
-                                    {otcProgress >= 100 && 'Sovereign Dispatch Complete ✓'}
+                                    {otcProgress >= 100 && 'Transfer Complete ✓'}
                                   </span>
                                 </div>
 
@@ -5294,7 +5294,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                           sourceAmount: `${otcSellAmount} ${otcSellCrypto}`,
                                           targetAmount: `${cleanDispatchVal.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${otcGetCurrency}`,
                                           fee: `${splitRoyalty.toLocaleString(undefined, { minimumFractionDigits: 2 })} ${otcGetCurrency} (5%)`,
-                                          recipient: `${otcPayoutMethod === 'bank' ? (otcBankName || 'Traditional Bank') + ' ****' + (otcBankAccount.slice(-4) || '1589') : otcPayoutMethod === 'paypal' ? otcEmailAddress : (otcBankAccount || 'Sovereign Wallet')}`,
+                                          recipient: `${otcPayoutMethod === 'bank' ? (otcBankName || 'Traditional Bank') + ' ****' + (otcBankAccount.slice(-4) || '1589') : otcPayoutMethod === 'paypal' ? otcEmailAddress : (otcBankAccount || 'EFADO Wallet')}`,
                                           status: 'Settled',
                                           txHash: '0x' + Math.random().toString(16).substr(2, 24)
                                         };
@@ -5595,7 +5595,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                   </span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span>5.0% Admin Protocol Royalty Fee:</span>
+                                  <span>5.0% Platform Service Fee:</span>
                                   <span className="font-bold text-indigo-600 font-mono">{(convAmount * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })} {convSourceCurrency} (Platform Fee)</span>
                                 </div>
                                 <div className="flex justify-between">
@@ -5625,7 +5625,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                             <h3 className="text-lg font-black uppercase tracking-tight text-slate-900 flex items-center gap-2">
                               <Activity className="w-5 h-5 text-indigo-600" />
-                              Sovereign Transfer Audit Logs
+                              Transfer History & Logs
                             </h3>
                             <span className="text-[10px] bg-slate-200 text-slate-600 px-3 py-1 rounded-full font-black font-mono">SECURE HISTORY</span>
                           </div>
@@ -5658,7 +5658,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                                     <p className="font-black font-mono text-emerald-600 mt-0.5">{order.targetAmount}</p>
                                   </div>
                                   <div className="col-span-2 md:col-span-1">
-                                    <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Protocol royalty Paid</p>
+                                    <p className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Platform Fee Paid</p>
                                     <p className="font-bold font-mono text-indigo-600 mt-0.5">{order.fee}</p>
                                   </div>
                                   <div className="col-span-2">
@@ -5694,7 +5694,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                       <div className="bg-slate-50 border border-slate-200/80 p-6 rounded-[2rem] shadow-lg space-y-4">
                         <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 pb-2 border-b border-slate-200 flex items-center gap-2">
                           <Lock className="w-4 h-4 text-emerald-500" />
-                          Sovereign Compliance & Custody
+                          Compliance & Security
                         </h4>
 
                         <div className="space-y-3.5">
@@ -6251,7 +6251,7 @@ export const EfadoDomainHub: React.FC<EfadoDomainHubProps> = ({ user, initialSec
                         {isEnrolling ? (
                           <>
                             <Zap className="w-4 h-4 animate-spin" />
-                            Authorizing Sovereign Link...
+                            Confirming Registration...
                           </>
                         ) : (
                           <>

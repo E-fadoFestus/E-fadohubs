@@ -449,42 +449,33 @@ export const EfadoCosmicWelcome: React.FC<EfadoCosmicWelcomeProps> = ({
           One ID. Ten Hubs. Endless Possibilities.
         </h2>
 
-        {/* Description: Tired of Multiple login? ... */}
-        <div className="mt-2.5 mb-8 text-center max-w-xl mx-auto space-y-0.5">
+        {/* Description */}
+        <div className="mt-2.5 mb-8 text-center max-w-xl mx-auto space-y-1">
           <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed m-0">
-            Tired of Multiple login? One connection, one account profile Wallet.
-          </p>
-          <p className="text-xs sm:text-sm text-cyan-200/90 font-semibold tracking-wide m-0">
-            EFADO Nexus of connectivity Hubs.
+            Sign in once to access all 10 hubs and manage everything from one central wallet.
           </p>
         </div>
 
-        {/* 10 Sovereign Hubs Cards Grid (2 rows x 5 columns) */}
+        {/* 10 Hubs Cards Grid (2 rows x 5 columns on desktop) */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
           {HUBS_LIST.map((hub) => (
             <div
               key={hub.id}
               onClick={() => handleCardClick(hub)}
-              className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-slate-950/70 backdrop-blur-xl border ${hub.borderColor} shadow-xl ${hub.glowColor} ${hub.bgGlow} transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1 cursor-pointer overflow-hidden active:scale-95`}
+              className={`group relative flex flex-col items-center text-center p-4 sm:p-5 rounded-2xl bg-slate-950/75 backdrop-blur-xl border ${hub.borderColor} shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer overflow-hidden active:scale-95 h-full`}
             >
-              {/* Subtle card top glow highlight */}
-              <div 
-                className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"
-                style={{ backgroundColor: hub.color }}
-              />
-
               {/* Hub Icon */}
-              <div className="mb-3 transition-transform duration-300 group-hover:scale-110">
+              <div className="mb-3 transition-transform duration-200 group-hover:scale-105">
                 {renderIcon(hub.iconType)}
               </div>
 
               {/* Hub Title */}
-              <h3 className="text-sm sm:text-base font-black text-white tracking-tight group-hover:text-cyan-200 transition-colors leading-tight mb-1">
+              <h3 className="text-sm sm:text-base font-bold text-white tracking-tight group-hover:text-cyan-200 transition-colors leading-tight mb-1">
                 {hub.name}
               </h3>
 
               {/* Hub Subtitle */}
-              <p className="text-[11px] sm:text-xs text-slate-400 font-medium group-hover:text-slate-200 transition-colors leading-snug m-0">
+              <p className="text-xs text-slate-300 font-normal group-hover:text-slate-100 transition-colors leading-snug m-0">
                 {hub.sub}
               </p>
 
@@ -583,9 +574,9 @@ export const EfadoCosmicWelcome: React.FC<EfadoCosmicWelcomeProps> = ({
       </div>
 
       {/* Footer Branding Line */}
-      <div className="relative z-20 w-full py-3 text-center border-t border-white/5 bg-slate-950/60 backdrop-blur-md">
-        <p className="text-[11px] text-slate-500 font-medium tracking-wider m-0">
-          EFADO Sovereign Ecosystem © 2026 • 1-ID Fast Digital Portal • Secured with Dual-Key Architecture
+      <div className="relative z-20 w-full py-3 text-center border-t border-white/10 bg-slate-950/70 backdrop-blur-md">
+        <p className="text-xs text-slate-400 m-0">
+          EFADO Hubs Connect &copy; 2026 • One Account for All Services
         </p>
       </div>
 
@@ -730,8 +721,8 @@ export const EfadoCosmicWelcome: React.FC<EfadoCosmicWelcomeProps> = ({
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-black text-white">CEO Sovereign Terminal</h3>
-                <p className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Dual-Key Clearance Protocol</p>
+                <h3 className="text-lg font-bold text-white">CEO Portal Sign In</h3>
+                <p className="text-xs text-amber-400 font-semibold">Two-step admin verification</p>
               </div>
             </div>
 
@@ -745,37 +736,37 @@ export const EfadoCosmicWelcome: React.FC<EfadoCosmicWelcomeProps> = ({
             {!otpStep ? (
               <form onSubmit={onAdminSubmit} className="space-y-4 text-left">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Sovereign Email</label>
+                  <label className="text-xs font-semibold text-slate-300">Admin Email</label>
                   <input
                     type="email"
                     required
-                    placeholder="festdanemh@gmail.com"
+                    placeholder="Enter admin email"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-wider text-slate-400">Sovereign Password</label>
+                  <label className="text-xs font-semibold text-slate-300">Admin Password</label>
                   <input
                     type="password"
                     required
                     placeholder="••••••••••••"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black uppercase tracking-wider text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20 active:scale-95"
+                  className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors shadow-lg active:scale-95"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Request Authorization</span>
+                  <span>Continue to Verification</span>
                 </button>
-                <p className="text-[10px] text-slate-500 text-center font-mono">
-                  Admin clearance required. Use password EFADO_CEO_2026 or registered CEO terminal.
+                <p className="text-xs text-slate-400 text-center">
+                  Authorized administrators only.
                 </p>
               </form>
             ) : (

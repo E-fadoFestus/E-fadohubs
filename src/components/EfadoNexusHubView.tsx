@@ -98,7 +98,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
     },
     { 
       id: 'tactical-hq', 
-      name: 'Tactical HQ Syndicate', 
+      name: 'Community HQ Group', 
       status: '12 active', 
       isOnline: true, 
       dp: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=150&auto=format&fit=crop&q=80',
@@ -172,8 +172,8 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       id: 'm2',
       senderId: 'user',
       senderName: user.displayName || 'You',
-      senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
-      content: 'Testing deep linking and voice masking capabilities on EFADO Nexus Hub.',
+      senderDp: user.photoURL || '',
+      content: 'Testing deep linking and voice masking features on EFADO Nexus Hub.',
       timestamp: '10:15 AM',
       isSelf: true,
       reactions: { '👍': 2 }
@@ -183,7 +183,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       senderId: 'sarah',
       senderName: 'Dr. Sarah (Lead AI Eng)',
       senderDp: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      content: 'Here is the tactical architectural package and video stream archive.',
+      content: 'Here is the updated platform guide and video stream archive.',
       timestamp: '10:16 AM',
       isSelf: false,
       fileCard: {
@@ -198,7 +198,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       id: 'm-bargain',
       senderId: 'user',
       senderName: user.displayName || 'You',
-      senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      senderDp: user.photoURL || '',
       content: `Hello! I am interested in ${bargainContext.title}. Can we agree on an exclusive community deal?`,
       timestamp: '10:18 AM',
       isSelf: true,
@@ -250,7 +250,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
   const [downloadsList, setDownloadsList] = useState<any[]>([
     { id: 'dl-1', name: 'EFADO_Nexus_Spec_v2.0.pdf', size: '3.2 MB', status: 'Downloaded', folder: '/Downloads/EFADO/Docs' },
     { id: 'dl-2', name: 'Product_Market_Catalog_HQ.docx', size: '14.8 MB', status: 'Downloaded', folder: '/Downloads/EFADO/Media' },
-    { id: 'dl-3', name: 'VoiceMask_Neural_Audio.wav', size: '4.1 MB', status: 'Downloaded', folder: '/Downloads/EFADO/Audio' }
+    { id: 'dl-3', name: 'VoiceMask_Studio_Audio.wav', size: '4.1 MB', status: 'Downloaded', folder: '/Downloads/EFADO/Audio' }
   ]);
 
   // Row 2 Action Buttons State
@@ -281,7 +281,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       user: 'Your Story', 
       isSelf: true, 
       hasStory: false, 
-      dp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      dp: user.photoURL || '',
       ring: 'border-indigo-500'
     },
     { 
@@ -562,7 +562,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
             id: `upload-${Date.now()}`,
             senderId: user.uid,
             senderName: user.displayName || 'You',
-            senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+            senderDp: user.photoURL || '',
             content: `Shared file: ${file.name}`,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isSelf: true,
@@ -634,7 +634,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       id: `buzz-${Date.now()}`,
       senderId: user.uid,
       senderName: user.displayName || 'You',
-      senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      senderDp: user.photoURL || '',
       content: '⚡ BUZZED THE CHAT! Attention requested.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isSelf: true
@@ -765,7 +765,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
         id: `reel-${Date.now()}`,
         senderId: user.uid,
         senderName: user.displayName || 'You',
-        senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        senderDp: user.photoURL || '',
         content: `🎬 Replied with 500MB Short Video Reel (${reelsDuration}s). Earns Creator Fund rewards!`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isSelf: true,
@@ -813,7 +813,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       const newStory = {
         id: `story-${Date.now()}`,
         user: user.displayName || 'You',
-        dp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        dp: user.photoURL || '',
         media: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&auto=format&fit=crop&q=80',
         caption: statusCaption,
         views: 1,
@@ -859,8 +859,8 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       // Local fallback for Pidgin / French / Chinese
       let fallback = text;
       if (targetLang === 'Pidgin') fallback = `Make una hear: "${text}". No shaking!`;
-      if (targetLang === 'French') fallback = `Traduction: "${text}" (Protocole Sécurisé)`;
-      if (targetLang === 'Chinese') fallback = `翻译: "${text}" (EFADO 协议)`;
+      if (targetLang === 'French') fallback = `Traduction: "${text}"`;
+      if (targetLang === 'Chinese') fallback = `翻译: "${text}"`;
 
       setMessages(msgs => msgs.map(m => {
         if (m.id === msgId) {
@@ -887,7 +887,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
       id: `msg-${Date.now()}`,
       senderId: user.uid,
       senderName: user.displayName || 'You',
-      senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      senderDp: user.photoURL || '',
       content: finalContent,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isSelf: true,
@@ -910,7 +910,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
           senderId: 'sarah',
           senderName: 'Dr. Sarah (Lead AI Eng)',
           senderDp: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          content: `Acknowledged! EFADO Nexus Comms node verified with 100% latency score. Ready to transmit audio, files up to 500MB, or launch WebRTC conference.`,
+          content: `Message received! You can send voice notes, files up to 500MB, or start a live video call anytime.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isSelf: false,
           reactions: { '⚡': 1 }
@@ -1180,7 +1180,13 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
                 className="flex flex-col items-center gap-1 flex-shrink-0 group cursor-pointer"
               >
                 <div className="relative w-14 h-14 rounded-full p-0.5 border-2 border-dashed border-indigo-400 group-hover:border-indigo-300 transition-colors flex items-center justify-center">
-                  <img src={st.dp} alt="You" className="w-full h-full rounded-full object-cover" />
+                  {st.dp ? (
+                    <img src={st.dp} alt="You" className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-indigo-600 text-white font-black text-base flex items-center justify-center">
+                      {(user.displayName || user.email || 'Y').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-slate-950">
                     +
                   </div>
@@ -1370,11 +1376,17 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
               >
                 {/* User DP: 32px circle with green online dot */}
                 <div className="relative w-8 h-8 rounded-full flex-shrink-0">
-                  <img
-                    src={msg.senderDp}
-                    alt={msg.senderName}
-                    className="w-8 h-8 rounded-full object-cover border border-white/20"
-                  />
+                  {msg.senderDp ? (
+                    <img
+                      src={msg.senderDp}
+                      alt={msg.senderName}
+                      className="w-8 h-8 rounded-full object-cover border border-white/20"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center border border-white/20">
+                      {(msg.senderName || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-950" />
                 </div>
 
@@ -1698,7 +1710,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
                         id: `vn-${Date.now()}`,
                         senderId: user.uid,
                         senderName: user.displayName || 'You',
-                        senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+                        senderDp: user.photoURL || '',
                         content: `🎙️ Voice Note (${micRecordingDuration}s) [Mask: ${activeVoiceMask}]`,
                         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isSelf: true,
@@ -2092,12 +2104,18 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
             {/* Video Grid (Up to 10 Participants) */}
             <div className="flex-grow grid grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto p-2">
               {/* Local User Tile */}
-              <div className="relative rounded-2xl overflow-hidden bg-slate-900 border-2 border-indigo-500 flex items-center justify-center">
-                <img
-                  src={user.photoURL || `https://picsum.photos/seed/${user.uid}/400/300`}
-                  alt="You"
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative rounded-2xl overflow-hidden bg-slate-900 border-2 border-indigo-500 flex items-center justify-center min-h-[160px]">
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt="You"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-indigo-600 text-white text-2xl font-black flex items-center justify-center shadow-lg">
+                    {(user.displayName || user.email || 'Y').charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white text-[10px] font-bold">
                   You {isScreenSharing ? '(Screen Sharing)' : ''}
                 </span>
@@ -2105,12 +2123,10 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
 
               {/* Other Participants */}
               {videoCallParticipants.map((pName, pIdx) => (
-                <div key={pIdx} className="relative rounded-2xl overflow-hidden bg-slate-900 border border-white/10 flex items-center justify-center">
-                  <img
-                    src={`https://picsum.photos/seed/call-${pName}/400/300`}
-                    alt={pName}
-                    className="w-full h-full object-cover"
-                  />
+                <div key={pIdx} className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 flex items-center justify-center min-h-[160px]">
+                  <div className="w-16 h-16 rounded-full bg-indigo-500/20 border border-indigo-400/40 text-indigo-200 text-2xl font-black flex items-center justify-center">
+                    {pName.charAt(0).toUpperCase()}
+                  </div>
                   <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg bg-black/60 text-white text-[10px] font-bold">
                     {pName}
                   </span>
@@ -2264,11 +2280,17 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
               {/* Story Header */}
               <div className="p-4 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between z-10">
                 <div className="flex items-center gap-2">
-                  <img
-                    src={stories[activeStoryIndex].dp}
-                    alt={stories[activeStoryIndex].user}
-                    className="w-8 h-8 rounded-full border border-white/40 object-cover"
-                  />
+                  {stories[activeStoryIndex].dp ? (
+                    <img
+                      src={stories[activeStoryIndex].dp}
+                      alt={stories[activeStoryIndex].user}
+                      className="w-8 h-8 rounded-full border border-white/40 object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full border border-white/40 bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
+                      {(stories[activeStoryIndex].user || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-xs font-black text-white flex items-center gap-1">
                       {stories[activeStoryIndex].user}
@@ -2407,7 +2429,7 @@ export const EfadoNexusHubView: React.FC<EfadoNexusHubViewProps> = ({
                         id: `gift-${Date.now()}`,
                         senderId: user.uid,
                         senderName: user.displayName || 'You',
-                        senderDp: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+                        senderDp: user.photoURL || '',
                         content: `🎁 Sent ${g.name} gift (${g.coins}) to ${currentRoom.name}!`,
                         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isSelf: true

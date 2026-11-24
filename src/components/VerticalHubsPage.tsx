@@ -115,15 +115,15 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-bold uppercase tracking-widest mb-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-300 text-xs font-semibold mb-3">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>E-FADO ECOSYSTEM • 10 VERTICAL HUBS</span>
+                <span>All EFADO Hubs</span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white drop-shadow-md">
-                Vertical Hubs Directory
+              <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
+                Explore Hubs Directory
               </h1>
               <p className="text-slate-400 text-sm sm:text-base max-w-2xl mt-2 leading-relaxed">
-                Launch any destination hub in a dedicated tab. Enjoy 1 Unified Login and 1 Synchronized Wallet across all specialized platforms.
+                Open any hub directly in a new tab or this window using one EFADO account and wallet.
               </p>
             </div>
 
@@ -285,12 +285,12 @@ export const VerticalHubsPage: React.FC<VerticalHubsPageProps> = ({
         </div>
 
         {/* Informational Footer Strip */}
-        <div className="mt-14 rounded-2xl bg-slate-900/50 border border-slate-800 p-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <div className="mt-12 rounded-2xl bg-slate-900/50 border border-slate-800 p-5 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-            <span>All 10 hubs share 1 persistent login session, real-time wallet synchronization, and provably fair architecture.</span>
+            <span>Every EFADO hub uses your single account session and synced profile wallet.</span>
           </div>
-          <div className="flex items-center gap-2 font-mono text-[11px] text-cyan-400">
+          <div className="flex items-center gap-2 font-mono text-xs text-cyan-400">
             <span>Direct Links:</span>
             <code className="bg-black/40 px-2 py-0.5 rounded border border-cyan-500/30">/hub/:slug</code>
           </div>

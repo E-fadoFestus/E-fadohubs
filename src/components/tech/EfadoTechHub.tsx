@@ -298,17 +298,17 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
             animate={{ opacity: 1, y: 0 }}
             className="flex items-center gap-2 mb-6"
           >
-            <span className="px-3 py-1 bg-indigo-600 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-white">Sovereign Creators Workspace</span>
-            <span className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em]">EFADO Sanctuary & Hub</span>
+            <span className="px-3 py-1 bg-indigo-600 rounded-full text-xs font-bold text-white">EFADO Creators Workspace</span>
+            <span className="text-white/60 text-xs font-semibold">Studio &amp; Learning Hub</span>
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-5xl lg:text-7xl font-black text-white italic tracking-tighter leading-[0.9] mb-8 animate-pulse"
+            className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight mb-6"
           >
-            WHERE DIVINE INSPIRATION MEETS THE WORLD MARKET. <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#DAA520] via-amber-200 to-[#DAA520]">THE SANCTUARY OF SOVEREIGN CREATORS.</span>
+            Where Inspiration Meets the Global Market. <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#DAA520] via-amber-200 to-[#DAA520]">The Workspace for Modern Creators.</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -342,8 +342,8 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
              <div className="w-2 h-2 bg-red-650 rounded-full animate-pulse" />
              <h2 className="text-2xl font-black text-white uppercase tracking-tighter italic">Live Broadcasts & Events</h2>
           </div>
-          <button className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors flex items-center gap-1 group">
-            View Protocol <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+          <button className="text-xs font-semibold text-slate-400 hover:text-white transition-colors flex items-center gap-1 group">
+            View All <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
         <div className="flex gap-6 overflow-x-auto no-scrollbar pb-6 px-2">
@@ -396,8 +396,8 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
     <div className="p-8 space-y-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter italic uppercase mb-2">Tactical Comms</h2>
-          <p className="text-slate-500 text-sm font-medium">Real-time deployments and synchronized mission briefs.</p>
+          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">Live Sessions</h2>
+          <p className="text-slate-400 text-sm font-medium">Real-time classes, workshops, and community broadcasts.</p>
         </div>
       </div>
 
@@ -606,14 +606,14 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
          <button className="px-10 py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">Launch Campaign</button>
        </section>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
          <PricingCard 
-           title="Tactical" 
+           title="Starter" 
            price="33" 
            features={['Sidebar Placement', 'Standard Impressions', 'General Tech Audience', 'Weekly Performance Brief']} 
          />
          <PricingCard 
-           title="Strategic" 
+           title="Growth" 
            price="166" 
            recommended
            features={['Homepage Placement', 'In-Feed Native Ads', 'Segmented Targeting', 'Real-time Analytics Portal']} 
@@ -621,16 +621,16 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
          <PricingCard 
            title="Enterprise" 
            price="333" 
-           features={['Category Sponsorship', 'Sub-page Takeover', 'Direct Deal Access', 'Dedicated Account Sync']} 
+           features={['Category Sponsorship', 'Sub-page Takeover', 'Direct Deal Access', 'Dedicated Account Support']} 
          />
        </div>
 
-       <section className="bg-white/5 border border-white/10 rounded-[3rem] p-12 flex items-center justify-between">
+       <section className="bg-white/5 border border-white/10 rounded-[3rem] p-8 sm:p-12 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2">Custom Deployment?</h3>
-            <p className="text-slate-400 text-sm">Need deep ecosystem integration? Talk to our tactical partnership team.</p>
+            <h3 className="text-2xl font-black text-white tracking-tight mb-2">Custom Campaign?</h3>
+            <p className="text-slate-400 text-sm">Need tailored promotion across EFADO hubs? Talk to our partnerships team.</p>
           </div>
-          <button className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all">Request Intelligence</button>
+          <button className="px-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-2xl font-bold text-xs transition-all shrink-0">Contact Partnerships</button>
        </section>
     </div>
   );
@@ -661,7 +661,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
     if (item.isLive || item.contentType === 'live') {
       onStartZoomSession?.(item.topic, item.title);
     } else {
-      alert(`Accessing course / asset: "${item.title}". You are automatically authorized via EFADO Premium Protocol!`);
+      alert(`Accessing course / asset: "${item.title}". You now have full EFADO member access!`);
     }
   };
 
@@ -695,7 +695,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
             },
             {
               title: "III. Deploying Impact in the Active Work Markets",
-              body: "Sovereign action. How local leaders and pastors can build visual presentation guides to inspire the community towards sustainable development."
+              body: "Practical action. How local leaders and pastors can build visual presentation guides to inspire the community towards sustainable development."
             }
           ],
           closingPrayer: "Lord, empower our hands, grant deep clarity to publishers and teachers, and let every presentation prepared here sow positive seed. Amen."
@@ -720,7 +720,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
           genre: bookGenre,
           color: bookCoverBg,
           chapters: [
-            { num: "Chapter 1", title: "The Sovereign Conception", desc: "Setting clear internal goals. How a simple non-programmer can harness digital systems without coding." },
+            { num: "Chapter 1", title: "The Core Vision", desc: "Setting clear goals. How anyone can harness digital tools without coding." },
             { num: "Chapter 2", title: "Unbending Integrity in Work Markets", desc: "Slandering deceitful financial structures. Cultivating community-wide trust, accountability, and divine favor." },
             { num: "Chapter 3", title: "Sowing Seeds of Community Impact", desc: "A practical workbook of action steps, local farming cooperatives layout, and educational initiatives." },
             { num: "Chapter 4", title: "Harvesting the Blessings", desc: "The strategic expansion. How Okhawere Festus's vision powers decentralized enterprise." }
@@ -778,7 +778,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
 
     // Slide manipulator triggers
     const addNewSlide = () => {
-      const title = newSlideTitle.trim() || `Sovereign Lesson Slide ${presentationSlides.length + 1}`;
+      const title = newSlideTitle.trim() || `Lesson Slide ${presentationSlides.length + 1}`;
       const subtitle = newSlideSubtitle.trim() || "Prepared directly inside EFADO";
       const body = newSlideBody.trim() || "This is a new custom slide prepared using our visual editor tools.";
       const bg = newSlideBg;
@@ -822,7 +822,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
                 </span>
                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider font-mono">NON-PROGRAMMERS WORKSPACE</span>
               </div>
-              <h2 className="text-3xl font-black italic tracking-tighter uppercase font-display text-white">Sovereign Creator Sanctuary</h2>
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Creator Studio &amp; Study</h2>
               <p className="text-slate-400 max-w-xl text-xs font-medium leading-relaxed">
                 Welcome pastors, preceptors, authors, and storytellers. Type, sketch ideas, generate sermon points, compose inspired book outlines, write scripts, and design visual slide decks beautifully. All codeless, beautiful, and intuitive.
               </p>
@@ -1059,7 +1059,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
                         onChange={(e) => setBookCoverBg(e.target.value as any)}
                         className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-2xl text-xs outline-none"
                       >
-                        <option value="gold">Sovereign Royal Gold</option>
+                        <option value="gold">Royal Gold</option>
                         <option value="royal-blue">Infinite Celestial Blue</option>
                         <option value="crimson">Pillar Crimson Red</option>
                         <option value="emerald">Ecosystem Abundance Green</option>
@@ -1297,10 +1297,10 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
                       </div>
 
                       <div className="space-y-2">
-                        <span className="text-[10px] uppercase font-black tracking-widest text-amber-500 font-mono italic">
-                          {presentationSlides[activeSlideIdx]?.subtitle || 'Sovereign Presentation'}
+                        <span className="text-xs font-semibold text-amber-400">
+                          {presentationSlides[activeSlideIdx]?.subtitle || 'EFADO Presentation'}
                         </span>
-                        <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tighter italic text-white leading-none">
+                        <h3 className="text-2xl md:text-4xl font-black tracking-tight text-white leading-tight">
                           {presentationSlides[activeSlideIdx]?.title || 'Slide Title'}
                         </h3>
                       </div>
@@ -1310,8 +1310,8 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
                       </p>
 
                       <div className="flex justify-between items-center border-t border-white/5 pt-4 mt-6">
-                         <span className="text-[9px] font-mono text-slate-500">EFADO SOVEREIGN PRESENTATION SUITE</span>
-                         <span className="text-[11px] font-bold text-white uppercase tracking-widest">{user.displayName || 'Venerated Leader'}</span>
+                         <span className="text-xs text-slate-400">EFADO Presentation Studio</span>
+                         <span className="text-xs font-bold text-white">{user.displayName || 'Presenter'}</span>
                       </div>
                     </motion.div>
                   </AnimatePresence>
@@ -1561,7 +1561,7 @@ export const EfadoTechHub: React.FC<EfadoTechHubProps> = ({ user, onClose, onSta
                     <option value="AI SaaS" className="bg-slate-950">AI SaaS Platforms</option>
                     <option value="FinTech Microfinance" className="bg-slate-950">FinTech Microfinance</option>
                     <option value="DeepTech Robotics" className="bg-slate-950">DeepTech & Web Robotics</option>
-                    <option value="Sovereign Ledger" className="bg-slate-950">S sovereign Ledgers</option>
+                    <option value="Sovereign Ledger" className="bg-slate-950">Digital Ledgers</option>
                     <option value="Education Technology" className="bg-slate-950">Pan-African Smart Learning</option>
                   </select>
                 </div>

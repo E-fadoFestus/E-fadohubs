@@ -72,45 +72,45 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
   const isManuf = group.match(/manufactur|industry|factory|material|supply/i) || categoryTitle.match(/manufactur/i);
 
   // 1. Group Description
-  let groupDescription = `Premium specialized council for strategic discussions in ${group}. Collaborate with verified community leaders and participate in global action steps.`;
-  if (isReligious) groupDescription = `Interfaith & pastoral sanctuary focusing on the theological foundations of leadership, biblical study, and inter-denominational community support.`;
-  if (isWives) groupDescription = `An exclusive, secure refuge for married women sharing holistic natural remedies, marital advice, child nurturing, and managing career-marriage equilibrium.`;
-  if (isHusbands) groupDescription = `A strictly confidential platform for husbands and fathers to discussion masculine emotional leadership, provisions, legacy building, and direct peer mentorship.`;
-  if (isSingles) groupDescription = `Vetted advisory space addressing marriage preparedness, courting protocols, healthy relationship boundaries, and values alignment.`;
-  if (isSports) groupDescription = `High-energy performance network discussing live tactical matches, transfers, training exercises, fitness protocols, and talent exploration.`;
-  if (isTech) groupDescription = `High-fidelity sandbox for exchanging insights on neural networks, APIs, decentralized web models, hardware fabrication, and coding standards.`;
-  if (isJobs) groupDescription = `Career accelerator portal displaying active local/remote placements, interview mock reviews, CV refinement, and direct HR connections.`;
-  if (isManuf) groupDescription = `Industrial knowledge hub reviewing global supply chains, material routing optimization, local fabrication facilities, and circular manufacturing.`;
+  let groupDescription = `Focused discussion group for ${group}. Connect with community leaders, ask questions, and share practical advice.`;
+  if (isReligious) groupDescription = `Interfaith & pastoral space focusing on spiritual leadership, Bible study, and community care.`;
+  if (isWives) groupDescription = `A supportive space for married women sharing natural wellness tips, marriage advice, parenting insights, and work-life balance.`;
+  if (isHusbands) groupDescription = `A private discussion space for husbands and fathers to talk about emotional leadership, family provision, and peer mentorship.`;
+  if (isSingles) groupDescription = `Guided discussion space covering marriage readiness, healthy courtship, relationship boundaries, and shared values.`;
+  if (isSports) groupDescription = `Lively sports discussion group covering live matches, transfers, fitness routines, and rising talent.`;
+  if (isTech) groupDescription = `Developer & tech space for discussing software, APIs, neural networks, hardware builds, and coding standards.`;
+  if (isJobs) groupDescription = `Career support group sharing active local and remote job openings, interview prep, CV reviews, and HR connections.`;
+  if (isManuf) groupDescription = `Manufacturing & industry group covering supply chains, sourcing materials, local production, and sustainable factories.`;
 
-  // 2. Simulated Members list
+  // 2. Group Members list (clean empty avatar triggers crisp initial badges)
   const getSubcategoryMembers = (): GroupMember[] => {
     if (isReligious) return [
-      { id: '1', name: 'Bishop Thomas A.', role: 'HOST', avatar: 'https://picsum.photos/seed/bishop/100/100', online: true, tagline: 'Lead Overseer • Grace Cathedral' },
-      { id: '2', name: 'Pastor Deborah K.', role: 'EXPERT', avatar: 'https://picsum.photos/seed/deborah/100/100', online: true, tagline: 'Theological Lecturer' },
-      { id: '3', name: 'Evang. Jude', role: 'MODERATOR', avatar: 'https://picsum.photos/seed/jude/100/100', online: true, tagline: 'Outreach Manager' },
-      { id: '4', name: 'Deaconess Lydia', role: 'MEMBER', avatar: 'https://picsum.photos/seed/lydia/100/100', online: false, tagline: 'Youth Coordinator' }
+      { id: '1', name: 'Bishop Thomas A.', role: 'HOST', avatar: '', online: true, tagline: 'Lead Overseer • Grace Cathedral' },
+      { id: '2', name: 'Pastor Deborah K.', role: 'EXPERT', avatar: '', online: true, tagline: 'Theological Lecturer' },
+      { id: '3', name: 'Evang. Jude', role: 'MODERATOR', avatar: '', online: true, tagline: 'Outreach Manager' },
+      { id: '4', name: 'Deaconess Lydia', role: 'MEMBER', avatar: '', online: false, tagline: 'Youth Coordinator' }
     ];
     if (isWives) return [
-      { id: '1', name: 'Dr. Evelyn Peters (Ph.D)', role: 'HOST', avatar: 'https://picsum.photos/seed/evelyn/100/100', online: true, tagline: 'Marriage Counsellor & Therapist' },
-      { id: '2', name: 'Nurse Naomi', role: 'EXPERT', avatar: 'https://picsum.photos/seed/naomi/100/100', online: true, tagline: 'Holistic Wellness Advocate' },
-      { id: '3', name: 'Onyinye (Mod)', role: 'MODERATOR', avatar: 'https://picsum.photos/seed/onyi/100/100', online: true, tagline: 'Career Advisor & Wife' },
-      { id: '4', name: 'Chisom', role: 'MEMBER', avatar: 'https://picsum.photos/seed/chisom/100/100', online: true, tagline: 'New Bride' }
+      { id: '1', name: 'Dr. Evelyn Peters (Ph.D)', role: 'HOST', avatar: '', online: true, tagline: 'Marriage Counsellor & Therapist' },
+      { id: '2', name: 'Nurse Naomi', role: 'EXPERT', avatar: '', online: true, tagline: 'Holistic Wellness Advocate' },
+      { id: '3', name: 'Onyinye (Mod)', role: 'MODERATOR', avatar: '', online: true, tagline: 'Career Advisor & Wife' },
+      { id: '4', name: 'Chisom', role: 'MEMBER', avatar: '', online: true, tagline: 'New Bride' }
     ];
     if (isHusbands) return [
-      { id: '1', name: 'Elder Christopher', role: 'HOST', avatar: 'https://picsum.photos/seed/chris/100/100', online: true, tagline: 'Provident Families Lead' },
-      { id: '2', name: 'Engr. Kolawole', role: 'EXPERT', avatar: 'https://picsum.photos/seed/kola/100/100', online: true, tagline: 'Fatherhood Mentor' },
-      { id: '3', name: 'Chuks V.', role: 'MODERATOR', avatar: 'https://picsum.photos/seed/chuks/100/100', online: true, tagline: 'Business Leader & Husband' },
-      { id: '4', name: 'Tunde S.', role: 'MEMBER', avatar: 'https://picsum.photos/seed/tunde/100/100', online: false, tagline: 'Husband of 3 years' }
+      { id: '1', name: 'Elder Christopher', role: 'HOST', avatar: '', online: true, tagline: 'Family Men Lead' },
+      { id: '2', name: 'Engr. Kolawole', role: 'EXPERT', avatar: '', online: true, tagline: 'Fatherhood Mentor' },
+      { id: '3', name: 'Chuks V.', role: 'MODERATOR', avatar: '', online: true, tagline: 'Business Leader & Husband' },
+      { id: '4', name: 'Tunde S.', role: 'MEMBER', avatar: '', online: false, tagline: 'Husband of 3 years' }
     ];
     if (isTech) return [
-      { id: '1', name: 'Tech Architect Dele', role: 'HOST', avatar: 'https://picsum.photos/seed/dele/100/100', online: true, tagline: 'Sovereign Systems Architect' },
-      { id: '2', name: 'Dr. Sarah (Lead Eng)', role: 'EXPERT', avatar: 'https://picsum.photos/seed/sarah/100/100', online: true, tagline: 'Machine Learning Deep Mind' },
-      { id: '3', name: 'Damilola Codes', role: 'MODERATOR', avatar: 'https://picsum.photos/seed/dami/100/100', online: true, tagline: 'Senior Rust Developer' }
+      { id: '1', name: 'Tech Architect Dele', role: 'HOST', avatar: '', online: true, tagline: 'Senior Systems Architect' },
+      { id: '2', name: 'Dr. Sarah (Lead Eng)', role: 'EXPERT', avatar: '', online: true, tagline: 'Machine Learning Engineer' },
+      { id: '3', name: 'Damilola Codes', role: 'MODERATOR', avatar: '', online: true, tagline: 'Senior Software Developer' }
     ];
     return [
-      { id: '1', name: 'Host Agent Strategic', role: 'HOST', avatar: 'https://picsum.photos/seed/strategic/100/100', online: true, tagline: 'Senior Community Lead' },
-      { id: '2', name: 'Ambassador Daniel', role: 'EXPERT', avatar: 'https://picsum.photos/seed/daniel/100/100', online: true, tagline: 'Field Advisory Expert' },
-      { id: '3', name: 'Sister Miriam (Mod)', role: 'MODERATOR', avatar: 'https://picsum.photos/seed/miriam/100/100', online: true, tagline: 'Local Moderator' }
+      { id: '1', name: 'Community Host', role: 'HOST', avatar: '', online: true, tagline: 'Senior Community Lead' },
+      { id: '2', name: 'Ambassador Daniel', role: 'EXPERT', avatar: '', online: true, tagline: 'Community Advisor' },
+      { id: '3', name: 'Sister Miriam (Mod)', role: 'MODERATOR', avatar: '', online: true, tagline: 'Local Moderator' }
     ];
   };
 
@@ -119,53 +119,53 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
   // 3. Initial Chat Messages
   const getInitialMessages = (): SimulatedMessage[] => {
     if (isReligious) return [
-      { id: 'm1', senderName: 'Bishop Thomas A.', senderRole: 'HOST', senderAvatar: 'https://picsum.photos/seed/bishop/100/100', content: 'Welcome beloved brethren! Let us maintain absolute theological depth. What are your perspectives on equipping youth ministers for the next decade?', timestamp: '09:12 AM' },
-      { id: 'm2', senderName: 'Pastor Deborah K.', senderRole: 'EXPERT', senderAvatar: 'https://picsum.photos/seed/deborah/100/100', content: 'Indeed bishop! Modern methodologies must match historical foundations. I believe systematic theology training is crucial.', timestamp: '09:15 AM' }
+      { id: 'm1', senderName: 'Bishop Thomas A.', senderRole: 'HOST', senderAvatar: '', content: 'Welcome everyone! Let us keep our discussions uplifting and thoughtful. How can we better mentor young ministers today?', timestamp: '09:12 AM' },
+      { id: 'm2', senderName: 'Pastor Deborah K.', senderRole: 'EXPERT', senderAvatar: '', content: 'Thank you, Bishop! Combining practical outreach with strong biblical foundations makes a lasting difference.', timestamp: '09:15 AM' }
     ];
     if (isWives) return [
-      { id: 'm1', senderName: 'Dr. Evelyn Peters (Ph.D)', senderRole: 'HOST', senderAvatar: 'https://picsum.photos/seed/evelyn/100/100', content: 'Good morning ladies! Our topic today focuses on managing emotional burnout while supporting your husband’s career. Remember, your holistic wellbeing is a priority.', timestamp: '09:05 AM' },
-      { id: 'm2', senderName: 'Nurse Naomi', senderRole: 'EXPERT', senderAvatar: 'https://picsum.photos/seed/naomi/100/100', content: 'Agreed! I’m sharing our natural hibiscus infusion guide today in the bulletin section—superb for blood flow and tension.', timestamp: '09:08 AM' }
+      { id: 'm1', senderName: 'Dr. Evelyn Peters (Ph.D)', senderRole: 'HOST', senderAvatar: '', content: 'Good morning ladies! Our topic today focuses on managing emotional burnout while balancing family and work. Remember, your wellbeing matters.', timestamp: '09:05 AM' },
+      { id: 'm2', senderName: 'Nurse Naomi', senderRole: 'EXPERT', senderAvatar: '', content: 'Agreed! I am sharing our natural hibiscus tea guide today in the shared files section — great for relaxation and healthy circulation.', timestamp: '09:08 AM' }
     ];
     if (isHusbands) return [
-      { id: 'm1', senderName: 'Elder Christopher', senderRole: 'HOST', senderAvatar: 'https://picsum.photos/seed/chris/100/100', content: 'Greetings men! True authority of a husband comes through consistent, quiet emotional leadership. Let’s avoid reactivity when conflicts arise.', timestamp: '09:01 AM' },
-      { id: 'm2', senderName: 'Engr. Kolawole', senderRole: 'EXPERT', senderAvatar: 'https://picsum.photos/seed/kola/100/100', content: 'Absolutely elder. Leading by serving is the sovereign husband protocol.', timestamp: '09:04 AM' }
+      { id: 'm1', senderName: 'Elder Christopher', senderRole: 'HOST', senderAvatar: '', content: 'Greetings men! Steady, patient leadership at home starts with listening calmly before reacting during disagreements.', timestamp: '09:01 AM' },
+      { id: 'm2', senderName: 'Engr. Kolawole', senderRole: 'EXPERT', senderAvatar: '', content: 'Absolutely elder. Leading by serving your family sets the strongest example.', timestamp: '09:04 AM' }
     ];
     if (isTech) return [
-      { id: 'm1', senderName: 'Tech Architect Dele', senderRole: 'HOST', senderAvatar: 'https://picsum.photos/seed/dele/100/100', content: 'Let’s look at optimizing network throughput for full-stack state replication. HMR is disabled, but sovereign local databases are scaling nicely.', timestamp: '09:00 AM' },
-      { id: 'm2', senderName: 'Dr. Sarah (Lead Eng)', senderRole: 'EXPERT', senderAvatar: 'https://picsum.photos/seed/sarah/100/100', content: 'The AI vectors pipeline is fully optimized inside the Cloud environment. We can safely ingest localized context.', timestamp: '09:03 AM' }
+      { id: 'm1', senderName: 'Tech Architect Dele', senderRole: 'HOST', senderAvatar: '', content: 'Let us look at improving API response times and clean state sync across client and server.', timestamp: '09:00 AM' },
+      { id: 'm2', senderName: 'Dr. Sarah (Lead Eng)', senderRole: 'EXPERT', senderAvatar: '', content: 'Good caching and clean data queries make a huge difference for users on slower mobile networks.', timestamp: '09:03 AM' }
     ];
     return [
-      { id: 'm1', senderName: 'Host Agent Strategic', senderRole: 'HOST', senderAvatar: 'https://picsum.photos/seed/strategic/100/100', content: `Welcome elements to the authoritative space for ${group}! Let's deploy pristine communication concepts.`, timestamp: '09:00 AM' },
-      { id: 'm2', senderName: 'Ambassador Daniel', senderRole: 'EXPERT', senderAvatar: 'https://picsum.photos/seed/daniel/100/100', content: 'Exciting times ahead! We have updated the tactical roadmap in the files.', timestamp: '09:02 AM' }
+      { id: 'm1', senderName: 'Community Host', senderRole: 'HOST', senderAvatar: '', content: `Welcome to the ${group} discussion group! Feel free to share questions and helpful insights.`, timestamp: '09:00 AM' },
+      { id: 'm2', senderName: 'Ambassador Daniel', senderRole: 'EXPERT', senderAvatar: '', content: 'Glad to have everyone here! We have updated the helpful guide in the shared files section.', timestamp: '09:02 AM' }
     ];
   };
 
   // 4. Smart responses logic when user sends text
-  const getSmartResponses = (text: string): string[] => {
+  const getSmartResponses = (_text: string): string[] => {
     if (isReligious) return [
-      "Amen to that! Absolutely scriptural. Let us hold onto this deep foundation as we scale ministries.",
-      "A profound analysis! That aligns exactly with historical apologetics frameworks. Thank you for sharing this revelation.",
-      "Wonderful insight! Community leadership relies heavily on these principles."
+      "Amen to that! Well said. Thank you for sharing this encouragement with the group.",
+      "A thoughtful point! That ties right into building strong community ministries.",
+      "Wonderful insight! Good leadership relies on these core values."
     ];
     if (isWives) return [
-      "That is so deeply relatable and true, dear sister! Letting wisdom guide our homes indeed changes everything.",
-      "So encouraging! We really need more mothers and wives discussing this openly. May grace hold our families.",
-      "I highly agree. Holistic patience always yields amazing outcomes."
+      "That is so relatable and true, dear sister! Wisdom at home really changes everything.",
+      "So encouraging! It helps so much when mothers and wives share openly like this.",
+      "I completely agree. Patience and open communication always help."
     ];
     if (isHusbands) return [
-      "Powerful point, brother! Setting the emotional pace and taking maximum ownership is our primary duty.",
-      "This is man-talk at its finest. Sound logic, absolutely free from ego. Thank you for sharing.",
-      "A provident dad leads by example. Outstanding addition!"
+      "Strong point, brother! Setting a calm tone and taking responsibility makes all the difference.",
+      "Well said. Honest, respectful conversation is what this space is for.",
+      "A caring father leads by example. Great addition!"
     ];
     if (isTech) return [
-      "Superb! Incorporating localized vectors directly with modern schemas will dramatically decrease server lag.",
-      "Brilliant optimization logic! It completely satisfies the security benchmarks we've set for the Efado Hub interface.",
-      "Compiling this module now. Type checking is passing 100% green."
+      "Great idea! Keeping data payloads light makes mobile performance noticeably faster.",
+      "Clean optimization approach! Simple architecture is much easier to maintain.",
+      "Tested a similar pattern recently — builds and checks are passing smoothly."
     ];
     return [
-      "Excellent contribution! Let us integrate this standard logic into our live roadmap.",
-      "Fascinating perspective! Very happy to observe our sector colleagues engaging with this depth.",
-      "Completely verified! The sovereign nodes are receiving this info with low latency."
+      "Excellent point! Thanks for contributing that to the discussion.",
+      "Great perspective! Always helpful hearing practical experiences from fellow members.",
+      "Received clearly! Appreciate you sharing that update with the group."
     ];
   };
 
@@ -193,8 +193,8 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
       opts: ["Emotional guidance under strain", "Sustained financial provision", "Generational mentor/legacy building"]
     };
     return {
-      q: "What is the most critical hurdle for development in this field?",
-      opts: ["Access to structural funding", "Peer-to-peer knowledge hubs", "Regulatory/safety protocols"]
+      q: "What is the most important goal for growth in this field?",
+      opts: ["Access to funding and grants", "Peer-to-peer learning groups", "Clear safety & industry guidelines"]
     };
   };
 
@@ -214,8 +214,8 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
 
   // Bulletins ledger
   const [bulletins, setBulletins] = useState<Array<{ title: string, author: string, size: string }>>([
-    { title: "Sovereign Framework Roadmap.pdf", author: "Bishop Thomas", size: "1.4 MB" },
-    { title: "Weekly Core Assessment Bulletins.docx", author: "Dr. Sarah", size: "380 KB" }
+    { title: "Community Guide & Roadmap.pdf", author: "Bishop Thomas", size: "1.4 MB" },
+    { title: "Weekly Resource Notes.docx", author: "Dr. Sarah", size: "380 KB" }
   ]);
   const [showAddBulletin, setShowAddBulletin] = useState(false);
   const [newBulletinTitle, setNewBulletinTitle] = useState('');
@@ -251,7 +251,7 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
       id: 'me_' + Math.random().toString(),
       senderName: user.displayName || user.email.split('@')[0],
       senderRole: 'MEMBER',
-      senderAvatar: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+      senderAvatar: user.photoURL || '',
       content: typedMessage,
       timestamp: formattedTime,
       isMe: true
@@ -577,13 +577,17 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
             </div>
             {/* Horizontal Avatars */}
             <div className="flex items-center -space-x-2">
-              {members.map((member, mIdx) => (
+              {members.map((member) => (
                 <div 
                   key={member.id} 
-                  className={`w-7 h-7 rounded-lg border-2 border-slate-900 overflow-hidden relative group cursor-pointer`}
+                  className="w-7 h-7 rounded-lg border-2 border-slate-900 overflow-hidden relative group cursor-pointer bg-indigo-600/30 flex items-center justify-center text-[10px] font-black text-white"
                   title={`${member.name} - ${member.tagline}`}
                 >
-                  <img src={member.avatar} alt={member.name} referrerPolicy="no-referrer" />
+                  {member.avatar ? (
+                    <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span>{member.name.charAt(0).toUpperCase()}</span>
+                  )}
                   {member.online && <div className="absolute top-0 right-0 w-2 h-2 bg-emerald-500 rounded-full border border-slate-900" />}
                 </div>
               ))}
@@ -599,9 +603,9 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
             <div className="flex flex-col items-center gap-2">
               <div className="px-5 py-2 bg-[#DAA520]/10 border border-[#DAA520]/20 rounded-xl flex items-center gap-2.5 shadow-sm">
                 <Lock className="w-3.5 h-3.5 text-[#DAA520]" />
-                <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-widest text-center">Encrypted Sovereign Dialogue Port Stream</span>
+                <span className="text-[9px] font-black text-[#DAA520] uppercase tracking-widest text-center">Encrypted Group Discussion</span>
               </div>
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono mt-1">PROTOCOL ESTABLISHED 100% SECURE</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono mt-1">PRIVATE GROUP CHAT ACTIVE</span>
             </div>
 
             {/* Rendered Dialogue Messages */}
@@ -614,8 +618,12 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
                   }`}
                 >
                   {/* Sender Avatar */}
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-white/5 overflow-hidden shrink-0 mt-0.5">
-                    <img src={msg.senderAvatar} alt={msg.senderName} referrerPolicy="no-referrer" />
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-white/5 overflow-hidden shrink-0 mt-0.5 flex items-center justify-center text-xs font-black text-indigo-300">
+                    {msg.senderAvatar ? (
+                      <img src={msg.senderAvatar} alt={msg.senderName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <span>{msg.senderName.charAt(0).toUpperCase()}</span>
+                    )}
                   </div>
 
                   <div className="flex flex-col space-y-1.5">
@@ -680,7 +688,7 @@ export const SovereignGroupArena: React.FC<SovereignGroupArenaProps> = ({
             </div>
             
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.25em] text-center mt-3">
-               ★ Distributed Ledger Technology active. Comments are signed by your secure node.
+               ★ Protected community chat. Messages are attributed to your verified profile.
             </p>
           </div>
 

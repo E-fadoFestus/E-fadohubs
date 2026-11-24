@@ -235,7 +235,7 @@ The era of digital division is officially OVER. Welcome to *${taglineUpper}*—t
 
 ✨ *Explore what you can do on EFADO under a single, highly polished dashboard:*
 • 🎮 *Elite Gaming Arena:* Stake in Lucky Spin, Digital Money Trading, and Money Card with real-time risk mitigation and instant withdrawals.
-• 🌾 *Agri-Sovereign Hub:* Connects farmers and rural ag-hubs directly with high-frequency urban consumers with zero middleman markups.
+• 🌾 *Agriculture Hub:* Connects farmers and rural co-ops directly with everyday buyers with zero middleman markups.
 • 💵 *Unity Hubs (CSCC):* Organize digital cooperative saving networks with automated rotating contribution logs.
 • 📦 *China-Factory Sourcing:* Instant factory pipeline from China. Sea/air freight coordination in one tap.
 • 📱 *Airtime & Utilities:* Instant cell top-ups globally across 120+ countries with smart payment gateways.
@@ -254,7 +254,7 @@ The era of digital division is officially OVER. Welcome to *${taglineUpper}*—t
 📩 *E-fado Support:* efado226@gmail.com
 📞 *Global Channel:* ${phoneNumber}
 
-*#EFADOHubs #FinancialSovereignty #AllInOneEcosystem #SovereignHubs #DecentralizedSync*`;
+*#EFADOHubs #AllInOneApp #EFADOConnect #SmartCommerce*`;
 
     const email = `Subject: Synchronize Your Empire: Meet ${tagline} (Global Launch)
 
@@ -281,7 +281,7 @@ Visit e-fado.com now and claim your digital sovereignty lock.
 
 In full synchronization,
 
-Sovereign Executive Office
+EFADO Executive Team
 ${taglineUpper} Network
 Email: efado226@gmail.com
 Ecosystem Link: e-fado.com`;
@@ -303,12 +303,12 @@ Ecosystem Link: e-fado.com`;
   const handleExportAll = () => {
     const combined = `========================================================================
              EFADO HUBS CONNECT - GLOBAL MARKETING MEDIA KIT
-             GENERATED FOR: ${user.email} (${user.displayName || 'Sovereign Node'})
+             GENERATED FOR: ${user.email} (${user.displayName || 'EFADO Member'})
 ========================================================================
 Tagline/Brand Name: ${tagline}
 Target Markets: ${targetLocation}
 CTA Statement: ${customCTA}
-Contact Protocol: ${phoneNumber}
+Contact Number: ${phoneNumber}
 Ecosystem URL: e-fado.com / e-fadohubs
 ========================================================================
 
@@ -349,7 +349,7 @@ ${email}
 
 * GOOGLE SEARCH ADS (SEM STRATEGIC INDEX):
   - Target Keywords: \"secure rotating savings\", \"P2P business loan instant\", \"China direct factory freight link\", \"airtime top-up multi-currency\", \"trusted escrow domain purchase\".
-  - Matching Protocol: Broad match modified to find high-intent operators.
+  - Keyword Match: Broad match modified to reach high-intent buyers and businesses.
 
 ========================================================================
 Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
@@ -443,7 +443,7 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Contact Protocol Number (Display)</label>
+                <label className="text-xs font-bold text-slate-300">Display Contact Number</label>
                 <input 
                   type="text" 
                   value={phoneNumber}
@@ -524,7 +524,7 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
               {/* Direction Blueprint Bubble (Appears on Hover) */}
               <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-xl p-8 flex flex-col justify-center items-center text-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-20 border border-white/5 rounded-[2rem]">
                 <Settings className="w-8 h-8 text-amber-500 mb-3 animate-spin duration-3000" />
-                <h5 className="text-[11px] font-black uppercase tracking-widest text-amber-400 mb-1">Sovereign Director Notes</h5>
+                <h5 className="text-xs font-bold text-amber-400 mb-1">Director Notes</h5>
                 <p className="text-[12px] font-mono text-slate-200 leading-relaxed max-w-sm">
                   {activeStoryboardList[activeStoryIdx].directorNote}
                 </p>
@@ -775,7 +775,7 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl mx-auto">
                           {[
                             { icon: '🛒', name: 'Marketplace', desc: 'Secure P2P trade' },
-                            { icon: '💼', name: 'Job Portal', desc: 'Sovereign careers' },
+                            { icon: '💼', name: 'Job Portal', desc: 'Verified careers' },
                             { icon: '🏠', name: 'Real Estate', desc: 'Land & housing lock' },
                             { icon: '🎓', name: 'Education', desc: 'Curriculum & learning' },
                             { icon: '🏦', name: 'Community Savings', desc: 'CSCC rotational pools' },
@@ -864,7 +864,7 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
                         <h4 className="text-xl font-black text-white uppercase">Built For Your True Success</h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {[
-                            { icon: '🔒', title: 'Security First', desc: 'Tactical escrow protection protocols' },
+                            { icon: '🔒', title: 'Security First', desc: 'Protected escrow payment handling' },
                             { icon: '⚡', title: 'All-In-One Ease', desc: 'No more jumping between separate apps' },
                             { icon: '🌍', title: 'Community Led', desc: 'Unlock collective capital & savings' },
                             { icon: '🚀', title: 'Pristine Tech Core', desc: 'Optimized for mobile-first global speed' }
@@ -1144,7 +1144,7 @@ Generated on ${new Date().toISOString()} | EFADO Ecosystem Promotion Core
           </div>
 
           <div className="p-6 bg-slate-900 border border-white/5 rounded-3xl space-y-4">
-            <span className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl inline-block text-[10px] font-black uppercase tracking-widest">Google SEM Protocol</span>
+            <span className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl inline-block text-xs font-bold">Google Search Ads</span>
             <h4 className="text-sm font-bold uppercase text-white tracking-wide">High Intent Operator Index</h4>
             <p className="text-[11px] font-mono text-slate-400 leading-relaxed text-left">
               Bid on strategic keywords: "secured rotate savings contributions", "trusted china direct sourcing freight line", and "fast withdraw global top-up app". Captive traffic redirects straight to native browser URLs.

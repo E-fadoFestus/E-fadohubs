@@ -4,6 +4,7 @@ import { useCurrency } from '../lib/CurrencyContext';
 import { SUPPORT_EMAILS, PHONE_NUMBERS, OFFICE_ADDRESSES } from '../constants/businessProfile';
 import { HubGuideNote } from './HubGuideNote';
 import { HUB_GUIDES } from '../data/hubGuides';
+import { openSupportHelpForm } from '../utils/helpSupport';
 import { 
   MessageSquare, 
   ChevronRight, 
@@ -197,7 +198,7 @@ const GIST_CATEGORIES = [
     description: 'Connections, remarriage support.', 
     subcategories: [
       { id: 'widow-connections', name: 'Widow Connections', groups: ['Global Companionship', 'Support & Healing', 'New Horizons'] },
-      { id: 'remarriage-sup', name: 'Remarriage Support', groups: ['Blended Families', 'Courtship Protocols', 'Legal & Wisdom'] }
+      { id: 'remarriage-sup', name: 'Remarriage Support', groups: ['Blended Families', 'Courtship Guidance', 'Legal & Wisdom'] }
     ] 
   },
   { 
@@ -205,10 +206,10 @@ const GIST_CATEGORIES = [
     title: 'Dating & Connections', 
     icon: Link2, 
     color: 'red', 
-    description: 'Safe dating practices, roadmaps.', 
+    description: 'Safe dating practices and guidance.', 
     subcategories: [
-      { id: 'courtship-roadmaps', name: 'Premium Courtship Roadmaps', groups: ['Match Selection Criteria', 'First Date Protocols', 'Value Alignment Audit'] },
-      { id: 'safe-dating-guard', name: 'Safe Dating Safeguards', groups: ['Verification Standards', 'Moderated Safe Dating', 'Red Flag Consulting Counsel'] }
+      { id: 'courtship-roadmaps', name: 'Courtship Guides', groups: ['Partner Selection Tips', 'First Date Etiquette', 'Shared Values Check'] },
+      { id: 'safe-dating-guard', name: 'Safe Dating Safeguards', groups: ['Verification Standards', 'Moderated Safe Dating', 'Red Flag Advice'] }
     ] 
   },
   { 
@@ -216,10 +217,10 @@ const GIST_CATEGORIES = [
     title: 'Youth & Character Development', 
     icon: UserCircle, 
     color: 'emerald', 
-    description: 'Character building, young men forum.', 
+    description: 'Character building and young men forum.', 
     subcategories: [
       { id: 'char-building', name: 'Character Building Academy', groups: ['Ethical Leadership Initiatives', 'Mental Resilience Gym', 'Integrity Network Circle'] },
-      { id: 'young-men-council', name: 'Young Men Council', groups: ['Manhood Transition Councils', 'Sovereign Purpose Discovery', 'Civic Action duty'] }
+      { id: 'young-men-council', name: 'Young Men Council', groups: ['Mentorship & Growth', 'Purpose Discovery', 'Community Service'] }
     ] 
   },
   { 
@@ -227,10 +228,10 @@ const GIST_CATEGORIES = [
     title: 'Education & Student Life', 
     icon: GraduationCap, 
     color: 'indigo', 
-    description: 'Career guidance, study tips.', 
+    description: 'Career guidance and study tips.', 
     subcategories: [
-      { id: 'career-acad-guidance', name: 'Career & Academic Guidance', groups: ['Global Scholarship Councils', 'Major Selection Advisors', 'Study Abroad networks'] },
-      { id: 'student-life-tactics', name: 'Student Life Tactics', groups: ['Cognitive Study Strategies', 'High-Performance Research Methods', 'Focus Optimization protocols'] }
+      { id: 'career-acad-guidance', name: 'Career & Academic Guidance', groups: ['Scholarship Support', 'Course Selection Advisors', 'Study Abroad Networks'] },
+      { id: 'student-life-tactics', name: 'Student Life & Study Habits', groups: ['Smart Study Strategies', 'Research Methods', 'Focus & Time Management'] }
     ] 
   },
   { 
@@ -238,9 +239,9 @@ const GIST_CATEGORIES = [
     title: 'Technology & Knowledge Exchange', 
     icon: Cpu, 
     color: 'cyan', 
-    description: 'Trends, knowledge sharing.', 
+    description: 'Tech trends and knowledge sharing.', 
     subcategories: [
-      { id: 'tech-frontier-trends', name: 'Tech Frontiers & Artificial Intelligence', groups: ['Neural Nets & LLM Tuning', 'Sovereign Decentralised Frameworks', 'Industrial Automation Lab'] },
+      { id: 'tech-frontier-trends', name: 'Tech Trends & AI', groups: ['AI & Machine Learning', 'Web3 & Open Platforms', 'Automation & Engineering'] },
       { id: 'peer-knowledge-exch', name: 'Peer Knowledge Exchange Labs', groups: ['Coding Bootcamps Circles', 'Product Matrix design', 'Micro-architecture Forums'] }
     ] 
   },
@@ -290,8 +291,8 @@ const PRESET_GIFS = [
 ];
 
 const PRESET_STICKERS = [
-  { name: 'Sovereign Diamond', url: 'https://media2.giphy.com/media/W80Y9y1XSSgC2otT9M/giphy.gif' },
-  { name: 'Tactical Bullseye', url: 'https://media4.giphy.com/media/D8uW8XQxP9Z3a/giphy.gif' },
+  { name: 'Diamond Spark', url: 'https://media2.giphy.com/media/W80Y9y1XSSgC2otT9M/giphy.gif' },
+  { name: 'Bullseye Hit', url: 'https://media4.giphy.com/media/D8uW8XQxP9Z3a/giphy.gif' },
   { name: 'Gold Medal Sync', url: 'https://media3.giphy.com/media/g9582DNuQppazNM4SZ/giphy.gif' },
   { name: 'Rocket Fire', url: 'https://media1.giphy.com/media/Ky5gU85gYfV3v5L37L/giphy.gif' },
   { name: 'Thumbs Up Champion', url: 'https://media2.giphy.com/media/l3q2zVr6cu95nF6O4/giphy.gif' },
@@ -340,7 +341,7 @@ const DEFAULT_MOCK_REELS: Reel[] = [
   {
     id: 'viral-4',
     authorId: 'sports_weekly',
-    authorName: 'Sovereign League',
+    authorName: 'Sports League',
     authorPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-man-holding-a-smartphone-with-a-green-screen-41125-large.mp4',
     caption: '⚽ High energy sports & viral action live on EFADO! #Sports #Global #Reels',
@@ -448,11 +449,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [activeChatRoomId, setActiveChatRoomId] = useState<string>('sarah');
   const activeRoomDef = {
     name: activeChatRoomId === 'sarah' ? 'Sarah Alade' :
-          activeChatRoomId === 'tactical-hq' ? 'Tactical Headquarters' :
-          activeChatRoomId === 'global' ? 'Global Syndicate Lounge' :
+          activeChatRoomId === 'tactical-hq' ? 'Community HQ' :
+          activeChatRoomId === 'global' ? 'Global Community Chat' :
           activeChatRoomId === 'bishop' ? 'Bishop Enclave' :
           `Private Room: ${activeChatRoomId}`,
-    status: 'SOVEREIGN NETWORK CONDUIT'
+    status: 'ENCRYPTED GROUP CHAT'
   };
   const [customRooms, setCustomRooms] = useState<any[]>(() => {
     try {
@@ -476,7 +477,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   // Custom states for interactive chat tools
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerAmount, setLedgerAmount] = useState('50000');
-  const [ledgerMemo, setLedgerMemo] = useState('Tactical Project Escrow');
+  const [ledgerMemo, setLedgerMemo] = useState('Project Payment');
   const [ledgerCurrency, setLedgerCurrency] = useState('NGN');
   const [buzzActive, setBuzzActive] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
@@ -491,10 +492,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
       const newRoom = {
         id: cleanCode,
         name: customName?.trim() || `Room: ${cleanCode.toUpperCase()}`,
-        status: customPhone?.trim() || 'Private Secure Tunnel',
-        role: customRole?.trim() || 'Sovereign Contributor',
+        status: customPhone?.trim() || 'Private Secure Room',
+        role: customRole?.trim() || 'Community Member',
         time: 'Just Now',
-        msg: 'Ready for secure sync.',
+        msg: 'Ready to chat.',
         unread: 0,
         type: 'DIRECT'
       };
@@ -507,7 +508,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
     setPrivateRoomCode('');
     setNewContactName('');
     setNewContactPhone('');
-    setNewContactRole('Sovereign Contributor');
+    setNewContactRole('Community Member');
     setShowPrivateRoomModal(false);
   };
   const [newMessageText, setNewMessageText] = useState('');
@@ -609,7 +610,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const [newContactName, setNewContactName] = useState('');
   const [newContactCode, setNewContactCode] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
-  const [newContactRole, setNewContactRole] = useState('Sovereign Contributor');
+  const [newContactRole, setNewContactRole] = useState('Community Contributor');
 
   useEffect(() => {
     if (user) {
@@ -888,84 +889,84 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
   const FAQ_DATA = [
     { q: "What is EFADO Nexus Hub?", a: "EFADO Nexus Hub is a global social ecosystem designed for meaningful discourse, community building, 10 action bar controls, and real-time knowledge exchange across various professional and spiritual categories." },
     { q: "How do I promote my business here?", a: "You can use the 'Advertisement Center' to create targeted campaigns that reach specific communities within the hub, from technology enthusiasts to spiritual leaders." },
-    { q: "Is the EFADO Nexus Hub safe for women and youth?", a: "Yes, we have dedicated, moderated sub-sections like 'The Wives Forum' and 'Youth Development' with strict community guidelines and security protocols." },
-    { q: "Can I earn while using the EFADO Nexus Hub?", a: "Directly through the Ads center, qualified views creator fund, or by building industry authority in our tactical communities, which often leads to job opportunities and professional networking." }
+    { q: "Is the EFADO Gist Hub safe for women and youth?", a: "Yes, we have dedicated, moderated sections like 'The Wives Forum' and 'Youth Development' with clear community guidelines." },
+    { q: "Can I earn while using the EFADO Gist Hub?", a: "Yes. You can earn through creator views on your posts and reels, promote products via the Ads Center, or network across active community groups." }
   ];
 
-  // Tactical Blog Content
+  // Editorial Blog Content
   const BLOG_POSTS = [
     {
       id: 1,
       title: "The Future of Digital Communities in Nigeria",
       category: "Technology",
-      excerpt: "Exploring how platforms like EFADO are redefining social interaction and local industry and manufacturing trends...",
+      excerpt: "Exploring how platforms like EFADO are connecting local businesses, creators, and communities...",
       date: "Oct 12, 2023",
-      image: "https://picsum.photos/seed/blog1/600/400",
-      content: "Digital ecosystems in Nigeria are transitioning from passive chat boards to active value creation and micro-economy clusters. Emerging frameworks like EFADO demonstrate how high-integrity systems empower local industry, technical manufacturing, and remote collaboration. By nesting trust networks into functional hubs, we pave a non-linear path for youth development and sustainable regional tech-scale. Moving forward, the fusion of micro-banking protocols and secure peer coordination will define the absolute standard for online communities across emerging markets."
+      image: "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80",
+      content: "Digital communities in Nigeria are evolving from simple message boards into thriving hubs for business, mentorship, and collaboration. EFADO brings together trusted payments, local commerce, learning, and social networking in one practical place."
     },
     {
       id: 2,
       title: "Building Marriage Resilience in the Modern Age",
       category: "Relationships",
-      excerpt: "Tactical advice for young couples navigating the complexities of career and family in a fast-paced global economy...",
+      excerpt: "Practical advice for couples balancing work, finances, and family life in a busy world...",
       date: "Oct 10, 2023",
-      image: "https://picsum.photos/seed/blog2/600/400",
-      content: "Building long-term relationship resilience in contemporary, fast-paced commercial hubs requires structured intentionality and shared priorities. Today's couples navigate complex pressures from hybrid career shifts, globalized social media comparisons, and evolving economic parameters. Tactical resilience begins with absolute financial transparency, transparent communication protocols, and dedicating screen-free spaces in home environments. EFADO's 'Wives Forum' and community circles seek to establish a solid backing where values and long-term commitments are anchored in communal wisdom."
+      image: "https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=800&q=80",
+      content: "Strong relationships thrive on clear communication, shared goals, and financial openness. Setting aside quality time together and learning from supportive communities like EFADO's Wives Forum helps families grow stronger together."
     },
     {
       id: 3,
       title: "Spiritual Leadership: Leading with Integrity",
       category: "Religion",
-      excerpt: "A deep dive into the theological foundations of leadership and how pastors can impact their communities positively...",
+      excerpt: "How faith leaders can mentor communities with transparency, care, and lasting impact...",
       date: "Oct 08, 2023",
-      image: "https://picsum.photos/seed/blog3/600/400",
-      content: "Primacy of integrity remains the absolute non-negotiable metric for spiritual guides and community builders in our contemporary connected age. Pastors, ministers, and elders must establish clear ethical boundaries, transparent financial reporting, and high personal accountability standards. Stewardship is not about visual popularity or digital engagement counts; it is about local human integration, spiritual authenticity, and the selfless growth of congregants. Engaging in tactical peer forums helps modern leaders align their actions with original scriptures and eternal parameters."
+      image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
+      content: "Integrity and genuine care remain the foundation of spiritual leadership. Transparency, accountability, and active community support help leaders serve their congregations faithfully."
     }
   ];
 
-  // Ad Deployment Plans
+  // Ad Plans
   const AD_PLANS = [
     {
-      name: "Tactical Entry",
+      name: "Starter Trial",
       duration: "3 Days",
       amount: 0,
-      description: "Free trial period for local testing deployment.",
-      features: ["1 Active Campaign", "Basic Reach Intel", "Category Targeting"]
+      description: "Free trial period to test your campaign.",
+      features: ["1 Active Campaign", "Basic Reach Stats", "Category Targeting"]
     },
     {
-      name: "Standard Deployment",
+      name: "Standard Plan",
       duration: "Monthly",
       amount: 10000,
       description: "Consistent brand presence.",
       features: ["3 Active Campaigns", "Standard Analytics", "Interest Targeting", "Email Support"]
     },
     {
-      name: "Strategic Growth",
+      name: "Growth Plan",
       duration: "Quarterly",
       amount: 25000,
-      description: "Optimized cost efficiency.",
-      features: ["10 Active Campaigns", "Advanced Analytics", "Behavioral Layering", "Priority Chat"]
+      description: "Better value for growing businesses.",
+      features: ["10 Active Campaigns", "Detailed Analytics", "Audience Insights", "Priority Chat"]
     },
     {
-      name: "Operational Command",
+      name: "Business Pro",
       duration: "6 Months",
       amount: 45000,
-      description: "Global sustained influence.",
-      features: ["25 Active Campaigns", "Verified Badge", "Retargeting Data", "Strategy Support"]
+      description: "Sustained visibility across hubs.",
+      features: ["25 Active Campaigns", "Verified Badge", "Retargeting Tools", "Campaign Support"]
     },
     {
-      name: "Global Authority",
+      name: "Annual Reach",
       duration: "Yearly",
       amount: 80000,
-      description: "Maximum market scale.",
-      features: ["Unlimited Campaigns", "Real-time API", "Account Manager", "Reach Boost"]
+      description: "Full-year promotion coverage.",
+      features: ["Unlimited Campaigns", "Live Stats", "Account Manager", "Priority Placement"]
     },
     {
-      name: "Sovereign Scale",
-      duration: "Enterprise",
+      name: "Enterprise",
+      duration: "Custom",
       amount: -1, 
-      description: "Bespoke infrastructure.",
-      features: ["Tailored Solutions", "White-label Options", "24/7 Elite Support", "Custom API"]
+      description: "Custom plan for large organizations.",
+      features: ["Tailored Solutions", "Custom Branding", "24/7 Support", "Dedicated Assistance"]
     }
   ];
 
@@ -980,8 +981,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         id: 'mock-1',
         authorId: 'system-1',
         authorName: 'Dr. Sarah (Lead Eng)',
-        authorPhoto: 'https://picsum.photos/seed/sarah/100/100',
-        content: "Deploying the sovereign EFADO digital architecture with 100% end-to-end encryption protocols. Welcome to EFADO Nexus Hub! Express your thoughts freely, connect in specialized hubs, and explore creator monetization channels! 🛡️🚀",
+        authorPhoto: '',
+        content: "Welcome to EFADO Gist Hub! Share updates, join topic groups, watch short video reels, and connect with creators across Nigeria and beyond.",
         likes: ['user-1'],
         comments: [],
         category: 'TECH',
@@ -991,8 +992,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         id: 'mock-2',
         authorId: 'system-2',
         authorName: 'Minister Caleb',
-        authorPhoto: 'https://picsum.photos/seed/caleb/100/100',
-        content: "Integrity is the chief cornerstone of community-building. In these modern spaces, we seek fruitful relationships, professional excellence, and wisdom. Join the Church Administration or Marriage and Courtship hubs for deep discourse! 📖✨",
+        authorPhoto: '',
+        content: "Integrity is the chief cornerstone of community-building. In these modern spaces, we seek fruitful relationships, professional excellence, and wisdom. Join the Church Administration or Marriage and Courtship hubs for deep discourse!",
         likes: [],
         comments: [],
         category: 'RELIGIOUS',
@@ -1002,8 +1003,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         id: 'mock-3',
         authorId: 'system-3',
         authorName: 'Victoria (Business Head)',
-        authorPhoto: 'https://picsum.photos/seed/victoria/100/100',
-        content: "A professional network thrives on collaborative feedback and mutual mentorship. We are rolling out creator monetization payouts so active gisters can monetize their community traffic! Let's build together! 💼💰",
+        authorPhoto: '',
+        content: "A professional network thrives on collaborative feedback and mutual mentorship. Explore creator monetization payouts as you post helpful content and grow your audience!",
         likes: ['user-2', 'user-3'],
         comments: [],
         category: 'BUSINESS',
@@ -1177,34 +1178,30 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         roomId: activeChatRoomId,
         senderId: user.uid,
         senderName: user.displayName || user.email.split('@')[0],
-        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        senderPhoto: user.photoURL || '',
         content: text,
         mediaUrl: media || null,
         timestamp: serverTimestamp()
       });
 
-      // Simulate live tactical reply
+      // Simulate automated chat reply
       setTimeout(async () => {
-        let reply = "Affirmative. Command received with high status integrity.";
-        let senderName = "System";
-        let senderPhoto = "https://picsum.photos/seed/system/100/100";
+        let reply = "Message received! Thanks for sharing.";
+        let senderName = "EFADO Team";
+        let senderPhoto = "";
         
         if (activeChatRoomId === 'sarah') {
-          reply = "Understood. The signal remains secure. Syncing node updates now.";
+          reply = "Thanks for reaching out! Checking the latest platform updates now.";
           senderName = "Dr. Sarah (Lead Eng)";
-          senderPhoto = "https://picsum.photos/seed/sarah/100/100";
         } else if (activeChatRoomId === 'tactical-hq') {
-          reply = "Node received. Broadcasting data stream to strategic channels.";
-          senderName = "Tactical HQ";
-          senderPhoto = "https://picsum.photos/seed/tactical/100/100";
+          reply = "Message posted to the Community HQ channel.";
+          senderName = "Community HQ";
         } else if (activeChatRoomId === 'global') {
-          reply = "Live bridge signal received with 100% integrity. Welcome!";
-          senderName = "Global Outreach";
-          senderPhoto = "https://picsum.photos/seed/global/100/100";
+          reply = "Welcome to the Global Chat Room! Feel free to share your thoughts.";
+          senderName = "Global Chat";
         } else if (activeChatRoomId === 'bishop') {
-          reply = "Blessings to you. Keep pushing the boundary of strategic excellence.";
-          senderName = "Bishop T. (Spiritual)";
-          senderPhoto = "https://picsum.photos/seed/bishop/100/100";
+          reply = "Blessings to you. Wishing you a productive day ahead.";
+          senderName = "Bishop T.";
         }
 
         try {
@@ -1234,7 +1231,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         roomId: activeChatRoomId,
         senderId: user.uid,
         senderName: user.displayName || user.email.split('@')[0],
-        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        senderPhoto: user.photoURL || '',
         content: `[LEDGER_TX] currency:${currency}|amount:${amount}|memo:${memo}`,
         mediaUrl: null,
         timestamp: serverTimestamp()
@@ -1253,7 +1250,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         roomId: activeChatRoomId,
         senderId: user.uid,
         senderName: user.displayName || user.email.split('@')[0],
-        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        senderPhoto: user.photoURL || '',
         content: `[FLASH_BUZZ]`,
         mediaUrl: null,
         timestamp: serverTimestamp()
@@ -1269,7 +1266,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
         roomId: activeChatRoomId,
         senderId: user.uid,
         senderName: user.displayName || user.email.split('@')[0],
-        senderPhoto: user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`,
+        senderPhoto: user.photoURL || '',
         content: `[VERIFICATION_REQ]`,
         mediaUrl: null,
         timestamp: serverTimestamp()
@@ -1407,11 +1404,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <button 
+                    type="button"
                     onClick={() => {
                       setShowGuide(false);
-                      window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: HUB_GUIDES.nexus.helpCategory } }));
+                      openSupportHelpForm({ hub: 'EFADO Nexus Hub', subject: 'Account' });
                     }}
-                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2"
+                    className="flex-1 min-h-[44px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <MessageCircle className="w-4 h-4 text-cyan-400" /> Need Help? Chat Us
                   </button>
@@ -1484,7 +1482,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 onClick={() => setShowGuide(true)}
                 className="text-[9px] font-black text-[#06B6D4] uppercase tracking-widest flex items-center gap-1 hover:text-cyan-300 transition-colors mt-0.5 bg-[#06B6D4]/10 px-2 py-0.5 rounded-lg border border-[#06B6D4]/30"
               >
-                <HelpCircle className="w-3 h-3" /> Tactical Guide
+                <HelpCircle className="w-3 h-3" /> View Guide
               </button>
             </div>
           </div>
@@ -1542,8 +1540,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
           {/* User Profile Mini */}
           <div className="p-4 md:p-6 border-t border-white/10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-[#8B5CF6]/20 overflow-hidden flex-shrink-0 p-0.5 border border-[#8B5CF6]/30">
-                <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-[#8B5CF6]/20 overflow-hidden flex-shrink-0 p-0.5 border border-[#8B5CF6]/30 flex items-center justify-center">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Me" className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full rounded-xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center">
+                    {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
               <div className="hidden md:block overflow-hidden">
                 <p className="text-sm font-bold text-white truncate">{user.displayName || user.email.split('@')[0]}</p>
@@ -1576,8 +1580,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 {activeView === 'MONETIZATION' && 'EFADO NEXUS HUB • Creator Monetization Fund'}
                 {activeView === 'LIVE' && 'EFADO NEXUS HUB • Live WebRTC Streaming'}
                 {activeView === 'COMMUNITIES' && 'EFADO NEXUS HUB • Community Groups'}
-                {activeView === 'BLOG' && 'EFADO NEXUS HUB • Strategic Briefings'}
-                {activeView === 'TOOLS' && 'EFADO NEXUS HUB • Tactical Industry Tools'}
+                {activeView === 'BLOG' && 'EFADO NEXUS HUB • Articles & Guides'}
+                {activeView === 'TOOLS' && 'EFADO NEXUS HUB • Creator & Ad Tools'}
                 {activeView === 'FAQ' && 'EFADO NEXUS HUB • Support & FAQ'}
                 {activeView === 'CATEGORIES' && 'EFADO NEXUS HUB • Explore Hubs'}
                 {activeView === 'ADS' && 'EFADO NEXUS HUB • Advertise & Monetize'}
@@ -1709,11 +1713,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     id: b.id,
                     title: b.title,
                     category: b.category || 'Technology',
-                    excerpt: b.excerpt || 'Read this full strategic briefing inside the EFADO Nexus Hub platform.',
+                    excerpt: b.excerpt || 'Read the full article inside the EFADO Nexus Hub.',
                     date: b.createdAt?.seconds 
                       ? new Date(b.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: '2-digit', year: 'numeric' }) 
                       : 'Just Now',
-                    image: b.image || 'https://picsum.photos/seed/blog/600/400',
+                    image: b.image || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80',
                     content: b.content
                   })),
                   ...BLOG_POSTS
@@ -1725,41 +1729,43 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="max-w-6xl mx-auto p-8 space-y-12 animate-fade-in"
+                    className="max-w-6xl mx-auto p-6 sm:p-8 space-y-12 animate-fade-in"
                   >
-                    <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 golden-card-border p-12 rounded-[3.5rem] text-center relative overflow-hidden flex flex-col items-center">
+                    <div className="bg-slate-900/40 backdrop-blur-xl border border-white/5 golden-card-border p-8 sm:p-12 rounded-[2.5rem] sm:rounded-[3.5rem] text-center relative overflow-hidden flex flex-col items-center">
                       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -mr-32 -mt-32" />
-                      <h3 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">SEO Resource Hub</h3>
-                      <p className="text-slate-400 text-lg max-w-2xl mx-auto font-medium leading-relaxed mb-8">
-                        Deep-dive into tactical industry trends, community management, and professional roadmaps.
+                      <h3 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tighter mb-4">Resource & Article Hub</h3>
+                      <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto font-medium leading-relaxed mb-8">
+                        Explore helpful guides, community tips, and step-by-step growth roadmaps.
                       </p>
                       <button 
                         type="button"
                         onClick={() => setShowBlogCreateModal(true)}
                         className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-600/20 hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center gap-3 border border-indigo-500/30"
                       >
-                        <PlusCircle className="w-5 h-5 text-indigo-200" /> Publish Strategic Entry
+                        <PlusCircle className="w-5 h-5 text-indigo-200" /> Publish Article
                       </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                       {ALL_BLOG_POSTS.map((post, idx) => (
-                      <div key={`blog-post-${post.id || idx}-${idx}`} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-xl shadow-gray-100/50 group hover:-translate-y-2 transition-all">
-                        <div className="h-56 overflow-hidden relative">
+                      <div key={`blog-post-${post.id || idx}-${idx}`} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-xl shadow-gray-100/50 group hover:-translate-y-2 transition-all flex flex-col">
+                        <div className="h-56 overflow-hidden relative shrink-0">
                           <img src={post.image} alt={post.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" referrerPolicy="no-referrer" />
                           <div className="absolute top-4 left-4 px-4 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">
                             {post.category}
                           </div>
                         </div>
-                        <div className="p-8">
-                          <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-4">{post.date}</p>
-                          <h4 className="text-xl font-black text-gray-950 uppercase tracking-tight mb-4 leading-tight group-hover:text-indigo-600 transition-colors">{post.title}</h4>
-                          <p className="text-sm font-black text-gray-950 line-clamp-3 mb-8 leading-relaxed">{post.excerpt}</p>
+                        <div className="p-8 flex-1 flex flex-col justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-gray-950 uppercase tracking-widest mb-4">{post.date}</p>
+                            <h4 className="text-xl font-black text-gray-950 uppercase tracking-tight mb-4 leading-tight group-hover:text-indigo-600 transition-colors">{post.title}</h4>
+                            <p className="text-sm font-black text-gray-950 line-clamp-3 mb-8 leading-relaxed">{post.excerpt}</p>
+                          </div>
                           <button 
                             onClick={() => setSelectedBlogPost(post)}
                             className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-widest hover:translate-x-1 hover:text-indigo-850 transition-all"
                           >
-                            Read Tactical Entry <ChevronRight className="w-4 h-4" />
+                            Read Article <ChevronRight className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -1768,16 +1774,16 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                   {/* Related Content Strip */}
                   <div className="pt-12 border-t border-gray-100">
-                    <h4 className="text-[10px] font-black text-gray-950 uppercase tracking-[0.3em] mb-8">Recommended for Strategists</h4>
+                    <h4 className="text-[10px] font-black text-gray-950 uppercase tracking-[0.3em] mb-8">Recommended Reading</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                       {[1,2,3,4].map(i => (
                         <div key={i} className="flex gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:shadow-xl hover:shadow-gray-100/50 transition-all group cursor-pointer">
-                          <div className="w-16 h-16 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
-                             <img src={`https://picsum.photos/seed/rec${i}/100/100`} alt="Rec" referrerPolicy="no-referrer" />
+                          <div className="w-16 h-16 bg-indigo-600 rounded-xl overflow-hidden flex-shrink-0 border border-indigo-500/20 flex items-center justify-center text-white font-black text-lg">
+                             R{i}
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Resource {i}</p>
-                            <p className="text-[11px] font-black text-gray-900 uppercase tracking-tight line-clamp-2 leading-tight">Advanced Community Tactics</p>
+                            <p className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Guide {i}</p>
+                            <p className="text-[11px] font-black text-gray-900 uppercase tracking-tight line-clamp-2 leading-tight">Community Growth Guide</p>
                           </div>
                         </div>
                       ))}
@@ -1797,8 +1803,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 >
                   <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-12 rounded-[3.5rem] border border-white/5 golden-card-border relative overflow-hidden">
                     <div className="relative z-10">
-                      <h3 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">Tactical Social ROI Calculator</h3>
-                      <p className="text-indigo-200/60 text-lg mb-10 max-w-xl font-medium leading-relaxed">Calculate the engagement effectiveness and financial ROI of your tactical gists and advertisement campaigns.</p>
+                      <h3 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tighter mb-4">Social ROI Calculator</h3>
+                      <p className="text-indigo-200/60 text-base sm:text-lg mb-10 max-w-xl font-medium leading-relaxed">Estimate the engagement rate and returns from your posts and ad campaigns.</p>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black/40 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/10">
                         <div className="space-y-6">
@@ -1847,13 +1853,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
                         <div className="flex flex-col items-center justify-center p-8 bg-indigo-600/20 rounded-[2rem] border border-indigo-500/30">
                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Engagement Rate</p>
-                           <p className="text-6xl font-black text-white tracking-tighter mb-2">
+                           <p className="text-5xl sm:text-6xl font-black text-white tracking-tighter mb-2">
                              {roiResult !== null ? `${roiResult}%` : '--'}
                            </p>
                            <p className={`text-[10px] font-bold uppercase tracking-widest transition-all ${
                              roiResult !== null && roiResult > 4 ? 'text-emerald-400' : roiResult !== null && roiResult > 1.5 ? 'text-amber-400' : 'text-slate-400'
                            }`}>
-                             {roiResult !== null ? (roiResult > 4 ? 'Industry Standard: High' : roiResult > 1.5 ? 'Industry Standard: Average' : 'Industry Standard: Low') : 'Fill Out Estimates'}
+                             {roiResult !== null ? (roiResult > 4 ? 'Performance: High' : roiResult > 1.5 ? 'Performance: Average' : 'Performance: Low') : 'Enter Numbers Above'}
                            </p>
                         </div>
                       </div>
@@ -1873,19 +1879,21 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           let rate = (eng / imp) * 100;
                           if (rate > 100) rate = 100;
                           setRoiResult(parseFloat(rate.toFixed(2)));
-                          alert(`Execution ROI Calculated successfully! Rate: ${rate.toFixed(2)}%. This falls in our high engagement sector bracket.`);
+                          alert(`Engagement Rate Calculated! Rate: ${rate.toFixed(2)}%.`);
                         }}
                         className="mt-8 w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-500/20 hover:scale-[1.02] transition-all"
                       >
-                        Calculate Execution ROI
+                        Calculate Engagement ROI
                       </button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50">
-                       <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Content Strategy Tool</h5>
-                       <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Map out your community engagement roadmaps with our tactical content calendar generator.</p>
+                    <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50 flex flex-col justify-between">
+                       <div>
+                         <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Content Planner</h5>
+                         <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Plan your weekly community posts and campaigns using our content calendar planner.</p>
+                       </div>
                        <button 
                          onClick={() => {
                            setInteractiveCalendarOpen(true);
@@ -1893,28 +1901,30 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                          }}
                          className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform"
                        >
-                         Execute App <ChevronRight className="w-4 h-4" />
+                         Open Calendar <ChevronRight className="w-4 h-4" />
                        </button>
                     </div>
-                    <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50">
-                       <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Ad Performance Matrix</h5>
-                       <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Analyze conversion rates and sector-specific reach for your Efado hub advertisements.</p>
+                    <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-xl shadow-gray-100/50 flex flex-col justify-between">
+                       <div>
+                         <h5 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Ad Reach Estimator</h5>
+                         <p className="text-sm font-medium text-gray-500 mb-6 leading-relaxed">Estimate clicks and customer leads for your EFADO advertising campaigns.</p>
+                       </div>
                        <button 
                          onClick={() => {
                            const imp = parseFloat(roiImpressions) || 50000;
                            const clicks = Math.floor(imp * 0.024);
                            const conversions = Math.floor(clicks * 0.15);
                            alert(
-                             `--- EFADO AD PERFORMANCE STRATEGIC ANALYSIS ---\n\n` + 
-                             `🎯 Estimated Reach: ${imp.toLocaleString()} users\n` +
-                             `🖱️ Predicted Clicks (2.4% CTR): ${clicks.toLocaleString()}\n` +
-                             `📈 Predicted Conversions (15% CR): ${conversions.toLocaleString()} leads\n\n` +
-                             `Your current campaign parameters reside within our primary tier efficiency rating!`
+                             `--- EFADO AD PERFORMANCE SUMMARY ---\n\n` + 
+                             `🎯 Estimated Reach: ${imp.toLocaleString()} users\n` + 
+                             `🖱️ Predicted Clicks (2.4% CTR): ${clicks.toLocaleString()}\n` + 
+                             `📈 Predicted Leads (15% CR): ${conversions.toLocaleString()} leads\n\n` + 
+                             `Your campaign estimates look healthy!`
                            );
                          }}
                          className="text-indigo-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform"
                        >
-                         Execute App <ChevronRight className="w-4 h-4" />
+                         Estimate Reach <ChevronRight className="w-4 h-4" />
                        </button>
                     </div>
                   </div>
@@ -1930,8 +1940,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   className="max-w-4xl mx-auto p-8 space-y-12"
                 >
                   <div className="text-center">
-                    <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4">Help & Strategic FAQ</h2>
-                    <p className="text-gray-950 text-lg font-black uppercase tracking-tight">Resolving objections and providing tactical clarity for EFADO Nexus Hub users.</p>
+                    <h2 className="text-2xl sm:text-4xl font-black text-gray-900 uppercase tracking-tighter mb-4">Help & FAQ</h2>
+                    <p className="text-gray-950 text-base sm:text-lg font-black uppercase tracking-tight">Clear answers to common questions for EFADO Nexus Hub members.</p>
                   </div>
 
                   <div className="space-y-4">
@@ -1956,8 +1966,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                   <div className="bg-indigo-600 rounded-[3rem] p-12 text-center text-white relative overflow-hidden">
                     <div className="relative z-10">
-                      <h4 className="text-2xl font-black uppercase tracking-tight mb-4">Still need intel?</h4>
-                      <p className="text-indigo-100 mb-8 font-medium">Connect with our support strategists globally.</p>
+                      <h4 className="text-2xl font-black uppercase tracking-tight mb-4">Still need help?</h4>
+                      <p className="text-indigo-100 mb-8 font-medium">Connect with our friendly support team.</p>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10 text-left max-w-2xl mx-auto">
                         <div className="bg-white/10 p-6 rounded-2xl border border-white/10">
@@ -1967,9 +1977,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         </div>
                         <div className="bg-white/10 p-6 rounded-2xl border border-white/10">
                           <Phone className="w-5 h-5 text-indigo-200 mb-2" />
-                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">CEO Consultancy</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Customer Support Line</p>
                           <p className="text-sm font-black">{PHONE_NUMBERS.CONSULTANCY_CEO}</p>
-                          <p className="text-[10px] font-bold mt-1 opacity-60 italic">Global Response Protocol</p>
+                          <p className="text-[10px] font-bold mt-1 opacity-60 italic">Always Available Support</p>
                         </div>
                       </div>
 
@@ -1979,7 +1989,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           className="px-12 py-4 bg-white text-indigo-600 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                         >
                           <Mail className="w-4 h-4" />
-                          Email Support Matrix
+                          Email Support Team
                         </a>
                         <div className="flex items-center gap-4 px-6 py-4 bg-white/20 rounded-2xl backdrop-blur-md">
                           <Phone className="w-4 h-4 text-emerald-400" />
@@ -2114,8 +2124,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       />
 
                       <div className="flex items-start gap-3 sm:gap-4">
-                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0">
-                          <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0 bg-indigo-600 flex items-center justify-center text-white font-black text-sm">
+                          {user.photoURL ? (
+                            <img src={user.photoURL} alt="User" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            (user.displayName || user.email || 'U').charAt(0).toUpperCase()
+                          )}
                         </div>
                         <div className="flex-grow space-y-3">
                           <textarea 
@@ -2375,8 +2389,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               {/* Author & Header */}
                               <div className="flex items-center justify-between gap-1.5 pb-2 border-b border-white/5">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full ring-1 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0">
-                                    <img src={post.authorPhoto || `https://picsum.photos/seed/${post.authorId}/100/100`} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full ring-1 ring-[#8B5CF6]/50 overflow-hidden flex-shrink-0 bg-indigo-600 flex items-center justify-center text-white font-black text-xs">
+                                    {post.authorPhoto ? (
+                                      <img src={post.authorPhoto} alt={post.authorName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      (post.authorName || 'M').charAt(0).toUpperCase()
+                                    )}
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1">
@@ -2578,7 +2596,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     onShare={(item) => setSharingItem({ type: 'REEL', id: item.id })}
                     onTip={(id) => {
                       // Trigger tip flow
-                      alert("Opening Tactical Tipping Gateway for Reel: " + id);
+                      alert("Opening Creator Tipping for Reel: " + id);
                     }}
                   />
                 </motion.div>
@@ -2631,10 +2649,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   {/* Chat List - Style Tabs */}
                   {(() => {
                     const defaultRooms = [
-                      { id: 'tactical-hq', name: 'Tactical HQ', status: '8 members', time: '12:45', msg: 'System check complete.', unread: 0, type: 'GROUP' },
-                      { id: 'sarah', name: 'Dr. Sarah (Lead Eng)', status: 'Active', time: '11:20', msg: 'The encryption keys are synced.', unread: 0, type: 'DIRECT' },
-                      { id: 'global', name: 'Global Chat (Real-time with Colleague)', status: 'Live Cross-Device Bridge', time: 'Yesterday', msg: 'Active real-time public bridge.', unread: 0, type: 'GROUP' },
-                      { id: 'bishop', name: 'Bishop T. (Spiritual)', status: 'Online', time: 'Monday', msg: 'Blessings for the project.', unread: 0, type: 'DIRECT' }
+                      { id: 'tactical-hq', name: 'Community HQ', status: '8 members', time: '12:45', msg: 'Community chat is active.', unread: 0, type: 'GROUP' },
+                      { id: 'sarah', name: 'Dr. Sarah (Support)', status: 'Active', time: '11:20', msg: 'Encrypted messages are ready.', unread: 0, type: 'DIRECT' },
+                      { id: 'global', name: 'Global Chat (Live Members)', status: 'Live Group Chat', time: 'Yesterday', msg: 'Active real-time public room.', unread: 0, type: 'GROUP' },
+                      { id: 'bishop', name: 'Bishop T. (Community)', status: 'Online', time: 'Monday', msg: 'Blessings for the week.', unread: 0, type: 'DIRECT' }
                     ];
 
                     const dynamicGroupsList = groups.map(g => ({
@@ -2642,7 +2660,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       name: g.name,
                       status: g.status || 'Active Group',
                       time: 'Just Now',
-                      msg: g.msg || 'Ready for real-time sync.',
+                      msg: g.msg || 'Ready for real-time chat.',
                       unread: 0,
                       type: 'GROUP'
                     }));
@@ -2672,16 +2690,16 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         dummy.push({
                           id: 'init-sarah',
                           senderId: 'sarah',
-                          senderName: 'Dr. Sarah (Lead Eng)',
-                          content: 'The sovereign encryption protocols are now live. All tactical bridges are holding 100% integrity. 🛡️',
+                          senderName: 'Dr. Sarah (Support)',
+                          content: 'End-to-end encryption is active. Your messages stay private and secure. 🛡️',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else if (activeChatRoomId === 'tactical-hq') {
                         dummy.push({
                           id: 'init-hq',
                           senderId: 'tactical-hq',
-                          senderName: 'Tactical HQ',
-                          content: 'System check complete. Welcome to Tactical HQ. Report active status.',
+                          senderName: 'Community HQ',
+                          content: 'Welcome to Community HQ! Feel free to introduce yourself and share updates.',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else if (activeChatRoomId === 'global') {
@@ -2689,14 +2707,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           id: 'init-global',
                           senderId: 'global',
                           senderName: 'Global Chat',
-                          content: 'Welcome to the Live Global Chat Room! Anyone on any phone or computer can chat here in real-time. Try sending a message and have your colleague open EFADO Nexus Hub -> Messages -> Global Chat on their phone!',
+                          content: 'Welcome to the Live Global Chat Room! Anyone on any phone or computer can chat here in real-time. Try sending a message and have your friend open EFADO Nexus Hub -> Messages -> Global Chat on their phone!',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else if (activeChatRoomId === 'bishop') {
                         dummy.push({
                           id: 'init-bishop',
                           senderId: 'bishop',
-                          senderName: 'Bishop T. (Spiritual)',
+                          senderName: 'Bishop T. (Community)',
                           content: 'Blessings for the project. Wisdom is the principal thing, so get wisdom and understanding.',
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
@@ -2705,7 +2723,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           id: `init-${activeChatRoomId}`,
                           senderId: activeChatRoomId,
                           senderName: `Private Room: ${activeChatRoomId}`,
-                          content: `Welcome to your private room "${activeChatRoomId}"! Tell your colleague to enter this exact room code on their phone to connect. Your conversation is secure and synced in real-time.`,
+                          content: `Welcome to your private room "${activeChatRoomId}"! Tell your friend to enter this exact room code on their phone to connect. Your conversation is private and synced in real-time.`,
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       } else {
@@ -2715,7 +2733,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           id: `init-${activeChatRoomId}`,
                           senderId: activeChatRoomId,
                           senderName: matchingGroup ? matchingGroup.name : 'Group Chat',
-                          content: `Welcome to the custom secure group "${matchingGroup ? matchingGroup.name : activeChatRoomId}". Describe your tactical plan or share insights with team members!`,
+                          content: `Welcome to the group "${matchingGroup ? matchingGroup.name : activeChatRoomId}". Share updates and ideas with your group members!`,
                           timestamp: { seconds: Date.now() / 1000 - 120 }
                         });
                       }
@@ -2728,7 +2746,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       <>
                         <div className={`w-full md:w-96 border-r border-white/5 flex flex-col bg-slate-900/90 backdrop-blur-xl shrink-0 ${mobileChatView === 'chat' ? 'hidden md:flex' : 'flex'}`}>
                           <div className="p-6 border-b border-white/5 bg-indigo-600">
-                             <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Secure Comms</h4>
+                             <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-6 italic">Messages</h4>
                              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-2xl">
                                 <button 
                                   onClick={() => {
@@ -2752,7 +2770,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                   onClick={() => setChatSubTab('BRIDGES')}
                                   className={`flex-grow py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${chatSubTab === 'BRIDGES' ? 'bg-white text-indigo-600 shadow-xl' : 'text-white hover:bg-white/5'}`}
                                 >
-                                  Bridges
+                                  Hub Links
                                 </button>
                              </div>
                           </div>
@@ -2762,7 +2780,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                               <input 
                                 type="text" 
-                                placeholder="Search sovereign logs..."
+                                placeholder="Search messages..."
                                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest outline-none focus:ring-1 focus:ring-indigo-500/30"
                               />
                             </div>
@@ -2779,13 +2797,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                 onClick={() => setShowCreateGroupModal(true)}
                                 className="w-full py-2.5 bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:border-emerald-500 text-emerald-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                               >
-                                <Plus className="w-4 h-4 animate-pulse" /> Create Sovereign Group
+                                <Plus className="w-4 h-4 animate-pulse" /> Create Group
                               </button>
                             )}
                             {chatSubTab === 'BRIDGES' && (
                               <div className="py-2 px-3 bg-indigo-950/40 border border-indigo-500/10 rounded-xl text-center">
                                 <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest block animate-pulse">
-                                  ● Tactical Cross-System Hyper-Links Active
+                                  ● Quick Hub Links Active
                                 </span>
                               </div>
                             )}
@@ -2794,10 +2812,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           {chatSubTab === 'BRIDGES' ? (
                             <div className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-4">
                               {[
-                                { id: 'bridge-community', name: 'Community Hub Bridge', desc: 'Secure connection line to CSCC registry and shared community boards.', hub: 'COMMUNITY_HUBS', status: 'Online' },
-                                { id: 'bridge-domains', name: 'Domain Portfolio Bridge', desc: 'Active strategic pipeline for premium domains and bidding negotiations.', hub: 'DOMAIN_HUB', status: 'Online' },
-                                { id: 'bridge-education', name: 'Education Hub Interconnect', desc: 'Dedicated line for professional learning curriculum and certifications.', hub: 'EDUCATION', status: 'Online' },
-                                { id: 'bridge-zoom', name: 'Tactical Zoom Bridge', desc: 'High-integrity secure teleconferencing & virtual team meetings.', hub: 'ZOOM', status: 'Online' }
+                                { id: 'bridge-community', name: 'Community Hubs', desc: 'Direct link to CSCC groups and shared community boards.', hub: 'COMMUNITY_HUBS', status: 'Online' },
+                                { id: 'bridge-domains', name: 'Domain Marketplace', desc: 'Direct link to browse, register, and trade domain names.', hub: 'DOMAIN_HUB', status: 'Online' },
+                                { id: 'bridge-education', name: 'Education Hub', desc: 'Direct link to study materials, courses, and learning tools.', hub: 'EDUCATION', status: 'Online' },
+                                { id: 'bridge-zoom', name: 'Zoom Meetings', desc: 'Start or join live video meetings with your team.', hub: 'ZOOM', status: 'Online' }
                               ].map((bridge) => (
                                 <div 
                                   key={bridge.id} 
@@ -2819,12 +2837,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                       if (onNavigate) {
                                         onNavigate(bridge.hub);
                                       } else {
-                                        alert(`Connecting tactical bridge: ${bridge.name}`);
+                                        alert(`Opening hub link: ${bridge.name}`);
                                       }
                                     }}
                                     className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all text-center flex items-center justify-center gap-1.5"
                                   >
-                                    <Link2 className="w-3.5 h-3.5" /> Initialize Bridge
+                                    <Link2 className="w-3.5 h-3.5" /> Open Hub
                                   </button>
                                 </div>
                               ))}
@@ -2841,8 +2859,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                   className={`w-full p-6 flex items-center gap-4 hover:bg-indigo-600/10 transition-all border-b border-white/5 group border-l-4 ${activeChatRoomId === chat.id ? 'border-l-indigo-600 bg-indigo-600/5' : 'border-l-transparent'}`}
                                 >
                                   <div className="relative flex-shrink-0">
-                                    <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 overflow-hidden border border-white/10 shadow-sm">
-                                      <img src={`https://picsum.photos/seed/${chat.id}/100/100`} alt="User" referrerPolicy="no-referrer" />
+                                    <div className="w-14 h-14 rounded-2xl bg-indigo-600/20 overflow-hidden border border-white/10 shadow-sm flex items-center justify-center text-white font-black text-lg">
+                                      {(chat.name || 'C').charAt(0).toUpperCase()}
                                     </div>
                                     {chat.status.includes('Active') && <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full" />}
                                   </div>
@@ -2875,14 +2893,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               >
                                 <ArrowLeft className="w-5 h-5 text-purple-400" />
                               </button>
-                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
-                                <img src={`https://picsum.photos/seed/${activeChatRoomId}/100/100`} alt="User" className="rounded-2xl w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-600 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0 flex items-center justify-center text-white font-black text-base">
+                                {(activeRoomDef.name || 'C').charAt(0).toUpperCase()}
                               </div>
                               <div className="min-w-0">
                                 <h5 className="text-sm sm:text-base font-black text-white uppercase tracking-tight truncate">{activeRoomDef.name}</h5>
                                 <div className="flex items-center gap-1.5 sm:gap-2">
                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse flex-shrink-0" />
-                                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest truncate">Encrypted Signal Active</p>
+                                   <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest truncate">End-to-End Encrypted</p>
                                 </div>
                               </div>
                             </div>
@@ -2933,20 +2951,20 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                                           </div>
                                           <div>
                                             <p className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">LEDGER TRANSMITTED</p>
-                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Sovereign Proof Validated</p>
+                                            <p className="text-[10px] font-bold text-slate-400">Payment Receipt Verified</p>
                                           </div>
                                         </div>
                                         <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded uppercase tracking-wider">SECURE</span>
                                       </div>
                                       
                                       <div className="space-y-1">
-                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">TRANSMISSION SIZE</p>
+                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">TRANSFER AMOUNT</p>
                                         <p className="text-xl font-black text-white tracking-tight">{(data.amount ? Number(data.amount) : 50000).toLocaleString()} <span className="text-emerald-400 font-extrabold">{data.currency || 'NGN'}</span></p>
                                       </div>
 
                                       <div className="space-y-1 border-t border-white/5 pt-3">
-                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SECURE MEMO / PURPOSE</p>
-                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-wider truncate">{data.memo || 'Tactical Ledger Sync'}</p>
+                                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">PAYMENT NOTE</p>
+                                        <p className="text-xs font-semibold text-slate-300 truncate">{data.memo || 'Wallet Transfer'}</p>
                                       </div>
 
                                       <div className="bg-white/5 border border-white/5 p-3 rounded-xl flex items-center justify-between">
@@ -3198,7 +3216,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             {showStickerPickerChat && (
                               <div className="absolute z-50 bottom-24 left-6 right-6 p-6 bg-slate-950 border border-white/15 rounded-3xl shadow-2xl">
                                 <div className="flex justify-between items-center mb-4">
-                                  <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Transmit Sovereign Sticker</h6>
+                                  <h6 className="text-[10px] font-black text-white uppercase tracking-widest">Choose a Sticker</h6>
                                   <button type="button" onClick={() => setShowStickerPickerChat(false)} className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400">Close</button>
                                 </div>
                                 <div className="grid grid-cols-4 gap-3 max-h-48 overflow-y-auto custom-scrollbar">
@@ -3414,8 +3432,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         <ArrowLeft className="w-5 h-5" />
                       </button>
                       <div>
-                        <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{selectedCategory.title}</h2>
-                        <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1 pl-1">Tactical Sub-Sections</p>
+                        <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tighter">{selectedCategory.title}</h2>
+                        <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mt-1 pl-1">Topic Sub-Sections</p>
                       </div>
                     </div>
                   </div>
@@ -3433,10 +3451,10 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                             </div>
                             <h4 className="text-xl font-black text-white uppercase tracking-tight mb-3">{sub.name}</h4>
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-8 leading-relaxed">
-                              This dedicated portal provides tactical intel and community discourse specifically for {sub.name}. 
+                              Explore helpful guides, discussions, and community resources for {sub.name}. 
                             </p>
                             <div className="flex items-center gap-2 text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-white transition-all">
-                              Execute Page Entry <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                              Open Section <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                             </div>
                           </button>
                         </div>
@@ -3492,29 +3510,29 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       <div className="bg-white/5 border border-white/10 rounded-[3rem] p-10">
                         <h4 className="text-xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-3">
                           <Info className="w-5 h-5 text-indigo-400" />
-                          Hub Overview & Strategic Mission
+                          Hub Overview & Mission
                         </h4>
                         <p className="text-slate-400 leading-relaxed font-medium">
-                          Welcome to the authoritative page for {selectedSubCategory.name}. This community is strategically designed to answer long-tail industry questions and provide a platform for high-level tactical engagement within the {selectedCategory.title} sector.
+                          Welcome to the community hub for {selectedSubCategory.name}. Connect with members, ask questions, and share helpful updates within {selectedCategory.title}.
                         </p>
                         <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-4">
                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
                              <p className="text-lg font-black text-white">4.8K</p>
-                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Active Units</p>
+                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Active Members</p>
                            </div>
                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
                              <p className="text-lg font-black text-white">12K+</p>
-                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Global Gists</p>
+                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Community Posts</p>
                            </div>
                            <div className="p-4 bg-white/5 rounded-2xl border border-white/5 text-center">
-                             <p className="text-lg font-black text-white">Elite</p>
+                             <p className="text-lg font-black text-white">Active</p>
                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Hub Status</p>
                            </div>
                         </div>
                       </div>
 
                       <div className="space-y-6">
-                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-1">Specialized Command Groups</h4>
+                        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-1">Specialized Discussion Groups</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {selectedSubCategory.groups?.map((group: string, idx: number) => (
                             <button
@@ -3531,7 +3549,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               <h5 className="text-xl font-black text-white uppercase tracking-tight mb-2 group-hover:text-indigo-400 transition-colors">{group}</h5>
                               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Interactive Deployment Active
+                                Group Chat Active
                               </p>
                             </button>
                           ))}
@@ -3541,33 +3559,34 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                     <div className="space-y-8">
                        <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-[3rem] p-8">
-                         <h5 className="text-sm font-black text-white uppercase tracking-tight mb-4">Tactical FAQ for {selectedSubCategory.name}</h5>
+                         <h5 className="text-sm font-black text-white uppercase tracking-tight mb-4">FAQ for {selectedSubCategory.name}</h5>
                          <div className="space-y-4">
                             {[1,2].map(i => (
                               <div key={i} className="space-y-2">
                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Question {i}?</p>
-                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Dedicated expert answers for long-tail search queries related to this sector.</p>
+                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">Helpful community answers and guidance for this topic.</p>
                               </div>
                             ))}
                          </div>
                        </div>
 
                        <div className="bg-emerald-600/10 border border-emerald-500/20 rounded-[3rem] p-8">
-                         <h5 className="text-sm font-black text-white uppercase tracking-tight mb-4">Hub Expert Support</h5>
+                         <h5 className="text-sm font-black text-white uppercase tracking-tight mb-4">Community Support</h5>
                          <div className="flex items-center gap-4 mb-6">
-                            <div className="w-12 h-12 rounded-2xl overflow-hidden border border-white/10">
-                              <img src="https://picsum.photos/seed/expert/100/100" alt="Expert" referrerPolicy="no-referrer" />
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-300 font-black text-lg">
+                              S
                             </div>
                             <div>
-                               <p className="text-xs font-black text-white uppercase">Agent Strategic</p>
-                               <p className="text-[9px] font-bold text-emerald-500 uppercase">Field Expert</p>
+                               <p className="text-xs font-black text-white uppercase">Hub Support</p>
+                               <p className="text-[9px] font-bold text-emerald-500 uppercase">Verified Helper</p>
                             </div>
                          </div>
                          <button 
-                           onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat', { detail: { category: 'Technical Hub Issues' } }))}
-                           className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all"
+                           type="button"
+                           onClick={() => openSupportHelpForm({ hub: 'EFADO Nexus Hub', subject: 'Other' })}
+                           className="w-full py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer"
                          >
-                           Launch Direct Support
+                           Chat with Support
                          </button>
                        </div>
                     </div>
@@ -3594,9 +3613,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </div>
               </div>
 
-              {/* Deployment Plans Section */}
+              {/* Ad Plans Section */}
               <div className="space-y-6">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-1">Strategic Deployment Plans</h4>
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] pl-1">Advertising Plans</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {AD_PLANS.map((plan, idx) => (
                     <div key={idx} className="group relative bg-[#0A0C16] border border-white/5 golden-card-border p-8 rounded-[2.5rem] flex flex-col hover:bg-slate-900 transition-all duration-500 overflow-hidden shadow-2xl">
@@ -3626,7 +3645,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         }}
                         className="relative z-10 w-full py-4 bg-white/5 border border-white/10 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-[#DAA520] hover:text-slate-900 hover:border-[#DAA520] transition-all shadow-xl"
                       >
-                        Deploy Plan
+                        Choose Plan
                       </button>
                     </div>
                   ))}
@@ -3703,8 +3722,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
                     <div className="px-12 pb-12 relative">
                       <div className="absolute -top-16 left-12">
-                        <div className="w-32 h-32 rounded-[2.5rem] border-8 border-slate-900 bg-slate-800 overflow-hidden shadow-2xl">
-                          <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/200/200`} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="w-32 h-32 rounded-[2.5rem] border-8 border-slate-900 bg-indigo-600 overflow-hidden shadow-2xl flex items-center justify-center text-white font-black text-4xl">
+                          {user.photoURL ? (
+                            <img src={user.photoURL} alt="Me" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            (user.displayName || user.email || 'U').charAt(0).toUpperCase()
+                          )}
                         </div>
                       </div>
                       <div className="pt-20 flex items-center justify-between">
@@ -3816,7 +3839,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           {posts.filter(p => p.authorId === user.uid).map((post) => (
                             <div key={post.id} className="p-5 bg-white/5 border border-white/10 rounded-2xl space-y-3">
                               <div className="flex items-center gap-3">
-                                <img src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} alt="Me" className="w-8 h-8 rounded-full object-cover" />
+                                {user.photoURL ? (
+                                  <img src={user.photoURL} alt="Me" className="w-8 h-8 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center">
+                                    {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                )}
                                 <div>
                                   <h5 className="text-xs font-bold text-white">{post.authorName}</h5>
                                   <span className="text-[10px] text-slate-400">{post.category || 'General'}</span>
@@ -3859,7 +3888,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           {reels.filter(r => r.authorId === user.uid).map((reel) => (
                             <div key={reel.id} className="relative aspect-[9/16] bg-slate-800 rounded-2xl overflow-hidden group shadow-lg">
-                              <img src={reel.videoUrl || `https://picsum.photos/seed/${reel.id}/400/700`} alt="Reel" className="w-full h-full object-cover" />
+                              {reel.videoUrl ? (
+                                <video src={reel.videoUrl} muted playsInline className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-slate-900 to-rose-900" />
+                              )}
                               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 p-3 flex flex-col justify-between">
                                 <span className="text-[10px] bg-black/60 px-2 py-0.5 rounded-full text-white self-start">
                                   Reel
@@ -3988,7 +4021,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                               try {
                                 if (auth.currentUser) {
                                   await updatePassword(auth.currentUser, newPassword);
-                                  setPasswordStatus({ text: 'Sovereign passcode updated successfully. Keep this credential safe!', type: 'SUCCESS' });
+                                  setPasswordStatus({ text: 'Password updated successfully. Keep it safe!', type: 'SUCCESS' });
                                   setNewPassword('');
                                 } else {
                                   setPasswordStatus({ text: 'No active user found. Please authenticate.', type: 'ERROR' });
@@ -4202,7 +4235,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                <button 
                  type="button"
                  onClick={() => {
-                   alert("EFADO™ Elite Synchronisation initiated. Handshaking secure terminal node...");
+                   alert("EFADO™ Pro membership details coming right up!");
                  }}
                  className="px-3 py-1.5 bg-[#8B5CF6] hover:bg-[#8B5CF6]/80 text-white rounded-xl text-[9px] font-bold uppercase transition-all active:scale-95 shadow-md cursor-pointer flex-shrink-0"
                >
@@ -4280,7 +4313,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200 group-hover:rotate-12 transition-transform">
                            <Users className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Share to Tactical Groups</span>
+                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Share to Groups</span>
                      </button>
                      <button className="p-8 border border-gray-100 bg-gray-50 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white hover:border-emerald-200 hover:scale-105 transition-all group">
                         <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:rotate-12 transition-transform">
@@ -4292,16 +4325,16 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         <div className="w-12 h-12 bg-rose-600 rounded-2xl flex items-center justify-center shadow-lg shadow-rose-200 group-hover:rotate-12 transition-transform">
                            <Share2 className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Copy Signal Link</span>
+                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Copy Share Link</span>
                      </button>
                      <button className="p-8 border border-gray-100 bg-gray-50 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white hover:border-cyan-200 hover:scale-105 transition-all group">
                         <div className="w-12 h-12 bg-cyan-600 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-200 group-hover:rotate-12 transition-transform">
                            <Globe className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Broadcast Locally</span>
+                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest text-center">Share Locally</span>
                      </button>
                   </div>
-                  <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl">Initialize Transmission</button>
+                  <button className="w-full py-5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-2xl">Share Now</button>
                 </motion.div>
              </motion.div>
           )}
@@ -4326,9 +4359,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                        <div className="w-10 h-10 bg-emerald-500/20 border border-emerald-500/30 rounded-xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
                          <Check className="w-5 h-5 text-emerald-400" />
                        </div>
-                       <p className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Transmission Sync'd</p>
+                       <p className="text-xs font-black uppercase tracking-widest text-[#DAA520]">Subscribed!</p>
                        <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest leading-relaxed">
-                         Sovereign node verified. Monthly roadmaps will be routed to your endpoint.
+                         Email verified. You will receive our monthly community updates and guides.
                        </p>
                      </div>
                    ) : (
@@ -4336,8 +4369,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
                           <Mail className="w-5 h-5 text-white" />
                        </div>
-                       <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">Tactical Intelligence</h5>
-                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join 124K+ strategists receiving monthly industry roadmaps.</p>
+                       <h5 className="text-lg font-black text-white uppercase tracking-tight mb-2">EFADO Newsletter</h5>
+                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-6 leading-relaxed">Join our community receiving monthly updates and helpful tips.</p>
                        <form onSubmit={handleSubscribeNewsletter} className="space-y-3">
                          <input 
                            type="email" 
@@ -4363,10 +4396,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
              <div className="flex items-center gap-3 pointer-events-auto">
                <button 
-                 onClick={() => window.dispatchEvent(new CustomEvent('open-help-chat'))}
-                 className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group"
+                 type="button"
+                 onClick={() => openSupportHelpForm({ hub: 'EFADO Nexus Hub', subject: 'Other' })}
+                 className="flex items-center gap-3 px-6 py-4 bg-white text-gray-900 rounded-[2rem] shadow-2xl border border-gray-100 hover:scale-105 transition-all group cursor-pointer"
                >
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Connect Support</span>
                   <MessageSquareIcon className="w-5 h-5 text-indigo-600 group-hover:rotate-12 transition-transform" />
                </button>
@@ -4407,13 +4441,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10 animate-pulse">
                     <MessageSquare className="w-6 h-6 text-indigo-400" />
                   </div>
-                  <h4 className="text-xl font-black uppercase tracking-tight italic">Connect Secure Contact</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sovereign Direct Comms Handshake</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Connect Private Contact</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Start a Direct Private Chat</p>
                 </div>
 
                 <div className="space-y-4">
                   <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
-                    Connect with anyone instantly! Enter a custom name and a secure tunnel code. Once configured, you can exchange encrypted chat messages and place voice/video calls!
+                    Connect with anyone instantly! Enter a contact name and a shared room code to start an encrypted chat or call.
                   </p>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -4429,7 +4463,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
 
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Tunnel Code / ID *</label>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Room Code *</label>
                       <input 
                         type="text"
                         value={privateRoomCode}
@@ -4443,7 +4477,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Phone / Connection Info</label>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Phone Number</label>
                       <input 
                         type="text"
                         value={newContactPhone}
@@ -4454,17 +4488,17 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     </div>
 
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Tactical Category / Role</label>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Relationship / Role</label>
                       <select 
                         value={newContactRole}
                         onChange={(e) => setNewContactRole(e.target.value)}
                         className="w-full px-4 py-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-indigo-300 focus:ring-1 focus:ring-indigo-500 outline-none"
                       >
-                        <option value="Sovereign Contributor">Sovereign Contributor</option>
-                        <option value="Lead Advisor">Lead Advisor</option>
-                        <option value="Partner Node">Partner Node</option>
-                        <option value="HQ Command">HQ Command</option>
-                        <option value="Private Terminal">Private Terminal</option>
+                        <option value="Community Member">Community Member</option>
+                        <option value="Advisor">Advisor</option>
+                        <option value="Business Partner">Business Partner</option>
+                        <option value="Group Admin">Group Admin</option>
+                        <option value="Private Contact">Private Contact</option>
                       </select>
                     </div>
                   </div>
@@ -4474,7 +4508,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     onClick={() => handleJoinPrivateRoom(privateRoomCode, newContactName, newContactPhone, newContactRole)}
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 mt-2 cursor-pointer"
                   >
-                    Establish Direct Link
+                    Connect Chat Room
                   </button>
                 </div>
               </motion.div>
@@ -4482,7 +4516,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
           )}
         </AnimatePresence>
 
-        {/* Custom Create Sovereign Group Modal */}
+        {/* Create Group Modal */}
         <AnimatePresence>
           {showCreateGroupModal && (
             <motion.div 
@@ -4508,13 +4542,13 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   <div className="w-14 h-14 bg-emerald-600/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
                     <Users className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h4 className="text-xl font-black uppercase tracking-tight italic">Create Sovereign Group</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Deploy New Community Channel</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Create Group</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Start a New Community Group</p>
                 </div>
 
                 <form onSubmit={handleCreateGroup} className="space-y-4">
                   <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
-                    Launch a synchronized room where colleagues and users can hold group discussions. Group IDs are instantly registered in our secure Firestore database!
+                    Create a shared chat room where friends and teammates can talk and collaborate together.
                   </p>
                   
                   <div className="space-y-1">
@@ -4524,7 +4558,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       required
                       value={newGroupName}
                       onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="e.g. EFADO Strategic Thinkers"
+                      placeholder="e.g. EFADO Community Circle"
                       className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-600"
                     />
                   </div>
@@ -4534,7 +4568,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     <textarea 
                       value={newGroupDescription}
                       onChange={(e) => setNewGroupDescription(e.target.value)}
-                      placeholder="e.g. Discussion panel for marketing, trading nodes, and tactical projects."
+                      placeholder="e.g. Discussion panel for marketing, trading, and business projects."
                       className="w-full h-24 px-5 py-4 bg-white/5 border border-white/10 rounded-xl text-xs font-black text-white focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-slate-600 resize-none"
                     />
                   </div>
@@ -4549,7 +4583,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     ) : (
                       <Plus className="w-4 h-4" />
                     )}
-                    {isCreatingGroup ? 'Deploying Channel...' : 'Deploy Sovereign Group'}
+                    {isCreatingGroup ? 'Creating Group...' : 'Create Group'}
                   </button>
                 </form>
               </motion.div>
@@ -4557,7 +4591,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
           )}
         </AnimatePresence>
 
-        {/* Custom Transmit Ledger Modal */}
+        {/* Send Escrow Transfer Modal */}
         <AnimatePresence>
           {showLedgerModal && (
             <motion.div 
@@ -4584,8 +4618,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   <div className="w-14 h-14 bg-emerald-500/20 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/10">
                     <Download className="w-6 h-6 text-emerald-400" />
                   </div>
-                  <h4 className="text-xl font-black uppercase tracking-tight italic">Transmit Secure Ledger</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sovereign Asset Transfer Protocol</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Send Payment Record</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Secure Chat Transfer</p>
                 </div>
 
                 <div className="space-y-4">
@@ -4666,17 +4700,17 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   <div className="w-14 h-14 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/10">
                     <Shield className="w-6 h-6 text-indigo-400 animate-pulse" />
                   </div>
-                  <h4 className="text-xl font-black uppercase tracking-tight italic">Verify Node Identity</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Enclave Encryption Verification</p>
+                  <h4 className="text-xl font-black uppercase tracking-tight italic">Verify Chat Identity</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Security Verification</p>
                 </div>
 
                 <div className="space-y-4">
                   <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest leading-relaxed text-center bg-white/5 p-4 rounded-xl border border-white/5">
-                    An automated secure token challenge has been sent to your primary mobile node authenticator. Please input your 6-digit node secret key to finalize connection verification.
+                    Enter your 6-digit security verification code to confirm this chat connection.
                   </p>
 
                   <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Node Passkey / Authentication Code</label>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">6-Digit Verification Code</label>
                     <input 
                       type="text"
                       maxLength={6}
@@ -4686,7 +4720,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         if (e.key === 'Enter') {
                           setUserVerifiedRooms(prev => [...prev, activeChatRoomId]);
                           setShowVerificationModal(false);
-                          alert("🟢 Sovereign identity node connection fully verified with 100% security clearance!");
+                          alert("🟢 Chat identity verified successfully!");
                         }
                       }}
                     />
@@ -4697,11 +4731,11 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     onClick={() => {
                       setUserVerifiedRooms(prev => [...prev, activeChatRoomId]);
                       setShowVerificationModal(false);
-                      alert("🟢 Sovereign identity node connection fully verified with 100% security clearance!");
+                      alert("🟢 Chat identity verified successfully!");
                     }}
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 cursor-pointer"
                   >
-                    Authorize Node Enclave
+                    Verify & Continue
                   </button>
                 </div>
               </motion.div>
@@ -4732,15 +4766,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 )}
 
                 {isCalling === 'VIDEO' && callStatus === 'CONNECTED' && !callVideoOff ? (
-                  <div className="absolute inset-0 opacity-40 z-0 animate-fade-in">
-                    <img src={`https://picsum.photos/seed/${activeChatRoomId}-video/800/800`} alt="Video stream" className="w-full h-full object-cover filter saturate-150" referrerPolicy="no-referrer" />
-                  </div>
+                  <div className="absolute inset-0 opacity-40 z-0 animate-fade-in bg-gradient-to-br from-indigo-900 via-slate-900 to-emerald-900" />
                 ) : null}
 
                 <div className="relative z-10 flex flex-col items-center">
                   <div className="relative mb-6">
-                    <div className={`w-32 h-32 rounded-full p-1 mx-auto transition-all duration-500 ${callStatus === 'CONNECTED' ? 'border-4 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-4 border-indigo-500 shadow-lg shadow-indigo-500/20 animate-pulse'}`}>
-                      <img src={`https://picsum.photos/seed/${activeChatRoomId}/200/200`} alt={activeRoomDef.name} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+                    <div className={`w-32 h-32 rounded-full p-1 mx-auto transition-all duration-500 bg-indigo-600/30 flex items-center justify-center ${callStatus === 'CONNECTED' ? 'border-4 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'border-4 border-indigo-500 shadow-lg shadow-indigo-500/20 animate-pulse'}`}>
+                      <div className="w-full h-full rounded-full bg-indigo-600 text-white font-black text-4xl flex items-center justify-center">
+                        {(activeRoomDef.name || 'C').charAt(0).toUpperCase()}
+                      </div>
                     </div>
                     {callStatus === 'CONNECTED' && (
                       <span className="absolute bottom-2 right-2 w-5 h-5 bg-emerald-500 border-2 border-slate-900 rounded-full animate-ping" />
@@ -4749,18 +4783,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                   <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-1">{activeRoomDef.name}</h3>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">
-                    {activeRoomDef.status || 'SOVEREIGN NETWORK CONDUIT'}
+                    {activeRoomDef.status || 'PRIVATE CHAT CALL'}
                   </p>
 
                   <div className="px-4 py-1.5 bg-white/5 border border-white/5 rounded-full mb-8">
                     {callStatus === 'CONNECTING' && (
                       <p className="text-[10px] text-indigo-400 font-black uppercase tracking-[0.2em] animate-pulse">
-                        Connecting Secure Tunnel...
+                        Connecting Call...
                       </p>
                     )}
                     {callStatus === 'RINGING' && (
                       <p className="text-[10px] text-amber-400 font-black uppercase tracking-[0.2em] animate-bounce">
-                        Ringing Sovereign Node...
+                        Ringing...
                       </p>
                     )}
                     {callStatus === 'CONNECTED' && (
@@ -4853,14 +4887,14 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                   <div className="w-12 h-12 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/10">
                     <PlusCircle className="w-6 h-6 text-indigo-400" />
                   </div>
-                  <h4 className="text-2xl font-black uppercase tracking-tight italic">Publish Strategic Entry</h4>
-                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">Broadcast Knowledge into the SEO Hub</p>
+                  <h4 className="text-2xl font-black uppercase tracking-tight italic">Publish Article</h4>
+                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest mt-1">Share Helpful Guides with the Community</p>
                 </div>
 
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Strategic Title *</label>
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Article Title *</label>
                       <input 
                         type="text"
                         value={blogTitle}
@@ -4905,19 +4939,19 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       type="text"
                       value={blogExcerpt}
                       onChange={(e) => setBlogExcerpt(e.target.value)}
-                      placeholder="Provide a compelling 1-sentence synopsis to capture reader attention..."
+                      placeholder="Provide a compelling 1-sentence summary for readers..."
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Full Strategic Intelligence Content *</label>
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-2">Full Article Content *</label>
                     <textarea 
                       rows={6}
                       value={blogContent}
                       onChange={(e) => setBlogContent(e.target.value)}
-                      placeholder="Write your rich community briefing here... Scripture verses, business guidelines, and tactical formulas are welcome."
+                      placeholder="Write your article here... Tips, guides, scripture notes, and business advice are welcome."
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-xs font-medium text-white focus:ring-1 focus:ring-indigo-500 outline-none placeholder:text-slate-600 custom-scrollbar resize-none"
                       required
                     />
@@ -4934,9 +4968,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           category: blogCategory,
                           excerpt: blogExcerpt,
                           content: blogContent,
-                          image: blogImage.trim() || 'https://picsum.photos/seed/' + Math.random().toString(36).substring(7) + '/600/400',
+                          image: blogImage.trim() || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=600&q=80',
                           authorId: user.uid,
-                          authorName: user.displayName || user.email || 'Sovereign Contributor',
+                          authorName: user.displayName || user.email || 'Community Member',
                           authorPhoto: user.photoURL || '',
                           createdAt: serverTimestamp()
                         });
@@ -4945,17 +4979,17 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         setBlogContent('');
                         setBlogImage('');
                         setShowBlogCreateModal(false);
-                        alert("Strategic intelligence entry fully published! All connected hub members have synchronized with your broadcast.");
+                        alert("Article published successfully! Community members can now read it.");
                       } catch (err) {
                         console.error("Publishing error:", err);
-                        alert("Failed to synchronize strategic intelligence broadcast. Please verify connection credentials.");
+                        alert("Could not publish your article right now. Please check your internet connection.");
                       } finally {
                         setIsPublishingBlog(false);
                       }
                     }}
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {isPublishingBlog ? 'Broadcasting Strategic Intel...' : 'Broadcast Strategic Intel'}
+                    {isPublishingBlog ? 'Publishing Article...' : 'Publish Article'}
                   </button>
                 </div>
               </motion.div>
@@ -5006,16 +5040,17 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center font-black text-sm">EF</div>
                       <div>
                         <p className="text-xs font-black text-gray-900 uppercase">EFADO Editorial</p>
-                        <p className="text-[10px] text-gray-500 font-bold uppercase">Sovereign Content Board</p>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase">Community Editorial</p>
                       </div>
                     </div>
                     
                     <button 
+                      type="button"
                       onClick={() => {
                         setSelectedBlogPost(null);
-                        window.dispatchEvent(new CustomEvent('open-help-chat'));
+                        openSupportHelpForm({ hub: 'EFADO Nexus Hub', subject: 'Other' });
                       }}
-                      className="px-5 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="px-5 py-2.5 bg-slate-900 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
                     >
                       Share with Expert
                     </button>
@@ -5052,8 +5087,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </button>
 
                 <div className="mb-6">
-                  <h3 className="text-2xl font-black text-gray-950 uppercase tracking-tight">Tactical content calendar</h3>
-                  <p className="text-xs text-gray-500 font-bold font-sans">Deploy community growth and social engagement campaigns across optimized weekly timelines.</p>
+                  <h3 className="text-2xl font-black text-gray-950 uppercase tracking-tight">Content Calendar</h3>
+                  <p className="text-xs text-gray-500 font-bold font-sans">Plan your community posts and promotions across the week.</p>
                 </div>
 
                 <div className="grid grid-cols-7 gap-3 mb-8">
@@ -5108,8 +5143,8 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 <div className="p-8 md:p-12">
                    <div className="flex items-center justify-between mb-10">
                       <div>
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-2">Checkout Lifecycle</p>
-                        <h3 className="text-3xl font-black text-white uppercase tracking-tight">Deployment Secure</h3>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-2">Checkout</p>
+                        <h3 className="text-3xl font-black text-white uppercase tracking-tight">Confirm Ad Plan</h3>
                       </div>
                       <button onClick={() => setIsAdPaymentOpen(false)} className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
                         <X className="w-6 h-6" />
@@ -5134,7 +5169,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         {selectedAdPlan.amount > 0 && (
                           <div className="flex items-center justify-between">
                              <div>
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Tactical Service Charge (1.3%)</p>
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Service Charge (1.3%)</p>
                              </div>
                              <div className="text-right">
                                 <p className="text-sm font-black text-indigo-400">
@@ -5145,7 +5180,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         )}
 
                         <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                           <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Total Strategic Investment</span>
+                           <span className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Total Amount</span>
                            <span className="text-2xl font-black text-white">
                              {selectedAdPlan.amount <= 0 ? 
                                (selectedAdPlan.amount === 0 ? 'Free' : 'Custom Quote') : 
@@ -5158,7 +5193,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
 
                       {selectedAdPlan.amount > 0 && (
                         <div className="space-y-4">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Choose Payment Instrument</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Choose Payment Method</p>
                           <div className="grid grid-cols-2 gap-4">
                              {[
                                { id: 'card', name: 'Card', icon: <CreditCard className="w-5 h-5" /> },
@@ -5180,9 +5215,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       {selectedAdPlan.amount === 0 && (
                         <div className="p-8 bg-indigo-500/10 border border-indigo-500/20 rounded-[2.5rem] text-center">
                           <Zap className="w-10 h-10 text-indigo-400 mx-auto mb-4 animate-pulse" />
-                          <h4 className="text-sm font-black text-white uppercase tracking-tight mb-2">Tactical Deployment Ready</h4>
+                          <h4 className="text-sm font-black text-white uppercase tracking-tight mb-2">Free Trial Ready</h4>
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-                            Your trial deployment is ready for launch. No payment instrument required for this tactical cycle.
+                            Your trial campaign is ready to go. No payment card is required.
                           </p>
                         </div>
                       )}
@@ -5190,9 +5225,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                       {selectedAdPlan.amount === -1 && (
                         <div className="p-8 bg-amber-500/10 border border-amber-500/20 rounded-[2.5rem] text-center">
                           <Shield className="w-10 h-10 text-amber-500 mx-auto mb-4" />
-                          <h4 className="text-sm font-black text-white uppercase tracking-tight mb-2">Enterprise Support Protocol</h4>
+                          <h4 className="text-sm font-black text-white uppercase tracking-tight mb-2">Custom Enterprise Plan</h4>
                           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-                            Custom scale requires manual tactical review. Click below to initiate contact with our sovereign support fleet.
+                            Custom campaigns are arranged with our team. Click below to speak with our advertising support.
                           </p>
                         </div>
                       )}
@@ -5204,15 +5239,15 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                          if (selectedAdPlan.amount === -1) {
                            alert("Connecting to Sales Support Hub...");
                          } else {
-                           alert(`Initiating ${selectedAdPlan.name} deployment sequence...`);
+                           alert(`Starting ${selectedAdPlan.name} campaign...`);
                          }
                          setIsAdPaymentOpen(false);
                        }}
                        className="w-full py-6 bg-white text-slate-900 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-white/5 hover:scale-[1.02] active:scale-95 transition-all"
                      >
-                       {(selectedAdPlan.amount === 0 || user?.is_super_admin) ? 'Activate Free CEO Deployment' : 
-                        selectedAdPlan.amount === -1 ? 'Contact Sovereign Sales' : 
-                        'Authorise Transaction'}
+                       {(selectedAdPlan.amount === 0 || user?.is_super_admin) ? 'Activate Free Plan' : 
+                        selectedAdPlan.amount === -1 ? 'Contact Sales Team' : 
+                        'Confirm & Pay'}
                      </button>
 
                      <div className="mt-8 flex items-center justify-center gap-4">
@@ -5247,9 +5282,9 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 </button>
 
                 <div className="text-center">
-                  <span className="text-[9px] font-black tracking-[0.3em] text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-full uppercase">Tactical Setup</span>
-                  <h4 className="text-2xl font-black text-white uppercase tracking-tighter italic mt-3">Refine Social Profile</h4>
-                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mt-1">Customize your EFADO Nexus Hub identity across all channels</p>
+                  <span className="text-[9px] font-black tracking-[0.3em] text-indigo-400 bg-indigo-500/10 px-4 py-2 rounded-full uppercase">Profile Setup</span>
+                  <h4 className="text-2xl font-black text-white uppercase tracking-tighter italic mt-3">Edit Social Profile</h4>
+                  <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] mt-1">Customize your EFADO Nexus Hub profile</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -5259,8 +5294,12 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                     <div className="space-y-3">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Profile Avatar</label>
                       <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-[1.5rem] border-2 border-indigo-500 bg-slate-800 overflow-hidden relative group shrink-0">
-                          <img src={editPhotoURL || `https://picsum.photos/seed/${user.uid}/200/200`} alt="Avatar Preview" className="w-full h-full object-cover" />
+                        <div className="w-20 h-20 rounded-[1.5rem] border-2 border-indigo-500 bg-indigo-600 overflow-hidden relative group shrink-0 flex items-center justify-center text-white font-black text-2xl">
+                          {editPhotoURL ? (
+                            <img src={editPhotoURL} alt="Avatar Preview" className="w-full h-full object-cover" />
+                          ) : (
+                            (editFullName || editDisplayName || user.email || 'U').charAt(0).toUpperCase()
+                          )}
                         </div>
                         <div className="flex-1 space-y-2">
                           <div className="relative">
@@ -5394,7 +5433,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           type="text" 
                           value={editFullName}
                           onChange={(e) => setEditFullName(e.target.value)}
-                          placeholder="Sovereign Leader"
+                          placeholder="Your Full Name"
                           className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-2xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                         />
                       </div>
@@ -5405,7 +5444,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                           type="text" 
                           value={editDisplayName}
                           onChange={(e) => setEditDisplayName(e.target.value.toLowerCase().replace(/\s/g, ''))}
-                          placeholder="e.g. general_ceo"
+                          placeholder="e.g. alex_efado"
                           className="w-full px-4 py-3 bg-slate-950 border border-white/5 rounded-2xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                         />
                         <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Alphanumeric & lowercase only</p>
@@ -5416,7 +5455,7 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                         <textarea 
                           value={editBio}
                           onChange={(e) => setEditBio(e.target.value)}
-                          placeholder="Welcome to my tactical space..."
+                          placeholder="Tell the community about yourself..."
                           className="w-full h-24 px-4 py-3 bg-slate-950 border border-white/5 rounded-3xl text-white text-xs font-bold focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none"
                         />
                       </div>
@@ -5464,12 +5503,18 @@ export const EfadoGistHub: React.FC<EfadoGistHubProps> = ({ user, onClose, initi
                 {/* Top Overlay Bar */}
                 <div className="absolute top-0 inset-x-0 p-4 z-20 bg-gradient-to-b from-black/80 to-transparent flex items-center justify-between text-white">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={selectedReelForModal.authorPhoto || `https://picsum.photos/seed/${selectedReelForModal.authorId}/100/100`}
-                      alt="Author"
-                      className="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover"
-                      referrerPolicy="no-referrer"
-                    />
+                    {selectedReelForModal.authorPhoto ? (
+                      <img
+                        src={selectedReelForModal.authorPhoto}
+                        alt="Author"
+                        className="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full border-2 border-indigo-500 bg-indigo-600 text-white font-black text-sm flex items-center justify-center">
+                        {(selectedReelForModal.authorName || 'C').charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs font-black uppercase tracking-tight text-white">{selectedReelForModal.authorName}</p>
                       <span className="text-[9px] font-bold text-rose-400 uppercase tracking-widest flex items-center gap-1">

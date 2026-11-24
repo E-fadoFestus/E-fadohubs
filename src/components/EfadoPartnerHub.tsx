@@ -312,7 +312,7 @@ const CompanyRegistrationModal: React.FC<{
                     />
                   </PartnerFormField>
 
-                  <PartnerFormField label="Sovereign Liaison Email" icon={<Mail className="w-3.5 h-3.5" />} error={errors.contactEmail} hint="Used for strict operational compliance logging.">
+                  <PartnerFormField label="Contact Email" icon={<Mail className="w-3.5 h-3.5" />} error={errors.contactEmail} hint="Used for partner verification and account updates.">
                     <input 
                       type="email" 
                       value={form.contactEmail}
@@ -322,7 +322,7 @@ const CompanyRegistrationModal: React.FC<{
                     />
                   </PartnerFormField>
 
-                  <PartnerFormField label="Verified Hotline Number" icon={<Users className="w-3.5 h-3.5" />} error={errors.contactPhone} hint="Hotline for sudden logistics validation.">
+                  <PartnerFormField label="Verified Hotline Number" icon={<Users className="w-3.5 h-3.5" />} error={errors.contactPhone} hint="Phone number for quick verification.">
                     <input 
                       type="tel" 
                       value={form.contactPhone}
@@ -332,7 +332,7 @@ const CompanyRegistrationModal: React.FC<{
                     />
                   </PartnerFormField>
 
-                  <PartnerFormField label="Deployment Base Country" icon={<Globe className="w-3.5 h-3.5" />}>
+                  <PartnerFormField label="Country" icon={<Globe className="w-3.5 h-3.5" />}>
                     <select
                       value={form.country}
                       onChange={(e) => setForm({ ...form, country: e.target.value })}
@@ -348,7 +348,7 @@ const CompanyRegistrationModal: React.FC<{
                   </PartnerFormField>
 
                   <div className="md:col-span-2">
-                    <PartnerFormField label="Tactical Headquarters Address" icon={<MapPinIcon />} error={errors.address}>
+                    <PartnerFormField label="Office Address" icon={<MapPinIcon />} error={errors.address}>
                       <input 
                         type="text" 
                         value={form.address}
@@ -529,10 +529,10 @@ const CompanyRegistrationModal: React.FC<{
                   <CheckCircle2 className="w-10 h-10 text-emerald-400" />
                 </div>
                 <div className="space-y-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.3em] text-emerald-400">verification processing initialized</span>
-                  <h3 className="text-3xl font-black italic uppercase tracking-tighter">EFADO Sovereign Onboarding Complete</h3>
-                  <p className="text-slate-400 text-xs max-w-md mx-auto leading-relaxed">
-                    Sovereign validation services are processing your corporate materials. An official response with authorization credentials will be dispatched to <span className="text-white font-black">{form.contactEmail}</span> on or before 48 business hours.
+                  <span className="text-xs font-semibold text-emerald-400">Application Received</span>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-white">EFADO Partner Onboarding Complete</h3>
+                  <p className="text-slate-300 text-sm max-w-md mx-auto leading-relaxed">
+                    Our team is reviewing your organization details. We will send confirmation and partner credentials to <span className="text-white font-semibold">{form.contactEmail}</span> within 48 business hours.
                   </p>
                 </div>
 
@@ -677,10 +677,10 @@ const AffiliateMarketingModal: React.FC<{
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             
             <div className="space-y-4">
-              <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Configure Referral Protocol</h4>
+              <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Referral Link Settings</h4>
               
               <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-6 space-y-4 text-left">
-                <PartnerFormField label="Custom Marketing Account Handle" icon={<Users className="w-3.5 h-3.5" />} hint="Your handle creates clean links to maximize psychological click trust.">
+                <PartnerFormField label="Custom Referral Code" icon={<Users className="w-3.5 h-3.5" />} hint="Short custom codes make your referral link easier to share.">
                   <div className="flex gap-2">
                     <input 
                       type="text" 
@@ -692,7 +692,7 @@ const AffiliateMarketingModal: React.FC<{
                 </PartnerFormField>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Live Affiliation Link</label>
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Your Referral Link</label>
                   <div className="relative flex items-center bg-slate-900 border border-white/5 rounded-2xl px-4 py-3.5 font-mono text-xs text-white overflow-hidden">
                     <span className="opacity-60 truncate pr-16 select-all">{referralLink}</span>
                     <button 
@@ -709,65 +709,65 @@ const AffiliateMarketingModal: React.FC<{
               {/* Commissions Statistics */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-950/20 border border-white/5 rounded-2xl p-4 text-left">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Affiliate Tier</span>
-                  <span className="text-sm font-black text-indigo-400 uppercase tracking-tighter block mt-1 flex items-center gap-1.5">
-                    Sovereign Master <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="text-[10px] font-bold text-slate-400 block">Partner Tier</span>
+                  <span className="text-sm font-bold text-indigo-400 block mt-1 flex items-center gap-1.5">
+                    Verified Partner <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                   </span>
                 </div>
                 <div className="bg-slate-950/20 border border-white/5 rounded-2xl p-4 text-left">
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Commission Rate</span>
-                  <span className="text-sm font-black text-emerald-400 font-mono block mt-1">20.5% Cash-cut</span>
+                  <span className="text-[10px] font-bold text-slate-400 block">Commission Rate</span>
+                  <span className="text-sm font-bold text-emerald-400 font-mono block mt-1">20.5% Share</span>
                 </div>
               </div>
             </div>
 
             {/* Visual Branding Package Display */}
             <div className="bg-slate-950/40 border border-white/5 rounded-[2rem] p-6 text-left space-y-4">
-              <h4 className="text-xs font-black uppercase text-white tracking-widest flex items-center gap-1.5">
+              <h4 className="text-xs font-bold uppercase text-white tracking-wider flex items-center gap-1.5">
                 <Target className="w-4 h-4 text-indigo-400" /> Affiliate Brand Kit Card
               </h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">Your strategic promotional profile is ready. Share this ready-made visual branding block locally or via web platforms.</p>
+              <p className="text-xs text-slate-400 leading-relaxed">Your promotional card is ready. Share it directly with businesses and friends.</p>
               
               {/* Visual Ticket Graphic Component */}
               <div className="relative bg-gradient-to-tr from-indigo-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -mr-16 -mt-16" />
                 <div className="relative z-10 flex justify-between items-start">
                   <div>
-                    <span className="text-[7px] font-black uppercase tracking-[0.25em] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full inline-block mb-2">EFADO CONNECT</span>
-                    <h5 className="text-[14px] font-black italic uppercase leading-none text-white tracking-tighter">GLOBAL ENTERPRISE PIPELINE</h5>
+                    <span className="text-[10px] font-bold uppercase bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full inline-block mb-2">EFADO CONNECT</span>
+                    <h5 className="text-sm font-bold leading-snug text-white">PARTNER REFERRAL CARD</h5>
                   </div>
                   <Handshake className="w-7 h-7 text-indigo-400" />
                 </div>
 
-                <div className="my-6 border-t-2 border-dashed border-white/10" />
+                <div className="my-5 border-t border-dashed border-white/15" />
 
                 <div className="flex justify-between items-end font-mono">
                   <div>
-                    <span className="text-[6px] text-slate-400 uppercase tracking-widest block">strategic code</span>
-                    <span className="text-xs font-black text-emerald-400 uppercase">{affiliateCode || 'PENDING'}</span>
+                    <span className="text-[10px] text-slate-400 uppercase block">Referral Code</span>
+                    <span className="text-xs font-bold text-emerald-400 uppercase">{affiliateCode || 'PENDING'}</span>
                   </div>
                   <div>
-                    <span className="text-[6px] text-slate-400 uppercase tracking-widest block">directory priority</span>
-                    <span className="text-[8px] font-black text-indigo-300 tracking-wider">VERIFIED RECRUIT</span>
+                    <span className="text-[10px] text-slate-400 uppercase block">Status</span>
+                    <span className="text-xs font-bold text-indigo-300">VERIFIED PARTNER</span>
                   </div>
                 </div>
               </div>
 
-              <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-300 border border-white/5 flex items-center justify-center gap-2">
-                <Download className="w-3.5 h-3.5 text-indigo-400" /> Save Co-branded Banner Image
+              <button className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-semibold text-slate-300 border border-white/5 flex items-center justify-center gap-2">
+                <Download className="w-3.5 h-3.5 text-indigo-400" /> Save Partner Banner Image
               </button>
             </div>
           </div>
 
           {/* Promotional Marketing Channels Tabs */}
           <div className="space-y-4">
-            <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Ready-to-Deploy Promo Campaigns</h4>
+            <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Ready-to-Share Promo Copy</h4>
             
             <div className="flex gap-2 border-b border-white/5">
               {[
                 { id: 'CARD', label: 'Campaign Hub' },
-                { id: 'SOCIAL', label: 'Social Outreach Scripts' },
-                { id: 'EMAIL', label: 'Sovereign Letter Blueprint' }
+                { id: 'SOCIAL', label: 'Social Posts' },
+                { id: 'EMAIL', label: 'Partner Invitation Email' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -894,30 +894,16 @@ export const EfadoPartnerHub: React.FC<PartnerHubProps> = ({ user, onNavigate })
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950/80 to-slate-950" />
         
         <div className="relative z-10 text-center max-w-4xl px-4">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] mb-6"
-          >
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-semibold mb-5">
             <Handshake className="w-4 h-4" />
-            Strategic Affiliation Hub
-          </motion.div>
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-5xl md:text-7xl font-black italic tracking-tighter mb-6 leading-none select-none"
-          >
-            HOOK-UP YOUR <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">ORGANIZATION</span> TO THE GLOBE
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-slate-400 text-lg md:text-xl font-medium max-w-2xl mx-auto"
-          >
-            A unified connection portal for marketers, companies, and global citizens to affiliate, patronize, and synchronize.
-          </motion.p>
+            EFADO Partner Program
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-4 leading-tight">
+            Connect Your <span className="text-indigo-400">Organization</span> With EFADO
+          </h1>
+          <p className="text-slate-300 text-sm sm:text-base max-w-2xl mx-auto">
+            Partner with EFADO to promote your services, earn referral commissions, and reach new customers.
+          </p>
         </div>
       </div>
 

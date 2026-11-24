@@ -256,10 +256,9 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
 
   const handleAddProduct = () => {
     if (validateProduct()) {
-      // Add a placeholder photo if none provided for demo
       const productToAdd = {
         ...currentProduct,
-        photos: currentProduct.photos?.length ? currentProduct.photos : [`https://picsum.photos/seed/${Math.random()}/800/600`]
+        photos: currentProduct.photos?.length ? currentProduct.photos : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80']
       };
       setProducts([...products, productToAdd]);
       setCurrentProduct({
@@ -454,7 +453,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                     className={`w-full bg-slate-800/50 border rounded-2xl px-6 py-4 text-white focus:border-indigo-500 outline-none transition-all font-bold ${errors.phone ? 'border-rose-500' : 'border-white/5'}`}
                   />
                 </FormField>
-                <FormField label="WhatsApp Protocol" icon={<Globe className="w-3 h-3" />} hint="For real-time strategic engagement.">
+                <FormField label="WhatsApp Number" icon={<Globe className="w-3 h-3" />} hint="For fast customer inquiries.">
                   <input 
                     type="tel" 
                     value={vendorForm.whatsapp}
@@ -570,7 +569,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                   />
                 </FormField>
               )}
-              <FormField label="Tactical Fulfillment Method" icon={<Package className="w-3 h-3" />}>
+              <FormField label="Order Fulfillment Method" icon={<Package className="w-3 h-3" />}>
                 <select 
                   value={vendorForm.pickupMethod}
                   onChange={e => setVendorForm({...vendorForm, pickupMethod: e.target.value as any})}
@@ -763,7 +762,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                   />
                 </FormField>
 
-                <FormField label="Tactical Category Path" error={errors.category} hint="Select 4 levels of category depth for optimal search mapping.">
+                <FormField label="Product Category" error={errors.category} hint="Select 4 category levels so buyers can easily find your item.">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <select 
                       value={currentProduct.categoryPath?.level1}
@@ -965,7 +964,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                 </div>
 
                 <div className="md:col-span-2 space-y-4">
-                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Tactical Product Assets (Photos)</span>
+                  <span className="text-xs font-bold text-slate-300 block">Product Photos</span>
                   <div className="grid grid-cols-4 gap-4">
                     <button 
                       type="button"
@@ -1001,9 +1000,9 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
                       </div>
                     ))}
                     {(currentProduct.photos || []).length === 0 && (
-                      <div className="aspect-square bg-slate-950/20 border border-white/5 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group">
-                        <img src="https://picsum.photos/seed/prd1/300/300" alt="Blank" className="w-full h-full object-cover opacity-20" />
-                        <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-slate-500 uppercase tracking-widest animate-pulse">Select Photos</span>
+                      <div className="aspect-square bg-slate-950/30 border border-white/10 rounded-2xl flex flex-col items-center justify-center text-slate-500 gap-1">
+                        <Camera className="w-5 h-5 opacity-60" />
+                        <span className="text-[10px] font-semibold">Select Photos</span>
                       </div>
                     )}
                   </div>
@@ -1011,8 +1010,8 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = ({
 
                 {/* Optional Video & Reels Integration */}
                 <div className="md:col-span-2 space-y-4 border-t border-white/5 pt-6">
-                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                    <Video className="w-4 h-4 text-indigo-400" /> Tactical Product Video (Optional)
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                    <Video className="w-4 h-4 text-indigo-400" /> Product Video (Optional)
                   </span>
                   <p className="text-[11px] text-slate-400">Add an optional promotional video (MP4/WebM, Max 5MB) or enter a video URL below to showcase your product in motion.</p>
                   

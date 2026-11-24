@@ -36,6 +36,8 @@ interface Reel {
   comments: any[];
   shares: number;
   tags?: string[];
+  linkedAdId?: string;
+  linkedAdSlug?: string;
   createdAt?: any;
 }
 
@@ -348,13 +350,15 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
                 />
               </div>
             </div>
-          ) : (
+          ) : currentReel.videoUrl ? (
             <img 
-              src={currentReel.videoUrl || `https://picsum.photos/seed/${currentReel.id}/720/1280`} 
+              src={currentReel.videoUrl} 
               alt="Reel background" 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
             />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900" />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/90 pointer-events-none" />
         </motion.div>
@@ -410,13 +414,17 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
       <div className="absolute right-3 bottom-20 z-40 flex flex-col items-center gap-4 pointer-events-auto">
         {/* Creator Avatar with Follow Ring */}
         <div className="relative mb-1">
-          <div className="w-12 h-12 rounded-full border-2 border-[#8B5CF6] p-0.5 bg-slate-900 shadow-xl overflow-hidden">
-            <img 
-              src={currentReel.authorPhoto || `https://picsum.photos/seed/${currentReel.authorId}/100/100`} 
-              alt="Author" 
-              className="w-full h-full object-cover rounded-full"
-              referrerPolicy="no-referrer"
-            />
+          <div className="w-12 h-12 rounded-full border-2 border-[#8B5CF6] p-0.5 bg-slate-900 shadow-xl overflow-hidden flex items-center justify-center text-white font-black text-sm">
+            {currentReel.authorPhoto ? (
+              <img 
+                src={currentReel.authorPhoto} 
+                alt={currentReel.authorName} 
+                className="w-full h-full object-cover rounded-full"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span>{(currentReel.authorName || 'E').charAt(0).toUpperCase()}</span>
+            )}
           </div>
           {!isFollowing && currentReel.authorId !== user.uid && (
             <button 
@@ -552,6 +560,18 @@ export const ReelFeed: React.FC<ReelFeedProps> = ({
             return <span key={i}>{word} </span>;
           })}
         </p>
+
+        {(currentReel.linkedAdSlug || currentReel.linkedAdId) && (
+          <a
+            href={`/advert/${currentReel.linkedAdSlug || currentReel.linkedAdId}`}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors"
+          >
+            View Full Advert &rarr;
+          </a>
+        )}
 
         {/* Rotating Music Disc & Sound Track Marquee */}
         <div className="flex items-center gap-3 pt-1">

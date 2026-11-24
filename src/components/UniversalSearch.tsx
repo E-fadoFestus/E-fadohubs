@@ -13,58 +13,98 @@ import {
   MessageSquare,
   ShoppingBag,
   GraduationCap,
-  Briefcase
+  Briefcase,
+  Megaphone
 } from 'lucide-react';
+import { db, collection, query, onSnapshot } from '../firebase';
+import { AdListing } from '../types';
 
 interface SearchResult {
   id: string;
   title: string;
-  category: 'hubs' | 'external' | 'community';
+  category: 'hubs' | 'adverts' | 'external' | 'community';
   description: string;
   icon: any;
   link?: string;
 }
 
 export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'hubs' | 'external'>('all');
+  const [queryText, setQueryText] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'hubs' | 'adverts' | 'external'>('all');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [liveAdverts, setLiveAdverts] = useState<AdListing[]>([]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(collection(db, 'ad_listings')),
+      (snap) => {
+        const now = Date.now();
+        setLiveAdverts(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() } as AdListing))
+            .filter((ad) => ad.status !== 'deleted' && ad.status !== 'finished' && (!ad.expiryDate || ad.expiryDate >= now))
+        );
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, []);
 
   const HUB_RESULTS: SearchResult[] = [
-    { id: '1', title: 'Fairly Used Market', category: 'hubs', description: 'Trade quality pre-owned assets in the strategic marketplace.', icon: ShoppingBag },
-    { id: '2', title: 'Service Corps Hub', category: 'hubs', description: 'Connect with verified strategic service providers globally.', icon: Briefcase },
-    { id: '3', title: 'Education Hub', category: 'hubs', description: 'Access industrial knowledge and strategic learning patterns.', icon: GraduationCap },
-    { id: '4', title: 'EFADO Nexus Hub', category: 'hubs', description: 'Join high-intellect community discussions, 10 action buttons, viral reels, and strategic news.', icon: MessageSquare },
+    { id: '1', title: 'Fairly Used Market', category: 'hubs', description: 'Buy and sell quality pre-owned items with escrow protection.', icon: ShoppingBag },
+    { id: '2', title: 'Service Corps Hub', category: 'hubs', description: 'Connect with verified skilled professionals and service providers.', icon: Briefcase },
+    { id: '3', title: 'Education Hub', category: 'hubs', description: 'Learn practical tech, business, and career skills.', icon: GraduationCap },
+    { id: '4', title: 'EFADO Nexus Hub', category: 'hubs', description: 'Join community discussions, short reels, group chats, and news.', icon: MessageSquare },
   ];
 
   const EXTERNAL_ENGINES = [
-    { name: 'Google Strategic Search', url: 'https://www.google.com/search?q=', color: 'text-blue-500' },
-    { name: 'Bing Global Intelligence', url: 'https://www.bing.com/search?q=', color: 'text-cyan-500' },
-    { name: 'DuckDuckGo Secure Protocol', url: 'https://duckduckgo.com/?q=', color: 'text-orange-500' },
+    { name: 'Google Search', url: 'https://www.google.com/search?q=', color: 'text-blue-500' },
+    { name: 'Bing Search', url: 'https://www.bing.com/search?q=', color: 'text-cyan-500' },
+    { name: 'DuckDuckGo Search', url: 'https://duckduckgo.com/?q=', color: 'text-orange-500' },
   ];
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!queryText.trim()) {
       setResults([]);
       return;
     }
 
-    const filtered = HUB_RESULTS.filter(r => 
-      r.title.toLowerCase().includes(query.toLowerCase()) || 
-      r.description.toLowerCase().includes(query.toLowerCase())
+    const qLower = queryText.toLowerCase();
+    const filteredHubs = HUB_RESULTS.filter(r =>
+      r.title.toLowerCase().includes(qLower) ||
+      r.description.toLowerCase().includes(qLower)
     );
 
-    const externalResults: SearchResult[] = query.length > 2 ? EXTERNAL_ENGINES.map(e => ({
+    const matchedAdverts: SearchResult[] = liveAdverts
+      .filter(a =>
+        a.title?.toLowerCase().includes(qLower) ||
+        a.description?.toLowerCase().includes(qLower) ||
+        a.category?.toLowerCase().includes(qLower) ||
+        a.customCategoryName?.toLowerCase().includes(qLower) ||
+        a.location?.city?.toLowerCase().includes(qLower) ||
+        a.location?.state?.toLowerCase().includes(qLower)
+      )
+      .slice(0, 12)
+      .map(a => ({
+        id: `ad_${a.id}`,
+        title: `${a.title}${Number(a.price || 0) > 0 ? ` — ₦${Number(a.price).toLocaleString()}` : ''}`,
+        category: 'adverts' as const,
+        description: `${a.customCategoryName || a.category} • ${[a.location?.city, a.location?.state].filter(Boolean).join(', ')}`,
+        icon: Megaphone,
+        link: `/advert/${a.slug || a.id}`,
+      }));
+
+    const externalResults: SearchResult[] = queryText.length > 2 ? EXTERNAL_ENGINES.map(e => ({
       id: `ext_${e.name}`,
-      title: `${e.name}: "${query}"`,
+      title: `${e.name}: "${queryText}"`,
       category: 'external',
-      description: `Bridge to external intelligence via ${e.name} secure protocol.`,
+      description: `Search the web directly using ${e.name}.`,
       icon: Globe,
-      link: `${e.url}${encodeURIComponent(query)}`
+      link: `${e.url}${encodeURIComponent(queryText)}`
     })) : [];
 
-    setResults([...filtered, ...externalResults]);
-  }, [query]);
+    setResults([...matchedAdverts, ...filteredHubs, ...externalResults]);
+  }, [queryText, liveAdverts]);
 
   return (
     <motion.div 
@@ -95,24 +135,24 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-8 h-8 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
             <input 
               autoFocus
-              placeholder="Search EFADO Hubs or External Intelligence..."
+              placeholder="Search EFADO Hubs, Adverts, or Products..."
               className="w-full pl-18 pr-8 py-8 bg-slate-50 border-2 border-slate-50 rounded-[2.5rem] text-2xl font-black text-slate-900 focus:border-indigo-600 focus:bg-white transition-all outline-none italic placeholder:text-slate-400"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={queryText}
+              onChange={(e) => setQueryText(e.target.value)}
             />
             <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
-               <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] bg-white border border-slate-100 px-3 py-1.5 rounded-full shadow-sm">AI Pulse Active</span>
+               <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] bg-white border border-slate-100 px-3 py-1.5 rounded-full shadow-sm">Live Search</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-             {['all', 'hubs', 'external'].map(tab => (
+          <div className="flex items-center gap-4 flex-wrap">
+             {['all', 'adverts', 'hubs', 'external'].map(tab => (
                <button 
                  key={tab}
                  onClick={() => setActiveTab(tab as any)}
                  className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400 hover:bg-slate-50'}`}
                >
-                 {tab === 'all' ? 'Universal' : tab === 'hubs' ? 'Local Hubs' : 'Global Bridges'}
+                 {tab === 'all' ? 'All' : tab === 'adverts' ? 'Adverts & Items' : tab === 'hubs' ? 'EFADO Hubs' : 'Web Search'}
                </button>
              ))}
           </div>
@@ -120,14 +160,14 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
         {/* Results Area */}
         <div className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar bg-slate-50/30">
-          {!query ? (
+          {!queryText ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
                <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center shadow-xl border border-slate-100 animate-bounce">
                   <Globe className="w-10 h-10 text-indigo-400" />
                </div>
                <div className="space-y-2">
-                 <h3 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter italic">World Intelligence Bridge</h3>
-                 <p className="text-sm text-slate-500 font-medium max-w-sm mx-auto">Start typing to bridge the gap between EFADO local hubs and global external search protocols.</p>
+                 <h3 className="text-2xl font-black text-slate-900 uppercase italic tracking-tighter">Universal Search</h3>
+                 <p className="text-sm text-slate-500 font-medium max-w-sm mx-auto">Start typing to find EFADO Hubs or search external web engines.</p>
                </div>
                <div className="grid grid-cols-2 gap-4 max-w-md w-full">
                   {HUB_RESULTS.slice(0, 4).map(hub => (
@@ -150,7 +190,16 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
                      initial={{ opacity: 0, y: 20 }}
                      animate={{ opacity: 1, y: 0 }}
                      exit={{ opacity: 0, scale: 0.95 }}
-                     onClick={() => result.link && window.open(result.link, '_blank')}
+                     onClick={() => {
+                       if (!result.link) return;
+                       if (result.link.startsWith('/')) {
+                         onClose();
+                         window.history.pushState({}, '', result.link);
+                         window.dispatchEvent(new PopStateEvent('popstate'));
+                       } else {
+                         window.open(result.link, '_blank', 'noopener,noreferrer');
+                       }
+                     }}
                      className="w-full text-left p-6 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm hover:shadow-xl hover:border-indigo-600 transition-all group flex items-start gap-6 relative overflow-hidden"
                    >
                      {result.category === 'external' && (
@@ -196,7 +245,7 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
                <Cpu className="w-12 h-12 text-slate-300 animate-pulse" />
-               <p className="text-slate-400 font-black uppercase tracking-widest text-xs italic">No Strategic Matches Found for "{query}"</p>
+               <p className="text-slate-400 font-black uppercase tracking-widest text-xs italic">No results found for "{queryText}"</p>
             </div>
           )}
         </div>
@@ -206,11 +255,11 @@ export const UniversalSearch: React.FC<{ onClose: () => void }> = ({ onClose }) 
            <div className="flex items-center gap-8">
               <div className="flex items-center gap-2">
                  <Shield className="w-4 h-4 text-emerald-400" />
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">End-to-End Encryption Terminal</span>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Encrypted Search</span>
               </div>
               <div className="flex items-center gap-2">
                  <Globe className="w-4 h-4 text-indigo-400" />
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Universal Bridge Protocol v2.5</span>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">EFADO Search Hub</span>
               </div>
            </div>
            

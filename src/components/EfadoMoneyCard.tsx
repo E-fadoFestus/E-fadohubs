@@ -427,7 +427,7 @@ export const EfadoMoneyCard: React.FC<EfadoMoneyCardProps> = ({ onClose, user, o
                     animate={{ opacity: 1, y: 0 }}
                     className="flex items-center gap-4"
                   >
-                    <span className="text-8xl font-display font-black text-white drop-shadow-2xl">
+                    <span className="text-5xl sm:text-7xl md:text-8xl font-display font-black text-white drop-shadow-2xl">
                       {formatPrice(winAmount)}
                     </span>
                   </motion.div>

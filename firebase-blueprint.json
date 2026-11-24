@@ -663,6 +663,76 @@
         "expiresAt": { "type": "number" }
       },
       "required": ["code", "userId", "userEmail", "amount", "status", "createdAt"]
+    },
+    "HelpInboxMessage": {
+      "title": "Help Inbox Message",
+      "description": "Support requests sent from EFADO Hub Guides to the CEO Help / Support Inbox.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "phone": { "type": "string" },
+        "hub": { "type": "string" },
+        "subject": {
+          "type": "string",
+          "enum": ["Payment Issue", "Game Issue", "Withdrawal", "Account", "Other"]
+        },
+        "message": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["New", "Replied", "Closed"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdAtIso": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userName", "hub", "subject", "message", "status", "createdAt"]
+    },
+    "AdListing": {
+      "title": "AdListing",
+      "description": "Published business adverts and product-for-sale listings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "vendorId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "hub": { "type": "string" },
+        "type": { "type": "string", "enum": ["ADVERT", "SELL"] },
+        "category": { "type": "string" },
+        "groupId": { "type": "string" },
+        "customCategoryName": { "type": "string" },
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "viewsCount": { "type": "number" },
+        "sharesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "pending", "finished", "expired", "sold_out", "deleted"] }
+      }
+    },
+    "AdvertComment": {
+      "title": "AdvertComment",
+      "description": "Buyer questions and comments on adverts.",
+      "type": "object",
+      "properties": {
+        "adId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "text": { "type": "string" }
+      }
+    },
+    "CustomAdvertCategory": {
+      "title": "CustomAdvertCategory",
+      "description": "Custom 'Others' categories that auto-promote when 5+ unique users submit them.",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "submissionCount": { "type": "number" },
+        "promoted": { "type": "boolean" }
+      }
     }
   },
   "firestore": {
@@ -821,6 +891,22 @@
     "/manual_game_pins/{pinId}": {
       "schema": "ManualGamePin",
       "description": "Secure manual game payment activation codes."
+    },
+    "/help_inbox/{messageId}": {
+      "schema": "HelpInboxMessage",
+      "description": "Dedicated Help / Support Inbox messages routed directly to the CEO Portal."
+    },
+    "/ad_listings/{adId}": {
+      "schema": "AdListing",
+      "description": "Published adverts and direct sell listings."
+    },
+    "/advert_comments/{commentId}": {
+      "schema": "AdvertComment",
+      "description": "Public comments and buyer questions per advert."
+    },
+    "/advert_categories/{categorySlug}": {
+      "schema": "CustomAdvertCategory",
+      "description": "Auto-growing custom categories promoted after 5+ user entries."
     }
   }
 }

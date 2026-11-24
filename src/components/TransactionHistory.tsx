@@ -180,9 +180,9 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic flex items-center gap-3">
-            <History className="w-8 h-8 text-amber-500" /> Transaction Intel
+            <History className="w-8 h-8 text-amber-500" /> Transaction History
           </h2>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Sovereign Ledger History</p>
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Complete Account Activity</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -420,7 +420,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
       ) : filteredTxs.length === 0 ? (
         <div className="p-20 text-center glass-card-ultra rounded-[2.5rem] border border-dashed border-white/10">
           <History className="w-16 h-16 text-slate-800 mx-auto mb-6 opacity-20" />
-          <p className="text-slate-500 font-bold uppercase tracking-tighter">No transactions recorded in the neural grid.</p>
+          <p className="text-slate-500 font-bold uppercase tracking-tighter">No transactions found yet.</p>
         </div>
       ) : (
         <div className="space-y-4 animate-duration-300 animate-fade-in animate-ease-in-out">
@@ -557,7 +557,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
                             {/* Detail Col 5 */}
                             <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
                               <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Funding / Payout Route</span>
-                              <span className="text-[10px] font-extrabold text-emerald-400 uppercase block">{tx.method || 'Internal Node Clearance'}</span>
+                              <span className="text-[10px] font-extrabold text-emerald-400 uppercase block">{tx.method || 'Wallet Balance'}</span>
                             </div>
 
                             {/* Detail Col 6 */}
@@ -575,7 +575,7 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
                             <div className="p-4 bg-slate-900/30 rounded-2xl border border-white/5 space-y-2 text-left">
                               <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Liaison Context / Audit Notes</span>
                               <p className="text-[11px] font-bold text-slate-200 uppercase leading-relaxed tracking-wide">
-                                {tx.description || 'Verified secure transaction recorded under sovereign clearance node.'}
+                                {tx.description || 'Verified transaction recorded in your account.'}
                               </p>
                               {tx.metadata && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 pt-2 border-t border-white/5 font-mono text-[10px] text-slate-400">
@@ -665,9 +665,9 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
           <Zap className="w-6 h-6" />
         </div>
         <div>
-          <h4 className="text-xs font-black text-white uppercase tracking-widest mb-1 italic">Ledger Integrity Protocol</h4>
+          <h4 className="text-xs font-black text-white uppercase tracking-widest mb-1 italic">Account Record Protection</h4>
           <p className="text-[10px] text-slate-400 font-medium leading-relaxed uppercase tracking-tighter">
-            Every entry in the EFADO ledger is encrypted and mirrored across three verification nodes. Strategic receipts are generated automatically to provide sovereign proof of equity.
+            Every transaction on EFADO is encrypted and safely recorded. Receipts are generated automatically for your records.
           </p>
         </div>
       </div>

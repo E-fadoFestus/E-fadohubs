@@ -503,25 +503,24 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
-          <div className="space-y-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+          <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 rounded-full border border-indigo-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              <span className="text-[9px] font-black tracking-widest text-indigo-400">Tactical Exchange Core</span>
+              <span className="text-xs font-semibold text-indigo-300">Digital Services &amp; Exchange</span>
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight text-white uppercase">
-              Digital Services <span className="text-indigo-400 block sm:inline">Hub</span>
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white">
+              Digital Services <span className="text-indigo-400">Hub</span>
             </h1>
-            <p className="text-xs text-slate-400 font-medium tracking-wide normal-case">
-              Highly secure, low-risk on-site transactions for utility refills, money exchange, and digital asset conversions.
+            <p className="text-sm text-slate-400 normal-case">
+              Buy airtime &amp; data, convert currencies, or swap supported crypto safely in one place.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="p-4 bg-slate-900 rounded-2xl border border-white/5 flex items-center gap-4">
-              <Lock className="w-6 h-6 text-emerald-400" />
-              <div>
-                <p className="text-[8px] font-black text-slate-500 tracking-wider">LEDGER SECURITY</p>
-                <p className="text-xs font-black text-white">SSL SECURE PORT</p>
+            <div className="p-3.5 bg-slate-900 rounded-2xl border border-white/10 flex items-center gap-3">
+              <Lock className="w-5 h-5 text-emerald-400" />
+              <div className="normal-case">
+                <p className="text-xs text-slate-400">Account Protection</p>
+                <p className="text-xs font-bold text-white">Encrypted Session</p>
               </div>
             </div>
           </div>
@@ -565,13 +564,13 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
           {activeTab === 'crypto' && (
             <div className="space-y-8 animate-fadeIn normal-case">
               <HubGuideNote guideId="cryptoOtc" variant="dark" />
-              <div className="border-b border-white/5 pb-6 uppercase">
-                <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-3">
+              <div className="border-b border-white/10 pb-5 normal-case">
+                <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2.5">
                   <Coins className="w-6 h-6 text-indigo-400" />
-                  Sovereign Crypto OTC Exchange
+                  Crypto OTC Swap
                 </h2>
-                <p className="text-[10px] text-slate-500 mt-1 normal-case font-medium">
-                  Deposit stablecoins or major tokens to exchange seamlessly for bank transfer or mobile money.
+                <p className="text-sm text-slate-400 mt-1">
+                  Send supported crypto to exchange seamlessly for local bank transfer or mobile money.
                 </p>
               </div>
 
@@ -782,11 +781,11 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
               )}
 
               {otcStep === 'confirming' && (
-                <div className="max-w-2xl mx-auto bg-slate-950 border border-white/10 rounded-3xl p-12 text-center space-y-6 animate-pulse">
-                  <RefreshCw className="w-16 h-16 text-indigo-400 mx-auto animate-spin" />
-                  <h3 className="text-xl font-black text-white">VERIFYING BLOCKCHAIN CONSTRAINTS</h3>
-                  <p className="text-xs text-slate-400 normal-case leading-relaxed">
-                    Sovereign validator network is confirming your stablecoin deposit hash inside TRON block height. Fiat dispatch will follow instantly upon 3/3 confirmations...
+                <div className="max-w-2xl mx-auto bg-slate-950 border border-white/10 rounded-3xl p-10 text-center space-y-5">
+                  <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto animate-spin" />
+                  <h3 className="text-xl font-bold text-white normal-case">Confirming Your Deposit</h3>
+                  <p className="text-sm text-slate-400 normal-case leading-relaxed">
+                    We are verifying your transaction details. Your payout will be processed automatically once confirmed.
                   </p>
                 </div>
               )}
@@ -933,21 +932,21 @@ export const EfadoDigitalServicesHub: React.FC<EfadoDigitalServicesHubProps> = (
               )}
 
               {convStatus === 'processing' && (
-                <div className="text-center py-16 space-y-6 max-w-lg mx-auto">
-                  <RefreshCw className="w-16 h-16 text-indigo-400 mx-auto animate-spin" />
-                  <h3 className="text-xl font-black text-white uppercase">Securing parallel market routes</h3>
-                  <p className="text-xs text-slate-400 normal-case leading-relaxed">
-                    Our sovereign routing engines are pairing parallel liquidities on-chain to process fiat conversion from {convSourceCurrency} to {convTargetCurrency}...
+                <div className="text-center py-14 space-y-5 max-w-lg mx-auto">
+                  <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto animate-spin" />
+                  <h3 className="text-xl font-bold text-white">Processing Your Currency Exchange</h3>
+                  <p className="text-sm text-slate-400 normal-case leading-relaxed">
+                    Preparing your payout from {convSourceCurrency} to {convTargetCurrency}...
                   </p>
                 </div>
               )}
 
               {convStatus === 'success' && (
-                <div className="max-w-xl mx-auto bg-slate-950 border-2 border-emerald-500/20 rounded-3xl p-8 md:p-10 text-center space-y-6 animate-fadeIn">
-                  <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
-                  <h3 className="text-xl font-black text-white">CONVERSION DISPATCH COMPLETED!</h3>
-                  <p className="text-xs text-slate-300 normal-case leading-relaxed">
-                    Sovereign funds of {convTargetCurrency} {Math.round((convAmount / (fiatRates[convSourceCurrency] || 1.0)) * (fiatRates[convTargetCurrency] || 1550) * 0.985).toLocaleString()} have been authorized and routed to your destination bank:
+                <div className="max-w-xl mx-auto bg-slate-950 border border-emerald-500/30 rounded-3xl p-8 text-center space-y-5">
+                  <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
+                  <h3 className="text-xl font-bold text-white">Exchange Complete</h3>
+                  <p className="text-sm text-slate-300 normal-case leading-relaxed">
+                    Your payout of {convTargetCurrency} {Math.round((convAmount / (fiatRates[convSourceCurrency] || 1.0)) * (fiatRates[convTargetCurrency] || 1550) * 0.985).toLocaleString()} has been sent to your bank account:
                   </p>
                   <div className="bg-white/5 p-4 rounded-2xl text-[10px] text-slate-400 space-y-1 text-left">
                     <p>RECIPIENT: <span className="text-white font-black uppercase">{convPayoutName}</span></p>
