@@ -220,19 +220,19 @@ export const HUB_GUIDES: Record<HubGuideId, HubGuideContent> = {
   },
   nexus: {
     id: 'nexus',
-    title: 'EFADO Nexus (Social & Reels) Guide',
+    title: 'EFADO Nexus Hub Guide',
     whatIsThis:
-      'Post updates, chat 1-on-1 or in groups, watch or upload short Reels, and earn Creator money when people watch your content.',
+      'One friendly place for all your EFADO social life: EFADO Gist World, EFADO Connect, EFADO Vibes, EFADO Moments, EFADO Assembly, and EFADO Mind Pro.',
     steps: [
-      'Tap the feed composer to share text, photos, or helpful posts with the EFADO community.',
-      'Open "Direct" or "Groups" at the top to chat privately or join communities like Business, Tech, and Forums.',
-      'Upload short videos in Reels Studio — stay active because 5-second+ qualified views earn ₦100 per 1,000 views.',
-      'Check your Creator Profile Wallet anytime to withdraw earned creator rewards to your EFADO Wallet or bank.'
+      'Tap "Open My Hub" on the welcome screen, or pick My Chats, Group Gist, or Reels directly.',
+      'Inside the hub, tap For You, Following, Trending, Marketplace, or Live Now, or share a photo, video, poll, or event.',
+      'Use the left Hub Integrations panel to open any of the 6 full pages: Gist World, Connect, Vibes, Moments, Assembly, or Mind Pro.',
+      'Visit EFADO Mind Pro anytime for Voice Mark voice notes, EFADO AI writing help, or Chat With a Real Human.'
     ],
     whatHappensNext:
-      'Posts and reels appear live on the feed, qualified views update your Creator Fund automatically, and payouts settle to your account.',
+      'Every post, chat, voice note, photo moment, poll, and Mind Pro note saves live to your account so your friends and communities see it right away.',
     example:
-      'If you teach farming, tech tips, or comedy in 30-second Reels, your 5s+ views count automatically toward real Naira earnings you can cash out.',
+      'Want to message a friend or join a group? Open EFADO Connect for private chats and voice notes, or open EFADO Assembly for big channels and polls.',
     helpCategory: 'General Help'
   },
   domainsPartners: {

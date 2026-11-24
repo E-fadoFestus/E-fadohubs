@@ -34,7 +34,6 @@ import { EfadoHepiHandsLoan } from './EfadoHepiHandsLoan';
 import { EfadoDomainHub } from './EfadoDomainHub';
 import { EfadoEducationHub } from './EfadoEducationHub';
 import { EfadoTechHub } from './tech/EfadoTechHub';
-import { EfadoGistHub } from './EfadoGistHub';
 import { EfadoNexusHubView } from './EfadoNexusHubView';
 import { EfadoServiceCorps } from './EfadoServiceCorps';
 import { UserWallet } from './UserWallet';
@@ -69,7 +68,6 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
   onUpdateBalance
 }) => {
   const [marketView, setMarketView] = useState<'new' | 'used'>('new');
-  const [isNexusSynced, setIsNexusSynced] = useState(false);
   const hubConfig = getHubBySlug(slug) || (slug === 'home' ? { name: 'Home', slug: 'home', tag: 'HOME', desc: 'Home', color: 'from-emerald-600 to-teal-600', route: '/home' } : (HUBS.find(h => h.slug === 'nexus-hub') || HUBS[0]));
 
   // Helper guest mock profile so guest users can preview hub interfaces cleanly without crashes
@@ -83,6 +81,31 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
     role: 'player',
     createdAt: new Date().toISOString()
   };
+
+  if (hubConfig.slug === 'nexus-hub') {
+    return (
+      <EfadoNexusHubView
+        user={effectiveUser}
+        onClose={onNavigateHome}
+        initialPage={itemId}
+        onOpenProfile={() => (user ? onOpenCashier?.('profile') : onLogin?.())}
+        onNavigate={(hub, subview) => {
+          if (hub === 'ADVERTISING') {
+            if (subview === 'SELL') {
+              onNavigateHub('advertising/start-sell');
+            } else {
+              onNavigateHub('advertising/my-adverts');
+            }
+          } else if (hub === 'dashboard') {
+            if (user) onOpenCashier?.('profile');
+            else onLogin?.();
+          } else {
+            onNavigateHub(String(hub));
+          }
+        }}
+      />
+    );
+  }
 
   const renderHubContent = () => {
     switch (hubConfig.slug) {
@@ -151,8 +174,8 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
           <EfadoAdvertisingHub
             user={effectiveUser}
             onClose={onNavigateHome}
-            initialType="ADVERT"
-            initialItemId={itemId}
+            initialType={itemId === 'start-sell' ? 'SELL' : 'ADVERT'}
+            initialItemId={itemId === 'start-sell' || itemId === 'my-adverts' ? undefined : itemId}
             onOpenProfile={() => onOpenCashier?.('profile')}
           />
         );
@@ -176,15 +199,6 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
               onStartZoomSession={() => {}}
             />
           </div>
-        );
-
-      case 'gist':
-        return (
-          <EfadoGistHub
-            user={effectiveUser}
-            onClose={onNavigateHome}
-            initialView="FEED"
-          />
         );
 
       case 'community':
@@ -253,59 +267,12 @@ export const UniversalHubPage: React.FC<UniversalHubPageProps> = ({
       case 'nexus-hub':
       case 'nexus':
       case 'gist':
-        if (isNexusSynced) {
-          return (
-            <EfadoNexusHubView
-              user={effectiveUser}
-              onClose={() => setIsNexusSynced(false)}
-            />
-          );
-        }
         return (
-          <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
-            <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
-              <h2 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
-                <MessageSquare className="w-6 h-6 text-indigo-400" />
-                EFADO Gist & Social Hub
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2 bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between h-full">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                      <MessageSquare className="w-5 h-5 text-indigo-400" />
-                    </div>
-                    <h4 className="text-base font-bold text-white">About EFADO Gist Hub</h4>
-                  </div>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    Connect with friends, join community groups, watch short video reels, chat directly with buyers or sellers, and share stories across EFADO.
-                  </p>
-                </div>
-                <div className="pt-4 border-t border-white/10 mt-5 flex items-center justify-between text-xs text-slate-400">
-                  <span className="text-emerald-400 font-medium">Protected Private Messaging</span>
-                  <span>Live Social Feed</span>
-                </div>
-              </div>
-
-              <div className="bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between items-center text-center h-full">
-                <div>
-                  <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <h4 className="text-base font-bold text-white mb-2">Open Gist Hub</h4>
-                  <p className="text-xs text-slate-400 mb-6">Access community feeds, reels, group chats, and voice calls.</p>
-                </div>
-                <button 
-                  onClick={() => setIsNexusSynced(true)}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
-                >
-                  Open Gist Hub
-                </button>
-              </div>
-            </div>
-          </div>
+          <EfadoNexusHubView
+            user={effectiveUser}
+            onClose={onNavigateHome}
+            initialPage={itemId}
+          />
         );
 
       case 'partners':

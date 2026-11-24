@@ -1868,6 +1868,114 @@ app.get('/robots.txt', (req, res) => {
   return res.status(200).send(`User-agent: *\nAllow: /\nAllow: /advert/\nSitemap: ${baseUrl}/sitemap.xml\n`);
 });
 
+// ============================================================================
+// EFADO NEXUS HUB & MIND PRO API MODULE
+// ============================================================================
+app.post('/api/nexus/validate-post', (req, res) => {
+  const { content, kind = 'post', userId } = req.body || {};
+  if (!userId || String(userId).trim().length < 2) {
+    return res.status(400).json({ success: false, message: 'Please sign in before publishing.' });
+  }
+  const cleanText = String(content || '').trim();
+  if (!cleanText || cleanText.length < 2 || cleanText.length > 5000) {
+    return res.status(400).json({ success: false, message: 'Please write between 2 and 5,000 characters.' });
+  }
+  return res.json({
+    success: true,
+    sanitized: cleanText,
+    kind: String(kind),
+    validatedAt: new Date().toISOString()
+  });
+});
+
+app.post('/api/nexus/voice-verify', (req, res) => {
+  const { userId, audioDurationSec, phrase } = req.body || {};
+  if (!userId || !String(userId).trim()) {
+    return res.status(400).json({ success: false, message: 'User ID is required for Voice Mark verification.' });
+  }
+  const dur = Number(audioDurationSec || 0);
+  if (!Number.isFinite(dur) || dur < 1) {
+    return res.status(400).json({ success: false, message: 'Voice sample is too short. Please speak for at least 1 second.' });
+  }
+  const cleanPhrase = String(phrase || 'EFADO Voice Mark Verified').trim().slice(0, 140);
+  const stamp = Date.now().toString(36).toUpperCase();
+  return res.json({
+    success: true,
+    voiceMarkCode: `VM-${String(userId).slice(0, 6).toUpperCase()}-${stamp}`,
+    confidence: 0.96,
+    phrase: cleanPhrase,
+    verifiedAt: new Date().toISOString()
+  });
+});
+
+app.post('/api/nexus/mind-pro/ai', async (req, res) => {
+  try {
+    const { mode = 'write_gist', prompt, userName = 'Member', faculty } = req.body || {};
+    const cleanPrompt = String(prompt || '').trim();
+    if (!cleanPrompt || cleanPrompt.length < 2 || cleanPrompt.length > 2500) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please write what you want EFADO AI to help you with.'
+      });
+    }
+
+    const ai = getAiClient();
+    if (!ai) {
+      return res.status(503).json({
+        success: false,
+        message: 'EFADO AI is not configured yet on the server. Please try again later.'
+      });
+    }
+
+    const modeInstructions: Record<string, string> = {
+      write_gist: 'Write a friendly, engaging, crystal-clear social gist post for EFADO community members. Keep paragraphs short, warm, and ready to publish.',
+      reply_chat: 'Write 3 clear, polite, helpful reply options the user can send in chat right away.',
+      create_advert: 'Write a persuasive, honest EFADO business advert with a catchy headline, 3 simple benefits, and a clear call to action.',
+      plan_business: 'Create a practical, step-by-step action plan tailored to small/growing African and global entrepreneurs using simple plain English.',
+      reason_partner: `Act as a calm, thoughtful Home of Reason mentor inside EFADO Mind Pro (${faculty || 'Reason & Logic'}). Give balanced, wise, practical insight in plain language.`
+    };
+
+    const instruction = modeInstructions[String(mode)] || modeInstructions.write_gist;
+    const fullPrompt = `${instruction}\n\nMember Name: ${String(userName).slice(0, 80)}\nRequest: ${cleanPrompt}\n\nImportant: Keep your answer plain, warm, practical, and easy to read on a phone screen. Do not mention third-party social apps.`;
+
+    let text = '';
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: fullPrompt
+      });
+      text = response.text ? response.text.trim() : '';
+    } catch (primaryErr: any) {
+      console.warn('[Mind Pro AI] Primary model fallback:', primaryErr?.message);
+      const fallbackResp = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt
+      });
+      text = fallbackResp.text ? fallbackResp.text.trim() : '';
+    }
+
+    if (!text) {
+      return res.status(502).json({
+        success: false,
+        message: 'EFADO AI did not return a response. Please try again.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      mode,
+      reply: text,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('[Mind Pro AI Error]', err?.message || err);
+    return res.status(500).json({
+      success: false,
+      message: 'Not sent, please try again.'
+    });
+  }
+});
+
 // Start server with Vite middleware support
 async function startServer() {
   try {

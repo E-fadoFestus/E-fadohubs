@@ -784,9 +784,17 @@ function AppContent() {
       return;
     }
 
-    const matched = getHubBySlug(slug);
-    const targetSlug = matched ? matched.slug : slug;
-    const url = itemId ? `/hub/${targetSlug}/${itemId}` : `/hub/${targetSlug}`;
+    let baseSlug = slug;
+    let resolvedItemId = itemId;
+    if (slug.includes('/')) {
+      const segs = slug.split('/').filter(Boolean);
+      baseSlug = segs[0] || slug;
+      if (!resolvedItemId && segs[1]) resolvedItemId = segs[1];
+    }
+
+    const matched = getHubBySlug(baseSlug);
+    const targetSlug = matched ? matched.slug : baseSlug;
+    const url = resolvedItemId ? `/hub/${targetSlug}/${resolvedItemId}` : `/hub/${targetSlug}`;
     if (inNewTab) {
       window.open(url, '_blank', 'noopener,noreferrer');
       return;
@@ -794,7 +802,7 @@ function AppContent() {
 
     navigate(url);
     setVerticalHubSlug(targetSlug);
-    setHubItemId(itemId || null);
+    setHubItemId(resolvedItemId || null);
     setShowVerticalHubsDirectory(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -826,13 +834,13 @@ function AppContent() {
     }
 
     if (hub === 'GIST' || hub === 'nexus' || hub === 'nexus-hub' || hub === 'nexushub') {
-      setVerticalHubSlug(null);
-      setHubItemId(null);
-      setShowVerticalHubsDirectory(false);
-      setShowGistHub(false);
-      setActiveHub('GIST');
-      navigate('/home');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (extraProps?.bargain && extraProps?.product) {
+        setGistBargainContext(extraProps.product);
+        navigateToVerticalHub('nexus-hub', false, 'connect');
+        return;
+      }
+      const subSlug = subview === 'CHAT' ? 'connect' : subview === 'REELS' ? 'vibes' : undefined;
+      navigateToVerticalHub('nexus-hub', false, subSlug);
       return;
     }
 
@@ -2905,13 +2913,7 @@ function AppContent() {
                         return;
                       }
                       if (item.id === 'GIST') {
-                        setVerticalHubSlug(null);
-                        setHubItemId(null);
-                        setShowVerticalHubsDirectory(false);
-                        setShowGistHub(false);
-                        setActiveHub('GIST');
-                        navigate('/home');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        navigateToVerticalHub('nexus-hub');
                         return;
                       }
                       navigateToVerticalHub(itemSlug);
@@ -3401,49 +3403,19 @@ function AppContent() {
               <motion.section
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-6"
+                className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 border border-sky-200 space-y-6"
               >
-                <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-3 tracking-tight">
-                    <MessageSquare className="w-6 h-6 text-indigo-400" />
-                    Gist Hub & Social Feed
+                <div className="text-center space-y-3">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    EFADO Nexus Hub - Chat, Gist and Connect
                   </h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl">
-                  <div className="md:col-span-2 bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between h-full">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                          <MessageSquare className="w-5 h-5 text-indigo-400" />
-                        </div>
-                        <h4 className="text-base font-bold text-white">About EFADO Gist Hub</h4>
-                      </div>
-                      <p className="text-sm text-slate-300 leading-relaxed">
-                        Stay connected with friends, join community groups, watch short video reels, chat directly with buyers or sellers, and share stories in real time.
-                      </p>
-                    </div>
-                    <div className="pt-4 border-t border-white/10 mt-5 flex items-center justify-between text-xs text-slate-400">
-                      <span className="text-emerald-400 font-medium">Protected Private Messaging</span>
-                      <span>Live Social Feed</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-900/70 border border-white/10 p-6 sm:p-7 rounded-2xl flex flex-col justify-between items-center text-center h-full">
-                    <div>
-                      <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <MessageSquare className="w-6 h-6 text-indigo-400" />
-                      </div>
-                      <h4 className="text-base font-bold text-white mb-2">Open Gist Hub</h4>
-                      <p className="text-xs text-slate-400 mb-6">Access community feeds, reels, group chats, and voice calls.</p>
-                    </div>
-                    <button 
-                      onClick={() => setShowGistHub(true)}
-                      className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all text-sm"
-                    >
-                      Open Gist Hub
-                    </button>
-                  </div>
+                  <p className="text-sm sm:text-base text-slate-600">One place for all your EFADO life.</p>
+                  <button
+                    onClick={() => navigateToVerticalHub('nexus-hub')}
+                    className="px-7 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-sm sm:text-base transition-all"
+                  >
+                    Open My Hub
+                  </button>
                 </div>
               </motion.section>
             )}

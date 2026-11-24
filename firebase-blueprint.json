@@ -733,6 +733,85 @@
         "submissionCount": { "type": "number" },
         "promoted": { "type": "boolean" }
       }
+    },
+    "NexusStory": {
+      "title": "NexusStory",
+      "description": "24h stories and highlights shared in EFADO Nexus Hub.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "hub": { "type": "string" },
+        "caption": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "NexusPage": {
+      "title": "NexusPage",
+      "description": "Public brand, ministry, or community pages in EFADO Gist World.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "bio": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "NexusMoment": {
+      "title": "NexusMoment",
+      "description": "Photo moments, highlights, close friends shares, and archives in EFADO Moments.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "caption": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "audience": { "type": "string", "enum": ["public", "close_friends", "archive"] },
+        "status": { "type": "string" }
+      }
+    },
+    "NexusAssemblyMessage": {
+      "title": "NexusAssemblyMessage",
+      "description": "Channel broadcasts, announcements, files, and polls in EFADO Assembly.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "channelId": { "type": "string" },
+        "content": { "type": "string" },
+        "msgKind": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "NexusMindProEntry": {
+      "title": "NexusMindProEntry",
+      "description": "Voice Marks and Home of Reason Faculty posts inside EFADO Mind Pro.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "section": { "type": "string" },
+        "faculty": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "NexusMindProSession": {
+      "title": "NexusMindProSession",
+      "description": "Mind Pro Tech focus sessions and study clarity notes.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "title": { "type": "string" },
+        "note": { "type": "string" },
+        "focusMinutes": { "type": "number" },
+        "status": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -907,6 +986,30 @@
     "/advert_categories/{categorySlug}": {
       "schema": "CustomAdvertCategory",
       "description": "Auto-growing custom categories promoted after 5+ user entries."
+    },
+    "/nexus_stories/{storyId}": {
+      "schema": "NexusStory",
+      "description": "24-hour stories and highlights across EFADO Nexus Hub."
+    },
+    "/nexus_pages/{pageId}": {
+      "schema": "NexusPage",
+      "description": "Public Pages in EFADO Gist World."
+    },
+    "/nexus_moments/{momentId}": {
+      "schema": "NexusMoment",
+      "description": "Photo Moments and archives in EFADO Moments."
+    },
+    "/nexus_assembly_messages/{messageId}": {
+      "schema": "NexusAssemblyMessage",
+      "description": "Channel announcements, broadcasts, files, and polls in EFADO Assembly."
+    },
+    "/nexus_mind_pro_entries/{entryId}": {
+      "schema": "NexusMindProEntry",
+      "description": "Voice Marks and Home of Reason discussions in EFADO Mind Pro."
+    },
+    "/nexus_mind_pro_sessions/{sessionId}": {
+      "schema": "NexusMindProSession",
+      "description": "Focus & clarity notes in EFADO Mind Pro Tech."
     }
   }
 }
