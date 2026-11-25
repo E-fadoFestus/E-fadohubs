@@ -29,6 +29,7 @@ import {
   injectAdvertMetaIntoHtml,
 } from './src/app/api/adverts/service';
 import { registerWalletRoutes } from './src/lib/wallet-routes';
+import { registerMarketplaceRoutes } from './src/lib/marketplace-routes';
 
 async function handleVercelHandler(handler: (req: any, res: any) => Promise<any>, req: express.Request, res: express.Response) {
   try {
@@ -418,6 +419,11 @@ app.post(['/api/webhook/paystack', '/webhook/paystack'], (req: express.Request, 
 app.all(['/api/bank/resolve', '/api/verify-bank'], (req: express.Request, res: express.Response) =>
   handleVercelHandler(verifyBankHandler, req, res)
 );
+
+// ============================================================================
+// MODERN DAY MARKET ENDPOINTS (Must register before wallet webhooks to handle MKT- refs)
+// ============================================================================
+registerMarketplaceRoutes(app);
 
 // ============================================================================
 // UNIFIED WALLET ENDPOINTS

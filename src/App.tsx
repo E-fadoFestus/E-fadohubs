@@ -1246,9 +1246,15 @@ function AppContent() {
           return;
         }
         const urlParams = new URLSearchParams(window.location.search);
+        const mktOrder = urlParams.get('marketplace_order');
         const reference = urlParams.get('reference') || urlParams.get('trxref');
         const simUserId = urlParams.get('userId');
         const simAmount = urlParams.get('amount');
+
+        if (mktOrder || (reference && reference.startsWith('MKT-'))) {
+          setShowModernMarket(true);
+          return;
+        }
 
         if (reference) {
           console.log('💳 Paystack Return Reference detected in URL:', reference);
@@ -1296,11 +1302,18 @@ function AppContent() {
     const handleFlutterwaveCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
+        const mktOrder = urlParams.get('marketplace_order');
         const txRef = urlParams.get('tx_ref') || urlParams.get('txRef');
+        const referenceParam = urlParams.get('reference');
         const transactionId = urlParams.get('transaction_id') || urlParams.get('id');
         const status = urlParams.get('status');
         const simUserId = urlParams.get('userId');
         const simAmount = urlParams.get('amount');
+
+        if (mktOrder || (txRef && txRef.startsWith('MKT-')) || (referenceParam && referenceParam.startsWith('MKT-'))) {
+          setShowModernMarket(true);
+          return;
+        }
 
         if (txRef || transactionId) {
           console.log('🌐 Flutterwave Return Reference detected in URL:', txRef || transactionId, 'Status:', status);
@@ -1351,11 +1364,17 @@ function AppContent() {
     const handleOpayCallback = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
+        const mktOrder = urlParams.get('marketplace_order');
         const opayRef = urlParams.get('opay_ref') || urlParams.get('reference');
         const status = urlParams.get('status');
         const simAmount = urlParams.get('amount');
         const simUserId = urlParams.get('userId');
         const isSimulated = urlParams.get('simulated');
+
+        if (mktOrder || (opayRef && opayRef.startsWith('MKT-'))) {
+          setShowModernMarket(true);
+          return;
+        }
 
         if (opayRef && opayRef.startsWith('OPAY_')) {
           console.log('🟢 OPay Return Reference detected in URL:', opayRef, 'Status:', status);
@@ -1408,6 +1427,16 @@ function AppContent() {
       // 2. Clean hash and pathname routing
       const rawHash = (window.location.hash || '').replace('#', '').split('?')[0].toLowerCase().trim();
       const pathname = window.location.pathname.toLowerCase().trim();
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const deepItem = searchParams.get('item');
+        if (deepItem && deepItem.startsWith('prod_')) {
+          setHubItemId(deepItem);
+          setShowModernMarket(true);
+        }
+      } catch {
+        // ignore URLSearchParams error
+      }
 
       // Check for hubs directory: /hubs or #hubs
       if (pathname === '/hubs' || pathname === '/vertical-hubs' || pathname === 'hubs' || rawHash === 'hubs' || rawHash === '/hubs') {
@@ -3660,6 +3689,7 @@ function AppContent() {
                 onClose={() => setShowModernMarket(false)} 
                 onOpenMining={() => setShowEfadoMining(true)}
                 onNavigate={handleNavigate}
+                initialItemId={hubItemId || undefined}
               />
             )}
 

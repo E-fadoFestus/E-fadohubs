@@ -102,6 +102,18 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    // Modern Day Market (Brand New, Escrow-Protected)
+    match /modern_market_products/{id} { allow read, write: if true; }
+    match /modern_market_orders/{id} { allow read, write: if true; }
+    match /modern_market_sellers/{id} { allow read, write: if true; }
+    match /modern_market_chats/{id} { allow read, write: if true; }
+    match /modern_market_chat_threads/{id} { allow read, write: if true; }
+    match /modern_market_disputes/{id} { allow read, write: if true; }
+    match /modern_market_alerts/{id} { allow read, write: if true; }
+    match /modern_market_reviews/{id} { allow read, write: if true; }
+    match /modern_market_audit_logs/{id} { allow read, write: if true; }
+    match /pendingMarketplacePayments/{id} { allow read, write: if true; }
+
     // Media, reels, & social
     match /reels/{id} {
       allow read: if true;

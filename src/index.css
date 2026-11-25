@@ -133,6 +133,25 @@ html[data-text-size="xlarge"] {
     @apply cursor-pointer transition-all duration-200;
     font-family: var(--font-sans);
   }
+
+  .modern-market-root h1,
+  .modern-market-root h2,
+  .modern-market-root h3,
+  .modern-market-root h4,
+  .modern-market-root h5,
+  .modern-market-root h6 {
+    color: inherit;
+    font-size: inherit;
+    font-family: 'Inter', 'Manrope', var(--font-sans);
+  }
+
+  .modern-market-root p {
+    color: inherit;
+    margin-bottom: 0;
+    margin-left: 0;
+    margin-right: 0;
+    max-width: none;
+  }
 }
 
 /* Enhanced text legibility across all screens - prevents unreadable tiny text on mobile */

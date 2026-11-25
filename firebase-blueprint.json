@@ -812,6 +812,48 @@
         "focusMinutes": { "type": "number" },
         "status": { "type": "string" }
       }
+    },
+    "ModernMarketProduct": {
+      "title": "Modern Market Product",
+      "description": "Brand new, sealed, warranty-backed NGN product listed on Modern Day Market.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "sellerName": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "brand": { "type": "string" },
+        "condition": { "type": "string", "enum": ["BRAND_NEW"] },
+        "price": { "type": "number" },
+        "priceKobo": { "type": "number" },
+        "stock": { "type": "number" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SOLD", "ARCHIVED"] },
+        "warrantyMonths": { "type": "number" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "waitlist": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "sellerId", "name", "category", "condition", "price", "stock", "status"]
+    },
+    "ModernMarketOrder": {
+      "title": "Modern Market Order",
+      "description": "Escrow-protected NGN order in Modern Day Market.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderCode": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "sellerIds": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "escrowStatus": { "type": "string", "enum": ["UNPAID", "HELD_IN_ESCROW", "RELEASED_TO_SELLER", "DISPUTED", "REFUNDED"] },
+        "deliveryMethod": { "type": "string", "enum": ["DELIVER_ADDRESS", "PICKUP_EFADO_OFFICE", "PICKUP_SELLER_STORE"] },
+        "pickupCode": { "type": "string" },
+        "grandTotal": { "type": "number" },
+        "grandTotalKobo": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "orderCode", "buyerId", "status", "escrowStatus", "grandTotalKobo"]
     }
   },
   "firestore": {
@@ -1010,6 +1052,14 @@
     "/nexus_mind_pro_sessions/{sessionId}": {
       "schema": "NexusMindProSession",
       "description": "Focus & clarity notes in EFADO Mind Pro Tech."
+    },
+    "/modern_market_products/{productId}": {
+      "schema": "ModernMarketProduct",
+      "description": "Brand New sealed products with warranty on Modern Day Market."
+    },
+    "/modern_market_orders/{orderId}": {
+      "schema": "ModernMarketOrder",
+      "description": "Escrow-protected NGN orders on Modern Day Market."
     }
   }
 }
