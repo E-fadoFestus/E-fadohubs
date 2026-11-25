@@ -1,43 +1,50 @@
-import React from 'react';
-import { Shield, Lock, ShieldCheck, ShieldAlert, Fingerprint } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Shield, Lock, ShieldCheck, Fingerprint, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export const SecurityGuard: React.FC<{ 
-  level?: 'basic' | 'high' | 'ultra',
-  showBadge?: boolean,
-  compact?: boolean
-}> = ({ level = 'high', showBadge = true, compact = false }) => {
-  const colors = {
-    basic: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
-    high: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-    ultra: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20'
+export const SecurityGuard: React.FC<{
+  level?: 'basic' | 'high' | 'ultra';
+  showBadge?: boolean;
+  compact?: boolean;
+}> = ({ level = 'high', compact = false }) => {
+  const styles = {
+    basic: 'text-[#7C3AED] bg-purple-50 border-purple-200',
+    high: 'text-[#16A34A] bg-emerald-50 border-emerald-200',
+    ultra: 'text-[#7C3AED] bg-purple-50 border-purple-200'
   };
 
   return (
-    <div className={`flex flex-col gap-2 ${compact ? 'p-2' : 'p-4'} rounded-2xl border ${colors[level]} backdrop-blur-md`}>
+    <div className={`flex flex-col gap-2 ${compact ? 'p-2.5' : 'p-4'} rounded-2xl border ${styles[level]}`}>
       <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-xl ${level === 'ultra' ? 'bg-indigo-500 text-white' : 'bg-current/10'}`}>
+        <div
+          className={`p-2 rounded-xl shrink-0 ${
+            level === 'ultra' ? 'bg-[#7C3AED] text-white' : 'bg-[#16A34A] text-white'
+          }`}
+        >
           {level === 'ultra' ? <Fingerprint className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
         </div>
-        <div>
-          <h4 className={`font-black uppercase tracking-tighter ${compact ? 'text-[10px]' : 'text-xs'}`}>
-            EFADO Guard & Shield
+        <div className="min-w-0">
+          <h4 className={`font-bold text-slate-900 m-0 ${compact ? 'text-xs' : 'text-sm'}`}>
+            Your Money is Safe
           </h4>
-          <p className={`font-bold opacity-70 uppercase tracking-widest ${compact ? 'text-[8px]' : 'text-[9px]'}`}>
-            {level === 'ultra' ? 'Military-Grade Encryption' : 'End-to-End Protected'}
+          <p className={`font-medium text-slate-600 m-0 max-w-none ${compact ? 'text-[11px]' : 'text-xs'}`}>
+            Protected by 256-bit encryption
           </p>
         </div>
       </div>
       {!compact && (
         <div className="flex items-center gap-2 mt-1">
           <div className="flex -space-x-1">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="w-4 h-4 rounded-full border border-white bg-current flex items-center justify-center">
-                <Lock className="w-2 h-2 text-white" />
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="w-4 h-4 rounded-full border border-white bg-[#16A34A] flex items-center justify-center"
+              >
+                <Lock className="w-2.5 h-2.5 text-white" />
               </div>
             ))}
           </div>
-          <span className="text-[8px] font-black uppercase tracking-widest opacity-60">Verified Secure Transaction</span>
+          <span className="text-xs font-semibold text-[#16A34A]">Secure Payment - Verified</span>
         </div>
       )}
     </div>
@@ -47,11 +54,30 @@ export const SecurityGuard: React.FC<{
 export const TransactionPinModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (pin: string) => void;
+  onConfirm: (pin: string, otpCode?: string) => void | Promise<void>;
   amount: number;
   action: string;
-}> = ({ isOpen, onClose, onConfirm, amount, action }) => {
-  const [pin, setPin] = React.useState(['', '', '', '']);
+  currencySymbol?: string;
+  subtitle?: string;
+  errorMessage?: string | null;
+  isSubmitting?: boolean;
+  requiresOtp?: boolean;
+  otpDeliveryNotice?: string;
+}> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  amount,
+  action,
+  currencySymbol = '₦',
+  subtitle = 'Enter your 4-digit Transaction PIN to continue',
+  errorMessage = null,
+  isSubmitting = false,
+  requiresOtp = false,
+  otpDeliveryNotice
+}) => {
+  const [pin, setPin] = useState(['', '', '', '']);
+  const [otp, setOtp] = useState('');
   const inputRefs = [
     React.useRef<HTMLInputElement>(null),
     React.useRef<HTMLInputElement>(null),
@@ -59,13 +85,22 @@ export const TransactionPinModal: React.FC<{
     React.useRef<HTMLInputElement>(null)
   ];
 
+  useEffect(() => {
+    if (isOpen) {
+      setPin(['', '', '', '']);
+      setOtp('');
+      setTimeout(() => inputRefs[0].current?.focus(), 80);
+    }
+  }, [isOpen]);
+
   const handleChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[0];
+    const clean = value.replace(/\D/g, '');
+    const char = clean ? clean[clean.length - 1] : '';
     const newPin = [...pin];
-    newPin[index] = value;
+    newPin[index] = char;
     setPin(newPin);
 
-    if (value && index < 3) {
+    if (char && index < 3) {
       inputRefs[index + 1].current?.focus();
     }
   };
@@ -77,40 +112,44 @@ export const TransactionPinModal: React.FC<{
   };
 
   const handleConfirm = () => {
-    if (pin.every(p => p !== '')) {
-      onConfirm(pin.join(''));
+    if (isSubmitting) return;
+    if (pin.every((p) => p !== '')) {
+      onConfirm(pin.join(''), requiresOtp ? otp.trim() : undefined);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl"
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
     >
-      <motion.div 
-        initial={{ scale: 0.9, y: 20 }}
+      <motion.div
+        initial={{ scale: 0.96, y: 12 }}
         animate={{ scale: 1, y: 0 }}
-        className="w-full max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl border border-gray-100"
+        className="w-full max-w-sm bg-white rounded-2xl p-6 shadow-xl border border-purple-100"
       >
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-200 mb-4">
-            <Shield className="w-8 h-8 text-white" />
+        <div className="flex flex-col items-center text-center mb-5">
+          <div className="w-14 h-14 rounded-2xl bg-[#7C3AED] flex items-center justify-center shadow-md mb-3">
+            <Shield className="w-7 h-7 text-white" />
           </div>
-          <h3 className="text-xl font-black text-gray-950 uppercase tracking-tighter">Authorize Transaction</h3>
-          <p className="text-xs text-gray-700 font-bold uppercase tracking-widest mt-1">Guard & Shield Protection</p>
+          <h3 className="text-lg font-bold text-slate-900 m-0">Authorize Transaction</h3>
+          <p className="text-xs text-slate-600 font-medium mt-1 mb-0 max-w-none">{subtitle}</p>
         </div>
 
-        <div className="bg-gray-50 rounded-2xl p-4 mb-8 border border-gray-100">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Action</span>
-            <span className="text-xs font-black text-gray-950 uppercase tracking-tight">{action}</span>
+        <div className="bg-purple-50/70 rounded-2xl p-4 mb-5 border border-purple-100 space-y-2">
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Action</span>
+            <span className="text-xs font-bold text-slate-900 text-right truncate max-w-[180px]">{action}</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Amount</span>
-            <span className="text-lg font-black text-indigo-600">${amount.toFixed(2)}</span>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Amount</span>
+            <span className="text-lg font-bold text-[#7C3AED] tabular-nums">
+              {currencySymbol}
+              {Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
           </div>
         </div>
 
@@ -120,40 +159,73 @@ export const TransactionPinModal: React.FC<{
               key={i}
               ref={inputRefs[i]}
               type="password"
+              inputMode="numeric"
               maxLength={1}
               value={p}
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
-              className="w-12 h-16 bg-gray-100 border-2 border-transparent focus:border-indigo-500 rounded-xl text-center text-2xl font-black focus:outline-none transition-all"
+              aria-label={`PIN digit ${i + 1}`}
+              className="w-12 h-14 bg-slate-50 border border-slate-300 focus:border-[#7C3AED] focus:ring-2 focus:ring-purple-200 rounded-xl text-center text-2xl font-bold text-slate-900 focus:outline-none transition-all tabular-nums"
             />
           ))}
         </div>
 
-        <div className="bg-indigo-50/60 rounded-xl p-3 text-center mb-6 border border-indigo-100/50">
-          <p className="text-[10px] text-indigo-700 font-bold leading-normal">
-            💡 For Security protection, please enter any 4-digit code of your choice (e.g., <span className="font-extrabold text-indigo-900">1234</span>) to verify and authorize this transaction safely.
-          </p>
-        </div>
+        {requiresOtp && (
+          <div className="mb-4 space-y-2">
+            <label className="block text-xs font-bold text-slate-700">
+              6-Digit Security Code (Sent via SMS / Email)
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+              placeholder="Enter 6-digit code"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 text-center tracking-widest tabular-nums focus:outline-none focus:border-[#7C3AED]"
+            />
+            <p className="text-xs text-[#7C3AED] font-semibold text-center mb-0 max-w-none">
+              {otpDeliveryNotice || 'Check your registered Email or SMS for your 6-digit verification code.'}
+            </p>
+          </div>
+        )}
 
-        <div className="space-y-3">
-          <button 
+        {errorMessage && (
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-semibold flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          <button
+            type="button"
             onClick={handleConfirm}
-            disabled={pin.some(p => p === '')}
-            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+            disabled={pin.some((p) => p === '') || (requiresOtp && otp.length < 6) || isSubmitting}
+            className="w-full py-3.5 bg-[#16A34A] hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Confirm & Pay
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Verifying...</span>
+              </>
+            ) : (
+              <span>Confirm</span>
+            )}
           </button>
-          <button 
+          <button
+            type="button"
             onClick={onClose}
-            className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-gray-200 transition-all font-inter"
+            disabled={isSubmitting}
+            className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all"
           >
             Cancel
           </button>
         </div>
 
-        <div className="mt-8 flex items-center justify-center gap-2 text-emerald-500">
+        <div className="mt-5 flex items-center justify-center gap-1.5 text-[#16A34A]">
           <ShieldCheck className="w-4 h-4" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Secured by EFADO Shield</span>
+          <span className="text-xs font-semibold">Protected by 256-bit encryption</span>
         </div>
       </motion.div>
     </motion.div>

@@ -28,6 +28,7 @@ import {
   buildDynamicSitemapXml,
   injectAdvertMetaIntoHtml,
 } from './src/app/api/adverts/service';
+import { registerWalletRoutes } from './src/lib/wallet-routes';
 
 async function handleVercelHandler(handler: (req: any, res: any) => Promise<any>, req: express.Request, res: express.Response) {
   try {
@@ -421,7 +422,9 @@ app.all(['/api/bank/resolve', '/api/verify-bank'], (req: express.Request, res: e
 // ============================================================================
 // UNIFIED WALLET ENDPOINTS
 // ============================================================================
-app.get(['/api/wallet/balance', '/api/wallet/balance/:userId'], async (req, res) => {
+registerWalletRoutes(app);
+
+app.get('/api/wallet/balance/:userId', async (req, res) => {
   try {
     const userId = String(req.params.userId || req.query.userId || req.headers['x-user-id'] || '').trim();
     if (!userId) {
@@ -460,7 +463,15 @@ app.get(['/api/wallet/balance', '/api/wallet/balance/:userId'], async (req, res)
 
 app.post('/api/wallet/deposit', async (req, res) => {
   try {
-    const { userId, amount, paymentMethod = 'flutterwave', reference } = req.body || {};
+    const { userId, amount, paymentMethod = 'flutterwave', reference, currency = 'NGN' } = req.body || {};
+    const cleanCur = String(currency || 'NGN').trim().toUpperCase();
+    if (cleanCur === 'SIRA') {
+      return res.status(400).json({
+        success: false,
+        code: 'CURRENCY_LOCKED',
+        error: 'SIRA (Burkina Faso) is Coming Soon and blocked on all backend payment endpoints.'
+      });
+    }
     if (!userId || !amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'userId and positive amount are required' });
     }
@@ -469,10 +480,11 @@ app.post('/api/wallet/deposit', async (req, res) => {
       userId,
       type: 'deposit',
       amount: Number(amount),
-      currency: 'NGN',
+      currency: cleanCur,
       paymentMethod,
       reference: txRef,
       status: 'pending',
+      credited: false,
       timestamp: serverTimestamp()
     };
     await setDoc(doc(db, 'transactions', txRef), txData, { merge: true });

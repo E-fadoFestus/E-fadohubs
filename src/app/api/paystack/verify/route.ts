@@ -96,11 +96,19 @@ async function verifyLogic(reference: string, userId: string) {
       updatedAt: serverTime
     }, { merge: true });
 
+    if (txCurrency === 'NGN') {
+      transaction.set(db.doc(`users/${userId}`), {
+        depositWallet: updatedBalance,
+        updatedAt: serverTime
+      }, { merge: true });
+    }
+
     const successRecord = {
       type: 'deposit',
       status: 'completed',
       credited: true,
       amount: paidAmount,
+      balanceAfter: updatedBalance,
       currency: txCurrency,
       reference,
       userId,

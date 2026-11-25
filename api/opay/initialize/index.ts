@@ -21,7 +21,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ status: false, message: 'Method not allowed' });
 
   try {
-    const { amount, userId, phone, domain } = req.body;
+    const { amount, userId, phone, domain, currency = 'NGN' } = req.body || {};
+    const cleanCurrency = String(currency || 'NGN').trim().toUpperCase();
+    if (cleanCurrency === 'SIRA') {
+      return res.status(400).json({
+        status: false,
+        code: 'CURRENCY_LOCKED',
+        message: 'SIRA (Burkina Faso) is Coming Soon and blocked on all payment endpoints.'
+      });
+    }
     if (!amount || !userId) {
       return res.status(400).json({ status: false, message: 'Amount and User ID required' });
     }

@@ -1,79 +1,75 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  History, 
-  Search, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  CreditCard, 
-  FileText, 
+import {
+  History,
+  Search,
+  ArrowUpRight,
+  ArrowDownLeft,
+  CreditCard,
   Download,
   Calendar,
   Filter,
   ShieldCheck,
-  Zap,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  ArrowUp
+  FileText,
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
-import { db, collection, query, where, orderBy, onSnapshot } from '../firebase';
+import { auth, db, collection, query, where, orderBy, onSnapshot } from '../firebase';
 import { Transaction, UserProfile } from '../types';
-import { useCurrency } from '../lib/CurrencyContext';
 import { StrategicReceipt } from './StrategicReceipt';
+import { ACTIVE_WALLET_CURRENCIES, formatCurrencyAmount } from '../constants/walletCurrencies';
 
 interface TransactionHistoryProps {
   user: UserProfile;
+  onFundAccount?: () => void;
 }
 
-export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) => {
-  const { formatPrice } = useCurrency();
+export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user, onFundAccount }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PAYMENT' | 'DEPOSIT' | 'WITHDRAWAL'>('ALL');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
-  // States for enhanced collapsible search/filtering & pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+  const [datePreset, setDatePreset] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH' | 'CUSTOM'>('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
-  const [filterSender, setFilterSender] = useState('');
-  const [filterReceiver, setFilterReceiver] = useState('');
-  const [filterMinAmount, setFilterMinAmount] = useState('');
-  const [filterMaxAmount, setFilterMaxAmount] = useState('');
+  const [filterCurrency, setFilterCurrency] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
-  const [highlightedTxId, setHighlightedTxId] = useState<string | null>(null);
-  const [showScrollTop, setShowScrollTop] = useState(false);
   const [expandedTxIds, setExpandedTxIds] = useState<Record<string, boolean>>({});
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [reconciliation, setReconciliation] = useState<{
+    byCurrency: Record<
+      string,
+      {
+        inflows: number;
+        outflows: number;
+        fees: number;
+        ledgerNet: number;
+        storedBalance: number;
+        delta: number;
+        matches: boolean;
+      }
+    >;
+    allMatched: boolean;
+  } | null>(null);
 
   const toggleExpand = (id: string) => {
-    setExpandedTxIds(prev => ({
+    setExpandedTxIds((prev) => ({
       ...prev,
       [id]: !prev[id]
     }));
   };
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 400) {
-        setShowScrollTop(true);
-      } else {
-        setShowScrollTop(false);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (!user) return;
+    if (!user?.uid) return;
+    let active = true;
 
     const q = query(
       collection(db, 'transactions'),
@@ -81,577 +77,553 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
       orderBy('timestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const txs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Transaction[];
-      setTransactions(txs);
-      setLoading(false);
-    });
+    const fetchReconciliation = async () => {
+      try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+        if (!token) return;
+        const r = await fetch('/api/wallet/history', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await r.json().catch(() => ({}));
+        if (active && data?.success) {
+          if (data.reconciliation) setReconciliation(data.reconciliation);
+          if (Array.isArray(data.transactions) && data.transactions.length > 0) {
+            setTransactions((prev) => (prev.length === 0 ? data.transactions : prev));
+          }
+        }
+      } catch {
+        // Silent fallback
+      }
+    };
 
-    return () => unsubscribe();
-  }, [user]);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!active) return;
+        const txs = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data()
+        })) as Transaction[];
+        setTransactions(txs);
+        setLoading(false);
+        void fetchReconciliation();
+      },
+      async () => {
+        // Fallback to authenticated server history endpoint if composite index or rule misses
+        try {
+          await fetchReconciliation();
+        } finally {
+          if (active) setLoading(false);
+        }
+      }
+    );
 
-  const filteredTxs = transactions.filter(tx => {
-    // 1. Basic Type Filter (ALL, PAYMENT, DEPOSIT, WITHDRAWAL) from tab buttons
+    void fetchReconciliation();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [user?.uid]);
+
+  const applyDatePreset = (preset: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH') => {
+    setDatePreset(preset);
+    const now = new Date();
+    const toStr = now.toISOString().slice(0, 10);
+    if (preset === 'ALL') {
+      setFilterStartDate('');
+      setFilterEndDate('');
+    } else if (preset === 'TODAY') {
+      setFilterStartDate(toStr);
+      setFilterEndDate(toStr);
+    } else if (preset === 'WEEK') {
+      const weekAgo = new Date(now.getTime() - 7 * 86400000);
+      setFilterStartDate(weekAgo.toISOString().slice(0, 10));
+      setFilterEndDate(toStr);
+    } else if (preset === 'MONTH') {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      setFilterStartDate(monthStart.toISOString().slice(0, 10));
+      setFilterEndDate(toStr);
+    }
+    setCurrentPage(1);
+  };
+
+  const getTxDate = (tx: Transaction): Date => {
+    if (typeof (tx as any)?.createdAtIso === 'string') return new Date((tx as any).createdAtIso);
+    if (tx.timestamp?.toDate) return tx.timestamp.toDate();
+    if (typeof tx.timestamp?.seconds === 'number') return new Date(tx.timestamp.seconds * 1000);
+    return new Date();
+  };
+
+  const filteredTxs = transactions.filter((tx) => {
+    const typeUpper = String(tx.type || '').toUpperCase();
     if (filter !== 'ALL') {
-      if (tx.type?.toUpperCase() !== filter) return false;
+      if (filter === 'PAYMENT') {
+        if (!['PAYMENT', 'GAME_BET', 'SWAP'].includes(typeUpper)) return false;
+      } else if (filter === 'DEPOSIT') {
+        if (!['DEPOSIT', 'REWARD', 'GAME_WIN'].includes(typeUpper)) return false;
+      } else if (typeUpper !== filter) {
+        return false;
+      }
     }
 
-    // 2. Text Search Query matching multiple fields
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const hasMatch = 
+      const match =
         (tx.type && tx.type.toLowerCase().includes(q)) ||
         (tx.purpose && tx.purpose.toLowerCase().includes(q)) ||
         (tx.description && tx.description.toLowerCase().includes(q)) ||
         (tx.reference && tx.reference.toLowerCase().includes(q)) ||
-        (tx.hub && tx.hub.toLowerCase().includes(q)) ||
         (tx.status && tx.status.toLowerCase().includes(q)) ||
-        (tx.amount && String(tx.amount).includes(q)) ||
-        (tx.metadata?.senderName && tx.metadata.senderName.toLowerCase().includes(q)) ||
-        (tx.metadata?.receiverName && tx.metadata.receiverName.toLowerCase().includes(q));
-      if (!hasMatch) return false;
+        (tx.amount && String(tx.amount).includes(q));
+      if (!match) return false;
     }
 
-    // 3. Sender Name Filter
-    if (filterSender.trim()) {
-      const s = filterSender.toLowerCase();
-      const matchSender = 
-        (tx.metadata?.senderName && tx.metadata.senderName.toLowerCase().includes(s)) ||
-        (tx.purpose && tx.purpose.toLowerCase().includes(s)) ||
-        (tx.description && tx.description.toLowerCase().includes(s));
-      if (!matchSender) return false;
+    if (filterCurrency !== 'ALL') {
+      if (String(tx.currency || 'NGN').toUpperCase() !== filterCurrency) return false;
     }
 
-    // 4. Receiver Name Filter
-    if (filterReceiver.trim()) {
-      const r = filterReceiver.toLowerCase();
-      const matchReceiver = 
-        (tx.metadata?.receiverName && tx.metadata.receiverName.toLowerCase().includes(r)) ||
-        (tx.purpose && tx.purpose.toLowerCase().includes(r)) ||
-        (tx.description && tx.description.toLowerCase().includes(r));
-      if (!matchReceiver) return false;
-    }
-
-    // 5. Status Filter
     if (filterStatus !== 'ALL') {
-      if (tx.status?.toLowerCase() !== filterStatus.toLowerCase()) return false;
+      const st = String(tx.status || '').toLowerCase();
+      if (filterStatus === 'completed') {
+        if (st !== 'completed' && st !== 'success') return false;
+      } else if (st !== filterStatus.toLowerCase()) {
+        return false;
+      }
     }
 
-    // 6. Min Amount Filter
-    if (filterMinAmount) {
-      const minAm = parseFloat(filterMinAmount);
-      if (!isNaN(minAm) && (tx.amount || 0) < minAm) return false;
-    }
-
-    // 7. Max Amount Filter
-    if (filterMaxAmount) {
-      const maxAm = parseFloat(filterMaxAmount);
-      if (!isNaN(maxAm) && (tx.amount || 0) > maxAm) return false;
-    }
-
-    // 8. Date Range Filter
+    const txDate = getTxDate(tx);
     if (filterStartDate) {
       const start = new Date(filterStartDate);
-      const txDate = tx.timestamp?.toDate ? tx.timestamp.toDate() : new Date();
-      start.setHours(0,0,0,0);
+      start.setHours(0, 0, 0, 0);
       if (txDate < start) return false;
     }
     if (filterEndDate) {
       const end = new Date(filterEndDate);
-      const txDate = tx.timestamp?.toDate ? tx.timestamp.toDate() : new Date();
-      end.setHours(23,59,59,999);
+      end.setHours(23, 59, 59, 999);
       if (txDate > end) return false;
     }
 
     return true;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredTxs.length / 20));
+  const handleDownloadStatement = async () => {
+    setDownloadingPdf(true);
+    try {
+      const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const params = new URLSearchParams();
+      if (filterCurrency !== 'ALL') params.set('currency', filterCurrency);
+      if (filterStartDate) params.set('from', filterStartDate);
+      if (filterEndDate) params.set('to', filterEndDate);
+
+      const resp = await fetch(`/api/wallet/statement.pdf?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (!resp.ok) throw new Error('Could not download PDF statement');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `EFADO-Statement-${filterCurrency === 'ALL' ? 'NGN' : filterCurrency}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Statement download error:', err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredTxs.length / 15));
   const activePage = Math.min(currentPage, totalPages);
-  const startIdx = (activePage - 1) * 20;
-  const paginatedTxs = filteredTxs.slice(startIdx, startIdx + 20);
+  const startIdx = (activePage - 1) * 15;
+  const paginatedTxs = filteredTxs.slice(startIdx, startIdx + 15);
 
   return (
-    <div className="space-y-8 relative">
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-4">
+      {/* Header Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic flex items-center gap-3">
-            <History className="w-8 h-8 text-amber-500" /> Transaction History
-          </h2>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Complete Account Activity</p>
+          <h3 className="text-lg font-bold text-slate-900 m-0 flex items-center gap-2">
+            <History className="w-5 h-5 text-[#7C3AED]" />
+            <span>Complete Account Activity</span>
+          </h3>
+          <p className="text-xs text-slate-500 font-medium mt-0.5 mb-0 max-w-none">
+            Track deposits, payouts, swaps, and receipts
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Main quick-tabs */}
-          <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-2xl border border-white/5">
-            {(['ALL', 'PAYMENT', 'DEPOSIT', 'WITHDRAWAL'] as const).map(f => (
+        <button
+          type="button"
+          onClick={handleDownloadStatement}
+          disabled={downloadingPdf}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all disabled:opacity-60"
+        >
+          {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          <span>{downloadingPdf ? 'Generating PDF...' : 'Download Statement (PDF)'}</span>
+        </button>
+      </div>
+
+      {/* History & Balance Verification Summary */}
+      {reconciliation?.byCurrency?.NGN && (
+        <div
+          className={`rounded-2xl p-4 border shadow-sm flex flex-wrap items-center justify-between gap-3 ${
+            reconciliation.allMatched
+              ? 'bg-emerald-50/70 border-emerald-200'
+              : 'bg-purple-50/70 border-purple-200'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#16A34A] text-white flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-extrabold text-slate-900">
+                {reconciliation.allMatched ? 'History & Balance Matched' : 'Account Balance Summary'}
+              </div>
+              <div className="text-[11px] font-semibold text-slate-600">
+                Money In:{' '}
+                <span className="font-bold text-[#16A34A] tabular-nums">
+                  {formatCurrencyAmount(reconciliation.byCurrency.NGN.inflows, 'NGN')}
+                </span>{' '}
+                • Money Out &amp; Fees:{' '}
+                <span className="font-bold text-[#DC2626] tabular-nums">
+                  {formatCurrencyAmount(reconciliation.byCurrency.NGN.outflows, 'NGN')}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-bold uppercase text-slate-500">Current Balance</div>
+            <div className="text-sm font-extrabold text-slate-900 tabular-nums">
+              {formatCurrencyAmount(reconciliation.byCurrency.NGN.storedBalance, 'NGN')}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs + Search + Advanced */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-purple-50 p-1 rounded-xl border border-purple-100">
+          {(['ALL', 'PAYMENT', 'DEPOSIT', 'WITHDRAWAL'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => {
+                setFilter(f);
+                setCurrentPage(1);
+              }}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+                filter === f ? 'bg-[#7C3AED] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:w-52">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search reference or title..."
+              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7C3AED]"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+            className={`px-3 py-2 border rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              isFilterExpanded
+                ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-[#7C3AED]'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>ADVANCED</span>
+            {isFilterExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Advanced Filters */}
+      {isFilterExpanded && (
+        <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-2xl space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {(
+              [
+                { id: 'ALL', label: 'All Time' },
+                { id: 'TODAY', label: 'Today' },
+                { id: 'WEEK', label: 'This Week' },
+                { id: 'MONTH', label: 'This Month' }
+              ] as const
+            ).map((p) => (
               <button
-                key={f}
+                key={p.id}
                 type="button"
-                onClick={() => {
-                  setFilter(f);
-                  setCurrentPage(1);
-                }}
-                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  filter === f ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-500 hover:text-white'
+                onClick={() => applyDatePreset(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                  datePreset === p.id
+                    ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                    : 'bg-white text-slate-700 border-slate-200'
                 }`}
               >
-                {f}
+                {p.label}
               </button>
             ))}
           </div>
 
-          {/* Search Inputs & Toggle Buttons */}
-          <div className="flex items-center gap-1.5 ml-auto sm:ml-0 mt-2 sm:mt-0">
-            <div className="relative">
-              <input 
-                type="text"
-                value={searchQuery}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 block mb-1">From Date</label>
+              <input
+                type="date"
+                value={filterStartDate}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
+                  setDatePreset('CUSTOM');
+                  setFilterStartDate(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search ledger..."
-                className="w-40 sm:w-48 pl-8 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
               />
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
             </div>
-            <button
-              type="button"
-              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
-              className={`p-2 border rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-1 ${
-                isFilterExpanded 
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20' 
-                  : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              <span className="hidden sm:inline">Advanced</span>
-              {isFilterExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Advanced Collapsible Filter options */}
-      {isFilterExpanded && (
-        <div className="p-6 bg-slate-950 border border-white/10 rounded-[2rem] grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in animate-duration-300 shadow-2xl">
-          {/* Date Picker Input Row */}
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Start Date</label>
-            <input 
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => {
-                setFilterStartDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold inline-block"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">End Date</label>
-            <input 
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => {
-                setFilterEndDate(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold inline-block"
-            />
-          </div>
-
-          {/* Senders & Receivers */}
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Sender Name</label>
-            <input 
-              type="text"
-              placeholder="Filter sender name..."
-              value={filterSender}
-              onChange={(e) => {
-                setFilterSender(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Receiver Name</label>
-            <input 
-              type="text"
-              placeholder="Filter receiver name..."
-              value={filterReceiver}
-              onChange={(e) => {
-                setFilterReceiver(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold"
-            />
-          </div>
-
-          {/* Min & Max Amount boundaries */}
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Min Amount</label>
-            <input 
-              type="number"
-              placeholder="Min Price $"
-              value={filterMinAmount}
-              onChange={(e) => {
-                setFilterMinAmount(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Max Amount</label>
-            <input 
-              type="number"
-              placeholder="Max Price $"
-              value={filterMaxAmount}
-              onChange={(e) => {
-                setFilterMaxAmount(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold"
-            />
-          </div>
-
-          {/* Status Switcher option */}
-          <div className="space-y-1 col-span-1 sm:col-span-2">
-            <label className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Secured Status State</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-bold outline-none"
-            >
-              <option value="ALL">All States</option>
-              <option value="completed">Completed Status</option>
-              <option value="pending">Pending Status</option>
-              <option value="failed">Failed Status</option>
-            </select>
-          </div>
-
-          {/* Quick Clear Controls */}
-          <div className="col-span-1 sm:col-span-2 md:col-span-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setFilterStartDate('');
-                setFilterEndDate('');
-                setFilterSender('');
-                setFilterReceiver('');
-                setFilterMinAmount('');
-                setFilterMaxAmount('');
-                setFilterStatus('ALL');
-                setSearchQuery('');
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-amber-500 border border-white/10 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all"
-            >
-              Reset Advanced Filter Parameters
-            </button>
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 block mb-1">To Date</label>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => {
+                  setDatePreset('CUSTOM');
+                  setFilterEndDate(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 block mb-1">Currency</label>
+              <select
+                value={filterCurrency}
+                onChange={(e) => {
+                  setFilterCurrency(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
+              >
+                <option value="ALL">All Currencies</option>
+                {ACTIVE_WALLET_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} ({c.symbol})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-slate-600 block mb-1">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="completed">Success</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Select Search Matches Direct Jumper Tray */}
-      {searchQuery.trim() && filteredTxs.length > 0 && (
-        <div className="p-4 bg-amber-500/5 border border-amber-500/25 rounded-2xl">
-          <span className="text-[9px] font-black uppercase text-amber-500 tracking-widest block mb-2">
-            🎯 Quick Select Search Results ({filteredTxs.length} Matches Found)
-          </span>
-          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto no-scrollbar">
-            {filteredTxs.slice(0, 10).map((tx, idx) => {
-              const uniqueId = tx.id || String(tx.timestamp?.seconds || idx);
-              return (
-                <button
-                  key={`history-suggestion-${uniqueId}`}
-                  type="button"
-                  onClick={() => {
-                    const indexInFiltered = filteredTxs.findIndex(t => (t.id && t.id === tx.id) || t.timestamp?.seconds === tx.timestamp?.seconds);
-                    if (indexInFiltered !== -1) {
-                      const pageNum = Math.floor(indexInFiltered / 20) + 1;
-                      setCurrentPage(pageNum);
-                      setHighlightedTxId(uniqueId);
-                      setTimeout(() => {
-                        const rowEl = document.getElementById(`tx-row-${uniqueId}`);
-                        if (rowEl) {
-                          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                      }, 150);
-                      setTimeout(() => setHighlightedTxId(null), 3500);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-slate-900 border border-white/10 hover:border-amber-500 rounded-xl text-left text-[10px] font-bold text-slate-300 hover:text-amber-500 flex items-center gap-1.5 transition-all shadow-md max-w-xs truncate"
-                >
-                  <span className="capitalize text-amber-500">{tx.type.replace('_', ' ')}:</span>
-                  <span>{formatPrice(tx.amount)}</span>
-                  <span className="text-[8px] text-slate-500 truncate max-w-[80px]">({tx.purpose || tx.id || 'Operation'})</span>
-                </button>
-              );
-            })}
-            {filteredTxs.length > 10 && (
-              <span className="text-[8.5px] font-bold text-slate-400 self-center leading-none pl-1">
-                + {filteredTxs.length - 10} more matches
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Transaction List */}
+      {/* List / Empty State */}
       {loading ? (
-        <div className="p-12 text-center">
-          <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Accessing Ledger...</p>
+        <div className="p-10 text-center bg-white rounded-2xl border border-purple-100">
+          <Loader2 className="w-8 h-8 text-[#7C3AED] animate-spin mx-auto mb-2" />
+          <p className="text-xs font-bold text-slate-500 mb-0 max-w-none">Loading activity...</p>
         </div>
       ) : filteredTxs.length === 0 ? (
-        <div className="p-20 text-center glass-card-ultra rounded-[2.5rem] border border-dashed border-white/10">
-          <History className="w-16 h-16 text-slate-800 mx-auto mb-6 opacity-20" />
-          <p className="text-slate-500 font-bold uppercase tracking-tighter">No transactions found yet.</p>
+        <div className="p-10 text-center bg-white rounded-2xl border border-purple-100 shadow-sm space-y-3">
+          <div className="w-14 h-14 bg-purple-50 text-[#7C3AED] rounded-2xl flex items-center justify-center mx-auto">
+            <FileText className="w-7 h-7" />
+          </div>
+          <h4 className="text-base font-bold text-slate-900 m-0">No transactions yet</h4>
+          <p className="text-xs text-slate-500 font-medium mb-0 max-w-sm mx-auto">
+            Your deposits, withdrawals, and currency swaps will appear here once you make your first transfer.
+          </p>
+          {onFundAccount && (
+            <button
+              type="button"
+              onClick={onFundAccount}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7C3AED] hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all"
+            >
+              <span>Fund Your Account</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ) : (
-        <div className="space-y-4 animate-duration-300 animate-fade-in animate-ease-in-out">
-          <AnimatePresence mode="popLayout">
-            {paginatedTxs.map((tx, idx) => {
-              const uniqueId = tx.id || String(tx.timestamp?.seconds || startIdx + idx);
-              const isHighlighted = highlightedTxId === uniqueId;
-              const isExpanded = !!expandedTxIds[uniqueId];
-              return (
-                <motion.div
-                  key={`${uniqueId}-${idx}`}
-                  id={`tx-row-${uniqueId}`}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className={`group relative duration-500 rounded-[1.5rem] transition-all bg-slate-950/20 border border-white/5 overflow-hidden ${
-                    isHighlighted ? 'ring-4 ring-amber-500 bg-amber-500/10 shadow-2xl scale-[1.01]' : ''
-                  }`}
+        <div className="space-y-3">
+          {paginatedTxs.map((tx, idx) => {
+            const uniqueId = tx.id || tx.reference || String(idx);
+            const isExpanded = !!expandedTxIds[uniqueId];
+            const isMoneyIn = tx.type === 'deposit' || tx.type === 'reward' || tx.type === 'game_win';
+            const statusStr = String(tx.status || 'completed').toLowerCase();
+            const statusLabel = statusStr === 'completed' || statusStr === 'success' ? 'SUCCESS' : statusStr.toUpperCase();
+            const statusStyle =
+              statusLabel === 'SUCCESS'
+                ? 'bg-emerald-50 text-[#16A34A] border-emerald-200'
+                : statusLabel === 'FAILED'
+                  ? 'bg-red-50 text-[#DC2626] border-red-200'
+                  : 'bg-purple-50 text-[#7C3AED] border-purple-200';
+            const txDate = getTxDate(tx);
+
+            return (
+              <motion.div
+                key={`${uniqueId}-${idx}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden"
+              >
+                <div
+                  onClick={() => toggleExpand(uniqueId)}
+                  className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-purple-50/30 transition-colors"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-all rounded-[1.5rem] pointer-events-none" />
-                  
-                  {/* Clickable Header Area of Row */}
-                  <div 
-                    onClick={() => toggleExpand(uniqueId)}
-                    className="relative p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:bg-white/[0.02] transition-all"
-                  >
-                    <div className="flex items-center gap-4 sm:gap-6">
-                      <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
-                        tx.type === 'deposit' ? 'bg-emerald-500/20 text-emerald-400' :
-                        tx.type === 'withdrawal' ? 'bg-rose-500/20 text-rose-400' :
-                        'bg-indigo-500/20 text-indigo-400'
-                      }`}>
-                        {tx.type === 'deposit' ? <ArrowDownLeft className="w-5 h-5 sm:w-6 sm:h-6" /> :
-                         tx.type === 'withdrawal' ? <ArrowUpRight className="w-5 h-5 sm:w-6 sm:h-6" /> :
-                         <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <h4 className="text-base sm:text-lg font-black text-white uppercase tracking-tighter italic truncate">
-                            {tx.purpose || tx.description || 'Verified Operation'}
-                          </h4>
-                          {tx.hub && (
-                            <span className="px-1.5 py-0.5 bg-white/5 text-[8px] font-black text-slate-400 rounded border border-white/5 uppercase shrink-0">
-                              {tx.hub}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                          <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-amber-500/80" /> {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleDateString() : 'Recent'}</span>
-                          <span className="font-mono opacity-50 truncate max-w-[120px] sm:max-w-none">Ref: {tx.reference}</span>
-                        </div>
-                      </div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        isMoneyIn
+                          ? 'bg-emerald-50 text-[#16A34A]'
+                          : tx.type === 'withdrawal'
+                            ? 'bg-red-50 text-[#DC2626]'
+                            : 'bg-purple-50 text-[#7C3AED]'
+                      }`}
+                    >
+                      {isMoneyIn ? (
+                        <ArrowDownLeft className="w-5 h-5" />
+                      ) : tx.type === 'withdrawal' ? (
+                        <ArrowUpRight className="w-5 h-5" />
+                      ) : (
+                        <CreditCard className="w-5 h-5" />
+                      )}
                     </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-white/5 sm:border-t-0">
-                      <div className="text-left sm:text-right">
-                        <p className={`text-xl sm:text-2xl font-black font-display ${
-                          tx.type === 'deposit' || tx.type === 'game_win' ? 'text-emerald-400' : 'text-white'
-                        }`}>
-                          {tx.type === 'deposit' || tx.type === 'game_win' ? '+' : '-'}{formatPrice(tx.amount)}
-                        </p>
-                        <div className="flex items-center sm:justify-end gap-1 mt-0.5">
-                          <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                          <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">
-                            {tx.status || 'Secured'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                        {/* Elegant Show/Hide Button */}
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(uniqueId)}
-                          className={`px-3 py-2 rounded-xl text-[9px] font-black tracking-widest uppercase border transition-all flex items-center gap-1.5 ${
-                            isExpanded 
-                              ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' 
-                              : 'bg-white/5 border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
-                          }`}
-                        >
-                          <span>{isExpanded ? 'Hide' : 'Details'}</span>
-                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-
-                        <button 
-                          onClick={() => setSelectedTx(tx)}
-                          className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-amber-500 transition-all border border-white/5 group/btn"
-                          title="Download Receipt"
-                        >
-                          <Download className="w-4 h-4 group-hover/btn:scale-110 transition-all" />
-                        </button>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-slate-900 m-0 truncate">
+                        {tx.purpose || tx.description || tx.type || 'Transaction'}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium mt-0.5">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-[#7C3AED]" />
+                          {txDate.toLocaleDateString()} • {txDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="font-mono text-slate-400 truncate max-w-[140px]">
+                          {tx.reference || uniqueId}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Collapsible Details Area */}
-                  <AnimatePresence initial={false}>
-                    {isExpanded && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3, ease: 'easeInOut' }}
-                        className="border-t border-white/5 bg-slate-950/60 overflow-hidden text-left"
+                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <div className="text-left sm:text-right">
+                      <p
+                        className={`text-sm font-bold tabular-nums mb-0 max-w-none ${
+                          isMoneyIn ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                        }`}
                       >
-                        <div className="p-6 space-y-4 font-sans text-xs text-slate-300">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {/* Detail Col 1 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Ledger Identifier (Hash)</span>
-                              <span className="font-mono text-[10px] text-amber-500 break-all block">{uniqueId}</span>
-                            </div>
-
-                            {/* Detail Col 2 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">System Reference Code</span>
-                              <span className="font-mono text-[10px] text-white block">{tx.reference}</span>
-                            </div>
-
-                            {/* Detail Col 3 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Operations Channel / Hub</span>
-                              <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wide block">{tx.hub || 'PRIMARY SYSTEM'} ({tx.type})</span>
-                            </div>
-
-                            {/* Detail Col 4 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Transaction Time (UTC)</span>
-                              <span className="text-[10px] font-extrabold text-white block">
-                                {tx.timestamp?.toDate ? tx.timestamp.toDate().toLocaleString() : 'Recent Entry'}
-                              </span>
-                            </div>
-
-                            {/* Detail Col 5 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Funding / Payout Route</span>
-                              <span className="text-[10px] font-extrabold text-emerald-400 uppercase block">{tx.method || 'Wallet Balance'}</span>
-                            </div>
-
-                            {/* Detail Col 6 */}
-                            <div className="space-y-1.5 bg-slate-900/40 p-3 rounded-xl border border-white/5">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Block Security Level</span>
-                              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-wide flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
-                                AES-256 GCM INTEGRITY PASS
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Extra Metadata Section (if exists) */}
-                          {(tx.description || tx.metadata) && (
-                            <div className="p-4 bg-slate-900/30 rounded-2xl border border-white/5 space-y-2 text-left">
-                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block">Liaison Context / Audit Notes</span>
-                              <p className="text-[11px] font-bold text-slate-200 uppercase leading-relaxed tracking-wide">
-                                {tx.description || 'Verified transaction recorded in your account.'}
-                              </p>
-                              {tx.metadata && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 pt-2 border-t border-white/5 font-mono text-[10px] text-slate-400">
-                                  {tx.metadata.bankName && (
-                                    <div><span className="text-slate-600">Settlement Bank:</span> <span className="text-white uppercase">{tx.metadata.bankName}</span></div>
-                                  )}
-                                  {tx.metadata.accountNumber && (
-                                    <div><span className="text-slate-600">Account Number:</span> <span className="text-white">{tx.metadata.accountNumber}</span></div>
-                                  )}
-                                  {tx.metadata.senderName && (
-                                    <div><span className="text-slate-600">Sender:</span> <span className="text-white uppercase">{tx.metadata.senderName}</span></div>
-                                  )}
-                                  {tx.metadata.receiverName && (
-                                    <div><span className="text-slate-600">Beneficiary:</span> <span className="text-white uppercase">{tx.metadata.receiverName}</span></div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                        {isMoneyIn ? '+' : '-'}
+                        {formatCurrencyAmount(Number(tx.amount || 0), tx.currency || 'NGN')}
+                      </p>
+                      {tx.type === 'withdrawal' && Number((tx as any).fee || 0) > 0 && (
+                        <div className="text-[10px] font-semibold text-slate-500 tabular-nums">
+                          + {formatCurrencyAmount(Number((tx as any).fee || 0), tx.currency || 'NGN')} fee
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                      )}
+                      <span
+                        className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${statusStyle}`}
+                      >
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedTx(tx);
+                      }}
+                      className="px-3 py-1.5 bg-purple-50 hover:bg-[#7C3AED] text-[#7C3AED] hover:text-white rounded-xl text-xs font-bold border border-purple-100 transition-colors shrink-0"
+                    >
+                      View Receipt
+                    </button>
+                  </div>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="border-t border-slate-100 bg-slate-50/70 px-4 py-3 text-xs text-slate-600 space-y-1.5"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-400 block">Reference ID</span>
+                          <span className="font-mono font-bold text-slate-900 break-all">{tx.reference || uniqueId}</span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-400 block">Method</span>
+                          <span className="font-bold text-slate-900">{tx.method || 'EFADO Wallet'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-semibold text-slate-400 block">Security</span>
+                          <span className="font-bold text-[#16A34A] flex items-center gap-1">
+                            <ShieldCheck className="w-3.5 h-3.5" /> Protected by 256-bit encryption
+                          </span>
+                        </div>
+                      </div>
+                      {tx.description && (
+                        <p className="text-xs text-slate-600 pt-1 mb-0 max-w-none">{tx.description}</p>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
-      {/* Pagination controls for Profile Transactions */}
-      {filteredTxs.length > 20 && (
-        <div className="flex items-center justify-between bg-slate-900/40 border border-white/5 rounded-2xl px-6 py-4">
-          <div className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-            Showing {startIdx + 1} - {Math.min(startIdx + 20, filteredTxs.length)} of {filteredTxs.length} Operations
-          </div>
+      {/* Pagination */}
+      {filteredTxs.length > 15 && (
+        <div className="flex items-center justify-between bg-white border border-purple-100 rounded-2xl px-4 py-3">
+          <span className="text-xs font-semibold text-slate-500">
+            Page {activePage} of {totalPages}
+          </span>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={activePage === 1}
-              className="p-2 border border-white/10 bg-slate-950 rounded-xl text-slate-400 disabled:opacity-30 transition-all hover:bg-slate-900"
+              className="p-2 border border-slate-200 rounded-xl text-slate-600 disabled:opacity-30"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            
-            {Array.from({ length: totalPages }).map((_, pIdx) => {
-              const pageNum = pIdx + 1;
-              const isCurrent = pageNum === activePage;
-              if (totalPages > 5 && Math.abs(pageNum - activePage) > 1 && pageNum !== 1 && pageNum !== totalPages) {
-                if (pageNum === 2 || pageNum === totalPages - 1) {
-                  return <span key={pageNum} className="px-1 text-xs text-slate-500">...</span>;
-                }
-                return null;
-              }
-              return (
-                <button
-                  key={pageNum}
-                  type="button"
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 flex items-center justify-center text-[10px] font-black tracking-widest rounded-xl border transition-all ${
-                    isCurrent 
-                      ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' 
-                      : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
             <button
               type="button"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={activePage === totalPages}
-              className="p-2 border border-white/10 bg-slate-950 rounded-xl text-slate-400 disabled:opacity-30 transition-all hover:bg-slate-900"
+              className="p-2 border border-slate-200 rounded-xl text-slate-600 disabled:opacity-30"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -659,35 +631,9 @@ export const TransactionHistory: React.FC<TransactionHistoryProps> = ({ user }) 
         </div>
       )}
 
-      {/* Global Security Disclaimer */}
-      <div className="p-8 bg-amber-500/5 rounded-[2rem] border border-amber-500/10 flex items-center gap-6">
-        <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-amber-500/20">
-          <Zap className="w-6 h-6" />
-        </div>
-        <div>
-          <h4 className="text-xs font-black text-white uppercase tracking-widest mb-1 italic">Account Record Protection</h4>
-          <p className="text-[10px] text-slate-400 font-medium leading-relaxed uppercase tracking-tighter">
-            Every transaction on EFADO is encrypted and safely recorded. Receipts are generated automatically for your records.
-          </p>
-        </div>
-      </div>
-
-      {/* Scroll to Top helper for Profile Transactions */}
-      {showScrollTop && (
-        <button
-          type="button"
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 p-4 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all text-xs flex items-center justify-center align-middle focus:ring-4 focus:ring-amber-500/20 shadow-amber-500/40"
-          title="Scroll back to top"
-        >
-          <ArrowUp className="w-5 h-5" />
-        </button>
-      )}
-
-      {/* Receipt Modal */}
       <AnimatePresence>
         {selectedTx && (
-          <StrategicReceipt 
+          <StrategicReceipt
             transaction={selectedTx}
             userEmail={user.email}
             onClose={() => setSelectedTx(null)}

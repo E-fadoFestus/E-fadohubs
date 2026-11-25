@@ -1,24 +1,22 @@
 import React, { useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  X, 
-  Download, 
-  Printer, 
-  Share2, 
-  CheckCircle2, 
-  FileText, 
+import { motion } from 'motion/react';
+import {
+  Download,
+  Printer,
+  CheckCircle2,
+  FileText,
   CloudUpload,
   ExternalLink,
   ShieldCheck,
   Building2,
   Calendar,
-  DollarSign,
   ArrowLeft
 } from 'lucide-react';
 import { Transaction } from '../types';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { db, collection, addDoc, serverTimestamp } from '../firebase';
+import { getWalletCurrencyMeta } from '../constants/walletCurrencies';
 
 interface StrategicReceiptProps {
   transaction: Transaction;
@@ -26,10 +24,10 @@ interface StrategicReceiptProps {
   onClose: () => void;
 }
 
-export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({ 
-  transaction, 
+export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
+  transaction,
   userEmail,
-  onClose 
+  onClose
 }) => {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -51,13 +49,13 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
         unit: 'mm',
         format: 'a4'
       });
-      
+
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`EFADO-Receipt-${transaction.id || 'TX'}.pdf`);
+      pdf.save(`EFADO-Receipt-${transaction.reference || transaction.id || 'TX'}.pdf`);
     } catch (err) {
       console.error('PDF Generation failed', err);
     } finally {
@@ -65,15 +63,11 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleUploadToVault = async () => {
     setIsUploading(true);
     try {
       await addDoc(collection(db, 'receipts'), {
-        transactionId: transaction.id,
+        transactionId: transaction.id || transaction.reference,
         userId: transaction.userId,
         timestamp: serverTimestamp(),
         amount: transaction.amount,
@@ -90,274 +84,184 @@ export const StrategicReceipt: React.FC<StrategicReceiptProps> = ({
     }
   };
 
-  const currSymbol = (() => {
-    const curr = (transaction.currency || '').toUpperCase().trim();
-    // If it's a bank transfer, cash out, withdrawal, or Nigerian transaction, always display Naira ₦
-    const isLocalOrNaira = 
-      curr === 'NGN' || 
-      curr === 'NAIRA' || 
-      !curr ||
-      transaction.type === 'withdrawal' ||
-      transaction.purpose?.toLowerCase().includes('cash out') ||
-      transaction.purpose?.toLowerCase().includes('withdrawal') ||
-      transaction.method?.toLowerCase().includes('bank') ||
-      transaction.method?.toLowerCase().includes('paystack') ||
-      transaction.method?.toLowerCase().includes('flutterwave') ||
-      transaction.description?.includes('₦') ||
-      transaction.description?.toLowerCase().includes('naira');
-
-    if (isLocalOrNaira && curr !== 'EUR' && curr !== 'GBP') {
-      return '₦';
-    }
-
-    if (curr === 'USD') return '$';
-    if (curr === 'EUR') return '€';
-    if (curr === 'GBP') return '£';
-    if (curr === 'CAD') return 'C$';
-    if (curr === 'AUD') return 'A$';
-    if (curr === 'GHS') return '₵';
-    if (curr === 'KES') return 'KSh';
-    if (curr === 'ZAR') return 'R';
-    return '₦';
-  })();
+  const currCode = (transaction.currency || 'NGN').toUpperCase().trim();
+  const currSymbol = getWalletCurrencyMeta(currCode).symbol;
+  const txDate = transaction.timestamp instanceof Date
+    ? transaction.timestamp.toLocaleString()
+    : transaction.timestamp?.toDate
+      ? transaction.timestamp.toDate().toLocaleString()
+      : (transaction as any)?.createdAtIso
+        ? new Date((transaction as any).createdAtIso).toLocaleString()
+        : new Date().toLocaleString();
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-xl overflow-y-auto no-scrollbar flex flex-col font-sans"
+      className="fixed inset-0 z-[1100] bg-purple-50/95 backdrop-blur-sm overflow-y-auto flex flex-col font-sans"
     >
-      {/* Dynamic Navigation Bar to prevent getting trapped/stuck */}
-      <nav className="sticky top-0 z-[75] bg-slate-900/90 backdrop-blur-md border-b border-white/5 shadow-md px-4 py-3 sm:py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          
-          {/* Back/Exit Action - Go Back */}
-          <button 
+      <nav className="sticky top-0 z-20 bg-white border-b border-purple-100 shadow-sm px-4 py-3">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <button
+            type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all border border-white/5 select-none"
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] text-xs font-bold rounded-xl"
           >
-            <ArrowLeft className="w-4 h-4 text-amber-500" />
+            <ArrowLeft className="w-4 h-4" />
             <span>Go Back</span>
           </button>
 
-          {/* Central Context Label */}
-          <div className="text-center hidden md:block">
-            <span className="text-[10px] font-black text-amber-500 uppercase tracking-[0.25em]">Secure Receipt Portal</span>
-            <p className="text-xs text-slate-400 font-bold tracking-tight">Verified Transaction Proof</p>
+          <div className="text-center hidden sm:block">
+            <span className="text-xs font-bold text-[#7C3AED]">EFADO Payment Receipt</span>
           </div>
 
-          {/* Actions: Download & Print */}
           <div className="flex items-center gap-2">
-            <button 
-              onClick={handlePrint}
-              title="Print Receipt"
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-white/5 rounded-xl text-white text-xs font-black uppercase tracking-wider transition-all"
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-700 text-xs font-bold"
             >
-              <Printer className="w-4 h-4 text-amber-500" />
+              <Printer className="w-4 h-4 text-[#7C3AED]" />
               <span>Print</span>
             </button>
-            
-            <button 
+
+            <button
+              type="button"
               onClick={handleDownloadPDF}
               disabled={isExporting}
-              title="Save/Download PDF Receipt"
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-slate-950 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#7C3AED] hover:bg-purple-700 rounded-xl text-white text-xs font-bold disabled:opacity-50"
             >
-              <Download className="w-4 h-4 font-black" />
-              <span>{isExporting ? 'Saving...' : 'Download'}</span>
+              <Download className="w-4 h-4" />
+              <span>{isExporting ? 'Saving...' : 'Download PDF'}</span>
             </button>
 
-            <button 
+            <button
+              type="button"
               onClick={handleUploadToVault}
               disabled={isUploading || uploadSuccess}
-              title="Upload to Secure Cloud Vault"
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
-                uploadSuccess ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 'bg-slate-800/80 hover:bg-slate-700 text-white border-white/5'
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border ${
+                uploadSuccess
+                  ? 'bg-emerald-50 text-[#16A34A] border-emerald-200'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
               }`}
             >
-              {uploadSuccess ? <CheckCircle2 className="w-4 h-4" /> : <CloudUpload className="w-4 h-4 text-emerald-400" />}
-              <span className="hidden md:inline">{isUploading ? 'Vaulting...' : uploadSuccess ? 'Vaulted' : 'Vault'}</span>
+              {uploadSuccess ? <CheckCircle2 className="w-4 h-4" /> : <CloudUpload className="w-4 h-4 text-[#16A34A]" />}
+              <span>{isUploading ? 'Saving...' : uploadSuccess ? 'Saved' : 'Save'}</span>
             </button>
           </div>
-
         </div>
       </nav>
 
-      {/* Main Content Area */}
-      <div className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6 md:my-6">
-        {/* Tactical Receipt Sheet */}
-        <div 
+      <div className="flex-1 max-w-2xl w-full mx-auto p-4 sm:p-6">
+        <div
           ref={receiptRef}
-          className="bg-white rounded-[2rem] shadow-2xl overflow-hidden relative print:shadow-none border border-slate-100"
+          className="bg-white rounded-2xl shadow-lg overflow-hidden border border-purple-100"
         >
-          {/* Golden Strategic Watermark - EFADO™ TRADEMARK (Fitted to page margins) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04] select-none overflow-hidden p-8">
-            <div className="w-full h-full bg-amber-400/5 absolute inset-0" />
-            <h1 className="text-[5rem] sm:text-[6.5rem] md:text-[8rem] font-black italic tracking-tighter rotate-[-30deg] text-amber-500 leading-none text-center uppercase whitespace-pre-wrap max-w-md break-words p-4 border border-amber-500/10 rounded-3xl">
-              EFADO™<br />TRADEMARK
-            </h1>
-          </div>
+          <div className="h-2 bg-[#7C3AED] w-full" />
 
-          {/* Header Strip */}
-          <div className="h-2 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 w-full" />
-
-          <div className="p-8 md:p-12 space-y-10">
-            {/* Brand Section */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-              <div className="space-y-4">
+          <div className="p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-amber-200">
-                    <span className="text-2xl font-black text-white italic">E</span>
+                  <div className="w-11 h-11 bg-[#7C3AED] rounded-2xl flex items-center justify-center shadow-sm">
+                    <span className="text-xl font-black text-white">E</span>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-slate-900 leading-none tracking-tighter">EFADO Hubs Connect</h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-1">Digital Ecosystem Unified</p>
+                    <h2 className="text-xl font-bold text-slate-900 m-0">EFADO Wallet</h2>
+                    <p className="text-xs font-medium text-slate-500 m-0 max-w-none">Official Transaction Receipt</p>
                   </div>
                 </div>
-                <div className="flex flex-col text-[10px] font-bold text-slate-500 uppercase tracking-widest gap-1">
-                  <p className="flex items-center gap-2"><Building2 className="w-3 h-3 text-amber-500" /> Digital Command Center 01</p>
-                  <p className="flex items-center gap-2 text-indigo-500"><ExternalLink className="w-3 h-3" /> efadohubsconnect.app</p>
+                <div className="flex flex-col text-xs font-medium text-slate-500 gap-1">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-[#7C3AED]" /> EFADO Digital Settlement
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[#7C3AED]">
+                    <ExternalLink className="w-3.5 h-3.5" /> e-fado.com
+                  </span>
                 </div>
               </div>
-              <div className="md:text-right">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Receipt Identity</h3>
-                <p className="text-lg font-black text-slate-900 font-mono">#{transaction.reference || transaction.id?.slice(-12).toUpperCase() || 'INTERNAL-TX'}</p>
-                <div className="mt-4 flex items-center md:justify-end gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full w-fit md:ml-auto">
-                  <ShieldCheck className="w-3 h-3" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Verified Transaction</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Global Verification Details (New Highly Detailed Sections) */}
-            <div className="bg-slate-50/50 rounded-2xl p-5 border border-slate-100 flex flex-col gap-2.5 text-slate-700 text-[10px] font-bold uppercase tracking-wider relative z-10">
-              <div className="flex justify-between border-b border-slate-100 pb-1.5">
-                <span className="text-slate-400">Ledger Node:</span>
-                <span className="text-slate-900">EFADO Ledger #01</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-1.5">
-                <span className="text-slate-400">Digital Hash Index:</span>
-                <span className="text-slate-900 font-mono break-all text-right max-w-[70%]">
-                  {Math.random().toString(36).substring(2, 15).toUpperCase()}B98X{transaction.id || 'TX007'}F90
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-1.5">
-                <span className="text-slate-400">Verification channel:</span>
-                <span className="text-slate-900">{transaction.method || 'Digital Wallet'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Security PIN Auth:</span>
-                <span className="text-emerald-600 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> Authenticated & Sealed
-                </span>
-              </div>
-            </div>
-
-            {/* Main Payload */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-y border-slate-100 py-8 relative z-10">
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Recipient Entity</h4>
-                  <p className="text-sm font-bold text-slate-900">{userEmail || 'Individual User'}</p>
-                  <p className="text-[10px] font-mono text-slate-500 mt-0.5 uppercase">ID: {transaction.userId?.slice(0, 16) || 'SECURE_USER'}...</p>
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Temporal Execution</h4>
-                  <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                    <Calendar className="w-4 h-4 text-amber-500 font-bold" />
-                    {transaction.timestamp instanceof Date ? transaction.timestamp.toLocaleString() : 
-                     transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleString() : 
-                     new Date().toLocaleString()}
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Sector</h4>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                      transaction.type === 'deposit' ? 'bg-emerald-500/10 text-emerald-600' :
-                      transaction.type === 'withdrawal' ? 'bg-rose-500/10 text-rose-600' :
-                      'bg-indigo-500/10 text-indigo-600'
-                    }`}>
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{transaction.type.replace('_', ' ')}</p>
-                      <p className="text-[10px] font-bold text-slate-400">{transaction.purpose || transaction.description || 'Verified Operation'} {transaction.hub ? `[${transaction.hub}]` : ''}</p>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payment Integrity</h4>
-                  <p className="text-sm font-bold text-slate-900 font-mono">{transaction.reference || 'SYSTEM_INTERNAL_OVD'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Financial Summary */}
-            <div className="bg-slate-50 rounded-3xl p-6 md:p-8 space-y-4 relative z-10">
-              <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
-                <span>Sub-Total Allocation</span>
-                <span className="font-mono">{currSymbol}{transaction.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-500 font-bold text-sm">
-                <span>Service Charge</span>
-                <span className="font-mono">{currSymbol}{(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-              </div>
-              <div className="h-px bg-slate-200" />
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Total Amount</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Transaction Ref: {transaction.reference}</p>
-                </div>
-                <div className="flex flex-col items-end">
-                  <div className="flex items-center gap-1 text-3xl md:text-4xl font-black text-slate-900 font-display">
-                    <span className="text-amber-500 font-sans">{currSymbol}</span>
-                    {(transaction.amount + (transaction.fee || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                  </div>
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.15em] mt-1.5 bg-emerald-50 px-2 py-0.5 rounded">Completed Success</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Compliance Footer */}
-            <div className="space-y-6 relative z-10">
-              <div className="flex items-center gap-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-100">
-                <CheckCircle2 className="w-5 h-5 text-amber-600 shrink-0" />
-                <p className="text-[10px] text-amber-900 font-medium leading-relaxed">
-                  This document serves as an official automated receipt issued by EFADO Hubs Connect™. It confirms the successful allocation of digital assets as summarized above. Digital signature verified for security integrity.
+              <div className="sm:text-right">
+                <span className="text-xs font-semibold text-slate-400 block">Reference ID</span>
+                <p className="text-sm font-bold text-slate-900 font-mono m-0 max-w-none">
+                  {transaction.reference || transaction.id || 'TXN'}
                 </p>
-              </div>
-              <div className="text-center pt-4">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[1em] mb-4">Master Integrity Signature</p>
-                <div className="w-48 h-12 border-b-2 border-slate-100 mx-auto flex items-center justify-center">
-                  <span className="font-display text-2xl text-slate-400 select-none opacity-30 italic">EFADO Strategic Admin</span>
+                <div className="mt-2 inline-flex items-center gap-1.5 text-[#16A34A] bg-emerald-50 px-3 py-1 rounded-full">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span className="text-xs font-bold">Secure Payment - Verified</span>
                 </div>
               </div>
             </div>
-          </div>
-          
-          {/* Footer Security Strip */}
-          <div className="h-4 bg-slate-950 flex items-center justify-center gap-8 px-12 overflow-hidden print:hidden">
-            {[1,2,3,4,5].map(i => (
-              <span key={i} className="text-[6px] font-black text-slate-700 uppercase tracking-[1em] whitespace-nowrap">
-                EFADO SECURE RECEIPT 2026 // VERIFIED TRANSACTION // NO REVERSALS
-              </span>
-            ))}
-          </div>
-        </div>
 
-        {/* Bottom Escape Control Button to prevent getting stuck/trapped */}
-        <div className="mt-8 mb-12 text-center print:hidden">
-          <button 
-            onClick={onClose}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-slate-900 hover:bg-slate-800 border border-white/10 active:scale-95 text-white text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-slate-950/50 select-none"
-          >
-            <ArrowLeft className="w-4 h-4 text-amber-500" />
-            <span>Go Back</span>
-          </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-y border-slate-100 py-5">
+              <div>
+                <span className="text-xs font-semibold text-slate-400 block">Account Holder</span>
+                <p className="text-sm font-bold text-slate-900 m-0 max-w-none">{userEmail || 'EFADO Member'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-400 block">Date & Time</span>
+                <div className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                  <Calendar className="w-4 h-4 text-[#7C3AED]" />
+                  <span>{txDate}</span>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-400 block">Transaction Type</span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <FileText className="w-4 h-4 text-[#7C3AED]" />
+                  <span className="text-sm font-bold text-slate-900 capitalize">
+                    {String(transaction.type || 'payment').replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-slate-400 block">Payment Method</span>
+                <span className="text-sm font-bold text-slate-900">{transaction.method || 'EFADO Wallet'}</span>
+              </div>
+            </div>
+
+            <div className="bg-purple-50/60 rounded-2xl p-5 space-y-3 border border-purple-100">
+              <div className="flex items-center justify-between text-slate-600 font-semibold text-sm">
+                <span>Amount</span>
+                <span className="font-bold text-slate-900 tabular-nums">
+                  {currSymbol}
+                  {Number(transaction.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 font-semibold text-sm">
+                <span>Fee</span>
+                <span className="font-bold text-slate-900 tabular-nums">
+                  {currSymbol}
+                  {Number(transaction.fee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="h-px bg-purple-200" />
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-slate-900 m-0 max-w-none">Total</p>
+                  <p className="text-xs text-slate-500 m-0 max-w-none">
+                    {transaction.purpose || transaction.description || 'Verified transaction'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-slate-900 tabular-nums">
+                    {currSymbol}
+                    {(Number(transaction.amount || 0) + Number(transaction.fee || 0)).toLocaleString(undefined, {
+                      minimumFractionDigits: 2
+                    })}
+                  </div>
+                  <span className="text-xs font-bold text-[#16A34A] uppercase">
+                    {transaction.status === 'completed' ? 'Success' : transaction.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center text-xs text-slate-500 font-medium pt-2">
+              Protected by 256-bit encryption • EFADO Wallet Official Receipt
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>

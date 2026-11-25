@@ -37,9 +37,26 @@ export interface UserProfile {
   bankName?: string;
   accountNumber?: string;
   accountName?: string;
+  bankCode?: string;
+  bankAddedAt?: string | number;
   externalWallet?: string;
+  usdtAddress?: string;
+  btcAddress?: string;
   mobileMoneyNumber?: string;
   mobileMoneyProvider?: string;
+  promoWallet?: number;
+  alias?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  gender?: string;
+  address?: string;
+  country?: string;
+  kycStatus?: 'verified' | 'pending' | 'unverified';
+  hasTransactionPin?: boolean;
+  twoFactorEnabled?: boolean;
+  biometricEnabled?: boolean;
+  nightSafeSentryEnabled?: boolean;
+  opayShieldEnabled?: boolean;
   activeTradingGameBet?: {
     expiry: number;
   };
@@ -61,16 +78,18 @@ export interface UserWallet {
 
 export interface PaymentMethod {
   id: string;
-  type: 'bank_transfer' | 'credit_card' | 'crypto' | 'paypal';
+  type: 'bank_transfer' | 'credit_card' | 'crypto' | 'paypal' | 'mobile_money';
   name: string;
-  details: string; // Masked or encrypted
+  details: string; // Masked for UI display
   isDefault: boolean;
+  network?: string;
+  createdAt?: string | number;
 }
 
 export interface Transaction {
   id?: string;
   userId: string;
-  type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win' | 'payment' | 'payout';
+  type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win' | 'payment' | 'payout' | 'swap' | 'reward';
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed';

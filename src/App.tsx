@@ -556,27 +556,19 @@ function AppContent() {
   const renderWalletModal = () => (
     <AnimatePresence>
       {showWallet && user && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => setShowWallet(false)}
-          className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+          className="fixed inset-0 z-[999] flex items-center justify-center p-2 sm:p-4 bg-slate-900/55 backdrop-blur-sm"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl"
+            className="relative w-full max-w-[1200px] max-h-[94vh] overflow-y-auto no-scrollbar rounded-3xl bg-[#FAF8FF] shadow-2xl border border-purple-200"
           >
-            <button 
-              type="button"
-              onClick={() => setShowWallet(false)}
-              aria-label="Close Account Profile Wallet"
-              className="absolute top-4 right-4 z-20 p-2 bg-slate-900/80 hover:bg-slate-800 rounded-full text-slate-300 hover:text-white transition-all border border-white/10"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <UserWallet 
-              user={user} 
+            <UserWallet
+              user={user}
               onUpdateBalance={handleWalletUpdate}
               onClose={() => setShowWallet(false)}
               initialTab={walletInitialTab}
@@ -2008,6 +2000,10 @@ function AppContent() {
 
   const handleWalletUpdate = async (amount: number, type: 'deposit' | 'withdrawal' | 'game_bet' | 'game_win', withdrawalAccountDetails?: any) => {
     if (!user) return;
+    if (withdrawalAccountDetails?.alreadyProcessedByServer === true) {
+      // Server atomic transaction already updated wallet balance and wrote the matching transaction history row
+      return;
+    }
     const cur = normalizeCurrencyCode(withdrawalAccountDetails?.currency || 'NGN');
     if (isDisabledFutureCurrency(cur)) {
       throw new Error('SIRA (Burkina Faso) is Coming Soon and not yet in circulation.');
@@ -2072,7 +2068,14 @@ function AppContent() {
 
       if (type === 'deposit') {
         const bonusToApply = !user.hasReceivedSignupBonus && cur === 'NGN' ? 100 : 0;
+        const txRef = withdrawalAccountDetails?.reference
+          ? doc(db, 'transactions', String(withdrawalAccountDetails.reference))
+          : doc(collection(db, 'transactions'));
         await runTransaction(db, async (transaction) => {
+          const existingTxSnap = await transaction.get(txRef);
+          if (existingTxSnap.exists() && existingTxSnap.data()?.credited === true) {
+            return;
+          }
           const pocketSnap = await transaction.get(walletPocketRef);
           const oldBal = pocketSnap.exists()
             ? Number(pocketSnap.data()?.balance ?? pocketSnap.data()?.depositWallet ?? 0) || 0
@@ -2084,6 +2087,23 @@ function AppContent() {
             currency: cur,
             userId: user.uid,
             updatedAt: serverTimestamp()
+          }, { merge: true });
+          if (cur === 'NGN') {
+            transaction.set(userRef, { depositWallet: nextBal }, { merge: true });
+          }
+          transaction.set(txRef, {
+            userId: user.uid,
+            type: 'deposit',
+            status: 'completed',
+            credited: true,
+            amount,
+            balanceAfter: nextBal,
+            currency: cur,
+            sourceWallet: 'depositWallet',
+            reference: txRef.id,
+            purpose: `Funded ${cur} Pocket`,
+            createdAtIso: new Date().toISOString(),
+            timestamp: serverTimestamp()
           }, { merge: true });
           if (bonusToApply > 0) {
             transaction.update(userRef, {

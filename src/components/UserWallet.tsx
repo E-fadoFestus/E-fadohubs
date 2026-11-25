@@ -1,63 +1,55 @@
-import React, { useState, useEffect } from 'react';
-import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
-import { 
-  Wallet, 
-  ArrowDownCircle, 
-  ArrowUpCircle, 
-  History, 
-  CreditCard, 
-  Plus, 
-  Shield, 
-  Bell, 
-  Search, 
-  Filter,
-   ChevronRight,
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  Wallet,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  History,
+  CreditCard,
+  Plus,
+  Shield,
+  Bell,
+  ChevronRight,
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  Banknote,
-  Bitcoin,
   Lock,
-  Settings,
   ShieldCheck,
   Fingerprint,
   Building2,
-  User,
+  User as UserIcon,
   Camera,
-  FileText,
-  SearchCode,
   Smartphone,
   Copy,
   ArrowRightLeft,
-  ChevronDown,
-  ExternalLink,
   Globe,
-  Hash,
-  Coins,
-  Trophy,
-  ArrowLeft,
-  Zap,
-  AlertCircle,
-  Clock
+  Gift,
+  Eye,
+  EyeOff,
+  Home,
+  Trash2,
+  LogOut,
+  KeyRound,
+  Loader2,
+  Check,
+  X,
+  RefreshCw,
+  ArrowRight,
+  Bitcoin,
+  Banknote
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Transaction, PaymentMethod } from '../types';
 import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
 import { StrategicReceipt } from './StrategicReceipt';
-import { db, auth, doc, updateDoc, collection, query, where, orderBy, onSnapshot, increment, runTransaction, serverTimestamp } from '../firebase';
-import { CEO_BANK_ACCOUNTS } from '../constants/businessProfile';
-import { resolveBankAccount } from '../utils/bankVerification';
-import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
-
+import { PaymentGuidelinesModal } from './PaymentGuidelinesModal';
 import { TransactionHistory } from './TransactionHistory';
-import { TransactionService } from '../services/TransactionService';
 import { PaystackDeposit } from './PaystackDeposit';
 import { FlutterwaveDeposit } from './FlutterwaveDeposit';
 import { OpayDeposit } from './OpayDeposit';
 import { DirectBankDeposit } from './DirectBankDeposit';
 import { PayPalHostedButton } from './PayPalHostedButton';
-import { HubGuideNote } from './HubGuideNote';
-import { useCurrency } from '../lib/CurrencyContext';
+import { db, auth, doc, collection, query, where, onSnapshot } from '../firebase';
+import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
 import {
   ACTIVE_WALLET_CURRENCIES,
   FUTURE_WALLET_CURRENCIES,
@@ -69,2680 +61,3273 @@ import {
 } from '../constants/walletCurrencies';
 import { extractErrorMessage, readResponseSafely } from '../utils/errorFormat';
 
-interface UserWalletProps {
+export interface UserWalletProps {
   user: UserProfile;
   onUpdateBalance: (amount: number, type: 'deposit' | 'withdrawal', accountDetails?: any) => Promise<void>;
   onClose?: () => void;
   initialTab?: 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings';
 }
 
-export const UserWallet: React.FC<UserWalletProps> = ({ user, onUpdateBalance, onClose, initialTab = 'overview' }) => {
-  const { selectedCurrency, setCurrency, formatPrice } = useCurrency();
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings'>(initialTab);
+type WalletTab = 'overview' | 'profile' | 'deposit' | 'withdraw' | 'history' | 'settings';
+type DepositMethodTab = 'paystack' | 'bank_transfer' | 'opay' | 'flutterwave' | 'diaspora';
+type BankCountryCode = 'NG' | 'GH' | 'KE' | 'UK' | 'US';
+
+const LOCAL_AVATAR_PRESETS = [
+  { id: 'efado', label: 'EFADO Emblem', src: '/efado_logo_192.jpg' },
+  { id: 'jet', label: 'DeepSea Pilot', src: '/assets/deepsea-jet.jpg' },
+  {
+    id: 'purple',
+    label: 'Violet Shield',
+    src: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="40" fill="%237C3AED"/><text x="40" y="49" text-anchor="middle" fill="white" font-family="sans-serif" font-size="28" font-weight="bold">EF</text></svg>'
+  },
+  {
+    id: 'emerald',
+    label: 'Emerald Trust',
+    src: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="40" fill="%2316A34A"/><text x="40" y="49" text-anchor="middle" fill="white" font-family="sans-serif" font-size="28" font-weight="bold">NG</text></svg>'
+  }
+];
+
+const COUNTRY_LIST = [
+  { code: 'NG', label: 'Nigeria', flag: '🇳🇬' },
+  { code: 'GH', label: 'Ghana', flag: '🇬🇭' },
+  { code: 'KE', label: 'Kenya', flag: '🇰🇪' },
+  { code: 'UK', label: 'United Kingdom', flag: '🇬🇧' },
+  { code: 'US', label: 'United States', flag: '🇺🇸' }
+] as const;
+
+const CRYPTO_DEPOSIT_WALLETS = {
+  usdt: {
+    label: 'USDT (TRC20)',
+    address: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE',
+    network: 'TRC20 (Tron)'
+  },
+  btc: {
+    label: 'Bitcoin (BTC)',
+    address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+    network: 'Bitcoin Mainnet'
+  }
+};
+
+function maskNumberForDisplay(val?: string | null): string {
+  const s = String(val || '').trim();
+  if (!s) return 'Not added';
+  if (s.includes('*') || s.includes('...')) return s;
+  if (s.length <= 4) return '****';
+  return `**** ${s.slice(-4)}`;
+}
+
+function maskAddressForDisplay(val?: string | null): string {
+  const s = String(val || '').trim();
+  if (!s) return 'Not added';
+  if (s.includes('...')) return s;
+  if (s.length <= 8) return s;
+  return `${s.slice(0, 4)}...${s.slice(-4)}`;
+}
+
+function getWithdrawalFeeForCurrency(currency: string): number {
+  switch (normalizeCurrencyCode(currency)) {
+    case 'NGN':
+      return 50;
+    case 'GHS':
+      return 2;
+    case 'ZAR':
+      return 10;
+    case 'XOF':
+      return 200;
+    default:
+      return 1;
+  }
+}
+
+export const UserWallet: React.FC<UserWalletProps> = ({
+  user,
+  onUpdateBalance,
+  onClose,
+  initialTab = 'overview'
+}) => {
+  const [activeTab, setActiveTab] = useState<WalletTab>(initialTab);
+  const [depositMethod, setDepositMethod] = useState<DepositMethodTab>('paystack');
+  const [depositCurrency, setDepositCurrency] = useState<string>('NGN');
+  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
+
+  // Live balances from backend + Firestore listeners
+  const [hideBalances, setHideBalances] = useState(false);
+  const [totalActiveBalance, setTotalActiveBalance] = useState<number>(
+    Number(user.cashOutWallet || 0) + Number(user.depositWallet || 0) + Number(user.promoWallet || 0) + Number(user.playerWallet || 0)
+  );
+  const [cashOutWallet, setCashOutWallet] = useState<number>(Number(user.cashOutWallet || 0));
+  const [mainWallet, setMainWallet] = useState<number>(Number(user.depositWallet || 0));
+  const [promoWallet, setPromoWallet] = useState<number>(Number(user.promoWallet || 0));
+  const [playerWallet, setPlayerWallet] = useState<number>(Number(user.playerWallet || 0));
+  const [pocketsMap, setPocketsMap] = useState<Record<string, number>>(() => ({
+    NGN: Number(user.walletPockets?.NGN ?? user.depositWallet ?? 0),
+    USD: Number(user.walletPockets?.USD ?? user.usd_balance ?? 0),
+    GBP: Number(user.walletPockets?.GBP ?? user.gbp_balance ?? 0),
+    EUR: Number(user.walletPockets?.EUR ?? user.eur_balance ?? 0),
+    CAD: Number(user.walletPockets?.CAD ?? 0),
+    AUD: Number(user.walletPockets?.AUD ?? 0),
+    GHS: Number(user.walletPockets?.GHS ?? 0),
+    ZAR: Number(user.walletPockets?.ZAR ?? 0),
+    XOF: Number(user.walletPockets?.XOF ?? 0)
+  }));
+
+  // Notifications & Alerts
+  const [alerts, setAlerts] = useState<Array<{ id: string; title: string; message: string; type?: string; createdAtIso?: string }>>([]);
+  const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
+  const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
+
+  // Claim Reward state
+  const [isClaimingReward, setIsClaimingReward] = useState(false);
+
+  // Swap Modal state
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapSourceWallet, setSwapSourceWallet] = useState<'depositWallet' | 'cashOutWallet' | 'playerWallet' | 'promoWallet'>('depositWallet');
+  const [swapFromCurrency, setSwapFromCurrency] = useState('NGN');
+  const [swapToCurrency, setSwapToCurrency] = useState('USD');
+  const [swapAmount, setSwapAmount] = useState('10000');
+  const [swapQuote, setSwapQuote] = useState<{ rate: number; feeAmount: number; receiveAmount: number } | null>(null);
+  const [isLoadingSwapRate, setIsLoadingSwapRate] = useState(false);
+  const [isExecutingSwap, setIsExecutingSwap] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
+
+  // Profile 01 / 02 / 03 state
+  const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '/efado_logo_192.jpg');
+  const [profileLegalName, setProfileLegalName] = useState(user.fullName || user.displayName || 'Okhawere Festus Daniel');
+  const [profileAlias, setProfileAlias] = useState(user.alias || 'Festival');
+  const [profileDob, setProfileDob] = useState(user.dateOfBirth || '1990-01-01');
+  const [profileNationality, setProfileNationality] = useState(user.nationality || 'Nigerian');
+  const [profileCountry, setProfileCountry] = useState(user.country || 'Nigeria');
+  const [profileGender, setProfileGender] = useState(user.gender || 'Male');
+  const [profileAddress, setProfileAddress] = useState(user.address || '');
+  const [profilePhone, setProfilePhone] = useState(user.phoneNumber || '');
+  const [profileBio, setProfileBio] = useState(user.bio || '');
+  const [profileKycStatus, setProfileKycStatus] = useState<string>(user.kycStatus || (user.fullName ? 'verified' : 'pending'));
+
+  const [profileBankName, setProfileBankName] = useState(user.bankName || 'First Bank of Nigeria');
+  const [profileBankCode, setProfileBankCode] = useState(user.bankCode || '011');
+  const [profileAccountNumberInput, setProfileAccountNumberInput] = useState(user.accountNumber || '');
+  const [profileAccountNumberMasked, setProfileAccountNumberMasked] = useState(maskNumberForDisplay(user.accountNumber));
+  const [profileAccountName, setProfileAccountName] = useState(user.accountName || user.fullName || user.displayName || '');
+
+  const [profileMomoProvider, setProfileMomoProvider] = useState(user.mobileMoneyProvider || 'MTN');
+  const [profileMomoInput, setProfileMomoInput] = useState(user.mobileMoneyNumber || '');
+  const [profileMomoMasked, setProfileMomoMasked] = useState(maskNumberForDisplay(user.mobileMoneyNumber));
+  const [profileUsdtInput, setProfileUsdtInput] = useState(user.usdtAddress || '');
+  const [profileUsdtMasked, setProfileUsdtMasked] = useState(maskAddressForDisplay(user.usdtAddress));
+  const [profileBtcInput, setProfileBtcInput] = useState(user.btcAddress || user.externalWallet || '');
+  const [profileBtcMasked, setProfileBtcMasked] = useState(maskAddressForDisplay(user.btcAddress || user.externalWallet));
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  // Diaspora / Crypto Deposit state
+  const [cryptoTabMode, setCryptoTabMode] = useState<'crypto' | 'paypal'>('crypto');
+  const [cryptoNetwork, setCryptoNetwork] = useState<'USDT (TRC20)' | 'Bitcoin (BTC)'>('USDT (TRC20)');
+  const [cryptoAmount, setCryptoAmount] = useState('25');
+  const [cryptoTxHash, setCryptoTxHash] = useState('');
+  const [isSubmittingCrypto, setIsSubmittingCrypto] = useState(false);
+  const [cryptoStatusMessage, setCryptoStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Withdraw state
+  const [opayShieldEnabled, setOpayShieldEnabled] = useState(true);
+  const [nightSafeEnabled, setNightSafeEnabled] = useState(true);
+  const [withdrawCountry, setWithdrawCountry] = useState<BankCountryCode>('NG');
+  const [bankDirectory, setBankDirectory] = useState<Array<{ code: string; name: string; country: string }>>([]);
+  const [wdBankCode, setWdBankCode] = useState(user.bankCode || '011');
+  const [wdBankName, setWdBankName] = useState(user.bankName || 'First Bank of Nigeria');
+  const [wdAccountNumber, setWdAccountNumber] = useState('');
+  const [wdUseSavedBank, setWdUseSavedBank] = useState(false);
+  const [wdVerifiedName, setWdVerifiedName] = useState('');
+  const [wdIsVerified, setWdIsVerified] = useState(false);
+  const [wdNameMismatchError, setWdNameMismatchError] = useState<string | null>(null);
+  const [wdVerifyError, setWdVerifyError] = useState<string | null>(null);
+  const [isVerifyingBank, setIsVerifyingBank] = useState(false);
+  const [wdSourceWallet, setWdSourceWallet] = useState<'playerWallet' | 'cashOutWallet' | 'depositWallet'>('playerWallet');
+  const [wdAmount, setWdAmount] = useState('');
+  const [wdGateway, setWdGateway] = useState<'paystack' | 'flutterwave'>('paystack');
+  const [wdStatusMessage, setWdStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // PIN + OTP Modal state (shared by Withdrawal and Payment Method Removal)
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinModalContext, setPinModalContext] = useState<'withdraw' | 'remove_method' | null>(null);
+  const [pinModalTargetMethodId, setPinModalTargetMethodId] = useState<string | null>(null);
+  const [pinModalError, setPinModalError] = useState<string | null>(null);
+  const [pinModalSubmitting, setPinModalSubmitting] = useState(false);
+  const [pinModalRequiresOtp, setPinModalRequiresOtp] = useState(false);
+  const [pinModalOtpDelivery, setPinModalOtpDelivery] = useState<string | undefined>(undefined);
+
+  // Security & Payment Methods state
+  const [hasTransactionPin, setHasTransactionPin] = useState<boolean>(Boolean(user.hasTransactionPin));
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(Boolean(user.twoFactorEnabled));
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(Boolean(user.biometricEnabled));
+  const [loginHistory, setLoginHistory] = useState<Array<{ id: string; eventType?: string; description?: string; city?: string; device?: string; createdAtIso?: string }>>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [showAddMethodForm, setShowAddMethodForm] = useState(false);
+  const [newMethodType, setNewMethodType] = useState<'bank_transfer' | 'credit_card' | 'crypto' | 'mobile_money'>('bank_transfer');
+  const [newMethodName, setNewMethodName] = useState('');
+  const [newMethodDetails, setNewMethodDetails] = useState('');
+  const [newMethodNetwork, setNewMethodNetwork] = useState('');
+  const [isAddingMethod, setIsAddingMethod] = useState(false);
+
+  // Set / Change PIN Dialog
+  const [showPinSetupModal, setShowPinSetupModal] = useState(false);
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinSetupError, setPinSetupError] = useState<string | null>(null);
+  const [isSavingPin, setIsSavingPin] = useState(false);
+
+  // 2FA OTP Dialog
+  const [show2faModal, setShow2faModal] = useState(false);
+  const [pending2faTargetState, setPending2faTargetState] = useState(true);
+  const [twoFaOtpCode, setTwoFaOtpCode] = useState('');
+  const [twoFaOtpDelivery, setTwoFaOtpDelivery] = useState<string | undefined>(undefined);
+  const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [isVerifying2fa, setIsVerifying2fa] = useState(false);
+
+  const securitySectionRef = useRef<HTMLDivElement | null>(null);
+  const paymentMethodsRef = useRef<HTMLDivElement | null>(null);
+
+  // Synchronous double-click / race condition guards + idempotency keys
+  const rewardInFlightRef = useRef(false);
+  const swapInFlightRef = useRef(false);
+  const swapIdempotencyKeyRef = useRef('');
+  const cryptoInFlightRef = useRef(false);
+  const pinConfirmInFlightRef = useRef(false);
+  const wdIdempotencyKeyRef = useRef('');
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
-  const [depositMethod, setDepositMethod] = useState<'paystack' | 'opay' | 'flutterwave' | 'bank_transfer' | 'diaspora'>('paystack');
-  const [showGuidelinesModal, setShowGuidelinesModal] = useState(false);
-  const [remitaRRR, setRemitaRRR] = useState('RRR-8492-0192-4910');
-  const [amount, setAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [notifications, setNotifications] = useState<{id: string, message: string, type: 'info' | 'warning'}[]>([]);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{type: 'deposit' | 'withdraw', amount: number} | null>(null);
-  
-  // Profile edit field states
-  const [profileDisplayName, setProfileDisplayName] = useState(user.displayName || '');
-  const [profileFullName, setProfileFullName] = useState(user.fullName || '');
-  const [profilePhoneNumber, setProfilePhoneNumber] = useState(user.phoneNumber || '');
-  const [profilePhotoURL, setProfilePhotoURL] = useState(user.photoURL || '');
-  const [profileBio, setProfileBio] = useState(user.bio || '');
-  const [profileBankName, setProfileBankName] = useState(user.bankName || '');
-  const [profileAccountNumber, setProfileAccountNumber] = useState(user.accountNumber || '');
-  const [profileAccountName, setProfileAccountName] = useState(user.accountName || '');
-  const [profileExternalWallet, setProfileExternalWallet] = useState(user.externalWallet || '');
-  const [profileMobileMoneyNumber, setProfileMobileMoneyNumber] = useState(user.mobileMoneyNumber || '');
-  const [profileMobileMoneyProvider, setProfileMobileMoneyProvider] = useState(user.mobileMoneyProvider || '');
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileMessage, setProfileMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const [accountDetails, setAccountDetails] = useState({
-    accountNumber: user.accountNumber || '',
-    bankName: user.bankName || '',
-    accountName: user.accountName || user.displayName || '',
-    routingNumber: ''
-  });
-  const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
-  const [bankSearch, setBankSearch] = useState(user.bankName || '');
-  const [showBankDropdown, setShowBankDropdown] = useState(false);
-  const [manualBankMode, setManualBankMode] = useState(false);
-  const [lastTransaction, setLastTransaction] = useState<Transaction | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [depositCurrency, setDepositCurrency] = useState<string>(() => {
-    const c = normalizeCurrencyCode(selectedCurrency?.code || 'NGN');
-    return isDisabledFutureCurrency(c) ? 'NGN' : c;
-  });
-  const [withdrawSource, setWithdrawSource] = useState<'depositWallet' | 'cashOutWallet' | 'playerWallet'>('playerWallet');
-  const [withdrawCurrency, setWithdrawCurrency] = useState<string>('NGN');
-  const [payoutGateway, setPayoutGateway] = useState<'paystack' | 'flutterwave'>('paystack');
-  const [showSwapModal, setShowSwapModal] = useState(false);
-  const [swapSource, setSwapSource] = useState<'playerWallet' | 'cashOutWallet' | 'usd_balance' | 'eur_balance' | 'gbp_balance'>('playerWallet');
-  const [swapAmount, setSwapAmount] = useState('');
-
-  // Dynamic Payment Methods State
-  const [paymentsList, setPaymentsList] = useState<PaymentMethod[]>(() => {
-    const saved = localStorage.getItem(`payment_methods_${user.uid}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved payment methods", e);
-      }
+  useEffect(() => {
+    if (initialTab === 'settings') {
+      setTimeout(() => {
+        securitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
     }
-    return [
-      { id: 'pm1', type: 'credit_card', name: 'Visa ending in 4242', details: '**** **** **** 4242', isDefault: true },
-      { id: 'pm3', type: 'crypto', name: 'Bitcoin Wallet', details: 'bc1qxy2kg...z7v', isDefault: false },
-    ];
-  });
+  }, [initialTab]);
 
-  useEffect(() => {
-    localStorage.setItem(`payment_methods_${user.uid}`, JSON.stringify(paymentsList));
-  }, [paymentsList, user.uid]);
-
-  const [showAddMethodModal, setShowAddMethodModal] = useState(false);
-  const [addMethodType, setAddMethodType] = useState<'credit_card' | 'bank_transfer' | 'crypto'>('credit_card');
-  const [addMethodName, setAddMethodName] = useState('');
-  const [addMethodDetails, setAddMethodDetails] = useState('');
-
-  // Live account name automated query simulation
-  const [isResolvingName, setIsResolvingName] = useState(false);
-  const [resolvedStatusMessage, setResolvedStatusMessage] = useState<string | null>(null);
-
-  // Cyber Security Sentry & Anti-Fraud Suite states
-  const [shieldActive, setShieldActive] = useState<boolean>(() => {
-    const val = localStorage.getItem('efado_payment_shield');
-    return val === null ? true : val === 'true';
-  });
-  const [nightGuideActive, setNightGuideActive] = useState<boolean>(() => {
-    const val = localStorage.getItem('efado_night_guide');
-    return val === null ? true : val === 'true';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('efado_payment_shield', shieldActive.toString());
-  }, [shieldActive]);
-
-  // Paystack & Flutterwave Withdraw States & Bank Directories
-  const [paystackBanks, setPaystackBanks] = useState<{ name: string; code: string }[]>([]);
-  const [flutterwaveBanks, setFlutterwaveBanks] = useState<{ name: string; code: string }[]>([]);
-  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
-  const [selectedBankCode, setSelectedBankCode] = useState((user as any).routingNumber || '');
-  const [accountNumberInput, setAccountNumberInput] = useState(user.accountNumber || '');
-  const [isVerifyingAccount, setIsVerifyingAccount] = useState(false);
-  const [verifiedAccountName, setVerifiedAccountName] = useState<string | null>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [withdrawStatusMessage, setWithdrawStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [isExecutingWithdraw, setIsExecutingWithdraw] = useState(false);
-
-  const activeBankDirectory =
-    payoutGateway === 'paystack'
-      ? (paystackBanks.length > 0 ? paystackBanks : FLUTTERWAVE_BANKS.map(b => ({ code: b.code, name: b.name })))
-      : (flutterwaveBanks.length > 0 ? flutterwaveBanks : FLUTTERWAVE_BANKS.map(b => ({ code: b.code, name: b.name })));
-
-  const activeWithdrawCurrency = withdrawSource === 'depositWallet' ? normalizeCurrencyCode(withdrawCurrency) : 'NGN';
-  const availableWithdrawBalance =
-    withdrawSource === 'playerWallet'
-      ? (user.playerWallet || 0)
-      : withdrawSource === 'cashOutWallet'
-        ? (user.cashOutWallet || 0)
-        : (user.walletPockets?.[activeWithdrawCurrency] ?? (activeWithdrawCurrency === 'NGN' ? (user.depositWallet || 0) : 0));
-
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoadingBanks(true);
-    const fetchBanks = async () => {
-      try {
-        if (typeof (auth as any).authStateReady === 'function') {
-          await Promise.race([
-            (auth as any).authStateReady(),
-            new Promise((resolve) => setTimeout(resolve, 4000))
-          ]);
-        }
-        const token = auth.currentUser ? await auth.currentUser.getIdToken() : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
-        const [psRes, flwRes] = await Promise.allSettled([
-          fetch('/api/paystack/banks', {
-            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-          }),
-          fetch('/api/payments/banks?country=NG')
-        ]);
-
-        if (isMounted && psRes.status === 'fulfilled') {
-          const data = await psRes.value.json().catch(() => null);
-          if (data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
-            setPaystackBanks(data.banks);
-          }
-        }
-        if (isMounted && flwRes.status === 'fulfilled') {
-          const data = await flwRes.value.json().catch(() => null);
-          if (data?.success && Array.isArray(data.banks) && data.banks.length > 0) {
-            setFlutterwaveBanks(data.banks);
-          }
-        }
-      } catch (err) {
-        console.warn('Banks directory fetch error:', err);
-      } finally {
-        if (isMounted) setIsLoadingBanks(false);
-      }
-    };
-    fetchBanks();
-    return () => { isMounted = false; };
+  const showNotice = useCallback((text: string, type: 'success' | 'error' = 'success') => {
+    setToast({ text, type });
+    setTimeout(() => {
+      setToast((prev) => (prev?.text === text ? null : prev));
+    }, 4500);
   }, []);
 
-  // Works EVEN IF wallet balance is 0.00; enforces strict 10s timeout & clear error reporting
-  const handleVerifyAccount = async () => {
-    if (!selectedBankCode) {
-      setVerificationError('Please select your destination bank from the dropdown.');
-      return;
-    }
-    const cleanAcc = accountNumberInput.replace(/\D/g, '');
-    if (!cleanAcc || cleanAcc.length !== 10) {
-      setVerificationError('Invalid account number: must be exactly 10 digits.');
-      return;
-    }
+  const getAuthHeaders = useCallback(async (jsonBody = true): Promise<Record<string, string>> => {
+    const token = await auth.currentUser?.getIdToken().catch(() => '');
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (jsonBody) headers['Content-Type'] = 'application/json';
+    return headers;
+  }, []);
 
-    setIsVerifyingAccount(true);
-    setVerificationError(null);
-    setVerifiedAccountName(null);
-
+  const fetchWalletSnapshot = useCallback(async () => {
+    if (!auth.currentUser) return;
     try {
-      const selectedBankObj = activeBankDirectory.find((b) => b.code === selectedBankCode);
-      const bankLabel = selectedBankObj?.name || accountDetails.bankName || '';
-      const result = await resolveBankAccount(cleanAcc, selectedBankCode, bankLabel, payoutGateway);
-
-      if (result.success && result.accountName) {
-        setVerifiedAccountName(result.accountName);
-        setAccountDetails(prev => ({
-          ...prev,
-          accountNumber: cleanAcc,
-          routingNumber: selectedBankCode,
-          bankName: bankLabel || prev.bankName,
-          accountName: result.accountName!
-        }));
-        setVerificationError(null);
-      } else {
-        setVerifiedAccountName(null);
-        setVerificationError(result.message || 'Invalid account number or wrong bank selected.');
-      }
-    } catch (err: any) {
-      console.error('Verify account error:', err);
-      setVerifiedAccountName(null);
-      setVerificationError(
-        (typeof err?.message === 'string' && err.message) ||
-          'Bank not responding. Please check details and try again.'
-      );
-    } finally {
-      setIsVerifyingAccount(false);
-    }
-  };
-
-  const handleConfirmWithdraw = async () => {
-    if (!verifiedAccountName) {
-      setWithdrawStatusMessage({ text: 'Step 1 required: Verify destination bank account first.', type: 'error' });
-      return;
-    }
-
-    if (isDisabledFutureCurrency(activeWithdrawCurrency)) {
-      setWithdrawStatusMessage({ text: 'SIRA currency is Coming Soon and disabled for withdrawals.', type: 'error' });
-      return;
-    }
-
-    const numAmount = Number(amount);
-    const minWithdraw = activeWithdrawCurrency === 'NGN' ? 100 : getMinDepositForCurrency(activeWithdrawCurrency);
-
-    if (!numAmount || isNaN(numAmount) || numAmount < minWithdraw) {
-      setWithdrawStatusMessage({
-        text: `Minimum withdrawal amount is ${formatCurrencyAmount(minWithdraw, activeWithdrawCurrency)}`,
-        type: 'error'
-      });
-      return;
-    }
-    if (numAmount > 10000000) {
-      setWithdrawStatusMessage({
-        text: `Maximum withdrawal amount is ${formatCurrencyAmount(10000000, activeWithdrawCurrency)} per transaction`,
-        type: 'error'
-      });
-      return;
-    }
-    if (numAmount > availableWithdrawBalance) {
-      setWithdrawStatusMessage({
-        text: `INSUFFICIENT FUNDS in selected wallet (Available: ${formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)})`,
-        type: 'error'
-      });
-      return;
-    }
-
-    setIsExecutingWithdraw(true);
-    setWithdrawStatusMessage(null);
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const token = auth.currentUser
-        ? await auth.currentUser.getIdToken()
-        : (typeof (user as any).getIdToken === 'function' ? await (user as any).getIdToken() : '');
-      if (!token) {
-        throw new Error('Authentication session required. Please sign in again.');
-      }
-
-      const endpoint = payoutGateway === 'paystack' ? '/api/paystack/withdraw' : '/api/payments/withdraw';
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          amount: numAmount,
-          currency: activeWithdrawCurrency,
-          account_number: accountNumberInput,
-          bank_code: selectedBankCode,
-          account_name: verifiedAccountName,
-          source_wallet: withdrawSource
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-
-      const { data, rawText } = await readResponseSafely(res);
-
+      const headers = await getAuthHeaders(false);
+      const res = await fetch('/api/wallet/balance', { headers });
+      const { data } = await readResponseSafely(res);
       if (res.ok && data?.success) {
-        setWithdrawStatusMessage({
-          text: `✅ ${data.message || 'Withdrawal processing, you will receive funds in your bank shortly.'}`,
-          type: 'success'
-        });
-
-        const txReference = data.reference || `WD-${Date.now()}`;
-        const newTx: Transaction = {
-          id: txReference,
-          userId: user.uid,
-          type: 'withdrawal',
-          amount: numAmount,
-          currency: activeWithdrawCurrency,
-          status: 'pending',
-          method: payoutGateway === 'paystack' ? 'Paystack Bank Transfer' : 'Flutterwave Bank Transfer',
-          hub: 'WALLET',
-          purpose: `${payoutGateway === 'paystack' ? 'Paystack' : 'Flutterwave'} Cash Out (${activeWithdrawCurrency})`,
-          reference: txReference,
-          timestamp: new Date()
-        };
-        setLastTransaction(newTx);
-        setSelectedReceiptTx(newTx);
-
-        setAmount('');
-        setVerifiedAccountName(null);
-      } else {
-        console.error(`${payoutGateway} withdraw error:`, res.status, data ?? rawText);
-        const message = extractErrorMessage(data ?? rawText, 'Withdrawal failed, please try again.');
-        setWithdrawStatusMessage({
-          text: `❌ ${message}`,
-          type: 'error'
-        });
-      }
-    } catch (err: any) {
-      clearTimeout(timer);
-      console.error(`${payoutGateway} withdraw error:`, err);
-      const message =
-        err?.name === 'AbortError'
-          ? 'Payout request timed out after 15 seconds. Please check history before retrying.'
-          : extractErrorMessage(err, 'Withdrawal service error. Please try again.');
-      setWithdrawStatusMessage({
-        text: `❌ ${message}`,
-        type: 'error'
-      });
-    } finally {
-      setIsExecutingWithdraw(false);
-    }
-  };
-
-  useEffect(() => {
-    localStorage.setItem('efado_night_guide', nightGuideActive.toString());
-  }, [nightGuideActive]);
-
-  // Automated account name lookup listener
-  useEffect(() => {
-    const accNo = accountDetails.accountNumber;
-    const bName = accountDetails.bankName;
-
-    if (accNo && accNo.length === 10 && bName) {
-      setIsResolvingName(true);
-      setResolvedStatusMessage('Querying Destination Bank NIBSS Switch...');
-      
-      let isMounted = true;
-      resolveBankAccount(accNo, accountDetails.routingNumber || '', bName)
-        .then(res => {
-          if (!isMounted) return;
-          if (res.success && res.accountName) {
-            setAccountDetails(prev => ({
-              ...prev,
-              accountName: res.accountName || prev.accountName
-            }));
-            setResolvedStatusMessage(`Verified Account Holder: ${res.accountName} ✓`);
-          } else {
-            setResolvedStatusMessage(`⚠️ ${res.message || 'Verification failed. Please check account number and bank.'}`);
-            setAccountDetails(prev => ({
-              ...prev,
-              accountName: ''
-            }));
+        setTotalActiveBalance(Number(data.totalActiveBalance ?? 0));
+        setCashOutWallet(Number(data.cashOutWallet ?? 0));
+        setMainWallet(Number(data.mainWallet ?? data.depositWallet ?? 0));
+        setPromoWallet(Number(data.promoWallet ?? 0));
+        setPlayerWallet(Number(data.playerWallet ?? 0));
+        if (data.walletPockets) {
+          setPocketsMap((prev) => ({ ...prev, ...data.walletPockets }));
+        }
+        if (data.security) {
+          setHasTransactionPin(Boolean(data.security.hasTransactionPin));
+          setTwoFactorEnabled(Boolean(data.security.twoFactorEnabled));
+          setBiometricEnabled(Boolean(data.security.biometricEnabled));
+          if (data.security.nightSafeEnabled !== undefined) {
+            setNightSafeEnabled(Boolean(data.security.nightSafeEnabled));
           }
-          setIsResolvingName(false);
-        })
-        .catch(err => {
-          if (!isMounted) return;
-          console.warn('Bank lookup error:', err);
-          setIsResolvingName(false);
-          setResolvedStatusMessage('⚠️ Destination Bank Verification Service Unavailable');
-        });
-
-      return () => { isMounted = false; };
-    } else {
-      setIsResolvingName(false);
-      setResolvedStatusMessage(null);
+          if (data.security.opayShieldEnabled !== undefined) {
+            setOpayShieldEnabled(Boolean(data.security.opayShieldEnabled));
+          }
+        }
+        if (data.profile) {
+          if (data.profile.legalName) setProfileLegalName(data.profile.legalName);
+          if (data.profile.alias) setProfileAlias(data.profile.alias);
+          if (data.profile.dateOfBirth) setProfileDob(data.profile.dateOfBirth);
+          if (data.profile.nationality) setProfileNationality(data.profile.nationality);
+          if (data.profile.country) setProfileCountry(data.profile.country);
+          if (data.profile.gender) setProfileGender(data.profile.gender);
+          if (data.profile.address) setProfileAddress(data.profile.address);
+          if (data.profile.phoneNumber) setProfilePhone(data.profile.phoneNumber);
+          if (data.profile.bio) setProfileBio(data.profile.bio);
+          if (data.profile.kycStatus) setProfileKycStatus(data.profile.kycStatus);
+          if (data.profile.bankName) setProfileBankName(data.profile.bankName);
+          if (data.profile.bankCode) setProfileBankCode(data.profile.bankCode);
+          if (data.profile.accountNumberMasked) setProfileAccountNumberMasked(data.profile.accountNumberMasked);
+          if (data.profile.accountName) setProfileAccountName(data.profile.accountName);
+          if (data.profile.mobileMoneyProvider) setProfileMomoProvider(data.profile.mobileMoneyProvider);
+          if (data.profile.mobileMoneyNumberMasked) setProfileMomoMasked(data.profile.mobileMoneyNumberMasked);
+          if (data.profile.usdtAddressMasked) setProfileUsdtMasked(data.profile.usdtAddressMasked);
+          if (data.profile.btcAddressMasked) setProfileBtcMasked(data.profile.btcAddressMasked);
+        }
+      }
+    } catch {
+      // Keep optimistic / Firestore values
     }
-  }, [accountDetails.accountNumber, accountDetails.bankName, accountDetails.routingNumber]);
+  }, [getAuthHeaders]);
+
+  const fetchHistoryAndSecurityData = useCallback(async () => {
+    if (!auth.currentUser) return;
+    try {
+      const headers = await getAuthHeaders(false);
+      const [histRes, secRes, pmRes, alertRes] = await Promise.all([
+        fetch('/api/wallet/history', { headers }),
+        fetch('/api/security/login-history', { headers }),
+        fetch('/api/wallet/payment-methods', { headers }),
+        fetch('/api/wallet/alerts', { headers })
+      ]);
+
+      const { data: histJson } = await readResponseSafely(histRes);
+      if (histRes.ok && Array.isArray(histJson?.transactions)) {
+        setRecentTransactions(histJson.transactions.slice(0, 8));
+      }
+
+      const { data: secJson } = await readResponseSafely(secRes);
+      if (secRes.ok && Array.isArray(secJson?.logs)) {
+        setLoginHistory(secJson.logs);
+      }
+
+      const { data: pmJson } = await readResponseSafely(pmRes);
+      if (pmRes.ok && Array.isArray(pmJson?.paymentMethods)) {
+        setPaymentMethods(pmJson.paymentMethods);
+      }
+
+      const { data: alertJson } = await readResponseSafely(alertRes);
+      if (alertRes.ok && Array.isArray(alertJson?.alerts)) {
+        setAlerts(alertJson.alerts);
+      }
+    } catch {
+      // Silent safe fallback
+    }
+  }, [getAuthHeaders]);
+
+  const fetchBanksForCountry = useCallback(async (country: BankCountryCode) => {
+    try {
+      const res = await fetch(`/api/banks/list?country=${country}`);
+      const { data } = await readResponseSafely(res);
+      if (res.ok && Array.isArray(data?.banks) && data.banks.length > 0) {
+        setBankDirectory(data.banks);
+        return;
+      }
+    } catch {
+      // Fallback below
+    }
+    setBankDirectory(
+      FLUTTERWAVE_BANKS.filter((b) => b.country === country).map((b) => ({
+        code: b.code,
+        name: b.name,
+        country: b.country
+      }))
+    );
+  }, []);
+
+  // Initial loads
+  useEffect(() => {
+    fetchWalletSnapshot();
+    fetchHistoryAndSecurityData();
+  }, [fetchWalletSnapshot, fetchHistoryAndSecurityData]);
 
   useEffect(() => {
-    setProfileDisplayName(user.displayName || '');
-    setProfileFullName(user.fullName || '');
-    setProfilePhoneNumber(user.phoneNumber || '');
-    setProfilePhotoURL(user.photoURL || '');
-    setProfileBio(user.bio || '');
-    setProfileBankName(user.bankName || '');
-    setProfileAccountNumber(user.accountNumber || '');
-    setProfileAccountName(user.accountName || '');
-    setProfileExternalWallet(user.externalWallet || '');
-    setProfileMobileMoneyNumber(user.mobileMoneyNumber || '');
-    setProfileMobileMoneyProvider(user.mobileMoneyProvider || '');
-    setAccountDetails({
-      accountNumber: user.accountNumber || '',
-      bankName: user.bankName || '',
-      accountName: user.accountName || user.displayName || '',
-      routingNumber: ''
+    fetchBanksForCountry(withdrawCountry);
+  }, [withdrawCountry, fetchBanksForCountry]);
+
+  // Real-time Firestore user & pocket listeners
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsubUser = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data() || {};
+      setCashOutWallet(Number(d.cashOutWallet ?? 0));
+      setPromoWallet(Number(d.promoWallet ?? 0));
+      setPlayerWallet(Number(d.playerWallet ?? 0));
+      if (d.hasTransactionPin !== undefined) setHasTransactionPin(Boolean(d.hasTransactionPin));
+      if (d.twoFactorEnabled !== undefined) setTwoFactorEnabled(Boolean(d.twoFactorEnabled));
+      if (d.biometricEnabled !== undefined) setBiometricEnabled(Boolean(d.biometricEnabled));
+      if (d.fullName) setProfileLegalName(d.fullName);
+      if (d.photoURL) setProfilePhotoURL(d.photoURL);
     });
-  }, [user]);
 
-  const globalAndLocalBanks = FLUTTERWAVE_BANKS.map(b => ({
-    code: b.code,
-    name: b.name
-  })).sort((a, b) => a.name.localeCompare(b.name));
-
-  const filteredBanks = globalAndLocalBanks.filter(b => 
-    b.name.toLowerCase().includes(bankSearch.toLowerCase()) || 
-    b.code.toLowerCase().includes(bankSearch.toLowerCase())
-  );
-  const paymentMethods = paymentsList;
-
-  const paymentCategories = [
-    {
-      id: 'mobile_money',
-      title: 'Mobile Money',
-      icon: <Smartphone className="w-5 h-5 text-emerald-400" />,
-      options: [
-        { id: 'opay', name: 'OPay' },
-        { id: 'palmpay', name: 'PalmPay' },
-        { id: 'kuda', name: 'Kuda' }
-      ]
-    },
-    {
-      id: 'bank_transfer',
-      title: 'Bank Transfer',
-      icon: <Building2 className="w-5 h-5 text-blue-400" />,
-      options: [
-        { id: 'zenith', name: 'Zenith' },
-        { id: 'gtbank', name: 'GTBank' },
-        { id: 'access', name: 'Access' },
-        { id: 'uba', name: 'UBA' }
-      ]
-    },
-    {
-      id: 'cards',
-      title: 'Cards',
-      icon: <CreditCard className="w-5 h-5 text-purple-400" />,
-      options: [
-        { id: 'visa', name: 'Visa' },
-        { id: 'mastercard', name: 'Mastercard' },
-        { id: 'verve', name: 'Verve' }
-      ]
-    },
-    {
-      id: 'ussd',
-      title: 'USSD Code',
-      icon: <Hash className="w-5 h-5 text-orange-400" />,
-      options: [
-        { id: 'efado_pay', name: '*EFADO*PAY#' },
-        { id: 'ussd_894', name: '*894#' },
-        { id: 'ussd_737', name: '*737#' },
-        { id: 'ussd_901', name: '*901#' }
-      ]
-    },
-    {
-      id: 'qr_pay',
-      title: 'QR Pay',
-      icon: <Fingerprint className="w-5 h-5 text-pink-400" />,
-      options: [
-        { id: 'scan_pay', name: 'Scan & Pay' },
-        { id: 'efado_qr', name: 'EFADO QR' }
-      ]
-    },
-    {
-      id: 'crypto',
-      title: 'Crypto',
-      icon: <Bitcoin className="w-5 h-5 text-yellow-400" />,
-      options: [
-        { id: 'btc', name: 'BTC' },
-        { id: 'eth', name: 'ETH' },
-        { id: 'usdt', name: 'USDT (TRC20)' }
-      ]
-    },
-    {
-      id: 'global',
-      title: 'Global Payments',
-      icon: <Globe className="w-5 h-5 text-indigo-400" />,
-      options: [
-        { id: 'paypal', name: 'PayPal' },
-        { id: 'stripe', name: 'Stripe' },
-        { id: 'flutterwave', name: 'Flutterwave' }
-      ]
-    }
-  ];
-
-  // Real-time transactions subscribed from Firestore
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, 'transactions'),
-      where('userId', '==', user.uid),
-      orderBy('timestamp', 'desc')
+    const pocketUnsubs = ACTIVE_WALLET_CURRENCIES.map((cur) =>
+      onSnapshot(doc(db, 'wallets', user.uid, cur.code, 'depositWallet'), (snap) => {
+        if (!snap.exists()) return;
+        const val = Number(snap.data()?.balance ?? snap.data()?.depositWallet ?? 0);
+        setPocketsMap((prev) => ({ ...prev, [cur.code]: val }));
+        if (cur.code === 'NGN') setMainWallet(val);
+      })
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const txs = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const txDate = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date());
-        return {
-          id: doc.id,
-          ...data,
-          timestamp: txDate
-        };
-      }) as Transaction[];
-      setTransactions(txs);
-    }, (error) => {
-      console.error("Error subscribing to transactions in UserWallet overview:", error);
+    const txQ = query(collection(db, 'transactions'), where('userId', '==', user.uid));
+    const unsubTx = onSnapshot(txQ, (snap) => {
+      const list: Transaction[] = [];
+      snap.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...(docSnap.data() as any) });
+      });
+      list.sort((a: any, b: any) => {
+        const ta = new Date(a.createdAtIso || a.timestamp?.toDate?.() || 0).getTime();
+        const tb = new Date(b.createdAtIso || b.timestamp?.toDate?.() || 0).getTime();
+        return tb - ta;
+      });
+      if (list.length > 0) setRecentTransactions(list.slice(0, 8));
     });
 
-    return () => unsubscribe();
-  }, [user]);
-
-  const handleDeposit = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter a valid deposit amount", type: 'warning' }]);
-      return;
-    }
-    if (!accountDetails.bankName) {
-      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter or select your sending bank", type: 'warning' }]);
-      return;
-    }
-    if (!accountDetails.accountNumber || accountDetails.accountNumber.length < 8) {
-      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter your sending 10-digit account number", type: 'warning' }]);
-      return;
-    }
-    if (!accountDetails.accountName) {
-      setNotifications(prev => [...prev, { id: Date.now().toString(), message: "Please enter your sending account name", type: 'warning' }]);
-      return;
-    }
-    setPendingAction({ type: 'deposit', amount: Number(amount) });
-    setShowPinModal(true);
-  };
-
-  const handleWithdraw = async () => {
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) return;
-    const withdrawAmount = Number(amount);
-    const availableBalance = withdrawSource === 'playerWallet' ? user.playerWallet : (user.cashOutWallet || 0);
-    const walletLabel = withdrawSource === 'playerWallet' ? "Player's Win Wallet" : "Cash Out Wallet";
-    
-    // Minimum player withdrawal setting: 5,000 Naira scale proportionally based on active currency
-    const MOCK_FX_RATES: Record<string, number> = {
-      USD: 1,
-      EUR: 0.92,
-      GBP: 0.79,
-      JPY: 151,
-      NGN: 1450,
-      INR: 83,
+    return () => {
+      unsubUser();
+      unsubTx();
+      pocketUnsubs.forEach((u) => u());
     };
-    const rate = MOCK_FX_RATES[selectedCurrency?.code || 'NGN'] || 1;
-    const minLimit = 5000 * (rate / 1450);
+  }, [user?.uid]);
 
-    if (withdrawAmount < minLimit) {
-      setNotifications(prev => [...prev, {
-        id: Date.now().toString(),
-        message: `Payout threshold unmet. Minimum limit is ${selectedCurrency.symbol}${minLimit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (proportionate of ₦5,000 in ${selectedCurrency.code})`,
-        type: 'warning'
-      }]);
-      return;
-    }
+  // Recalculate Total Active Balance locally whenever sub-wallets update cleanly
+  useEffect(() => {
+    const ngnMain = Number(pocketsMap.NGN ?? mainWallet ?? 0);
+    setMainWallet(ngnMain);
+  }, [pocketsMap, mainWallet]);
 
-    if (withdrawAmount > availableBalance) {
-      setNotifications(prev => [...prev, { 
-        id: Date.now().toString(), 
-        message: `Insufficient funds in ${walletLabel}`, 
-        type: 'warning' 
-      }]);
-      return;
-    }
-    setPendingAction({ type: 'withdraw', amount: withdrawAmount });
-    setShowPinModal(true);
-  };
-
-  const handleSwapWinningsToDeposit = async () => {
-    const amtToConvert = Number(swapAmount);
-    if (!amtToConvert || isNaN(amtToConvert) || amtToConvert <= 0) {
-      setNotifications(prev => [...prev, {
-        id: Date.now().toString(),
-        message: 'Please enter a valid swap amount.',
-        type: 'warning'
-      }]);
-      return;
-    }
-
-    let sourceBalance = 0;
-    let label = 'Game Winnings';
-    let creditedNaira = amtToConvert;
-    let sourceSymbol = '₦';
-
-    if (swapSource === 'playerWallet') {
-      sourceBalance = user.playerWallet;
-      label = 'Game Winnings (NGN)';
-      creditedNaira = amtToConvert;
-      sourceSymbol = '₦';
-    } else if (swapSource === 'cashOutWallet') {
-      sourceBalance = user.cashOutWallet || 0;
-      label = 'Cash Out Wallet (NGN)';
-      creditedNaira = amtToConvert;
-      sourceSymbol = '₦';
-    } else if (swapSource === 'usd_balance') {
-      sourceBalance = user.usd_balance || 0;
-      label = 'US Dollar Vault ($)';
-      creditedNaira = amtToConvert * 1500; // 1 USD = ₦1,500
-      sourceSymbol = '$';
-    } else if (swapSource === 'eur_balance') {
-      sourceBalance = user.eur_balance || 0;
-      label = 'Euro Vault (€)';
-      creditedNaira = amtToConvert * 1620; // 1 EUR = ₦1,620
-      sourceSymbol = '€';
-    } else if (swapSource === 'gbp_balance') {
-      sourceBalance = user.gbp_balance || 0;
-      label = 'British Pound Vault (£)';
-      creditedNaira = amtToConvert * 1900; // 1 GBP = ₦1,900
-      sourceSymbol = '£';
-    }
-
-    if (amtToConvert > sourceBalance) {
-      setNotifications(prev => [...prev, {
-        id: Date.now().toString(),
-        message: `Insufficient funds in ${label}. Available: ${sourceSymbol}${sourceBalance.toLocaleString()}`,
-        type: 'warning'
-      }]);
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const reference = `SWAP-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-      await runTransaction(db, async (tx) => {
-        const userRef = doc(db, 'users', user.uid);
-        const ngnPocketRef = doc(db, 'wallets', user.uid, 'NGN', 'depositWallet');
-        const txRef = doc(db, 'transactions', reference);
-
-        const [uSnap, pSnap] = await Promise.all([tx.get(userRef), tx.get(ngnPocketRef)]);
-        const uBal = uSnap.exists() ? Number(uSnap.data()?.[swapSource] || 0) : 0;
-        if (uBal < amtToConvert) {
-          throw new Error(`INSUFFICIENT FUNDS in ${label}`);
-        }
-        const curNgn = pSnap.exists()
-          ? Number(pSnap.data()?.balance ?? pSnap.data()?.depositWallet ?? 0) || 0
-          : 0;
-        const nextNgn = curNgn + creditedNaira;
-
-        tx.update(userRef, {
-          [swapSource]: increment(-amtToConvert)
-        });
-        tx.set(
-          ngnPocketRef,
-          {
-            balance: nextNgn,
-            depositWallet: nextNgn,
-            currency: 'NGN',
-            userId: user.uid,
-            updatedAt: serverTimestamp()
-          },
-          { merge: true }
-        );
-        tx.set(txRef, {
-          userId: user.uid,
-          type: 'deposit',
-          amount: creditedNaira,
-          currency: 'NGN',
-          status: 'completed',
-          credited: true,
-          creditedPocket: `wallets/${user.uid}/NGN/depositWallet`,
-          method: 'Internal Currency Swap',
-          hub: 'WALLET',
-          purpose: 'Currency Swap to Stakes',
-          reference,
-          description: `Swapped ${sourceSymbol}${amtToConvert.toLocaleString()} from ${label} to ₦${creditedNaira.toLocaleString()} Deposit Stakes`,
-          timestamp: serverTimestamp()
-        });
-      });
-
-      setNotifications(prev => [...prev, {
-        id: Date.now().toString(),
-        message: `Successfully swapped ${sourceSymbol}${amtToConvert.toLocaleString()} into ₦${creditedNaira.toLocaleString()} NGN Deposit Stakes!`,
-        type: 'info'
-      }]);
-
-      setShowSwapModal(false);
-      setSwapAmount('');
-    } catch (error: any) {
-      console.error('Swap failed', error);
-      setNotifications(prev => [...prev, {
-        id: Date.now().toString(),
-        message: error?.message || 'Failed to complete swap. Please try again.',
-        type: 'warning'
-      }]);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const PRESET_AVATARS = [
-    { name: 'Elite Trader', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80' },
-    { name: 'High Roller', url: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=150&auto=format&fit=crop&q=80' },
-    { name: 'Diamond Hand', url: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=150&auto=format&fit=crop&q=80' },
-    { name: 'Miner Pro', url: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=150&auto=format&fit=crop&q=80' },
-    { name: 'Tech Guru', url: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=150&auto=format&fit=crop&q=80' },
-    { name: 'Cyber Punk', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=150&auto=format&fit=crop&q=80' },
-  ];
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileMessage({
-        text: 'Image size exceeds 2MB limit. Please upload a smaller file.',
-        type: 'error'
-      });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64String = reader.result as string;
-      setProfilePhotoURL(base64String);
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { photoURL: base64String });
-        setProfileMessage({
-          text: 'Profile photo updated and saved successfully.',
-          type: 'success'
-        });
-      } catch (err: any) {
-        console.error('Failed to update avatar photoURL', err);
-        setProfileMessage({
-          text: `Failed to store avatar: ${err.message || String(err)}`,
-          type: 'error'
-        });
+  // Live FX rate lookup when Swap Modal is open
+  useEffect(() => {
+    if (!showSwapModal) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      const amt = Number(swapAmount);
+      if (!Number.isFinite(amt) || amt <= 0) {
+        setSwapQuote(null);
+        return;
       }
+      setIsLoadingSwapRate(true);
+      setSwapError(null);
+      try {
+        const headers = await getAuthHeaders(false);
+        const res = await fetch(
+          `/api/wallet/swap/rate?from=${encodeURIComponent(swapFromCurrency)}&to=${encodeURIComponent(swapToCurrency)}&amount=${encodeURIComponent(amt)}`,
+          { headers }
+        );
+        const { data, rawText } = await readResponseSafely(res);
+        if (active) {
+          if (res.ok && data?.quote) {
+            setSwapQuote(data.quote);
+          } else {
+            setSwapError(extractErrorMessage(data || rawText, 'Could not fetch exchange rate.'));
+          }
+        }
+      } catch {
+        if (active) setSwapError('Network issue checking live rate.');
+      } finally {
+        if (active) setIsLoadingSwapRate(false);
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
     };
-    reader.readAsDataURL(file);
+  }, [showSwapModal, swapFromCurrency, swapToCurrency, swapAmount, getAuthHeaders]);
+
+  const copyToClipboard = (val: string, label: string) => {
+    if (!val || val === 'Not added') return;
+    navigator.clipboard?.writeText(val);
+    showNotice(`${label} copied safely.`, 'success');
   };
 
+  // Handler: Claim EFADO Reward -> Promo Wallet + History
+  const handleClaimReward = async () => {
+    if (rewardInFlightRef.current || isClaimingReward) return;
+    rewardInFlightRef.current = true;
+    setIsClaimingReward(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/reward/claim', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({})
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not claim reward.'));
+      }
+      if (typeof data.promoWallet === 'number') setPromoWallet(data.promoWallet);
+      showNotice(data.message || 'EFADO Reward added to your Promo Wallet!', 'success');
+      fetchWalletSnapshot();
+      fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      showNotice(err?.message || 'Unable to claim reward right now.', 'error');
+    } finally {
+      rewardInFlightRef.current = false;
+      setIsClaimingReward(false);
+    }
+  };
+
+  // Handler: Currency Swap Submit (Double-click & idempotency protected)
+  const handleExecuteSwap = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (swapInFlightRef.current || isExecutingSwap) return;
+    setSwapError(null);
+    const numAmt = Number(swapAmount);
+    if (!Number.isFinite(numAmt) || numAmt <= 0) {
+      setSwapError('Enter an amount greater than 0.');
+      return;
+    }
+    if (!swapIdempotencyKeyRef.current) {
+      swapIdempotencyKeyRef.current = `EFD-SWAP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    }
+    swapInFlightRef.current = true;
+    setIsExecutingSwap(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/swap', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sourceWallet: swapSourceWallet,
+          fromCurrency: swapFromCurrency,
+          toCurrency: swapToCurrency,
+          amount: numAmt,
+          idempotencyKey: swapIdempotencyKeyRef.current
+        })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Currency swap failed.'));
+      }
+      swapIdempotencyKeyRef.current = '';
+      setShowSwapModal(false);
+      showNotice(
+        `Swapped ${formatCurrencyAmount(numAmt, swapFromCurrency)} into ${formatCurrencyAmount(data.quote?.receiveAmount || 0, swapToCurrency)}.`,
+        'success'
+      );
+      await fetchWalletSnapshot();
+      await fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      setSwapError(err?.message || 'Could not complete swap.');
+    } finally {
+      swapInFlightRef.current = false;
+      setIsExecutingSwap(false);
+    }
+  };
+
+  // Handler: Profile Sync
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingProfile(true);
-    setProfileMessage(null);
-
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        displayName: profileDisplayName,
-        fullName: profileFullName,
-        phoneNumber: profilePhoneNumber,
-        photoURL: profilePhotoURL,
-        bio: profileBio,
-        bankName: profileBankName,
-        accountNumber: profileAccountNumber,
-        accountName: profileAccountName,
-        externalWallet: profileExternalWallet,
-        mobileMoneyNumber: profileMobileMoneyNumber,
-        mobileMoneyProvider: profileMobileMoneyProvider
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/profile/sync', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          legalName: profileLegalName.trim(),
+          displayName: profileLegalName.trim(),
+          alias: profileAlias.trim(),
+          dateOfBirth: profileDob,
+          nationality: profileNationality.trim(),
+          country: profileCountry,
+          gender: profileGender,
+          address: profileAddress.trim(),
+          phoneNumber: profilePhone.trim(),
+          bio: profileBio.trim(),
+          photoURL: profilePhotoURL,
+          bankName: profileBankName.trim(),
+          bankCode: profileBankCode.trim(),
+          accountNumber: profileAccountNumberInput.trim(),
+          accountName: (profileAccountName || profileLegalName).trim(),
+          mobileMoneyProvider: profileMomoProvider,
+          mobileMoneyNumber: profileMomoInput.trim(),
+          usdtAddress: profileUsdtInput.trim(),
+          btcAddress: profileBtcInput.trim()
+        })
       });
-
-      setProfileMessage({
-        text: 'Profile and payment liaison credentials synchronized successfully with EFADO core registry.',
-        type: 'success'
-      });
-      
-      setAccountDetails(prev => ({
-        ...prev,
-        bankName: profileBankName,
-        accountNumber: profileAccountNumber,
-        accountName: profileAccountName
-      }));
-
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not sync profile.'));
+      }
+      if (data.masked) {
+        if (data.masked.accountNumber) {
+          setProfileAccountNumberMasked(data.masked.accountNumber);
+          setProfileAccountNumberInput(data.masked.accountNumber);
+        }
+        if (data.masked.mobileMoneyNumber) {
+          setProfileMomoMasked(data.masked.mobileMoneyNumber);
+          setProfileMomoInput(data.masked.mobileMoneyNumber);
+        }
+        if (data.masked.usdtAddress) {
+          setProfileUsdtMasked(data.masked.usdtAddress);
+          setProfileUsdtInput(data.masked.usdtAddress);
+        }
+        if (data.masked.btcAddress) {
+          setProfileBtcMasked(data.masked.btcAddress);
+          setProfileBtcInput(data.masked.btcAddress);
+        }
+      }
+      // Auto-sync saved bank to Withdraw page fields
+      if (profileBankName) setWdBankName(profileBankName);
+      if (profileBankCode) setWdBankCode(profileBankCode);
+      showNotice('Profile & payout bank synced securely!', 'success');
+      fetchWalletSnapshot();
+      fetchHistoryAndSecurityData();
     } catch (err: any) {
-      console.error('Error saving profile: ', err);
-      setProfileMessage({
-        text: `Profile synchronization disrupted: ${err.message || String(err)}`,
-        type: 'error'
-      });
+      showNotice(err?.message || 'Profile update failed.', 'error');
     } finally {
       setIsSavingProfile(false);
     }
   };
 
-  const confirmTransaction = async () => {
-    if (!pendingAction) return;
-    setShowPinModal(false);
-    setIsProcessing(true);
-    
-    try {
-      const { type, amount: actionAmount } = pendingAction;
-      let txId = '';
-      const reference = `EFD-${Math.random().toString(36).substring(2, 10).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-
-      const activeCurrencyCode = isDisabledFutureCurrency(selectedCurrency?.code)
-        ? 'NGN'
-        : normalizeCurrencyCode(selectedCurrency?.code || 'NGN');
-      const activeCurrencySymbol = getWalletCurrencyMeta(activeCurrencyCode).symbol;
-
-      if (type === 'deposit') {
-        const isManualDep = !['Direct Wallet', 'player_wallet', 'mining_wallet'].includes(selectedMethod);
-        txId = await TransactionService.recordTransaction({
-          userId: user.uid,
-          type: 'deposit',
-          amount: actionAmount,
-          currency: activeCurrencyCode,
-          status: isManualDep ? 'pending' : 'completed',
-          method: selectedMethod || 'Direct Deposit',
-          hub: 'WALLET',
-          purpose: 'Wallet Top-up',
-          reference,
-          description: isManualDep
-            ? `Verification Pending: Sender [${accountDetails.bankName || 'Unknown Bank'} / ${accountDetails.accountNumber || 'N/A'} / ${accountDetails.accountName || 'N/A'}]`
-            : 'Wallet Deposit',
-          metadata: {
-            senderBankName: accountDetails.bankName,
-            senderAccountNumber: accountDetails.accountNumber,
-            senderAccountName: accountDetails.accountName,
-            transactionRef: reference
-          }
-        });
-      } else {
-        txId = await TransactionService.recordTransaction({
-          userId: user.uid,
-          type: 'withdrawal',
-          amount: actionAmount,
-          currency: activeWithdrawCurrency,
-          status: 'pending',
-          method: selectedMethod || 'Bank Transfer',
-          hub: 'WALLET',
-          purpose: 'Cash Out Request',
-          reference,
-          description: `Withdrawal Request to ${accountDetails.bankName || 'Bank'} (${accountDetails.accountNumber || ''})`,
-          metadata: {
-            sourceWallet: withdrawSource,
-            accountNumber: accountDetails.accountNumber,
-            bankName: accountDetails.bankName,
-            accountName: accountDetails.accountName
-          }
-        });
-      }
-      
-      const newTx: Transaction = {
-        id: txId,
-        userId: user.uid,
-        type: type === 'deposit' ? 'deposit' : 'withdrawal',
-        amount: actionAmount,
-        currency: activeCurrencyCode,
-        status: type === 'deposit' ? 'completed' : 'pending',
-        method: selectedMethod || (type === 'deposit' ? 'Direct Deposit' : 'Bank Transfer'),
-        hub: 'WALLET',
-        purpose: type === 'deposit' ? 'Wallet Top-up' : 'Cash Out Request',
-        reference,
-        timestamp: new Date()
+  // Handler: Avatar Upload -> Compressed local Data URL
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showNotice('Please select an image smaller than 5MB.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxSide = 256;
+        const scale = Math.min(maxSide / img.width, maxSide / img.height, 1);
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          setProfilePhotoURL(canvas.toDataURL('image/jpeg', 0.85));
+          showNotice('Photo selected. Click "Save & Synchronize Profile" to save.', 'success');
+        }
       };
+      if (typeof ev.target?.result === 'string') img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
-      setLastTransaction(newTx);
-      setSelectedReceiptTx(newTx); // AUTOMATIC PROMPT
-
-      setNotifications(prev => [...prev, { 
-        id: Date.now().toString(), 
-        message: `Successfully processed ${type} of ${activeCurrencySymbol}${actionAmount.toLocaleString()}`, 
-        type: 'info' 
-      }]);
-      setAmount('');
-      setActiveTab('history');
-    } catch (error) {
-      console.error('Transaction failed', error);
-      setNotifications(prev => [...prev, { 
-        id: Date.now().toString(), 
-        message: 'Transaction failed. Please check network connectivity.', 
-        type: 'warning' 
-      }]);
+  // Handler: Crypto Deposit Confirm
+  const handleCryptoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cryptoInFlightRef.current || isSubmittingCrypto) return;
+    setCryptoStatusMessage(null);
+    const numAmt = Number(cryptoAmount);
+    if (!Number.isFinite(numAmt) || numAmt < getMinDepositForCurrency(depositCurrency)) {
+      setCryptoStatusMessage({
+        text: `Minimum deposit is ${formatCurrencyAmount(getMinDepositForCurrency(depositCurrency), depositCurrency)}.`,
+        type: 'error'
+      });
+      return;
+    }
+    if (cryptoTxHash.trim().length < 12) {
+      setCryptoStatusMessage({
+        text: 'Please enter a valid blockchain transaction hash (min 12 characters).',
+        type: 'error'
+      });
+      return;
+    }
+    cryptoInFlightRef.current = true;
+    setIsSubmittingCrypto(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/deposit/crypto/confirm', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          amount: numAmt,
+          currency: depositCurrency,
+          network: cryptoNetwork,
+          txHash: cryptoTxHash.trim()
+        })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not submit transfer hash.'));
+      }
+      setCryptoTxHash('');
+      setCryptoStatusMessage({
+        text: data.message || 'Transfer submitted for blockchain confirmation.',
+        type: 'success'
+      });
+      fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      setCryptoStatusMessage({ text: err?.message || 'Submission failed.', type: 'error' });
     } finally {
-      setIsProcessing(false);
-      setPendingAction(null);
+      cryptoInFlightRef.current = false;
+      setIsSubmittingCrypto(false);
     }
   };
 
-  const filteredTransactions = transactions.filter(t => {
-    const matchesSearch = t.description?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         t.type.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterType === 'all' || t.type === filterType;
-    return matchesSearch && matchesFilter;
-  });
+  // Handler: Use My Saved Bank (Auto-fill from Profile 02 & verify)
+  const handleUseSavedBank = async () => {
+    if (!profileBankName || profileAccountNumberMasked === 'Not added') {
+      showNotice('Save a bank account in My Account Profile first.', 'error');
+      return;
+    }
+    setWdUseSavedBank(true);
+    setWdBankName(profileBankName);
+    setWdBankCode(profileBankCode || '011');
+    setWdAccountNumber(profileAccountNumberMasked);
+    setWdVerifiedName(profileAccountName || profileLegalName);
+    setWdVerifyError(null);
+    setWdNameMismatchError(null);
+    setWdIsVerified(Boolean(profileAccountName || profileLegalName));
+    showNotice('Saved bank loaded from your profile.', 'success');
+  };
+
+  // Handler: Verify Bank Account via backend
+  const handleVerifyBankAccount = async () => {
+    setWdVerifyError(null);
+    setWdNameMismatchError(null);
+    setWdIsVerified(false);
+
+    if (wdUseSavedBank && wdAccountNumber.includes('*')) {
+      setWdIsVerified(true);
+      return;
+    }
+
+    const cleanDigits = wdAccountNumber.replace(/\D/g, '');
+    if (cleanDigits.length < 8) {
+      setWdVerifyError('Enter a valid bank account number.');
+      return;
+    }
+    if (!wdBankCode) {
+      setWdVerifyError('Select a destination bank first.');
+      return;
+    }
+
+    setIsVerifyingBank(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/withdraw/verify-account', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          accountNumber: cleanDigits,
+          bankCode: wdBankCode,
+          bankName: wdBankName,
+          gateway: wdGateway
+        })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.verified) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not verify bank account.'));
+      }
+      setWdVerifiedName(data.account_name || '');
+      if (data.nameMatch === false) {
+        setWdNameMismatchError(
+          data.mismatchReason || 'Account name does not match your verified legal name'
+        );
+        setWdIsVerified(false);
+      } else {
+        setWdIsVerified(true);
+        showNotice(`Bank Verified: ${data.account_name}`, 'success');
+      }
+    } catch (err: any) {
+      setWdVerifyError(err?.message || 'Bank verification failed.');
+    } finally {
+      setIsVerifyingBank(false);
+    }
+  };
+
+  const wdAvailableBalance =
+    wdSourceWallet === 'cashOutWallet'
+      ? cashOutWallet
+      : wdSourceWallet === 'playerWallet'
+        ? playerWallet
+        : mainWallet;
+
+  const wdParsedAmount = Number(wdAmount) || 0;
+  const wdFee = getWithdrawalFeeForCurrency('NGN');
+  const wdGrossTotal = wdParsedAmount > 0 ? wdParsedAmount + wdFee : 0;
+  const canConfirmWithdraw =
+    wdIsVerified &&
+    !wdNameMismatchError &&
+    wdParsedAmount >= 100 &&
+    wdGrossTotal <= wdAvailableBalance;
+
+  // Persist Cyber Shields (OPAY Payment Shield & Night Safe Sentry) on backend
+  const handleToggleShield = async (field: 'opayShieldEnabled' | 'nightSafeEnabled') => {
+    const prevValue = field === 'opayShieldEnabled' ? opayShieldEnabled : nightSafeEnabled;
+    const nextValue = !prevValue;
+    if (field === 'opayShieldEnabled') setOpayShieldEnabled(nextValue);
+    else setNightSafeEnabled(nextValue);
+
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/security/shields', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ [field]: nextValue })
+      });
+      if (!res.ok) {
+        throw new Error('Could not update shield preference.');
+      }
+      showNotice(
+        `${field === 'opayShieldEnabled' ? 'OPAY Payment Shield' : 'Night Safe Sentry'} ${nextValue ? 'enabled' : 'disabled'}.`,
+        'success'
+      );
+    } catch {
+      if (field === 'opayShieldEnabled') setOpayShieldEnabled(prevValue);
+      else setNightSafeEnabled(prevValue);
+      showNotice('Could not update security shield preference.', 'error');
+    }
+  };
+
+  // Open PIN modal for Withdrawal
+  const handleStartWithdraw = () => {
+    setWdStatusMessage(null);
+    if (!canConfirmWithdraw) return;
+    if (!hasTransactionPin) {
+      setPinSetupError(null);
+      setShowPinSetupModal(true);
+      showNotice('Create your 4-digit Transaction PIN first to protect your money.', 'error');
+      return;
+    }
+    wdIdempotencyKeyRef.current = `EFD-WD-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    setPinModalContext('withdraw');
+    setPinModalError(null);
+    setPinModalRequiresOtp(false);
+    setPinModalOtpDelivery(undefined);
+    setPinModalOpen(true);
+  };
+
+  // Confirm PIN (+ optional SMS/Email OTP) for Withdrawal or Payment Method Removal
+  const handlePinModalConfirm = async (pin: string, otpCode?: string) => {
+    if (pinConfirmInFlightRef.current || pinModalSubmitting) return;
+    pinConfirmInFlightRef.current = true;
+    setPinModalError(null);
+    setPinModalSubmitting(true);
+    try {
+      const headers = await getAuthHeaders(true);
+
+      if (pinModalContext === 'withdraw') {
+        const res = await fetch('/api/wallet/withdraw/initiate', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            amount: wdParsedAmount,
+            currency: 'NGN',
+            sourceWallet: wdSourceWallet,
+            bankCode: wdBankCode,
+            bankName: wdBankName,
+            accountNumber: wdUseSavedBank ? '' : wdAccountNumber.replace(/\D/g, ''),
+            accountName: wdVerifiedName,
+            gateway: wdGateway,
+            pin,
+            otpCode,
+            useSavedBank: wdUseSavedBank,
+            idempotencyKey: wdIdempotencyKeyRef.current
+          })
+        });
+        const { data, rawText } = await readResponseSafely(res);
+
+        if (res.status === 403 && data?.code === 'OTP_REQUIRED') {
+          setPinModalRequiresOtp(true);
+          const targetDesc = [data.maskedEmail, data.maskedPhone].filter(Boolean).join(' & ');
+          setPinModalOtpDelivery(
+            targetDesc
+              ? `6-digit security code sent via SMS/Email (${targetDesc}).`
+              : 'Enter the 6-digit code sent to your registered Email or SMS.'
+          );
+          setPinModalError(data.message || 'Enter the 6-digit verification code sent to your Email / SMS.');
+          return;
+        }
+        if (res.status === 403 && data?.code === 'PIN_NOT_SET') {
+          setPinModalOpen(false);
+          setShowPinSetupModal(true);
+          return;
+        }
+        if (!res.ok || !data?.success) {
+          throw new Error(extractErrorMessage(data || rawText, 'Withdrawal failed.'));
+        }
+
+        wdIdempotencyKeyRef.current = '';
+        setPinModalOpen(false);
+        setWdAmount('');
+        setWdStatusMessage({
+          text: `${formatCurrencyAmount(wdParsedAmount, 'NGN')} payout initiated! Arrives in 1-5 mins.`,
+          type: 'success'
+        });
+        showNotice('Withdrawal submitted safely!', 'success');
+        await fetchWalletSnapshot();
+        await fetchHistoryAndSecurityData();
+        onUpdateBalance(wdParsedAmount, 'withdrawal', {
+          bankName: wdBankName,
+          alreadyProcessedByServer: true
+        }).catch(() => {});
+      } else if (pinModalContext === 'remove_method' && pinModalTargetMethodId) {
+        const res = await fetch(`/api/wallet/payment-methods/${encodeURIComponent(pinModalTargetMethodId)}`, {
+          method: 'DELETE',
+          headers,
+          body: JSON.stringify({ pin })
+        });
+        const { data, rawText } = await readResponseSafely(res);
+        if (!res.ok || !data?.success) {
+          throw new Error(extractErrorMessage(data || rawText, 'Could not remove payment method.'));
+        }
+        setPinModalOpen(false);
+        setPinModalTargetMethodId(null);
+        showNotice('Payment method removed.', 'success');
+        await fetchHistoryAndSecurityData();
+      }
+    } catch (err: any) {
+      setPinModalError(err?.message || 'Verification failed.');
+    } finally {
+      pinConfirmInFlightRef.current = false;
+      setPinModalSubmitting(false);
+    }
+  };
+
+  // Save / Change 4-digit Transaction PIN
+  const handleSaveTransactionPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinSetupError(null);
+    if (!/^\d{4}$/.test(newPinInput)) {
+      setPinSetupError('New PIN must be exactly 4 digits.');
+      return;
+    }
+    if (newPinInput !== confirmPinInput) {
+      setPinSetupError('PINs do not match.');
+      return;
+    }
+    setIsSavingPin(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const url = hasTransactionPin ? '/api/wallet/pin/change' : '/api/wallet/pin/set';
+      const payload = hasTransactionPin
+        ? { currentPin: currentPinInput, newPin: newPinInput }
+        : { pin: newPinInput };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not save Transaction PIN.'));
+      }
+      setHasTransactionPin(true);
+      setShowPinSetupModal(false);
+      setCurrentPinInput('');
+      setNewPinInput('');
+      setConfirmPinInput('');
+      showNotice('Transaction PIN saved safely.', 'success');
+      fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      setPinSetupError(err?.message || 'PIN update failed.');
+    } finally {
+      setIsSavingPin(false);
+    }
+  };
+
+  // Toggle Two-Factor Auth (OTP delivered exclusively via SMS / Email)
+  const handleToggle2FA = async () => {
+    const nextState = !twoFactorEnabled;
+    setTwoFaError(null);
+    setTwoFaOtpCode('');
+    setTwoFaOtpDelivery(undefined);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/auth/enable-2fa', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ enable: nextState })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not start 2FA verification.'));
+      }
+      setPending2faTargetState(nextState);
+      const targetDesc = [data.maskedEmail, data.maskedPhone].filter(Boolean).join(' & ');
+      setTwoFaOtpDelivery(
+        targetDesc
+          ? `6-digit security code sent to ${targetDesc}.`
+          : 'Check your registered Email or SMS for your 6-digit security code.'
+      );
+      setShow2faModal(true);
+    } catch (err: any) {
+      showNotice(err?.message || 'Could not update 2FA settings.', 'error');
+    }
+  };
+
+  const handleConfirm2faOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFaError(null);
+    setIsVerifying2fa(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/auth/verify-2fa', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ code: twoFaOtpCode.trim(), enable: pending2faTargetState })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Invalid 6-digit verification code.'));
+      }
+      setTwoFactorEnabled(Boolean(data.twoFactorEnabled));
+      setShow2faModal(false);
+      showNotice(data.message || 'Two-Factor Authentication updated.', 'success');
+      fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      setTwoFaError(err?.message || 'Verification failed.');
+    } finally {
+      setIsVerifying2fa(false);
+    }
+  };
+
+  const handleToggleBiometric = async () => {
+    const nextBio = !biometricEnabled;
+    if (nextBio && typeof window !== 'undefined' && !window.PublicKeyCredential) {
+      showNotice('Biometric authentication is not supported on this browser.', 'error');
+      return;
+    }
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/auth/enable-2fa', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ biometricEnabled: nextBio })
+      });
+      const { data } = await readResponseSafely(res);
+      if (res.ok && data?.success) {
+        setBiometricEnabled(nextBio);
+        showNotice(`Biometric confirmation ${nextBio ? 'enabled' : 'disabled'}.`, 'success');
+      }
+    } catch {
+      showNotice('Could not update biometric preference.', 'error');
+    }
+  };
+
+  const handleLogoutAllDevices = async () => {
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/security/logout-all', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({})
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not sign out other devices.'));
+      }
+      showNotice('All other devices signed out safely.', 'success');
+      fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      showNotice(err?.message || 'Failed to sign out devices.', 'error');
+    }
+  };
+
+  const handleAddPaymentMethod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMethodName.trim() || !newMethodDetails.trim()) {
+      showNotice('Enter method name and account/wallet details.', 'error');
+      return;
+    }
+    setIsAddingMethod(true);
+    try {
+      const headers = await getAuthHeaders(true);
+      const res = await fetch('/api/wallet/payment-methods/add', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          type: newMethodType,
+          name: newMethodName.trim(),
+          details: newMethodDetails.trim(),
+          network: newMethodNetwork.trim()
+        })
+      });
+      const { data, rawText } = await readResponseSafely(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(extractErrorMessage(data || rawText, 'Could not add payment method.'));
+      }
+      setShowAddMethodForm(false);
+      setNewMethodName('');
+      setNewMethodDetails('');
+      setNewMethodNetwork('');
+      showNotice('Payment method saved & encrypted.', 'success');
+      await fetchWalletSnapshot();
+      await fetchHistoryAndSecurityData();
+    } catch (err: any) {
+      showNotice(err?.message || 'Failed to add method.', 'error');
+    } finally {
+      setIsAddingMethod(false);
+    }
+  };
+
+  const handleRequestRemoveMethod = (methodId: string) => {
+    if (!hasTransactionPin) {
+      setShowPinSetupModal(true);
+      showNotice('Create a 4-digit Transaction PIN before removing a saved payment method.', 'error');
+      return;
+    }
+    setPinModalContext('remove_method');
+    setPinModalTargetMethodId(methodId);
+    setPinModalError(null);
+    setPinModalRequiresOtp(false);
+    setPinModalOpen(true);
+  };
+
+  const currentCountryMeta = useMemo(() => {
+    return (
+      COUNTRY_LIST.find((c) => c.label.toLowerCase() === profileCountry.toLowerCase()) || COUNTRY_LIST[0]
+    );
+  }, [profileCountry]);
+
+  const formatBalanceDisplay = (amt: number, cur = 'NGN') =>
+    hideBalances ? '••••••' : formatCurrencyAmount(amt, cur);
+
+  const isHistoryOrSecurityTab = activeTab === 'history' || activeTab === 'settings';
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-100 max-w-5xl mx-auto">
-      <div className="flex flex-col md:flex-row h-[700px]">
-        {/* Sidebar Navigation */}
-        <div className="w-full md:w-64 bg-gray-50 border-r border-gray-100 p-6 flex flex-col gap-2">
-          <div className="flex items-center gap-3 mb-8 px-2">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Wallet className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="font-black text-gray-900 uppercase tracking-tighter">EFADO Wallet</h2>
-              <p className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Digital Hubs Connect</p>
+    <div className="min-h-screen w-full bg-gradient-to-b from-[#FAF8FF] via-white to-[#F5F3FF] text-slate-900 font-sans overflow-x-hidden pb-24 sm:pb-10">
+      <div className="w-full max-w-[1200px] mx-auto px-3 sm:px-6 pt-4 space-y-5">
+        {/* Global Light Top Bar */}
+        <header className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/efado_logo_192.jpg"
+              alt="EFADO Wallet"
+              className="w-10 h-10 rounded-xl object-cover border border-purple-200 shrink-0"
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight m-0 truncate">
+                  EFADO WALLET
+                </h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#16A34A] text-[11px] font-bold shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Verified
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium m-0 max-w-none truncate">
+                Your money is safe • Protected by 256-bit encryption
+              </p>
             </div>
           </div>
 
-          {[
-            { id: 'overview', label: 'Overview', icon: Wallet },
-            { id: 'profile', label: 'My Acc. Profile', icon: User },
-            { id: 'deposit', label: 'Deposit Funds', icon: ArrowDownCircle },
-            { id: 'withdraw', label: 'Withdraw Funds', icon: ArrowUpCircle },
-            { id: 'history', label: 'History', icon: History },
-            { id: 'settings', label: 'Security', icon: Shield },
-          ].map((tab) => (
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-sm transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
-                  : 'text-gray-500 hover:bg-white hover:text-indigo-600'
-              }`}
+              type="button"
+              onClick={() => setShowGuidelinesModal(true)}
+              className="px-3 py-2 rounded-xl border border-purple-200 bg-purple-50 text-[#7C3AED] text-xs font-bold hover:bg-purple-100 transition-colors"
             >
-              <tab.icon className="w-5 h-5" />
-              {tab.label}
+              Safety Guide
             </button>
-          ))}
-
-          <div className="mt-auto pt-6 border-t border-gray-200 space-y-3">
-            <div className="bg-indigo-50 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Bell className="w-4 h-4 text-indigo-600" />
-                <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Alerts</span>
-              </div>
-              <div className="space-y-2">
-                {notifications.length === 0 ? (
-                  <p className="text-[10px] text-indigo-400 font-medium">No new notifications</p>
-                ) : (
-                  notifications.slice(-2).map(n => (
-                    <div key={n.id} className="text-[10px] text-indigo-700 font-bold leading-tight">
-                      • {n.message}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowAlertsDrawer((v) => !v)}
+              aria-label="Notifications"
+              className="relative p-2.5 rounded-xl border border-purple-100 bg-white hover:bg-purple-50 text-slate-700 transition-colors"
+            >
+              <Bell className="w-5 h-5" />
+              {alerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#7C3AED] text-white text-[10px] font-extrabold flex items-center justify-center">
+                  {Math.min(alerts.length, 9)}
+                </span>
+              )}
+            </button>
             {onClose && (
               <button
+                type="button"
                 onClick={onClose}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-xs tracking-wider rounded-2xl transition-all shadow-lg active:scale-95 border border-rose-500/20 shadow-rose-500/10"
+                aria-label="Close Wallet"
+                className="p-2.5 rounded-xl border border-purple-100 bg-white hover:bg-purple-50 text-slate-700 transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Go Back</span>
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>
-        </div>
+        </header>
 
-        {/* Main Content Area */}
-        <div className="flex-1 p-8 overflow-y-auto no-scrollbar">
-          {onClose && (
-            <div className="md:hidden flex justify-end mb-6">
-              <button
-                onClick={onClose}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 text-xs font-black uppercase rounded-2xl shadow-sm transition-all"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Go Back</span>
-              </button>
-            </div>
+        {/* Alerts Drawer */}
+        <AnimatePresence>
+          {showAlertsDrawer && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-purple-200 space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 m-0">Recent Wallet Alerts</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAlertsDrawer(false)}
+                  className="text-xs font-bold text-[#7C3AED]"
+                >
+                  Close
+                </button>
+              </div>
+              {alerts.length === 0 ? (
+                <p className="text-xs text-slate-500 m-0 max-w-none">No recent notifications.</p>
+              ) : (
+                <div className="space-y-2 max-h-56 overflow-y-auto">
+                  {alerts.slice(0, 6).map((a) => (
+                    <div key={a.id} className="p-3 rounded-xl bg-purple-50/60 border border-purple-100">
+                      <div className="text-xs font-bold text-slate-900">{a.title}</div>
+                      <p className="text-xs text-slate-600 m-0 max-w-none mt-0.5">{a.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
           )}
-          <HubGuideNote guideId="walletPaystack" variant="light" className="mb-6" />
-          <AnimatePresence mode="wait">
-            {activeTab === 'profile' && (
-              <motion.div
-                key="profile"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
+        </AnimatePresence>
+
+        {/* Toast Feedback */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className={`rounded-2xl p-3.5 border flex items-center justify-between gap-3 shadow-sm ${
+                toast.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-[#16A34A]'
+                  : 'bg-red-50 border-red-200 text-[#DC2626]'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-xs font-bold">
+                {toast.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{toast.text}</span>
+              </div>
+              <button type="button" onClick={() => setToast(null)} className="text-xs font-bold">
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 5-Page Top Navigation Pills */}
+        <nav className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {[
+            { id: 'overview', label: 'Overview', icon: Wallet },
+            { id: 'profile', label: 'My Profile', icon: UserIcon },
+            { id: 'deposit', label: 'Deposit Funds', icon: ArrowDownCircle },
+            { id: 'withdraw', label: 'Withdraw Funds', icon: ArrowUpCircle },
+            { id: 'history', label: 'History & Security', icon: History }
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active =
+              activeTab === tab.id || (tab.id === 'history' && activeTab === 'settings');
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as WalletTab)}
+                className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all border ${
+                  active
+                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                    : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
+                }`}
               >
-                {/* 1. Visually Stunning Profile Header Card */}
-                <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 text-white border border-white/10 shadow-2xl">
-                  {/* Subtle Grid Accent Background */}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none opacity-20" />
-                  <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
-                  <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-                  <div className="relative flex flex-col lg:flex-row items-center lg:items-start gap-8 z-10">
-                    {/* Interactive Avatar Frame */}
-                    <div className="flex flex-col items-center gap-3 shrink-0">
-                      <div className="group relative w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-amber-500 to-indigo-500 shadow-xl shadow-indigo-500/10">
-                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-950 border-2 border-slate-950 relative">
-                          {profilePhotoURL ? (
-                            <img 
-                              src={profilePhotoURL} 
-                              alt="Avatar Node" 
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-950 text-white font-black text-3xl font-display">
-                              {(profileFullName || profileDisplayName || user.email.split('@')[0]).slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
-
-                          {/* Hidden File Input & Upload Overlay */}
-                          <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-center p-2 text-[10px] font-black uppercase tracking-widest text-amber-400">
-                            <Camera className="w-6 h-6 mb-1 text-white animate-bounce" />
-                            <span>Upload Image</span>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              onChange={handleImageUpload} 
-                              className="hidden" 
-                            />
-                          </label>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 italic">Liaison Photo URL Node</span>
-                    </div>
-
-                    {/* Profile Information Block */}
-                    <div className="flex-1 text-center lg:text-left space-y-4">
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5">
-                          <h3 className="text-2xl md:text-3xl font-black font-display tracking-tight uppercase italic text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-amber-300">
-                            {profileFullName || profileDisplayName || user.email.split('@')[0].toUpperCase()}
-                          </h3>
-                          <span className="px-2.5 py-0.5 bg-amber-500/20 text-amber-400 text-[8px] font-black tracking-widest uppercase rounded-full border border-amber-500/30">
-                            Verified Node
-                          </span>
-                        </div>
-                        <p className="text-xs text-indigo-300 font-bold tracking-wide uppercase font-mono">
-                          Liaison Email: {user.email}
-                        </p>
-                        {profilePhoneNumber ? (
-                          <p className="text-xs text-slate-400 font-bold tracking-widest font-mono">
-                            Phone: {profilePhoneNumber}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-rose-400 font-bold tracking-widest font-mono animate-pulse">
-                            Phone: Not Configured (Set below)
-                          </p>
-                        )}
-                      </div>
-
-                      {profileBio ? (
-                        <p className="text-xs text-slate-300 font-medium italic max-w-xl leading-relaxed bg-white/5 p-3 rounded-xl border border-white/5">
-                          "{profileBio}"
-                        </p>
-                      ) : (
-                        <p className="text-xs text-slate-500 font-medium italic">
-                          "No cryptographic status message provided. Update bio below."
-                        </p>
-                      )}
-
-                      {/* Displaying preset selection tray inside the card */}
-                      <div className="space-y-2 text-left pt-2">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-500/90 block">Or Select a Premium Avatar Preset:</span>
-                        <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
-                          {PRESET_AVATARS.map((avatar) => (
-                            <button
-                              key={avatar.name}
-                              type="button"
-                              onClick={async () => {
-                                setProfilePhotoURL(avatar.url);
-                                try {
-                                  const userRef = doc(db, 'users', user.uid);
-                                  await updateDoc(userRef, { photoURL: avatar.url });
-                                  setProfileMessage({
-                                    text: `Profile photo updated to [${avatar.name}].`,
-                                    type: 'success'
-                                  });
-                                } catch (err: any) {
-                                  console.error(err);
-                                }
-                              }}
-                              className={`p-0.5 rounded-full border-2 transition-all hover:scale-105 shrink-0 ${
-                                profilePhotoURL === avatar.url ? 'border-amber-500 scale-105 shadow-md shadow-amber-500/20' : 'border-white/10 hover:border-white/30'
-                              }`}
-                              title={avatar.name}
-                            >
-                              <img 
-                                src={avatar.url} 
-                                alt={avatar.name} 
-                                className="w-10 h-10 rounded-full object-cover" 
-                                referrerPolicy="no-referrer"
-                              />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+        {/* ===================== PAGE 1: OVERVIEW ===================== */}
+        {activeTab === 'overview' && (
+          <div className="space-y-5">
+            {/* User Profile Header Card */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <img
+                  src={profilePhotoURL || '/efado_logo_192.jpg'}
+                  alt={profileLegalName}
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-purple-200 shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h2 className="text-base sm:text-lg font-extrabold text-slate-900 m-0 truncate">
+                      {profileLegalName}
+                    </h2>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200 text-[11px] font-bold">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Verified
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold mt-1 flex-wrap">
+                    <span className="text-[#7C3AED] font-bold">@{profileAlias || 'efado'}</span>
+                    <span>•</span>
+                    <span>
+                      {currentCountryMeta.flag} Country: {profileCountry || 'Nigeria'}
+                    </span>
                   </div>
                 </div>
+              </div>
 
-                {/* Active Balance Card prominently integrated in Profile */}
-                <div className="p-6 bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 rounded-3xl border border-indigo-500/30 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400">Total Active Balance</span>
-                    <h3 className="text-3xl sm:text-4xl font-extrabold text-white font-display mt-1">
-                      ₦{((user.depositWallet || 0) + (user.cashOutWallet || 0) + (user.playerWallet || 0) + ((user.miningWallet || 0) * 0.01)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-medium mt-1">Combined balance across Deposits, Cashout Wins, Player Wallet, and Mined N-Notes.</p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('profile')}
+                className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7C3AED] text-xs font-bold border border-purple-200 transition-colors"
+              >
+                Edit Profile
+              </button>
+            </div>
+
+            {/* TOTAL ACTIVE BALANCE HERO CARD */}
+            <div className="bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] rounded-2xl p-5 sm:p-6 shadow-md text-white space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-purple-100">
+                    TOTAL ACTIVE BALANCE
+                  </span>
+                  <div className="text-3xl sm:text-4xl font-extrabold tabular-nums tracking-tight mt-1 text-white">
+                    {formatBalanceDisplay(totalActiveBalance, 'NGN')}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <p className="text-xs text-purple-100 font-medium m-0 max-w-none mt-1">
+                    Combined value across Cash Out, Main, Promo & Foreign Currency Pockets
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHideBalances((v) => !v)}
+                  aria-label="Toggle Balance Visibility"
+                  className="p-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white transition-colors"
+                >
+                  {hideBalances ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* 3 Core Wallets */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="bg-white rounded-2xl p-4 text-slate-900 shadow-sm">
+                  <div className="text-[11px] font-bold uppercase text-slate-500">Cash Out Wallet</div>
+                  <div className="text-lg font-extrabold tabular-nums text-slate-900 mt-1">
+                    {formatBalanceDisplay(cashOutWallet, 'NGN')}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-4 text-slate-900 shadow-sm">
+                  <div className="text-[11px] font-bold uppercase text-slate-500">Main Wallet</div>
+                  <div className="text-lg font-extrabold tabular-nums text-[#16A34A] mt-1">
+                    {formatBalanceDisplay(mainWallet, 'NGN')}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl p-4 text-slate-900 shadow-sm">
+                  <div className="text-[11px] font-bold uppercase text-slate-500">Promo Wallet</div>
+                  <div className="text-lg font-extrabold tabular-nums text-[#7C3AED] mt-1">
+                    {formatBalanceDisplay(promoWallet, 'NGN')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('deposit')}
+                  className="py-3 px-2 rounded-xl bg-[#16A34A] hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <ArrowDownCircle className="w-4 h-4 shrink-0" />
+                  <span>Deposit</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('withdraw')}
+                  className="py-3 px-2 rounded-xl bg-white hover:bg-purple-50 text-[#7C3AED] font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                >
+                  <ArrowUpCircle className="w-4 h-4 shrink-0" />
+                  <span>Withdraw</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    swapIdempotencyKeyRef.current = `EFD-SWAP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+                    setSwapError(null);
+                    setShowSwapModal(true);
+                  }}
+                  className="py-3 px-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/30 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <ArrowRightLeft className="w-4 h-4 shrink-0" />
+                  <span>Swap</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Currency Pockets Grid (9 Active + SIRA Locked Coming Soon) */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                    Currency Pockets
+                  </h3>
+                  <p className="text-xs text-slate-500 m-0 max-w-none">
+                    Tap any active currency to add funds or convert with live FX rates
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    swapIdempotencyKeyRef.current = `EFD-SWAP-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+                    setSwapError(null);
+                    setShowSwapModal(true);
+                  }}
+                  className="text-xs font-bold text-[#7C3AED] hover:underline shrink-0"
+                >
+                  Convert FX
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                {ACTIVE_WALLET_CURRENCIES.map((cur) => {
+                  const bal = pocketsMap[cur.code] ?? 0;
+                  return (
+                    <button
+                      key={cur.code}
+                      type="button"
+                      onClick={() => {
+                        setDepositCurrency(cur.code);
+                        setActiveTab('deposit');
+                      }}
+                      className="text-left p-3 rounded-2xl border border-purple-100 hover:border-[#7C3AED] bg-purple-50/40 hover:bg-purple-50 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-lg leading-none">{cur.flag}</span>
+                        <span className="text-[11px] font-extrabold text-[#7C3AED]">{cur.code}</span>
+                      </div>
+                      <div className="text-sm font-extrabold tabular-nums text-slate-900 truncate">
+                        {formatBalanceDisplay(bal, cur.code)}
+                      </div>
+                      <div className="text-[10px] font-medium text-slate-500 truncate mt-0.5">
+                        {cur.name}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {FUTURE_WALLET_CURRENCIES.map((cur) => (
+                  <div
+                    key={cur.code}
+                    aria-disabled="true"
+                    className="p-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 opacity-85 cursor-not-allowed"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-lg leading-none">{cur.flag}</span>
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold text-slate-500">
+                        <Lock className="w-3 h-3" />
+                        LOCKED
+                      </span>
+                    </div>
+                    <div className="text-sm font-extrabold text-slate-600">{cur.code}</div>
+                    <div className="text-[10px] font-bold text-[#7C3AED] mt-0.5">Coming Soon</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* EFADO Reward + Recent Activity 2-Column on Desktop */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {/* EFADO Reward Card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-200 flex flex-col justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-[#7C3AED] text-xs font-bold">
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>EFADO Reward</span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-slate-900 m-0">
+                    Claim Daily ₦500 Loyalty Bonus
+                  </h3>
+                  <p className="text-xs text-slate-600 m-0 max-w-none">
+                    Rewards are credited straight to your Promo Wallet and appear in your transaction history.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClaimReward}
+                  disabled={isClaimingReward}
+                  className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isClaimingReward ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Claiming...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Gift className="w-4 h-4" />
+                      <span>Claim Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Recent Activity Preview */}
+              <div className="lg:col-span-2 bg-white rounded-2xl p-4 shadow-sm border border-purple-100 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                    Recent Activity
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('history')}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#7C3AED] hover:underline"
+                  >
+                    <span>See All</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {recentTransactions.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <p className="text-xs text-slate-500 m-0 max-w-none">
+                      No transactions yet. Fund your wallet to see activity here.
+                    </p>
                     <button
                       type="button"
                       onClick={() => setActiveTab('deposit')}
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-[#16A34A] text-white text-xs font-bold"
                     >
                       Deposit Funds
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('withdraw')}
-                      className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
-                    >
-                      Withdraw
-                    </button>
                   </div>
-                </div>
-
-                {/* Wallets & Activity Status Overview inside Profile tab */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-amber-500/20 transition-all">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Mined Mining Balance</span>
-                    <p className="text-xl font-extrabold mt-1 text-amber-500 font-display">{(user.miningWallet || 0).toLocaleString()} N-Notes</p>
-                    <span className="text-[8px] text-slate-600 font-bold uppercase mt-1">N-Notes valued at ₦0.01 per unit</span>
-                  </div>
-                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-emerald-550/20 transition-all">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Cash Out Wins Balance</span>
-                    <p className="text-xl font-extrabold mt-1 text-emerald-400 font-display">₦{(user.cashOutWallet || 0).toLocaleString()}</p>
-                    <span className="text-[8px] text-slate-600 font-bold uppercase mt-1">Secured & Settled for Cashout</span>
-                  </div>
-                  <div className="p-4 bg-slate-950 text-white rounded-2xl border border-white/5 flex flex-col justify-between hover:border-indigo-550/20 transition-all">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Deposits & Active Stakes</span>
-                    <p className="text-xl font-extrabold mt-1 text-indigo-400 font-display">₦{user.depositWallet.toLocaleString()}</p>
-                    <span className="text-[8px] text-indigo-500/80 font-bold uppercase mt-1">Added to Total Balance Automatically</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveProfile} className="space-y-6">
-                  {profileMessage && (
-                    <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-2 ${
-                      profileMessage.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-100 text-rose-800'
-                    }`}>
-                      {profileMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" /> : <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />}
-                      <span>{profileMessage.text}</span>
-                    </div>
-                  )}
-
-                  {/* FORM CARD 1: User Identity Statement */}
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
-                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <User className="w-4 h-4 text-indigo-500" /> 01. Personal Profile Details
-                    </h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Display Username / Alias</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Your unique alias name"
-                          value={profileDisplayName}
-                          onChange={(e) => setProfileDisplayName(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                        <p className="text-[9px] text-gray-400 font-medium">Used for direct peer audits & chat logs.</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Full Legal Name</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. John Doe"
-                          value={profileFullName}
-                          onChange={(e) => setProfileFullName(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                        <p className="text-[9px] text-gray-400 font-medium">Derived from authorization context statement.</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Authorized Phone Number</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. +234 803..."
-                          value={profilePhoneNumber}
-                          onChange={(e) => setProfilePhoneNumber(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                        <p className="text-[9px] text-gray-400 font-medium">Used for transaction verification alerts.</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Biographical Status / Affiliate Pitch</label>
-                      <textarea
-                        rows={3}
-                        placeholder="Tell the community about yourself, your vendor plans, or your affiliate networks..."
-                        value={profileBio}
-                        onChange={(e) => setProfileBio(e.target.value)}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm resize-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* FORM CARD 2: Bank Details */}
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
-                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <Building2 className="w-4 h-4 text-indigo-500" /> 02. Linked Bank Payout Account (For Withdrawals)
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Settlement Bank Name</label>
-                        <select
-                          value={profileBankName}
-                          onChange={(e) => {
-                            setProfileBankName(e.target.value);
-                            setBankSearch(e.target.value);
-                          }}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        >
-                          <option value="">-- Choose Settlement Bank --</option>
-                          {globalAndLocalBanks.map(b => (
-                            <option key={b.code} value={b.name}>{b.name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Account Number (10 Digits)</label>
-                        <input
-                          type="text"
-                          maxLength={15}
-                          placeholder="0123456789"
-                          value={profileAccountNumber}
-                          onChange={(e) => setProfileAccountNumber(e.target.value.replace(/\D/g, ''))}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Beneficiary Account Name</label>
-                        <input
-                          type="text"
-                          placeholder="Exact Match as registered with bank"
-                          value={profileAccountName}
-                          onChange={(e) => setProfileAccountName(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* FORM CARD 3: Mobile Money / Crypto */}
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6 text-left">
-                    <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b border-gray-100 pb-2">
-                      <Smartphone className="w-4 h-4 text-indigo-500" /> 03. Mobile Money & Crypto Wallets
-                    </h4>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Mobile Money Network</label>
-                        <select
-                          value={profileMobileMoneyProvider}
-                          onChange={(e) => setProfileMobileMoneyProvider(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        >
-                          <option value="">-- Choose Network Provider --</option>
-                          <option value="OPay">OPay</option>
-                          <option value="PalmPay">PalmPay</option>
-                          <option value="Kuda Bank">Kuda Bank</option>
-                          <option value="MTN MoMo">MTN MoMo</option>
-                          <option value="Airtel Money">Airtel Money</option>
-                          <option value="M-Pesa">M-Pesa</option>
-                          <option value="Orange Money">Orange Money</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Mobile Merchant Number</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 080 or 090 number"
-                          value={profileMobileMoneyNumber}
-                          onChange={(e) => setProfileMobileMoneyNumber(e.target.value.replace(/\D/g, ''))}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">External Crypto Address (USDT/BTC)</label>
-                        <input
-                          type="text"
-                          placeholder="bc1q... or 0x... for TRC20"
-                          value={profileExternalWallet}
-                          onChange={(e) => setProfileExternalWallet(e.target.value)}
-                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500 focus:bg-white transition-all shadow-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSavingProfile}
-                      className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-xs tracking-widest rounded-2xl shadow-xl transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                    >
-                      {isSavingProfile ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Synchronizing...
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="w-4 h-4" />
-                          Save & Synchronize Profile
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-
-            {activeTab === 'overview' && (
-              <motion.div
-                key="overview"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Premium Wide Total Balance Banner with Combined Asset Ledger Breakdown */}
-                  <div className="md:col-span-2 lg:col-span-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 p-6 md:p-8 rounded-[2.5rem] text-white border border-white/10 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none opacity-40" />
-                    <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
-                    <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
-                    
-                    <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                      <div className="space-y-3 text-left">
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-400 block italic">Main EFADO Account Wallet</span>
-                          <h4 className="text-xs font-black uppercase tracking-widest text-slate-300">Total NGN Account Balance</h4>
-                        </div>
-                        <h3 className="text-3xl md:text-5xl font-black font-display text-white tracking-tight italic">
-                          ₦{((user.walletPockets?.NGN ?? user.depositWallet ?? 0) + user.playerWallet + (user.cashOutWallet || 0) + (user.miningWallet || 0) * 0.01).toLocaleString()}
-                        </h3>
-                        <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">
-                          <Shield className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Central Wallet Active
-                        </div>
-                      </div>
-
-                      {/* Explicit ledger explaining canonical wallet path */}
-                      <div className="bg-slate-900/60 border border-white/5 p-5 rounded-2xl space-y-3 min-w-[280px] text-left">
-                        <span className="text-[8px] font-black uppercase tracking-widest text-amber-500/90 block border-b border-white/5 pb-1.5">Asset Ledger Components</span>
-                        <div className="space-y-2 text-[11px] font-bold font-mono">
-                          <div className="flex justify-between gap-6">
-                            <span className="text-indigo-400">🏦 DEPOSIT / STAKES (NGN):</span>
-                            <span className="text-white">₦{(user.walletPockets?.NGN ?? user.depositWallet ?? 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between gap-6">
-                            <span className="text-emerald-400">🏆 GAME WINNINGS:</span>
-                            <span className="text-white">₦{user.playerWallet.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between gap-6">
-                            <span className="text-teal-400">💰 CASHOUT WIN CARD:</span>
-                            <span className="text-white">₦{(user.cashOutWallet || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between gap-6 border-t border-white/10 pt-2">
-                            <span className="text-amber-400">⛏️ MINED N-NOTES (≈):</span>
-                            <span className="text-white">₦{((user.miningWallet || 0) * 0.01).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
-                    <div>
-                      <p className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">NGN Deposit Pocket</p>
-                      <h3 className="text-2xl font-black text-gray-950">₦{(user.walletPockets?.NGN ?? user.depositWallet ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
-                      <p className="text-[10px] text-gray-400 font-bold mt-2">Ready for gameplay & stakes</p>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
-                    <div>
-                      <p className="text-xs font-black text-emerald-950 uppercase tracking-widest mb-1 flex items-center gap-1">
-                        <Trophy className="w-3 h-3 text-emerald-600" /> Player's Win Wallet
-                      </p>
-                      <h3 className="text-2xl font-black text-emerald-950">₦{user.playerWallet.toLocaleString()}</h3>
-                      <p className="text-[10px] text-emerald-700/80 font-bold mt-2">Accumulated winnings</p>
-                    </div>
-                    {user.playerWallet > 0 && (
-                      <button
-                        onClick={() => {
-                          setSwapSource('playerWallet');
-                          setSwapAmount('');
-                          setShowSwapModal(true);
-                        }}
-                        className="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-200"
-                      >
-                        <ArrowRightLeft className="w-3 h-3" /> Convert to Stakes
-                      </button>
-                    )}
-                  </div>
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-gray-700 uppercase tracking-widest mb-1">Cash Out Wallet</p>
-                      <h3 className="text-2xl font-black text-gray-900">₦{(user.cashOutWallet || 0).toLocaleString()}</h3>
-                      <p className="text-[10px] text-emerald-600 font-bold mt-2">Available for withdrawal</p>
-                    </div>
-                    {(user.cashOutWallet || 0) > 0 && (
-                      <button
-                        onClick={() => {
-                          setSwapSource('cashOutWallet');
-                          setSwapAmount('');
-                          setShowSwapModal(true);
-                        }}
-                        className="mt-4 w-full py-2 bg-slate-950 hover:bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-slate-200"
-                      >
-                        <ArrowRightLeft className="w-3 h-3" /> Convert to Stakes
-                      </button>
-                    )}
-                  </div>
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-125 transition-transform">
-                      <Coins className="w-12 h-12 text-indigo-600" />
-                    </div>
-                    <p className="text-xs font-black text-gray-950 uppercase tracking-widest mb-1">EFADO Mining Wallet</p>
-                    <div className="flex items-baseline gap-1">
-                      <h3 className="text-2xl font-black text-indigo-700">{(user.miningWallet || 0).toLocaleString()}</h3>
-                      <span className="text-[10px] font-black text-slate-950 uppercase tracking-widest">EC</span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                       <p className="text-[10px] text-indigo-700 font-black italic">Stage: {user.miningProgress?.stage || 'E'}</p>
-                       <p className="text-[10px] text-slate-950 font-black">≈ ₦{((user.miningWallet || 0) * 0.01).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* All 9 Active Currency Pockets + 1 Future Disabled SIRA Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 md:p-8 text-white space-y-6 relative overflow-hidden">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-400 mb-2">
-                        <Globe className="w-3.5 h-3.5 text-emerald-400" /> Multi-Currency Wallet Pockets (9 Active + 1 Upcoming)
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-black text-white tracking-tight">
-                        Canonical Currency Pockets
-                      </h3>
-                      <p className="text-xs text-slate-400 font-medium mt-1">
-                        All 9 active currencies live in independent pockets at <span className="font-mono text-indigo-300">wallets/{'{uid}'}/{'{currency}'}/depositWallet</span> — zero currency mixing.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setSwapSource('playerWallet');
-                        setSwapAmount('');
-                        setShowSwapModal(true);
-                      }}
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30"
-                    >
-                      <ArrowRightLeft className="w-3.5 h-3.5" /> Currency Swap
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ACTIVE_WALLET_CURRENCIES.map((cur) => {
-                      const pocketBal =
-                        user.walletPockets?.[cur.code] ??
-                        (cur.code === 'NGN' ? (user.depositWallet || 0) : 0);
+                ) : (
+                  <div className="divide-y divide-purple-50">
+                    {recentTransactions.slice(0, 5).map((tx: any) => {
+                      const isIn = ['deposit', 'reward', 'game_win'].includes(String(tx.type || '').toLowerCase());
                       return (
-                        <div
-                          key={cur.code}
-                          className="bg-slate-800/80 border border-white/10 rounded-2xl p-5 space-y-4 hover:border-emerald-500/40 transition-all"
+                        <button
+                          key={tx.id || tx.reference}
+                          type="button"
+                          onClick={() => setSelectedReceiptTx(tx)}
+                          className="w-full py-3 flex items-center justify-between gap-3 text-left hover:bg-purple-50/50 rounded-xl px-2 transition-colors"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-2xl">{cur.flag}</span>
-                              <div>
-                                <p className="text-xs font-black text-white">{cur.name}</p>
-                                <p className="text-[10px] text-slate-400 font-mono">
-                                  {cur.code} ({cur.symbol})
-                                </p>
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                isIn
+                                  ? 'bg-emerald-50 text-[#16A34A]'
+                                  : 'bg-red-50 text-[#DC2626]'
+                              }`}
+                            >
+                              {isIn ? (
+                                <ArrowDownCircle className="w-5 h-5" />
+                              ) : (
+                                <ArrowUpCircle className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                                {tx.purpose || tx.method || tx.type}
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                {tx.reference || 'Wallet Activity'} •{' '}
+                                <span className="capitalize">{tx.status || 'completed'}</span>
                               </div>
                             </div>
-                            <span className="text-[9px] font-black uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                              Active
-                            </span>
                           </div>
-
-                          <div className="space-y-1">
-                            <h4 className="text-2xl font-black text-emerald-400 font-mono">
-                              {formatCurrencyAmount(pocketBal, cur.code)}
-                            </h4>
-                            {cur.note && (
-                              <p className="text-[10px] text-slate-400 font-bold">{cur.note}</p>
-                            )}
+                          <div
+                            className={`text-xs sm:text-sm font-extrabold tabular-nums shrink-0 ${
+                              isIn ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                            }`}
+                          >
+                            {isIn ? '+' : '-'}
+                            {formatCurrencyAmount(Number(tx.amount || 0), tx.currency || 'NGN')}
                           </div>
-
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDepositCurrency(cur.code);
-                                setActiveTab('deposit');
-                              }}
-                              className="py-2 px-3 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1 border border-emerald-500/20 cursor-pointer"
-                            >
-                              <Plus className="w-3 h-3" /> Deposit {cur.code}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setWithdrawSource('depositWallet');
-                                setWithdrawCurrency(cur.code);
-                                setAmount('');
-                                setWithdrawStatusMessage(null);
-                                setActiveTab('withdraw');
-                              }}
-                              className="py-2 px-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-300 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <ArrowUpCircle className="w-3 h-3 text-indigo-300" /> Withdraw
-                            </button>
-                          </div>
-                        </div>
+                        </button>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-                    {/* 1 Future Disabled Currency Card: SIRA (Burkina Faso) */}
-                    {FUTURE_WALLET_CURRENCIES.map((cur) => (
-                      <div
-                        key={cur.code}
-                        aria-disabled="true"
-                        className="bg-slate-800/40 border border-white/5 rounded-2xl p-5 space-y-4 opacity-55 grayscale cursor-not-allowed select-none"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-2xl">{cur.flag}</span>
-                            <div>
-                              <p className="text-xs font-black text-slate-300">{cur.name}</p>
-                              <p className="text-[10px] text-slate-500 font-mono">{cur.code}</p>
-                            </div>
-                          </div>
-                          <span className="text-[9px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <Lock className="w-2.5 h-2.5" /> Coming Soon
-                          </span>
-                        </div>
+        {/* ===================== PAGE 2: MY ACCOUNT PROFILE ===================== */}
+        {activeTab === 'profile' && (
+          <form onSubmit={handleSaveProfile} className="space-y-5">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 m-0">
+                  My Account Profile
+                </h2>
+                <p className="text-xs text-slate-500 m-0 max-w-none mt-0.5">
+                  Changes are securely encrypted and automatically update your payout bank
+                </p>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl px-4 py-2.5">
+                <div className="text-[10px] font-bold uppercase text-[#7C3AED]">Total Active Balance</div>
+                <div className="text-base font-extrabold tabular-nums text-slate-900">
+                  {formatBalanceDisplay(totalActiveBalance, 'NGN')}
+                </div>
+              </div>
+            </div>
 
-                        <div className="space-y-1">
-                          <h4 className="text-2xl font-black text-slate-400 font-mono">0.00 SIRA</h4>
-                          <p className="text-[10px] text-slate-400 font-bold">
-                            {cur.note || 'Planned currency — deposits disabled'}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled
-                          className="w-full py-2 px-3 bg-slate-700/50 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-wider cursor-not-allowed flex items-center justify-center gap-1.5"
-                        >
-                          <Lock className="w-3 h-3" /> Coming Soon (Disabled)
-                        </button>
-                      </div>
-                    ))}
+            {/* Profile Summary Card */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="relative shrink-0">
+                  <img
+                    src={profilePhotoURL || '/efado_logo_192.jpg'}
+                    alt={profileLegalName}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-purple-200"
+                  />
+                  <label
+                    title="Upload Profile Photo"
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center cursor-pointer shadow-sm hover:bg-purple-700"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                  </label>
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base font-extrabold text-slate-900 truncate">
+                      {profileLegalName}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200 text-[11px] font-bold">
+                      <ShieldCheck className="w-3 h-3" />
+                      KYC: {profileKycStatus === 'verified' ? 'Verified' : 'Verified Member'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-600 font-medium">
+                    Alias: <span className="font-bold text-[#7C3AED]">@{profileAlias}</span> •{' '}
+                    {profileNationality} • DOB: {profileDob}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {user.email} • {profilePhone || 'Add phone number below'}
                   </div>
                 </div>
+              </div>
 
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-black text-gray-900 uppercase tracking-tighter">Recent Activity</h4>
-                    <button onClick={() => setActiveTab('history')} className="text-xs font-bold text-indigo-600 hover:underline">View All</button>
-                  </div>
-                  <div className="space-y-3">
-                    {transactions.slice(0, 4).map((t) => (
-                      <div key={t.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            t.type === 'deposit' ? 'bg-emerald-100 text-emerald-600' :
-                            t.type === 'withdrawal' ? 'bg-orange-100 text-orange-600' :
-                            'bg-indigo-100 text-indigo-600'
-                          }`}>
-                            {t.type === 'deposit' ? <ArrowDownCircle className="w-5 h-5" /> :
-                             t.type === 'withdrawal' ? <ArrowUpCircle className="w-5 h-5" /> :
-                             <CreditCard className="w-5 h-5" />}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">{t.description || 'Verified secure transaction'}</p>
-                            <p className="text-[10px] text-gray-950 font-bold">
-                              {t.timestamp instanceof Date ? t.timestamp.toLocaleDateString() : new Date(t.timestamp).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`text-sm font-black ${
-                            t.type === 'deposit' || t.type === 'game_win' ? 'text-emerald-600' : 'text-red-600'
-                          }`}>
-                            {t.type === 'deposit' || t.type === 'game_win' ? '+' : '-'}{formatPrice(t.amount)}
-                          </p>
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                            t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
-                          }`}>
-                            {t.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </motion.div>
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker((v) => !v)}
+                className="self-start sm:self-center px-3 py-2 rounded-xl border border-purple-200 text-xs font-bold text-[#7C3AED] hover:bg-purple-50"
+              >
+                Choose Badge
+              </button>
+            </div>
+
+            {showAvatarPicker && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-bold text-slate-700">Quick Profile Badges:</span>
+                {LOCAL_AVATAR_PRESETS.map((av) => (
+                  <button
+                    key={av.id}
+                    type="button"
+                    onClick={() => {
+                      setProfilePhotoURL(av.src);
+                      setShowAvatarPicker(false);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-purple-100 hover:border-[#7C3AED] text-xs font-semibold text-slate-800"
+                  >
+                    <img src={av.src} alt={av.label} className="w-7 h-7 rounded-full object-cover" />
+                    <span>{av.label}</span>
+                  </button>
+                ))}
+              </div>
             )}
 
-            {activeTab === 'deposit' && (
-              <motion.div
-                key="deposit"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="max-w-2xl mx-auto space-y-8"
-              >
-                <div className="text-center space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <h3 className="text-2xl sm:text-3xl font-black text-gray-900 uppercase tracking-tighter italic">FUND YOUR ACCOUNT</h3>
+            {/* 01 Personal Details */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
+              <div className="flex items-center gap-2 border-b border-purple-50 pb-3">
+                <span className="px-2.5 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-extrabold">01</span>
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                  Personal Details
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Legal Name</label>
+                  <input
+                    type="text"
+                    value={profileLegalName}
+                    onChange={(e) => setProfileLegalName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Alias / Handle</label>
+                  <input
+                    type="text"
+                    value={profileAlias}
+                    onChange={(e) => setProfileAlias(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Date of Birth</label>
+                  <input
+                    type="date"
+                    value={profileDob}
+                    onChange={(e) => setProfileDob(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nationality</label>
+                  <input
+                    type="text"
+                    value={profileNationality}
+                    onChange={(e) => setProfileNationality(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    placeholder="+234..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={user.email}
+                    readOnly
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Gender</label>
+                  <select
+                    value={profileGender}
+                    onChange={(e) => setProfileGender(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Residential Address</label>
+                  <input
+                    type="text"
+                    value={profileAddress}
+                    onChange={(e) => setProfileAddress(e.target.value)}
+                    placeholder="Street, City, State"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Bio</label>
+                  <textarea
+                    rows={2}
+                    value={profileBio}
+                    onChange={(e) => setProfileBio(e.target.value)}
+                    placeholder="Short bio about you..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 02 Bank For Withdrawal */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
+              <div className="flex items-center justify-between border-b border-purple-50 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-extrabold">02</span>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                    Bank For Withdrawal
+                  </h3>
+                </div>
+                <span className="text-[11px] font-bold text-[#16A34A]">Auto-syncs to Withdraw</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Bank Name</label>
+                  <select
+                    value={profileBankCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setProfileBankCode(code);
+                      const found = bankDirectory.find((b) => b.code === code) || FLUTTERWAVE_BANKS.find((b) => b.code === code);
+                      if (found) setProfileBankName(found.name);
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  >
+                    {(bankDirectory.length > 0 ? bankDirectory : FLUTTERWAVE_BANKS.filter((b) => b.country === 'NG')).map((b) => (
+                      <option key={`${b.code}-${b.name}`} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Account Number ({profileAccountNumberMasked})
+                  </label>
+                  <input
+                    type="text"
+                    value={profileAccountNumberInput}
+                    onChange={(e) => setProfileAccountNumberInput(e.target.value)}
+                    placeholder="Enter 10-digit account number"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold tabular-nums text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Account Name</label>
+                  <input
+                    type="text"
+                    value={profileAccountName}
+                    onChange={(e) => setProfileAccountName(e.target.value)}
+                    placeholder={profileLegalName}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 03 Mobile Money & Crypto Wallets */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
+              <div className="flex items-center gap-2 border-b border-purple-50 pb-3">
+                <span className="px-2.5 py-1 rounded-lg bg-[#7C3AED] text-white text-xs font-extrabold">03</span>
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                  Mobile Money &amp; Crypto Wallets
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Money Network</label>
+                  <select
+                    value={profileMomoProvider}
+                    onChange={(e) => setProfileMomoProvider(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  >
+                    <option value="MTN">MTN Mobile Money</option>
+                    <option value="Airtel">Airtel Money</option>
+                    <option value="Vodafone">Telecel / Vodafone Cash</option>
+                    <option value="M-Pesa">M-Pesa</option>
+                    <option value="Orange">Orange Money</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mobile Merchant Number ({profileMomoMasked})
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={profileMomoInput}
+                      onChange={(e) => setProfileMomoInput(e.target.value)}
+                      placeholder="e.g. 0803..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold tabular-nums text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                    />
                     <button
                       type="button"
-                      onClick={() => setShowGuidelinesModal(true)}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-1.5 active:scale-95"
+                      onClick={() => copyToClipboard(profileMomoMasked, 'Mobile Merchant Number')}
+                      className="px-3 rounded-xl border border-purple-200 text-[#7C3AED] hover:bg-purple-50 shrink-0"
                     >
-                      <FileText className="w-4 h-4 text-slate-950" />
-                      <span>📖 Payment & Payout Guidelines</span>
-                    </button>
-                  </div>
-                  
-                  {/* BEAUTIFUL SWITCHER TABS FOR ULTRA-CLEAR SELECTION - DEFAULT: DIRECT BANK WIRE */}
-                  <div className="flex flex-wrap gap-3 border-b border-gray-150 justify-center">
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('paystack')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'paystack' 
-                          ? 'border-b-4 border-emerald-600 text-emerald-600 font-extrabold' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      💳 Paystack (Cards/Transfer/USSD) (DEFAULT)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('bank_transfer')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'bank_transfer' 
-                          ? 'border-b-4 border-emerald-600 text-emerald-600 font-extrabold' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      🏦 Direct Bank Deposit
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('opay')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'opay' 
-                          ? 'border-b-4 border-emerald-500 text-emerald-600 font-extrabold' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      ⚡ OPay Pay-In (Instant)
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('flutterwave')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'flutterwave' 
-                          ? 'border-b-4 border-indigo-600 text-indigo-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      ⚡ Flutterwave Checkout
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setDepositMethod('diaspora')}
-                      className={`pb-3 text-xs font-black uppercase tracking-widest transition-all ${
-                        depositMethod === 'diaspora' 
-                          ? 'border-b-4 border-blue-600 text-blue-600' 
-                          : 'text-gray-400 hover:text-gray-650'
-                      }`}
-                    >
-                      🌐 Diaspora / Crypto
+                      <Copy className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-
-                {/* THE RENDER OF SECURE COMPLIANT MODULE WITH INTEGRATED CALLBACKS */}
-                <div className="bg-white border text-left border-gray-100 p-6 sm:p-8 rounded-[2.5rem] shadow-xl">
-                  {depositMethod === 'opay' ? (
-                    <OpayDeposit
-                      user={user}
-                      defaultAmount={1000}
-                      onSuccess={async ({ reference, amount: amt }) => {
-                        setSelectedReceiptTx({
-                          id: reference,
-                          userId: user.uid,
-                          type: 'deposit',
-                          amount: amt,
-                          currency: 'NGN',
-                          status: 'completed',
-                          method: 'OPay Pay-In Gateway',
-                          hub: 'WALLET',
-                          purpose: 'Wallet Top-up',
-                          reference,
-                          description: 'Wallet Top-up via OPay Pay-In Gateway',
-                          timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
-                        });
-                      }}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    USDT (TRC20) Address ({profileUsdtMasked})
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={profileUsdtInput}
+                      onChange={(e) => setProfileUsdtInput(e.target.value)}
+                      placeholder="Enter TRC20 wallet address"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
                     />
-                  ) : depositMethod === 'paystack' ? (
-                    <div className="space-y-6">
-                      <div className="p-4 bg-emerald-50 border-2 border-emerald-200 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase">PAYSTACK SECURE AUTOMATED GATEWAY</span>
-                          <p className="text-[11px] text-emerald-950 font-bold uppercase leading-normal mt-0.5">
-                            Atomic server verification — history & pocket balance update together on confirmed payment.
-                          </p>
-                        </div>
-                      </div>
-
-                      <PaystackDeposit
-                        user={user}
-                        defaultAmount={1000}
-                        defaultCurrency={depositCurrency}
-                        onSuccess={async ({ reference, amount: amt, currency: paidCur }) => {
-                          setSelectedReceiptTx({
-                            id: reference,
-                            userId: user.uid,
-                            type: 'deposit',
-                            amount: amt,
-                            currency: paidCur || 'NGN',
-                            status: 'completed',
-                            method: 'Paystack Gateway',
-                            hub: 'WALLET',
-                            purpose: 'Wallet Top-up',
-                            reference,
-                            description: `Wallet Top-up (${paidCur || 'NGN'}) via Paystack`,
-                            timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
-                          });
-                        }}
-                      />
-                    </div>
-                  ) : depositMethod === 'flutterwave' ? (
-                    <div className="space-y-6">
-                      <div className="p-4 bg-indigo-50 border-2 border-indigo-150 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <Zap className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="text-[10px] font-black tracking-widest text-[#4f46e5] uppercase">FLUTTERWAVE MULTI-CURRENCY GATEWAY</span>
-                          <p className="text-[11px] text-indigo-950 font-bold uppercase leading-normal mt-0.5">
-                            Real-time verified settlement into your exact currency pocket (NGN, USD, GBP, EUR, CAD, AUD, GHS, ZAR, XOF).
-                          </p>
-                        </div>
-                      </div>
-
-                      <FlutterwaveDeposit
-                        user={user}
-                        defaultAmount={1000}
-                        defaultCurrency={depositCurrency}
-                        onSuccess={async ({ reference, amount: amt, currency: paidCur }) => {
-                          setSelectedReceiptTx({
-                            id: reference,
-                            userId: user.uid,
-                            type: 'deposit',
-                            amount: amt,
-                            currency: paidCur || 'NGN',
-                            status: 'completed',
-                            method: 'Flutterwave Gateway',
-                            hub: 'WALLET',
-                            purpose: 'Wallet Top-up',
-                            reference,
-                            description: `Wallet Top-up (${paidCur || 'NGN'}) via Flutterwave`,
-                            timestamp: { seconds: Math.floor(Date.now() / 1000) } as any
-                          });
-                        }}
-                      />
-                    </div>
-                  ) : depositMethod === 'diaspora' ? (
-                    <div className="space-y-6">
-                      <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <Globe className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="text-[10px] font-black tracking-widest text-blue-800 uppercase">DIASPORA DIRECT WIRE & CRYPTO SETTLEMENT</span>
-                          <p className="text-[11px] text-blue-950 font-bold uppercase leading-normal mt-0.5">
-                            To protect CSCC from international payment processor flags, PayPal is reserved for Marketplace & Education. For CSCC savings, please use International Bank Wire or USDT/BTC Wallet Transfer below.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900 text-white p-6 rounded-3xl space-y-4 border border-white/10">
-                        <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
-                          <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest block">Option 1: USDT (TRC-20 / BEP-20)</span>
-                          <code className="text-sm font-mono text-gray-200 block break-all">TJ8Y9...EFADO...CRYPTO...TREASURY...9281</code>
-                          <p className="text-[10px] text-gray-400">Instant automated wallet settlement at parallel market rate.</p>
-                        </div>
-
-                        <div className="p-4 bg-black/40 rounded-2xl border border-white/10 space-y-2">
-                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Option 2: International Bank Transfer Support</span>
-                          <p className="text-xs text-gray-300 font-bold">Desk: EFADO Verified Settlement Desk</p>
-                          <p className="text-xs text-gray-300 font-bold">For NGN funding, use Paystack Card / Bank Transfer for instant credit.</p>
-                          <p className="text-[10px] text-gray-400 mt-1">Need international transfer guidance? Tap Need Help? Chat Us anytime.</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="p-4 bg-amber-50 border-2 border-amber-150 rounded-2xl flex gap-3 shadow-sm mb-2">
-                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="text-[10px] font-black tracking-widest text-amber-800 uppercase">VERIFIED BANK DEPOSIT OPTION</span>
-                          <p className="text-[11px] text-amber-950 font-bold uppercase leading-normal mt-0.5">
-                            Tip: Paystack Checkout credits your wallet immediately. If using bank transfer receipt upload, submit your proof below for admin confirmation.
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <DirectBankDeposit 
-                        user={user} 
-                        defaultAmount={1000}
-                        onSuccess={async () => {
-                          // Standard manual escrow deposit log added inside DirectBankDeposit
-                        }} 
-                      />
-                    </div>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(profileUsdtMasked, 'USDT Address')}
+                      className="px-3 rounded-xl border border-purple-200 text-[#7C3AED] hover:bg-purple-50 shrink-0"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-gray-100 pt-8">
-                  <span className="px-4 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-black tracking-wider text-slate-700">VISA</span>
-                  <span className="px-4 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-black tracking-wider text-slate-700">Mastercard</span>
-                  <span className="px-4 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-black tracking-wider text-emerald-700 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5" /> SSL Secured Checkout
-                  </span>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Bitcoin (BTC) Address ({profileBtcMasked})
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={profileBtcInput}
+                      onChange={(e) => setProfileBtcInput(e.target.value)}
+                      placeholder="Enter BTC wallet address"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(profileBtcMasked, 'BTC Address')}
+                      className="px-3 rounded-xl border border-purple-200 text-[#7C3AED] hover:bg-purple-50 shrink-0"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              </motion.div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-slate-500 m-0 max-w-none flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <span>Changes are securely encrypted</span>
+              </p>
+              <button
+                type="submit"
+                disabled={isSavingProfile}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#7C3AED] hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                {isSavingProfile ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save &amp; Synchronize Profile</span>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ===================== PAGE 3: DEPOSIT FUNDS ===================== */}
+        {activeTab === 'deposit' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 m-0">
+                  Fund Your Account
+                </h2>
+                <p className="text-xs text-slate-500 m-0 max-w-none mt-0.5">
+                  Choose a verified payment method to fund any of your 9 currency pockets
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#16A34A] text-xs font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                Secure Payment - Verified
+              </span>
+            </div>
+
+            {/* Horizontally Scrollable Payment Method Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {[
+                { id: 'paystack', label: 'Paystack', badge: 'Instant' },
+                { id: 'bank_transfer', label: 'Direct Bank Deposit', badge: 'Nigeria' },
+                { id: 'opay', label: 'OPAY Pay-In', badge: 'Fast' },
+                { id: 'flutterwave', label: 'Flutterwave', badge: 'Global' },
+                { id: 'diaspora', label: 'Diaspora / Crypto', badge: 'USDT • BTC' }
+              ].map((m) => {
+                const active = depositMethod === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setDepositMethod(m.id as DepositMethodTab)}
+                    className={`shrink-0 px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold flex items-center gap-2 transition-all ${
+                      active
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                        : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
+                    }`}
+                  >
+                    <span>{m.label}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        active ? 'bg-white/20 text-white' : 'bg-purple-50 text-[#7C3AED]'
+                      }`}
+                    >
+                      {m.badge}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {depositMethod === 'paystack' && (
+              <PaystackDeposit
+                user={user}
+                defaultCurrency={depositCurrency}
+                onSuccess={async (info) => {
+                  await fetchWalletSnapshot();
+                  await fetchHistoryAndSecurityData();
+                  await onUpdateBalance(info.amount, 'deposit', {
+                    currency: info.currency,
+                    reference: info.reference,
+                    alreadyProcessedByServer: info.alreadyCreditedByServer ?? true
+                  }).catch(() => {});
+                  showNotice(`Funded ${formatCurrencyAmount(info.amount, info.currency)} safely!`, 'success');
+                }}
+              />
             )}
 
-            {activeTab === 'withdraw' && (
-              <motion.div
-                key="withdraw"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="max-w-2xl mx-auto space-y-8"
-              >
-                <div className="text-center space-y-4">
-                  <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tighter italic">EXTERNAL BANK CASH OUT TERMINAL</h3>
-                  
-                  {/* DISTINCTIVE WITHDRAWAL FLAG */}
-                  <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 flex items-start gap-3 shadow-md text-left font-sans">
-                    <ArrowUpCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="text-[10px] font-black tracking-widest text-emerald-800 uppercase block">EXTERNAL CASH OUT/WITHDRAWAL</span>
-                      <p className="text-[11px] text-emerald-950 font-bold leading-relaxed uppercase mt-0.5">
-                        You are initiating a direct payload withdrawal OUT of the E-FADO ecosystem into an <span className="underline decoration-wavy">External Personal Bank or virtual wallet</span>. Ensure all recipient details are completely correct prior to payout execution.
-                      </p>
-                    </div>
+            {depositMethod === 'bank_transfer' && (
+              <DirectBankDeposit
+                user={user}
+                onSuccess={async () => {
+                  await fetchWalletSnapshot();
+                  await fetchHistoryAndSecurityData();
+                  showNotice('Bank deposit submitted for verification!', 'success');
+                }}
+              />
+            )}
+
+            {depositMethod === 'opay' && (
+              <OpayDeposit
+                user={user}
+                defaultCurrency={depositCurrency}
+                onSuccess={async (info) => {
+                  await fetchWalletSnapshot();
+                  await fetchHistoryAndSecurityData();
+                  showNotice(`OPay funding initialized (${info.reference}).`, 'success');
+                }}
+              />
+            )}
+
+            {depositMethod === 'flutterwave' && (
+              <FlutterwaveDeposit
+                user={user}
+                defaultCurrency={depositCurrency}
+                onSuccess={async (info) => {
+                  await fetchWalletSnapshot();
+                  await fetchHistoryAndSecurityData();
+                  await onUpdateBalance(info.amount, 'deposit', {
+                    currency: info.currency,
+                    reference: info.reference,
+                    alreadyProcessedByServer: info.alreadyCreditedByServer ?? true
+                  }).catch(() => {});
+                  showNotice(`Funded ${formatCurrencyAmount(info.amount, info.currency)} safely!`, 'success');
+                }}
+              />
+            )}
+
+            {depositMethod === 'diaspora' && (
+              <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 m-0">
+                      Diaspora &amp; Crypto Funding
+                    </h3>
+                    <p className="text-xs text-slate-500 m-0 max-w-none">
+                      Send USDT (TRC20), Bitcoin (BTC), or use PayPal for international deposits
+                    </p>
                   </div>
-
-                  {/* OPAY-STYLE SHIELD & NIGHT GUIDE CONTROLS */}
-                  <div className="bg-[#0f172a] text-white rounded-[2rem] p-5 shadow-xl border border-white/5 space-y-4 text-left font-sans">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-emerald-400 animate-pulse" />
-                        <div>
-                          <h4 className="text-xs font-black uppercase tracking-wider">CYBER SHIELD ACTIVE PRESETS</h4>
-                          <p className="text-[8px] text-slate-400 font-extrabold uppercase tracking-widest mt-0.5">Automated Cyber Sentry Protection Suite</p>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase">
-                        Shield Safe
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Shield Toggle */}
-                      <div className="flex items-center justify-between bg-slate-950/50 p-3.5 rounded-2xl border border-white/5">
-                        <div className="space-y-0.5">
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${shieldActive ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
-                            OPay Payment Shield
-                          </span>
-                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Phishing protection & secure routing</p>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => setShieldActive(!shieldActive)}
-                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-all ${shieldActive ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
-                        >
-                          <span className="w-4 h-4 rounded-full bg-white shadow-md block" />
-                        </button>
-                      </div>
-
-                      {/* Night Sentry Toggle */}
-                      <div className="flex items-center justify-between bg-slate-950/50 p-3.5 rounded-2xl border border-white/5">
-                        <div className="space-y-0.5">
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${nightGuideActive ? 'bg-indigo-500' : 'bg-slate-500'} animate-pulse`} />
-                            Night Safe Sentry
-                          </span>
-                          <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Late hours volume cap (10PM-6AM)</p>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => setNightGuideActive(!nightGuideActive)}
-                          className={`w-12 h-6 flex items-center rounded-full p-1 transition-all ${nightGuideActive ? 'bg-indigo-500 justify-end' : 'bg-slate-800 justify-start'}`}
-                        >
-                          <span className="w-4 h-4 rounded-full bg-white shadow-md block" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {nightGuideActive && (new Date().getHours() >= 22 || new Date().getHours() < 6) && (
-                      <div className="p-3 bg-indigo-950/80 border border-indigo-500/30 rounded-2xl flex gap-2.5 items-start">
-                        <Clock className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-spin-slow" />
-                        <p className="text-[8.5px] text-indigo-200 font-bold leading-relaxed uppercase">
-                          ⚠️ NOCTURNAL HOURS PROTECTION ACTIVE (10 PM - 6 AM): Withdrawals will be subject to manual CEO-desk dual clearance. Sleep security lock holds your funds gracefully till sunrise.
-                        </p>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCryptoTabMode('crypto')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                        cryptoTabMode === 'crypto'
+                          ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                          : 'bg-white text-slate-700 border-purple-200'
+                      }`}
+                    >
+                      Crypto Transfer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCryptoTabMode('paypal')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                        cryptoTabMode === 'paypal'
+                          ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                          : 'bg-white text-slate-700 border-purple-200'
+                      }`}
+                    >
+                      PayPal Global
+                    </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* STEP 1: Select Gateway -> Bank -> Enter Account Number -> Resolve Real Account Name (Works even at ₦0) */}
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">
-                          1. PAYOUT GATEWAY (PAYSTACK OR FLUTTERWAVE)
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPayoutGateway('paystack');
-                              setVerifiedAccountName(null);
-                              setVerificationError(null);
-                            }}
-                            className={`py-3 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                              payoutGateway === 'paystack'
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                            }`}
-                          >
-                            Paystack Payout
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPayoutGateway('flutterwave');
-                              setVerifiedAccountName(null);
-                              setVerificationError(null);
-                            }}
-                            className={`py-3 px-3 rounded-2xl text-xs font-black uppercase tracking-wider border transition-all cursor-pointer ${
-                              payoutGateway === 'flutterwave'
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
-                                : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                            }`}
-                          >
-                            Flutterwave Payout
-                          </button>
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest">
-                            2. SELECT DESTINATION BANK
-                          </label>
-                          {isLoadingBanks && (
-                            <span className="text-[9px] font-bold text-emerald-600 animate-pulse uppercase tracking-wider">
-                              Loading Banks...
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="relative">
-                          <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                          <select
-                            value={selectedBankCode}
-                            onChange={e => {
-                              const code = e.target.value;
-                              setSelectedBankCode(code);
-                              const b = activeBankDirectory.find(x => x.code === code);
-                              setAccountDetails(prev => ({
-                                ...prev,
-                                routingNumber: code,
-                                bankName: b ? b.name : prev.bankName
-                              }));
-                              setVerifiedAccountName(null);
-                              setVerificationError(null);
-                            }}
-                            className="w-full pl-12 pr-8 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900 cursor-pointer appearance-none"
-                          >
-                            <option value="">
-                              -- Select Destination Bank ({activeBankDirectory.length} Banks) --
-                            </option>
-                            {activeBankDirectory.map(b => (
-                              <option key={`${payoutGateway}-bank-${b.code}-${b.name}`} value={b.code}>
-                                {b.name} ({b.code})
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-black text-gray-900 uppercase tracking-widest mb-2">
-                          3. ENTER 10-DIGIT ACCOUNT NUMBER
-                        </label>
-                        <div className="relative">
-                          <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            maxLength={10}
-                            placeholder="Enter 10-Digit Account Number"
-                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-gray-400 text-gray-900"
-                            value={accountNumberInput}
-                            onChange={e => {
-                              const clean = e.target.value.replace(/\D/g, '').slice(0, 10);
-                              setAccountNumberInput(clean);
-                              setAccountDetails(prev => ({ ...prev, accountNumber: clean }));
-                              setVerifiedAccountName(null);
-                              setVerificationError(null);
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Verify Account Button — Explicitly ENABLED even if wallet balance is ₦0.00 */}
-                      <button
-                        type="button"
-                        onClick={handleVerifyAccount}
-                        disabled={isVerifyingAccount || !selectedBankCode || accountNumberInput.length !== 10}
-                        className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                      >
-                        {isVerifyingAccount ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Verifying Account (max 10s)...</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                            <span>4. Verify Bank Account</span>
-                          </>
-                        )}
-                      </button>
-
-                      {/* Verified Account Name in Green */}
-                      {verifiedAccountName && (
-                        <div className="p-4 bg-emerald-950/90 border-2 border-emerald-500 rounded-2xl flex items-center gap-2.5 text-emerald-300 font-black text-xs uppercase tracking-wider animate-in fade-in">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                          <span>✅ Verified Account Name: {verifiedAccountName}</span>
-                        </div>
-                      )}
-
-                      {/* Clear Verification Error in Red */}
-                      {verificationError && (
-                        <div className="p-4 bg-rose-950/90 border border-rose-500 rounded-2xl flex items-center gap-2.5 text-rose-200 font-bold text-xs animate-in fade-in">
-                          <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
-                          <span>❌ {verificationError}</span>
-                        </div>
-                      )}
-
-                      {/* Beneficiary Preview Card */}
-                      <div className="p-6 bg-slate-900 text-white rounded-[2rem] border border-white/10 relative overflow-hidden shadow-2xl space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-[9px] font-black uppercase tracking-wider text-slate-300">BENEFICIARY PREVIEW</span>
-                          </div>
-                          <span className={`text-[8px] font-sans font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                            verifiedAccountName ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                          }`}>
-                            {verifiedAccountName ? 'ACCOUNT VERIFIED ✓' : 'VERIFICATION REQUIRED'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">BANK</span>
-                            <p className="text-[10px] font-black text-white uppercase tracking-wider truncate">
-                              {accountDetails.bankName || <span className="text-rose-400 italic font-medium">NOT SELECTED</span>}
-                            </p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">GATEWAY</span>
-                            <p className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest truncate">
-                              {payoutGateway.toUpperCase()}
-                            </p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">ACCOUNT NUMBER</span>
-                            <p className="text-[11px] font-mono font-black text-indigo-400 uppercase tracking-widest truncate">
-                              {accountNumberInput || <span className="text-rose-400 italic font-medium">NOT ENTERED</span>}
-                            </p>
-                          </div>
-                          <div className="space-y-0.5">
-                            <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-widest">REAL ACCOUNT NAME</span>
-                            <p className="text-[10px] font-black uppercase tracking-wider truncate">
-                              {verifiedAccountName ? (
-                                <span className="text-emerald-400 font-extrabold">{verifiedAccountName} ✓</span>
-                              ) : (
-                                <span className="text-amber-400 italic font-medium">PENDING VERIFY</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* STEP 2: Check Source Balance -> Enter Amount -> Check INSUFFICIENT FUNDS -> Confirm Withdraw */}
-                  <div className="space-y-6">
-                    <div className="bg-emerald-600 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -translate-y-12 translate-x-12" />
-
-                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.25em] mb-3">
-                        5. SELECT SOURCE POCKET & CHECK BALANCE
-                      </p>
-
-                      <div className="grid grid-cols-3 gap-2 mb-4 pointer-events-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWithdrawSource('playerWallet');
-                            setAmount('');
-                            setWithdrawStatusMessage(null);
-                          }}
-                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
-                            withdrawSource === 'playerWallet'
-                              ? 'bg-white text-emerald-950 border-white shadow-md'
-                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
-                          }`}
-                        >
-                          Wins (₦{user.playerWallet.toLocaleString()})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWithdrawSource('cashOutWallet');
-                            setAmount('');
-                            setWithdrawStatusMessage(null);
-                          }}
-                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
-                            withdrawSource === 'cashOutWallet'
-                              ? 'bg-white text-emerald-900 border-white shadow-md'
-                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
-                          }`}
-                        >
-                          CashOut (₦{(user.cashOutWallet || 0).toLocaleString()})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setWithdrawSource('depositWallet');
-                            setAmount('');
-                            setWithdrawStatusMessage(null);
-                          }}
-                          className={`py-2.5 px-2 rounded-xl text-[9px] font-black tracking-wider uppercase transition-all border ${
-                            withdrawSource === 'depositWallet'
-                              ? 'bg-white text-emerald-950 border-white shadow-md'
-                              : 'bg-emerald-700/50 text-emerald-100 border-white/10 hover:bg-emerald-700'
-                          }`}
-                        >
-                          Deposit Pocket
-                        </button>
-                      </div>
-
-                      {withdrawSource === 'depositWallet' && (
-                        <div className="mb-4">
-                          <label className="text-[9px] font-black text-emerald-100 uppercase tracking-widest block mb-1.5">
-                            Pocket Currency
-                          </label>
-                          <select
-                            value={withdrawCurrency}
-                            onChange={(e) => {
-                              setWithdrawCurrency(e.target.value);
-                              setWithdrawStatusMessage(null);
-                            }}
-                            className="w-full px-3 py-2.5 bg-emerald-800/70 border border-white/20 rounded-xl text-xs font-black text-white focus:outline-none"
-                          >
-                            {ACTIVE_WALLET_CURRENCIES.map((c) => (
-                              <option key={c.code} value={c.code} className="text-slate-900">
-                                {c.flag} {c.code} — {formatCurrencyAmount(user.walletPockets?.[c.code] ?? (c.code === 'NGN' ? (user.depositWallet || 0) : 0), c.code)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-
-                      <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.25em] mb-1">
-                        Available Balance ({activeWithdrawCurrency})
-                      </p>
-                      <h4 className="text-3xl font-black mb-5 font-display italic tracking-tighter">
-                        {formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)}
-                      </h4>
-
-                      <label className="block text-[11px] font-black text-emerald-100 uppercase tracking-widest mb-2">
-                        6. WITHDRAWAL AMOUNT ({activeWithdrawCurrency})
+                {cryptoTabMode === 'paypal' ? (
+                  <PayPalHostedButton
+                    amount={Number(cryptoAmount) || 50}
+                    onSuccess={() => {
+                      fetchWalletSnapshot();
+                      fetchHistoryAndSecurityData();
+                    }}
+                  />
+                ) : (
+                  <form onSubmit={handleCryptoSubmit} className="space-y-4">
+                    {/* Target Currency Selector */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">
+                        Select Target Currency Pocket
                       </label>
-                      <div className="relative mb-4">
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl font-black text-white/40 select-none">
-                          {getWalletCurrencyMeta(activeWithdrawCurrency).symbol}
-                        </span>
-                        <input
-                          type="number"
-                          value={amount}
-                          onChange={(e) => {
-                            setAmount(e.target.value);
-                            setWithdrawStatusMessage(null);
-                          }}
-                          placeholder="Type Amount Here..."
-                          className="w-full pl-12 pr-4 bg-transparent border-b-2 border-white/20 py-3 font-display text-2xl font-black text-white focus:outline-none focus:border-white transition-all placeholder:text-white/20 outline-none"
-                        />
-                      </div>
-
-                      {Number(amount) > availableWithdrawBalance && (
-                        <div className="mb-4 p-3 bg-rose-950/90 border border-rose-400 rounded-xl flex items-center gap-2 text-rose-100 text-xs font-black uppercase tracking-wider">
-                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                          <span>
-                            INSUFFICIENT FUNDS — Available: {formatCurrencyAmount(availableWithdrawBalance, activeWithdrawCurrency)}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-4 gap-2">
-                        {[0.25, 0.5, 0.75, 1].map(percent => (
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {ACTIVE_WALLET_CURRENCIES.map((cur) => (
                           <button
-                            key={percent}
+                            key={cur.code}
                             type="button"
-                            onClick={() => {
-                              setAmount(Math.floor(availableWithdrawBalance * percent).toString());
-                              setWithdrawStatusMessage(null);
-                            }}
-                            className="py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black tracking-widest transition-all border border-white/10"
+                            onClick={() => setDepositCurrency(cur.code)}
+                            className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 ${
+                              depositCurrency === cur.code
+                                ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                                : 'bg-white text-slate-700 border-purple-100 hover:border-purple-300'
+                            }`}
                           >
-                            {percent * 100}%
+                            <span>{cur.flag}</span>
+                            <span>{cur.code}</span>
                           </button>
+                        ))}
+                        {FUTURE_WALLET_CURRENCIES.map((cur) => (
+                          <div
+                            key={cur.code}
+                            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-[11px] font-bold flex items-center justify-center gap-1"
+                          >
+                            <Lock className="w-3 h-3" />
+                            <span>{cur.code} LOCKED</span>
+                          </div>
                         ))}
                       </div>
                     </div>
 
-                    {withdrawStatusMessage && (
-                      <div className={`p-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
-                        withdrawStatusMessage.type === 'success' ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-500' : 'bg-rose-950/90 text-rose-200 border border-rose-500'
-                      }`}>
-                        <span>{withdrawStatusMessage.text}</span>
+                    {/* Network Selector */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(['USDT (TRC20)', 'Bitcoin (BTC)'] as const).map((net) => {
+                        const info = net === 'USDT (TRC20)' ? CRYPTO_DEPOSIT_WALLETS.usdt : CRYPTO_DEPOSIT_WALLETS.btc;
+                        const active = cryptoNetwork === net;
+                        return (
+                          <button
+                            key={net}
+                            type="button"
+                            onClick={() => setCryptoNetwork(net)}
+                            className={`p-3.5 rounded-2xl border text-left transition-all ${
+                              active
+                                ? 'border-[#7C3AED] bg-purple-50/70'
+                                : 'border-purple-100 bg-white hover:border-purple-300'
+                            }`}
+                          >
+                            <div className="text-xs font-extrabold text-slate-900">{info.label}</div>
+                            <div className="text-[11px] text-slate-500 font-mono truncate mt-1">{info.address}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-bold text-[#7C3AED] uppercase">
+                          Official {cryptoNetwork} Deposit Address
+                        </div>
+                        <div className="text-xs sm:text-sm font-mono font-bold text-slate-900 break-all mt-0.5">
+                          {cryptoNetwork === 'USDT (TRC20)'
+                            ? CRYPTO_DEPOSIT_WALLETS.usdt.address
+                            : CRYPTO_DEPOSIT_WALLETS.btc.address}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(
+                            cryptoNetwork === 'USDT (TRC20)'
+                              ? CRYPTO_DEPOSIT_WALLETS.usdt.address
+                              : CRYPTO_DEPOSIT_WALLETS.btc.address,
+                            `${cryptoNetwork} Address`
+                          )
+                        }
+                        className="px-3 py-2 rounded-xl bg-white border border-purple-200 text-[#7C3AED] text-xs font-bold shrink-0"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Amount ({depositCurrency})
+                        </label>
+                        <input
+                          type="number"
+                          min={getMinDepositForCurrency(depositCurrency)}
+                          step="any"
+                          value={cryptoAmount}
+                          onChange={(e) => setCryptoAmount(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-extrabold tabular-nums text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Transaction Hash (TxID)
+                        </label>
+                        <input
+                          type="text"
+                          value={cryptoTxHash}
+                          onChange={(e) => setCryptoTxHash(e.target.value)}
+                          placeholder="Paste blockchain TxID"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {cryptoStatusMessage && (
+                      <div
+                        className={`p-3 rounded-xl border text-xs font-bold ${
+                          cryptoStatusMessage.type === 'success'
+                            ? 'bg-emerald-50 border-emerald-200 text-[#16A34A]'
+                            : 'bg-red-50 border-red-200 text-[#DC2626]'
+                        }`}
+                      >
+                        {cryptoStatusMessage.text}
                       </div>
                     )}
 
-                    {/* Confirm Withdraw Button */}
+                    <div className="sticky bottom-2 z-10 sm:static">
+                      <button
+                        type="submit"
+                        disabled={isSubmittingCrypto}
+                        className="w-full py-3.5 rounded-xl bg-[#16A34A] hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-colors"
+                      >
+                        {isSubmittingCrypto ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <span>
+                            FUND {depositCurrency} POCKET{' '}
+                            {formatCurrencyAmount(Number(cryptoAmount) || 0, depositCurrency)}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            <SecurityGuard level="high" />
+          </div>
+        )}
+
+        {/* ===================== PAGE 4: WITHDRAW FUNDS ===================== */}
+        {activeTab === 'withdraw' && (
+          <div className="space-y-4">
+            {/* Header + Irreversible Warning */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 m-0">
+                    Withdraw Funds
+                  </h2>
+                  <p className="text-xs text-slate-500 m-0 max-w-none mt-0.5">
+                    External Bank Cash Out • Real-time bank verification enabled
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#16A34A] text-xs font-bold">
+                  <ShieldCheck className="w-4 h-4" />
+                  Protected by 256-bit encryption
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Check details carefully before confirming withdrawal - Transfers are irreversible</span>
+              </div>
+            </div>
+
+            {/* Cyber Shield Toggles */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/50 border border-purple-100">
+                <div>
+                  <div className="text-xs font-extrabold text-slate-900">OPAY Payment Shield</div>
+                  <div className="text-[11px] text-slate-500">Extra check on newly added bank accounts</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleShield('opayShieldEnabled')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-colors ${
+                    opayShieldEnabled ? 'bg-[#16A34A] text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {opayShieldEnabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-purple-50/50 border border-purple-100">
+                <div>
+                  <div className="text-xs font-extrabold text-slate-900">Night Safe Sentry 10PM-6AM</div>
+                  <div className="text-[11px] text-slate-500">6-digit approval for large night transfers</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggleShield('nightSafeEnabled')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-colors ${
+                    nightSafeEnabled ? 'bg-[#16A34A] text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {nightSafeEnabled ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Left Column: Destination Bank & Verification */}
+              <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900 m-0">
+                    Destination Bank Account
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleUseSavedBank}
+                    className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-[#7C3AED] border border-purple-200 text-xs font-bold transition-colors"
+                  >
+                    Use My Saved Bank
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Destination Country</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {COUNTRY_LIST.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => {
+                          setWithdrawCountry(c.code);
+                          setWdIsVerified(false);
+                          setWdVerifiedName('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 ${
+                          withdrawCountry === c.code
+                            ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                            : 'bg-white text-slate-700 border-purple-100'
+                        }`}
+                      >
+                        <span>{c.flag}</span>
+                        <span>{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Select Bank</label>
+                  <select
+                    value={wdBankCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      setWdBankCode(code);
+                      const found = bankDirectory.find((b) => b.code === code);
+                      if (found) setWdBankName(found.name);
+                      setWdUseSavedBank(false);
+                      setWdIsVerified(false);
+                      setWdVerifiedName('');
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  >
+                    {bankDirectory.map((b) => (
+                      <option key={`${b.code}-${b.name}`} value={b.code}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Account Number</label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={wdAccountNumber}
+                      onChange={(e) => {
+                        setWdAccountNumber(e.target.value);
+                        setWdUseSavedBank(false);
+                        setWdIsVerified(false);
+                        setWdVerifiedName('');
+                        setWdNameMismatchError(null);
+                      }}
+                      placeholder="Enter 10-digit account number"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-bold tabular-nums text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                    />
                     <button
                       type="button"
-                      onClick={handleConfirmWithdraw}
-                      disabled={
-                        isExecutingWithdraw ||
-                        !verifiedAccountName ||
-                        !amount ||
-                        Number(amount) <= 0 ||
-                        Number(amount) > availableWithdrawBalance
-                      }
-                      className={`w-full py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl transition-all flex items-center justify-center gap-3 ${
-                        verifiedAccountName && Number(amount) > 0 && Number(amount) <= availableWithdrawBalance
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40 cursor-pointer active:scale-95'
-                          : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
-                      }`}
+                      onClick={handleVerifyBankAccount}
+                      disabled={isVerifyingBank}
+                      className="px-4 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-500 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 shrink-0 transition-colors"
                     >
-                      {isExecutingWithdraw ? (
+                      {isVerifyingBank ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Processing {payoutGateway.toUpperCase()} Transfer...</span>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Checking...</span>
                         </>
                       ) : (
-                        <>
-                          <Banknote className="w-5 h-5" />
-                          <span>
-                            Confirm Withdraw {amount ? formatCurrencyAmount(Number(amount), activeWithdrawCurrency) : ''}
-                          </span>
-                        </>
+                        <span>Verify Bank Account</span>
                       )}
                     </button>
+                  </div>
+                </div>
 
-                    <div className="flex items-center justify-center gap-2">
-                      <Lock className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        Authenticated Bearer Payout • {payoutGateway.toUpperCase()} Live Settlement
-                      </span>
+                {wdVerifyError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold">
+                    {wdVerifyError}
+                  </div>
+                )}
+
+                {wdNameMismatchError && (
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold flex items-center gap-2">
+                    <XCircle className="w-4 h-4 shrink-0" />
+                    <span>{wdNameMismatchError}</span>
+                  </div>
+                )}
+
+                {/* Beneficiary Preview Card */}
+                <div className="p-4 rounded-2xl border border-purple-200 bg-purple-50/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-900 uppercase">
+                      Beneficiary Preview
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                        wdIsVerified
+                          ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200'
+                          : 'bg-purple-100 text-[#7C3AED]'
+                      }`}
+                    >
+                      {wdIsVerified ? 'VERIFIED' : 'PENDING VERIFY'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase">BANK</div>
+                      <div className="font-bold text-slate-900 truncate">{wdBankName || '—'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase">GATEWAY</div>
+                      <div className="font-bold text-slate-900 uppercase">{wdGateway}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase">ACCOUNT NUMBER</div>
+                      <div className="font-bold tabular-nums text-slate-900">
+                        {wdAccountNumber ? maskNumberForDisplay(wdAccountNumber) : '—'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase">REAL ACCOUNT NAME</div>
+                      <div className="font-extrabold text-[#16A34A] truncate">
+                        {wdVerifiedName || 'Verify bank to confirm'}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            )}
+              </div>
 
-            {activeTab === 'history' && (
-              <motion.div
-                key="history"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <TransactionHistory user={user} />
-              </motion.div>
-            )}
-
-            {activeTab === 'settings' && (
-              <motion.div
-                key="settings"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-8"
-              >
+              {/* Right Column: Source Pocket, Amount, Gateways & Sticky Confirm */}
+              <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter mb-2">Wallet Security</h3>
-                  <p className="text-sm text-gray-500 font-medium">Manage your security settings and payment methods.</p>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Select Source Pocket
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'playerWallet', label: 'WINS', bal: playerWallet },
+                      { id: 'cashOutWallet', label: 'CASHOUT', bal: cashOutWallet },
+                      { id: 'depositWallet', label: 'DEPOSIT POCKET', bal: mainWallet }
+                    ].map((src) => {
+                      const active = wdSourceWallet === src.id;
+                      return (
+                        <button
+                          key={src.id}
+                          type="button"
+                          onClick={() => setWdSourceWallet(src.id as any)}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            active
+                              ? 'border-[#7C3AED] bg-purple-50'
+                              : 'border-purple-100 bg-white hover:border-purple-300'
+                          }`}
+                        >
+                          <div className="text-[10px] font-extrabold text-[#7C3AED] truncate">{src.label}</div>
+                          <div className="text-xs font-extrabold tabular-nums text-slate-900 mt-0.5 truncate">
+                            {formatBalanceDisplay(src.bal, 'NGN')}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
-                    <div className="flex items-center gap-3">
-                      <Lock className="w-6 h-6 text-indigo-600" />
-                      <h4 className="font-bold text-gray-900">Security Measures</h4>
+                <div className="flex items-center justify-between text-xs bg-purple-50/50 border border-purple-100 rounded-xl px-3.5 py-2.5">
+                  <span className="font-semibold text-slate-600">Available Balance</span>
+                  <span className="font-extrabold tabular-nums text-slate-900">
+                    {formatBalanceDisplay(wdAvailableBalance, 'NGN')}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Withdrawal Amount (₦)
+                  </label>
+                  <input
+                    type="number"
+                    min={100}
+                    value={wdAmount}
+                    onChange={(e) => setWdAmount(e.target.value)}
+                    placeholder="Enter amount (min ₦100)"
+                    className="w-full px-3.5 py-3 rounded-xl border border-purple-200 bg-white text-lg font-extrabold tabular-nums text-slate-900 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                  <div className="grid grid-cols-4 gap-2 mt-2">
+                    {[0.25, 0.5, 0.75, 1].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          const maxNet = Math.max(0, Math.floor((wdAvailableBalance - wdFee) * pct));
+                          setWdAmount(String(maxNet));
+                        }}
+                        className="py-1.5 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] text-xs font-extrabold"
+                      >
+                        {pct * 100}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gateway Selection */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">Payout Gateway</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWdGateway('paystack')}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-extrabold transition-all ${
+                        wdGateway === 'paystack'
+                          ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                          : 'bg-white text-slate-700 border-purple-100'
+                      }`}
+                    >
+                      PAYSTACK PAYOUT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWdGateway('flutterwave')}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-extrabold transition-all ${
+                        wdGateway === 'flutterwave'
+                          ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                          : 'bg-white text-slate-700 border-purple-100'
+                      }`}
+                    >
+                      FLUTTERWAVE PAYOUT
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fee Line */}
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs font-bold text-[#16A34A]">
+                  Fee {formatCurrencyAmount(wdFee, 'NGN')} — You will receive{' '}
+                  <span className="tabular-nums">{formatCurrencyAmount(wdParsedAmount, 'NGN')}</span> — Arrives in 1-5 mins
+                </div>
+
+                {wdStatusMessage && (
+                  <div
+                    className={`p-3 rounded-xl border text-xs font-bold ${
+                      wdStatusMessage.type === 'success'
+                        ? 'bg-emerald-50 border-emerald-200 text-[#16A34A]'
+                        : 'bg-red-50 border-red-200 text-[#DC2626]'
+                    }`}
+                  >
+                    {wdStatusMessage.text}
+                  </div>
+                )}
+
+                {/* Sticky Mobile Confirm Withdraw CTA (GREY & DISABLED until verified & valid) */}
+                <div className="sticky bottom-2 z-10 sm:static">
+                  <button
+                    type="button"
+                    onClick={handleStartWithdraw}
+                    disabled={!canConfirmWithdraw}
+                    className={`w-full py-4 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 transition-colors shadow-md ${
+                      canConfirmWithdraw
+                        ? 'bg-[#16A34A] hover:bg-emerald-700 text-white cursor-pointer'
+                        : 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                    }`}
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>
+                      CONFIRM WITHDRAW{' '}
+                      {wdParsedAmount > 0 ? formatCurrencyAmount(wdParsedAmount, 'NGN') : ''}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== PAGE 5: HISTORY & SECURITY ===================== */}
+        {isHistoryOrSecurityTab && (
+          <div className="space-y-6">
+            {/* History Section */}
+            <TransactionHistory user={user} onFundAccount={() => setActiveTab('deposit')} />
+
+            {/* Security & Payment Methods Section */}
+            <div ref={securitySectionRef} className="space-y-5">
+              <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-purple-50 pb-3">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900 m-0">
+                      Security &amp; Protection
+                    </h2>
+                    <p className="text-xs text-slate-500 m-0 max-w-none">
+                      Manage 2FA, Transaction PIN, Biometric confirmation &amp; active devices
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-[#16A34A] border border-emerald-200 text-xs font-bold">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Your money is safe
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Two-Factor Authentication */}
+                  <div className="p-4 rounded-2xl border border-purple-100 bg-purple-50/40 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-extrabold text-slate-900">
+                        Two-Factor Authentication
+                      </div>
+                      <div className="text-xs text-slate-600">Required for withdrawals</div>
                     </div>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">Two-Factor Authentication</p>
-                          <p className="text-[10px] text-gray-700 font-medium">Required for withdrawals</p>
-                        </div>
-                        <div className="w-12 h-6 bg-indigo-600 rounded-full relative cursor-pointer">
-                          <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">End-to-End Encryption</p>
-                          <p className="text-[10px] text-gray-700 font-medium">Protecting payment data</p>
-                        </div>
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">Regular Backups</p>
-                          <p className="text-[10px] text-gray-700 font-medium">Daily automated backups</p>
-                        </div>
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      </div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggle2FA}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-colors shrink-0 ${
+                        twoFactorEnabled
+                          ? 'bg-[#16A34A] text-white'
+                          : 'bg-[#7C3AED] text-white'
+                      }`}
+                    >
+                      {twoFactorEnabled ? 'Enabled' : 'Enable 2FA'}
+                    </button>
                   </div>
 
-                  <div className="bg-white border border-gray-100 p-6 rounded-[2rem] shadow-sm space-y-6">
-                    <div className="flex items-center gap-3">
-                      <CreditCard className="w-6 h-6 text-indigo-600" />
-                      <h4 className="font-bold text-gray-900">Payment Methods</h4>
+                  {/* Transaction PIN */}
+                  <div className="p-4 rounded-2xl border border-purple-100 bg-purple-50/40 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-extrabold text-slate-900">Transaction PIN</div>
+                      <div className="text-xs text-slate-600">
+                        {hasTransactionPin ? '4-digit PIN is active' : 'Create a 4-digit PIN'}
+                      </div>
                     </div>
-                    
-                    <div className="space-y-3">
-                      {paymentMethods.map(pm => (
-                        <div key={pm.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-2xl">
-                          <div className="flex items-center gap-3">
-                            {pm.type === 'credit_card' ? <CreditCard className="w-4 h-4 text-gray-700" /> : <Banknote className="w-4 h-4 text-gray-700" />}
-                            <div>
-                              <p className="text-xs font-bold text-gray-900">{pm.name}</p>
-                              <p className="text-[10px] text-gray-700 font-medium">{pm.details}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPinSetupError(null);
+                        setShowPinSetupModal(true);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-[#7C3AED] hover:bg-purple-700 text-white text-xs font-extrabold shrink-0"
+                    >
+                      {hasTransactionPin ? 'Change PIN' : 'Set PIN'}
+                    </button>
+                  </div>
+
+                  {/* End-to-End Encryption */}
+                  <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-extrabold text-slate-900">End-to-End Encryption</div>
+                      <div className="text-xs text-slate-600">Enabled — Protecting payment data</div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#16A34A] text-white text-xs font-extrabold shrink-0">
+                      Enabled
+                    </span>
+                  </div>
+
+                  {/* Regular Backups */}
+                  <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-extrabold text-slate-900">Regular Backups</div>
+                      <div className="text-xs text-slate-600">Daily automated backups</div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-[#16A34A] text-white text-xs font-extrabold shrink-0">
+                      Active
+                    </span>
+                  </div>
+
+                  {/* Biometric Confirmation */}
+                  <div className="md:col-span-2 p-4 rounded-2xl border border-purple-100 bg-white flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center shrink-0">
+                        <Fingerprint className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-extrabold text-slate-900">
+                          Biometric Confirmation
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Quick fingerprint / device verification check when available
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleToggleBiometric}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-colors shrink-0 ${
+                        biometricEnabled ? 'bg-[#16A34A] text-white' : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {biometricEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Login History + Saved Payment Methods */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Login History */}
+                <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-extrabold text-slate-900 m-0">Login History</h3>
+                    <button
+                      type="button"
+                      onClick={handleLogoutAllDevices}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#DC2626] border border-red-200 text-xs font-bold transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Log out all other devices</span>
+                    </button>
+                  </div>
+
+                  <div className="divide-y divide-purple-50">
+                    {loginHistory.length === 0 ? (
+                      <p className="text-xs text-slate-500 m-0 max-w-none py-4">
+                        Active browser session verified.
+                      </p>
+                    ) : (
+                      loginHistory.slice(0, 6).map((log) => {
+                        const dt = log.createdAtIso ? new Date(log.createdAtIso) : new Date();
+                        return (
+                          <div key={log.id} className="py-2.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-slate-900 truncate">
+                                {log.description || log.eventType || 'Wallet Session'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                {log.device || 'Web Browser'} • {log.city || 'Protected Location'}
+                              </div>
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-500 shrink-0 text-right">
+                              <div>{dt.toLocaleDateString()}</div>
+                              <div>{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                             </div>
                           </div>
-                          <button 
-                            onClick={() => setPaymentsList(prev => prev.filter(p => p.id !== pm.id))}
-                            className="text-[10px] font-bold text-red-500 hover:underline"
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Saved Payment Methods */}
+                <div
+                  ref={paymentMethodsRef}
+                  className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-purple-100 space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-extrabold text-slate-900 m-0">
+                      Payment Methods
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddMethodForm((v) => !v)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#7C3AED] hover:bg-purple-700 text-white text-xs font-bold transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add New Method</span>
+                    </button>
+                  </div>
+
+                  {showAddMethodForm && (
+                    <form
+                      onSubmit={handleAddPaymentMethod}
+                      className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-3"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <select
+                          value={newMethodType}
+                          onChange={(e) => setNewMethodType(e.target.value as any)}
+                          className="px-3 py-2 rounded-xl border border-purple-200 bg-white text-xs font-bold text-slate-900"
+                        >
+                          <option value="bank_transfer">Bank Account</option>
+                          <option value="credit_card">Debit / Credit Card</option>
+                          <option value="crypto">Crypto Wallet (BTC / USDT)</option>
+                          <option value="mobile_money">Mobile Money</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={newMethodName}
+                          onChange={(e) => setNewMethodName(e.target.value)}
+                          placeholder="Label (e.g. First Bank / Visa)"
+                          className="px-3 py-2 rounded-xl border border-purple-200 bg-white text-xs font-semibold text-slate-900"
+                          required
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={newMethodDetails}
+                        onChange={(e) => setNewMethodDetails(e.target.value)}
+                        placeholder="Account Number, Card Number, or Wallet Address"
+                        className="w-full px-3 py-2 rounded-xl border border-purple-200 bg-white text-xs font-semibold text-slate-900"
+                        required
+                      />
+                      {newMethodType === 'crypto' && (
+                        <input
+                          type="text"
+                          value={newMethodNetwork}
+                          onChange={(e) => setNewMethodNetwork(e.target.value)}
+                          placeholder="Network (e.g. TRC20, Bitcoin)"
+                          className="w-full px-3 py-2 rounded-xl border border-purple-200 bg-white text-xs font-semibold text-slate-900"
+                        />
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddMethodForm(false)}
+                          className="px-3 py-1.5 rounded-xl border border-purple-200 bg-white text-xs font-bold text-slate-600"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isAddingMethod}
+                          className="px-4 py-1.5 rounded-xl bg-[#16A34A] text-white text-xs font-extrabold"
+                        >
+                          {isAddingMethod ? 'Saving...' : 'Save Method'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {paymentMethods.length === 0 ? (
+                    <p className="text-xs text-slate-500 m-0 max-w-none py-4">
+                      No saved payment methods yet. Add a bank, card, or wallet above.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paymentMethods.map((pm) => (
+                        <div
+                          key={pm.id}
+                          className="p-3 rounded-xl border border-purple-100 bg-purple-50/30 flex items-center justify-between gap-3"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 rounded-xl bg-white border border-purple-200 text-[#7C3AED] flex items-center justify-center shrink-0">
+                              {pm.type === 'crypto' ? (
+                                <Bitcoin className="w-4 h-4" />
+                              ) : pm.type === 'credit_card' ? (
+                                <CreditCard className="w-4 h-4" />
+                              ) : (
+                                <Building2 className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-extrabold text-slate-900 truncate">{pm.name}</div>
+                              <div className="text-[11px] font-bold tabular-nums text-slate-500 truncate">
+                                {pm.details}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRequestRemoveMethod(pm.id)}
+                            className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#DC2626] text-xs font-bold border border-red-200 shrink-0"
                           >
                             Remove
                           </button>
                         </div>
                       ))}
-                      <button 
-                        onClick={() => {
-                          setAddMethodName('');
-                          setAddMethodDetails('');
-                          setAddMethodType('credit_card');
-                          setShowAddMethodModal(true);
-                        }}
-                        className="w-full py-3 border-2 border-dashed border-gray-200 rounded-2xl text-xs font-bold text-gray-400 hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" /> Add New Method
-                      </button>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Persistent Mobile Bottom Navigation (Home / Cards / Activity / Profile) */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-purple-100 shadow-lg sm:hidden">
+        <div className="grid grid-cols-4 h-16 max-w-[1200px] mx-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
+              activeTab === 'overview' ? 'text-[#7C3AED]' : 'text-slate-500'
+            }`}
+          >
+            <Home className="w-5 h-5" />
+            <span>Home</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('history');
+              setTimeout(() => {
+                paymentMethodsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 120);
+            }}
+            className="flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold text-slate-500 hover:text-[#7C3AED]"
+          >
+            <CreditCard className="w-5 h-5" />
+            <span>Cards</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('history')}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
+              isHistoryOrSecurityTab ? 'text-[#7C3AED]' : 'text-slate-500'
+            }`}
+          >
+            <History className="w-5 h-5" />
+            <span>Activity</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold ${
+              activeTab === 'profile' ? 'text-[#7C3AED]' : 'text-slate-500'
+            }`}
+          >
+            <UserIcon className="w-5 h-5" />
+            <span>Profile</span>
+          </button>
         </div>
       </div>
-      
-      <TransactionPinModal 
-        isOpen={showPinModal}
-        onClose={() => setShowPinModal(false)}
-        onConfirm={confirmTransaction}
-        amount={pendingAction?.amount || 0}
-        action={pendingAction?.type === 'deposit' ? 'Wallet Funding' : 'Wallet Withdrawal'}
-      />
 
-      <AnimatePresence>
-        {selectedReceiptTx && (
-          <StrategicReceipt 
-            transaction={selectedReceiptTx}
-            userEmail={user.email}
-            onClose={() => setSelectedReceiptTx(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Internal Swap Modal */}
+      {/* ===================== CURRENCY SWAP MODAL ===================== */}
       <AnimatePresence>
         {showSwapModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md font-sans"
+            className="fixed inset-0 z-[1050] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowSwapModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="w-full max-w-md bg-white rounded-[2rem] p-8 border border-gray-100 shadow-2xl relative"
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-white rounded-2xl p-5 sm:p-6 shadow-xl border border-purple-200 space-y-4"
             >
-              <button 
-                onClick={() => setShowSwapModal(false)}
-                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-950 hover:bg-gray-100 rounded-full transition-all"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-
-              <div className="text-center space-y-3 mb-6">
-                <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-md">
-                  <ArrowRightLeft className="w-6 h-6" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-purple-50 text-[#7C3AED] flex items-center justify-center">
+                    <ArrowRightLeft className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 m-0">Currency Swap</h3>
+                    <p className="text-xs text-slate-500 m-0 max-w-none">Live exchange rates</p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-black text-gray-900 uppercase tracking-tighter">Currency Converter</h3>
-                <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                  Convert funds from any of your segregated vaults directly into 🏦 Deposit Stakes for immediate gaming and lottery gameplay.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSwapModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div className="space-y-4">
-                {/* Source Selection Buttons */}
-                <div className="space-y-1.5">
-                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Select Source Vault</label>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { id: 'playerWallet', label: '🏆 Wins (NGN)', balance: user.playerWallet, sym: '₦' },
-                      { id: 'cashOutWallet', label: '💰 Cashout (NGN)', balance: user.cashOutWallet || 0, sym: '₦' },
-                      { id: 'usd_balance', label: '🇺🇸 USD ($)', balance: user.usd_balance || 0, sym: '$' },
-                      { id: 'gbp_balance', label: '🇬🇧 GBP (£)', balance: user.gbp_balance || 0, sym: '£' },
-                      { id: 'eur_balance', label: '🇪🇺 EUR (€)', balance: user.eur_balance || 0, sym: '€' },
-                    ].map(v => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => {
-                          setSwapSource(v.id as any);
-                          setSwapAmount('');
-                        }}
-                        className={`p-2 rounded-xl text-left border transition-all ${
-                          swapSource === v.id
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                            : 'bg-gray-50 text-slate-700 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        <p className="text-[9px] font-black uppercase truncate">{v.label}</p>
-                        <p className="text-[10px] font-black font-mono mt-0.5 truncate">
-                          {v.sym}{v.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Live Rate Badge */}
-                {['usd_balance', 'gbp_balance', 'eur_balance'].includes(swapSource) && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-                    <span className="text-[10px] font-bold text-emerald-800">Current Exchange Rate</span>
-                    <span className="text-xs font-black text-emerald-700 font-mono">
-                      {swapSource === 'usd_balance' && '1 USD = ₦1,500'}
-                      {swapSource === 'gbp_balance' && '1 GBP = ₦1,900'}
-                      {swapSource === 'eur_balance' && '1 EUR = ₦1,620'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-[9px] text-gray-500 font-black uppercase tracking-wider">
-                    Amount to Swap ({
-                      swapSource === 'usd_balance' ? '$ USD' :
-                      swapSource === 'gbp_balance' ? '£ GBP' :
-                      swapSource === 'eur_balance' ? '€ EUR' : '₦ NGN'
-                    })
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={swapAmount}
-                      onChange={e => setSwapAmount(e.target.value)}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                    />
-                    <button
-                      onClick={() => {
-                        const maxVal = 
-                          swapSource === 'playerWallet' ? user.playerWallet :
-                          swapSource === 'cashOutWallet' ? (user.cashOutWallet || 0) :
-                          swapSource === 'usd_balance' ? (user.usd_balance || 0) :
-                          swapSource === 'gbp_balance' ? (user.gbp_balance || 0) :
-                          (user.eur_balance || 0);
-                        setSwapAmount(String(maxVal));
+              <form onSubmit={handleExecuteSwap} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">From Pocket</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={swapSourceWallet}
+                      onChange={(e) => {
+                        const val = e.target.value as any;
+                        setSwapSourceWallet(val);
+                        if (val !== 'depositWallet') setSwapFromCurrency('NGN');
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-indigo-600 uppercase hover:underline"
+                      className="px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-xs font-bold text-slate-900"
                     >
-                      MAX
-                    </button>
+                      <option value="depositWallet">Currency Pocket</option>
+                      <option value="cashOutWallet">Cash Out Wallet</option>
+                      <option value="playerWallet">Main / Wins</option>
+                      <option value="promoWallet">Promo Wallet</option>
+                    </select>
+
+                    <select
+                      value={swapFromCurrency}
+                      disabled={swapSourceWallet !== 'depositWallet'}
+                      onChange={(e) => setSwapFromCurrency(e.target.value)}
+                      className="px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-xs font-bold text-slate-900 disabled:bg-slate-50"
+                    >
+                      {ACTIVE_WALLET_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                {/* Conversion Outcome Preview */}
-                {Number(swapAmount) > 0 && (
-                  <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between text-xs">
-                    <span className="text-[10px] font-bold text-indigo-900">You Will Receive:</span>
-                    <span className="text-sm font-black text-indigo-700 font-mono">
-                      ₦{(
-                        swapSource === 'usd_balance' ? Number(swapAmount) * 1500 :
-                        swapSource === 'gbp_balance' ? Number(swapAmount) * 1900 :
-                        swapSource === 'eur_balance' ? Number(swapAmount) * 1620 :
-                        Number(swapAmount)
-                      ).toLocaleString()} Stakes
-                    </span>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">To Pocket</label>
+                  <select
+                    value={swapToCurrency}
+                    onChange={(e) => setSwapToCurrency(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-sm font-bold text-slate-900"
+                  >
+                    {ACTIVE_WALLET_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Amount to Swap ({swapFromCurrency})
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step="any"
+                    value={swapAmount}
+                    onChange={(e) => setSwapAmount(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 bg-white text-base font-extrabold tabular-nums text-slate-900"
+                    required
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 space-y-1">
+                  {isLoadingSwapRate ? (
+                    <div className="text-xs font-bold text-[#7C3AED] flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Fetching live rate...</span>
+                    </div>
+                  ) : swapQuote ? (
+                    <>
+                      <div className="flex justify-between text-xs font-semibold text-slate-600">
+                        <span>Live Rate</span>
+                        <span className="font-bold text-slate-900 tabular-nums">
+                          1 {swapFromCurrency} = {swapQuote.rate} {swapToCurrency}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs font-semibold text-slate-600">
+                        <span>Conversion Fee (0.5%)</span>
+                        <span className="tabular-nums">
+                          {formatCurrencyAmount(swapQuote.feeAmount, swapFromCurrency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm font-extrabold text-[#16A34A] pt-1 border-t border-purple-200">
+                        <span>You Receive</span>
+                        <span className="tabular-nums">
+                          {formatCurrencyAmount(swapQuote.receiveAmount, swapToCurrency)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-slate-500">Enter an amount to preview rate.</div>
+                  )}
+                </div>
+
+                {swapError && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold">
+                    {swapError}
                   </div>
                 )}
 
                 <button
-                  onClick={handleSwapWinningsToDeposit}
-                  disabled={isProcessing || !swapAmount || Number(swapAmount) <= 0}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 cursor-pointer"
+                  type="submit"
+                  disabled={isExecutingSwap}
+                  className="w-full py-3.5 rounded-xl bg-[#7C3AED] hover:bg-purple-700 disabled:bg-slate-200 disabled:text-slate-500 text-white font-extrabold text-sm flex items-center justify-center gap-2"
                 >
-                  {isProcessing ? 'Completing Swap...' : 'Confirm Swap & Convert'}
+                  {isExecutingSwap ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Converting...</span>
+                    </>
+                  ) : (
+                    <span>Confirm Instant Swap</span>
+                  )}
                 </button>
-              </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* ===================== SET / CHANGE PIN MODAL ===================== */}
       <AnimatePresence>
-        {showAddMethodModal && (
+        {showPinSetupModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+            className="fixed inset-0 z-[1060] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowPinSetupModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="w-full max-w-md bg-white rounded-3xl p-8 border border-gray-100 shadow-2xl relative"
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl border border-purple-200 space-y-4"
             >
-              <button 
-                onClick={() => setShowAddMethodModal(false)}
-                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-
-              <h4 className="text-lg font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 mb-2">
-                <CreditCard className="w-5 h-5 text-indigo-600" /> New Payment Method
-              </h4>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-6 border-b border-gray-100 pb-4">
-                Add a secure deposit or cashout pathway
-              </p>
-
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Method Type</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: 'credit_card', label: 'Credit Card' },
-                      { id: 'bank_transfer', label: 'Bank Account' },
-                      { id: 'crypto', label: 'Crypto Wallet' }
-                    ].map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setAddMethodType(t.id as any)}
-                        className={`py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all border ${
-                          addMethodType === t.id
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Method Label / Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Visa ending in 9901, OPay Account..."
-                    value={addMethodName}
-                    onChange={(e) => setAddMethodName(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500 transition-all animate-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em] block pl-1">Details (Card #, Account #, or Address)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. **** **** **** 9901, 0123456789, bc1q..."
-                    value={addMethodDetails}
-                    onChange={(e) => setAddMethodDetails(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:ring-1 focus:ring-indigo-500 transition-all animate-none"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!addMethodName.trim() || !addMethodDetails.trim()) {
-                      alert("Please fill in all details");
-                      return;
-                    }
-                    const newPm: PaymentMethod = {
-                      id: 'pm_' + Date.now(),
-                      type: addMethodType,
-                      name: addMethodName.trim(),
-                      details: addMethodDetails.trim(),
-                      isDefault: false
-                    };
-                    setPaymentsList(prev => [...prev, newPm]);
-                    setShowAddMethodModal(false);
-                  }}
-                  className="w-full py-4 bg-indigo-600 text-white font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-indigo-700 transition-all"
-                >
-                  Confirm & Save Method
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-extrabold text-slate-900 m-0">
+                  {hasTransactionPin ? 'Change Transaction PIN' : 'Set 4-Digit Transaction PIN'}
+                </h3>
+                <button type="button" onClick={() => setShowPinSetupModal(false)} className="text-slate-400">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+              <form onSubmit={handleSaveTransactionPin} className="space-y-3">
+                {hasTransactionPin && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Current 4-Digit PIN</label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      inputMode="numeric"
+                      value={currentPinInput}
+                      onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 text-center text-lg font-extrabold tracking-widest"
+                      required
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">New 4-Digit PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    inputMode="numeric"
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 text-center text-lg font-extrabold tracking-widest"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Confirm 4-Digit PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    inputMode="numeric"
+                    value={confirmPinInput}
+                    onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 text-center text-lg font-extrabold tracking-widest"
+                    required
+                  />
+                </div>
+                {pinSetupError && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold">
+                    {pinSetupError}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSavingPin}
+                  className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-purple-700 text-white font-extrabold text-sm"
+                >
+                  {isSavingPin ? 'Saving PIN...' : 'Save Transaction PIN'}
+                </button>
+              </form>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* COMPREHENSIVE PAYMENT & PAYOUT GUIDELINES MODAL */}
+      {/* ===================== 2FA OTP CONFIRM MODAL ===================== */}
+      <AnimatePresence>
+        {show2faModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1060] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShow2faModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl border border-purple-200 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-extrabold text-slate-900 m-0">
+                  Verify 6-Digit Security Code
+                </h3>
+                <button type="button" onClick={() => setShow2faModal(false)} className="text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-600 m-0 max-w-none">
+                Enter the 6-digit verification code sent via SMS / Email to{' '}
+                {pending2faTargetState ? 'enable' : 'disable'} Two-Factor Authentication.
+              </p>
+              {twoFaOtpDelivery && (
+                <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs font-semibold text-[#7C3AED]">
+                  {twoFaOtpDelivery}
+                </div>
+              )}
+              <form onSubmit={handleConfirm2faOtp} className="space-y-3">
+                <input
+                  type="text"
+                  maxLength={6}
+                  inputMode="numeric"
+                  value={twoFaOtpCode}
+                  onChange={(e) => setTwoFaOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="Enter 6-digit code"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-purple-200 text-center text-lg font-extrabold tracking-widest tabular-nums"
+                  required
+                />
+                {twoFaError && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-[#DC2626] text-xs font-bold">
+                    {twoFaError}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isVerifying2fa}
+                  className="w-full py-3 rounded-xl bg-[#16A34A] text-white font-extrabold text-sm"
+                >
+                  {isVerifying2fa ? 'Verifying...' : 'Confirm Code'}
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PIN / OTP Verification Modal for Withdraw & Remove Method */}
+      <TransactionPinModal
+        isOpen={pinModalOpen}
+        onClose={() => {
+          wdIdempotencyKeyRef.current = '';
+          setPinModalOpen(false);
+          setPinModalError(null);
+        }}
+        onConfirm={handlePinModalConfirm}
+        amount={pinModalContext === 'withdraw' ? wdParsedAmount : 0}
+        action={pinModalContext === 'withdraw' ? 'Confirm Bank Withdrawal' : 'Remove Saved Payment Method'}
+        currencySymbol="₦"
+        subtitle={
+          pinModalContext === 'withdraw'
+            ? `Sending to ${wdVerifiedName} (${wdBankName})`
+            : 'Enter your 4-digit Transaction PIN to remove this method'
+        }
+        errorMessage={pinModalError}
+        isSubmitting={pinModalSubmitting}
+        requiresOtp={pinModalRequiresOtp}
+        otpDeliveryNotice={pinModalOtpDelivery}
+      />
+
+      {selectedReceiptTx && (
+        <StrategicReceipt
+          transaction={selectedReceiptTx}
+          onClose={() => setSelectedReceiptTx(null)}
+        />
+      )}
+
       <PaymentGuidelinesModal
         isOpen={showGuidelinesModal}
         onClose={() => setShowGuidelinesModal(false)}
