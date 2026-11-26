@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore as getAdminFirestore, FieldValue as AdminFieldValue } from 'firebase-admin/firestore';
@@ -23,18 +24,48 @@ import {
   serverTimestamp as clientServerTimestamp,
   type QueryConstraint
 } from 'firebase/firestore';
-import bundledFirebaseConfig from '../../firebase-applet-config.json';
 
 function loadFirebaseConfig(): any {
+  const candidates: string[] = [
+    path.resolve(process.cwd(), 'firebase-applet-config.json')
+  ];
+
   try {
-    const cwdPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(cwdPath)) {
-      return JSON.parse(fs.readFileSync(cwdPath, 'utf8'));
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+      candidates.push(fileURLToPath(new URL('../../firebase-applet-config.json', import.meta.url)));
     }
   } catch {
-    // Fall back to statically bundled config
+    // Ignore when bundled into CommonJS
   }
-  return bundledFirebaseConfig;
+
+  try {
+    if (typeof __dirname !== 'undefined') {
+      candidates.push(path.resolve(__dirname, '../../firebase-applet-config.json'));
+      candidates.push(path.resolve(__dirname, '../firebase-applet-config.json'));
+    }
+  } catch {
+    // Ignore in pure ESM
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate && fs.existsSync(candidate)) {
+        return JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  return {
+    projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'efado-market-hubs-8leju',
+    appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID || '1:101379452246:web:8fc923051745f8dfa5baf7',
+    apiKey: process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'efado-market-hubs-8leju.firebaseapp.com',
+    firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || 'ai-studio-ae55e9a4-6837-4ca3-a2d6-3ec7ce41d18a',
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'efado-market-hubs-8leju.firebasestorage.app',
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '101379452246'
+  };
 }
 
 const cfg = loadFirebaseConfig();

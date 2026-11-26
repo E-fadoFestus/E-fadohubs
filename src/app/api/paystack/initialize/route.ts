@@ -122,11 +122,14 @@ export async function POST(req: Request) {
 
     const authUrl = paystackResponse?.data?.authorization_url;
     if (!paystackResponse?.status || !authUrl) {
+      const msg = paystackResponse?.message || 'Failed to initialize payment with Paystack';
       return Response.json({
         success: false,
-        error: paystackResponse?.message || 'Failed to initialize payment with Paystack',
+        status: false,
+        message: msg,
+        error: msg,
         details: paystackResponse
-      }, { status: 500 });
+      }, { status: 502 });
     }
 
     return Response.json({
@@ -139,13 +142,18 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('[Next.js Paystack Init Error]:', error);
-    const status =
-      typeof error?.status === 'number' && error.status >= 400 && error.status < 600
+    const msg = error?.message || 'Failed to initialize payment';
+    const isMissingConfig = msg.includes('PAYSTACK_SECRET_KEY');
+    const status = isMissingConfig
+      ? 503
+      : typeof error?.status === 'number' && error.status >= 400 && error.status < 600
         ? error.status
         : 500;
     return Response.json({
       success: false,
-      error: error.message || 'Failed to initialize payment'
+      status: false,
+      message: msg,
+      error: msg
     }, { status });
   }
 }

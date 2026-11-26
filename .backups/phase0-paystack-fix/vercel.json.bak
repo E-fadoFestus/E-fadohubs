@@ -1,0 +1,68 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/paystack/withdraw/status",
+      "destination": "/api/paystack-router?action=withdraw-status"
+    },
+    {
+      "source": "/api/paystack/withdraw-status",
+      "destination": "/api/paystack-router?action=withdraw-status"
+    },
+    {
+      "source": "/api/paystack/verify/:reference",
+      "destination": "/api/paystack-router?action=verify&reference=:reference"
+    },
+    {
+      "source": "/api/paystack/:action",
+      "destination": "/api/paystack-router?action=:action"
+    },
+    {
+      "source": "/api/webhook/paystack",
+      "destination": "/api/paystack-router?action=webhook"
+    },
+    {
+      "source": "/webhook/paystack",
+      "destination": "/api/paystack-router?action=webhook"
+    },
+    {
+      "source": "/api/flutterwave/initialize",
+      "destination": "/api/payments/initialize"
+    },
+    {
+      "source": "/api/flutterwave/verify/:txRef",
+      "destination": "/api/payments/verify?tx_ref=:txRef"
+    },
+    {
+      "source": "/api/flutterwave/verify",
+      "destination": "/api/payments/verify"
+    },
+    {
+      "source": "/api/flutterwave/banks",
+      "destination": "/api/payments/banks"
+    },
+    {
+      "source": "/api/banks",
+      "destination": "/api/payments/banks"
+    },
+    {
+      "source": "/api/flutterwave/withdraw",
+      "destination": "/api/payments/withdraw"
+    },
+    {
+      "source": "/api/flutterwave/payout",
+      "destination": "/api/payments/withdraw"
+    },
+    {
+      "source": "/api/flutterwave/transfer",
+      "destination": "/api/payments/withdraw"
+    },
+    {
+      "source": "/api/bank/resolve",
+      "destination": "/api/verify-bank"
+    },
+    {
+      "source": "/((?!api/|assets/|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

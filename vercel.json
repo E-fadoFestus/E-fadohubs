@@ -61,6 +61,26 @@
       "destination": "/api/verify-bank"
     },
     {
+      "source": "/api/wallet/:path*",
+      "destination": "/api/wallet-router?__route=/api/wallet/:path*"
+    },
+    {
+      "source": "/api/security/:path*",
+      "destination": "/api/wallet-router?__route=/api/security/:path*"
+    },
+    {
+      "source": "/api/banks/list",
+      "destination": "/api/wallet-router?__route=/api/banks/list"
+    },
+    {
+      "source": "/api/webhooks/:path*",
+      "destination": "/api/wallet-router?__route=/api/webhooks/:path*"
+    },
+    {
+      "source": "/api/marketplace/:path*",
+      "destination": "/api/wallet-router?__route=/api/marketplace/:path*"
+    },
+    {
       "source": "/((?!api/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }

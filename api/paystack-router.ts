@@ -77,14 +77,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ success: false, error: `Unknown or unsupported Paystack route: ${resolvedAction || reqUrl.pathname}` });
     }
 
+    const HOP_BY_HOP = new Set([
+      'content-length',
+      'host',
+      'connection',
+      'transfer-encoding',
+      'keep-alive',
+      'upgrade'
+    ]);
+
     const headers = new Headers();
     for (const [k, v] of Object.entries(req.headers)) {
-      if (v !== undefined) {
+      if (v !== undefined && !HOP_BY_HOP.has(k.toLowerCase())) {
         headers.set(k, Array.isArray(v) ? v.join(', ') : String(v));
       }
     }
 
     const bodyText = await readRawBody(req);
+    if (bodyText !== undefined && !headers.has('content-type')) {
+      headers.set('content-type', 'application/json');
+    }
+
     const webRequest = new Request(reqUrl.toString(), {
       method: req.method || 'GET',
       headers,
