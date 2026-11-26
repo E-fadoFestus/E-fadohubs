@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type { Express, NextFunction, Request, Response } from 'express';
-import { getServerDb, getServerTimestamp } from './server-firestore';
+import { getServerDb, getServerTimestamp } from './server-firestore.js';
 import {
   acquireInFlightLock,
   checkRateLimit,
@@ -19,14 +19,14 @@ import {
   toMinorUnits,
   verifyBearerUser,
   verifyPinHash
-} from './wallet-security';
+} from './wallet-security.js';
 import {
   createTransferRecipient,
   initializePaystackPayment,
   initiateTransfer,
   verifyPaystackPayment,
   verifyPaystackSignature
-} from './paystack';
+} from './paystack.js';
 
 interface AuthedRequest extends Request {
   rawBody?: Buffer;

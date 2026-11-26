@@ -1,13 +1,12 @@
 import crypto from 'crypto';
-import { jsPDF } from 'jspdf';
-import { auth, getServerDb, getServerTimestamp } from './server-firestore';
+import { auth, getServerDb, getServerTimestamp } from './server-firestore.js';
 import {
   ACTIVE_WALLET_CURRENCIES,
   getWalletCurrencyMeta,
   isActiveWalletCurrency,
   isDisabledFutureCurrency,
   normalizeCurrencyCode
-} from '../constants/walletCurrencies';
+} from '../constants/walletCurrencies.js';
 
 export interface VerifiedAuthUser {
   uid: string;
@@ -396,7 +395,7 @@ export function toIsoStringSafe(ts: any): string {
   return new Date().toISOString();
 }
 
-export function generateAccountStatementPdf(params: {
+export async function generateAccountStatementPdf(params: {
   userName: string;
   userEmail: string;
   fromDate: string;
@@ -405,7 +404,8 @@ export function generateAccountStatementPdf(params: {
   openingBalance: number;
   closingBalance: number;
   transactions: any[];
-}): Buffer {
+}): Promise<Buffer> {
+  const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const sym = getWalletCurrencyMeta(params.currency).symbol;
   const fmt = (n: number) => `${params.currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

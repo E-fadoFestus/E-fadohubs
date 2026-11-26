@@ -1,13 +1,13 @@
 import type { Express, Request, Response } from 'express';
 import crypto from 'crypto';
-import { auth, getServerDb, getServerTimestamp } from './server-firestore';
+import { auth, getServerDb, getServerTimestamp } from './server-firestore.js';
 import {
   ACTIVE_WALLET_CURRENCIES,
   FUTURE_WALLET_CURRENCIES,
   getMinDepositForCurrency,
   isDisabledFutureCurrency,
   normalizeCurrencyCode
-} from '../constants/walletCurrencies';
+} from '../constants/walletCurrencies.js';
 import {
   initializePaystackPayment,
   verifyPaystackPayment,
@@ -16,8 +16,8 @@ import {
   resolveAccountNumber,
   createTransferRecipient,
   initiateTransfer
-} from './paystack';
-import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks';
+} from './paystack.js';
+import { FLUTTERWAVE_BANKS } from '../data/flutterwaveBanks.js';
 import {
   acquireInFlightLock,
   calculateSwapQuote,
@@ -47,18 +47,33 @@ import {
   verifyBearerUser,
   verifyPinHash,
   type VerifiedAuthUser
-} from './wallet-security';
+} from './wallet-security.js';
 
 type AuthedRequest = Request & { authUser?: VerifiedAuthUser; rawBody?: Buffer };
 
+function hasPaystackSecret(): boolean {
+  const raw =
+    process.env.PAYSTACK_SECRET_KEY ||
+    process.env.PAYSTACK_LIVE ||
+    process.env.PAYSTACK_LIVE_SECRET_KEY ||
+    process.env.PAYSTACK_SECRET ||
+    process.env.VITE_PAYSTACK_SECRET_KEY ||
+    '';
+  return Boolean(raw.trim().replace(/^['"]|['"]$/g, '').replace(/[;\s]/g, ''));
+}
+
 function getFlwSecret(): string {
   return (
+    process.env.FLWSECK_LIVE ||
     process.env.FLUTTERWAVE_CLIENT_SECRET ||
     process.env.FLUTTERWAVE_SECRET_KEY ||
     process.env.FLW_SECRET_KEY ||
     process.env.FLWSECK ||
     ''
-  ).trim();
+  )
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/[;\s]/g, '');
 }
 
 function getOpayConfig() {
@@ -977,17 +992,32 @@ export function registerWalletRoutes(app: Express) {
 
       let resolvedName = '';
       let resolvedVia = '';
+      const paystackConfigured = hasPaystackSecret();
+      const flwSecretConfigured = getFlwSecret();
+
+      if (!paystackConfigured && !flwSecretConfigured) {
+        return res.status(503).json({
+          success: false,
+          verified: false,
+          code: 'KEY_MISSING',
+          message: 'Key missing: PAYSTACK_SECRET_KEY and FLW_SECRET_KEY are missing in server environment.'
+        });
+      }
 
       if (gateway === 'flutterwave' || !/^\d{3,6}$/.test(cleanCode)) {
-        const flwSecret = getFlwSecret();
-        if (flwSecret && /^\d{10}$/.test(cleanAcc) && /^\d{3,6}$/.test(cleanCode)) {
+        if (flwSecretConfigured && /^\d{10}$/.test(cleanAcc) && /^\d{3,6}$/.test(cleanCode)) {
+          let flwBankCode = cleanCode;
+          if (flwBankCode === '999992') flwBankCode = '100004';
+          if (flwBankCode === '999991') flwBankCode = '100033';
+          if (flwBankCode === '50211') flwBankCode = '090267';
+
           const flwRes = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${flwSecret}`,
+              Authorization: `Bearer ${flwSecretConfigured}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ account_number: cleanAcc, account_bank: cleanCode })
+            body: JSON.stringify({ account_number: cleanAcc, account_bank: flwBankCode })
           });
           const flwData: any = await flwRes.json().catch(() => ({}));
           if (flwRes.ok && flwData?.status === 'success' && flwData?.data?.account_name) {
@@ -1006,15 +1036,19 @@ export function registerWalletRoutes(app: Express) {
           }
         } catch (psErr: any) {
           // Try Flutterwave backup if configured
-          const flwSecret = getFlwSecret();
-          if (flwSecret) {
+          if (flwSecretConfigured) {
+            let flwBankCode = cleanCode;
+            if (flwBankCode === '999992') flwBankCode = '100004';
+            if (flwBankCode === '999991') flwBankCode = '100033';
+            if (flwBankCode === '50211') flwBankCode = '090267';
+
             const flwRes = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
               method: 'POST',
               headers: {
-                Authorization: `Bearer ${flwSecret}`,
+                Authorization: `Bearer ${flwSecretConfigured}`,
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify({ account_number: cleanAcc, account_bank: cleanCode })
+              body: JSON.stringify({ account_number: cleanAcc, account_bank: flwBankCode })
             });
             const flwData: any = await flwRes.json().catch(() => ({}));
             if (flwRes.ok && flwData?.status === 'success' && flwData?.data?.account_name) {
@@ -1023,10 +1057,15 @@ export function registerWalletRoutes(app: Express) {
             }
           }
           if (!resolvedName) {
-            return res.status(400).json({
+            const msg = String(psErr?.message || '');
+            const missingKey = msg.includes('PAYSTACK_SECRET_KEY') && !flwSecretConfigured;
+            return res.status(missingKey ? 503 : 400).json({
               success: false,
               verified: false,
-              message: psErr?.message || 'Could not verify account number with bank.'
+              ...(missingKey ? { code: 'KEY_MISSING' } : {}),
+              message: missingKey
+                ? 'Key missing: PAYSTACK_SECRET_KEY or FLW_SECRET_KEY is missing in Vercel environment.'
+                : (msg || 'Could not verify account number with bank.')
             });
           }
         }
@@ -1036,7 +1075,11 @@ export function registerWalletRoutes(app: Express) {
         return res.status(400).json({
           success: false,
           verified: false,
-          message: 'Unable to verify bank account details. Check the account number and bank.'
+          message: !paystackConfigured && gateway !== 'flutterwave'
+            ? 'Key missing: PAYSTACK_SECRET_KEY is missing in Vercel environment.'
+            : !flwSecretConfigured && gateway === 'flutterwave'
+              ? 'Key missing: FLW_SECRET_KEY is missing in Vercel environment.'
+              : 'Unable to verify bank account details. Check the account number and bank.'
         });
       }
 
@@ -1735,7 +1778,7 @@ export function registerWalletRoutes(app: Express) {
       }
       const openingBalance = Math.max(0, fromMinorUnits(toMinorUnits(closingBalance) - netDeltaMinor));
 
-      const pdfBuffer = generateAccountStatementPdf({
+      const pdfBuffer = await generateAccountStatementPdf({
         userName: u.fullName || u.displayName || user.name || 'EFADO Member',
         userEmail: u.email || user.email,
         fromDate,
