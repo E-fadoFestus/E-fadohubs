@@ -69,6 +69,10 @@
       "destination": "/api/wallet-router?__route=/api/security/:path*"
     },
     {
+      "source": "/api/auth/:path*",
+      "destination": "/api/wallet-router?__route=/api/auth/:path*"
+    },
+    {
       "source": "/api/banks/list",
       "destination": "/api/wallet-router?__route=/api/banks/list"
     },

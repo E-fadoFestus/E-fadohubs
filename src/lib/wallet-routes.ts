@@ -1440,6 +1440,11 @@ export function registerWalletRoutes(app: Express) {
       if (gateway === 'flutterwave') {
         const flwSecret = getFlwSecret();
         if (flwSecret) {
+          let flwBankCode = targetBankCode;
+          if (flwBankCode === '999992') flwBankCode = '100004';
+          if (flwBankCode === '999991') flwBankCode = '100033';
+          if (flwBankCode === '50211') flwBankCode = '090267';
+
           try {
             const flwRes = await fetch('https://api.flutterwave.com/v3/transfers', {
               method: 'POST',
@@ -1448,7 +1453,7 @@ export function registerWalletRoutes(app: Express) {
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
-                account_bank: targetBankCode,
+                account_bank: flwBankCode,
                 account_number: targetAccNumber,
                 amount: numAmount,
                 currency: cleanCurrency,
@@ -1469,22 +1474,27 @@ export function registerWalletRoutes(app: Express) {
           }
         } else {
           finalStatus = 'failed';
-          gatewayError = 'Flutterwave server secret key is not configured.';
+          gatewayError = 'Key missing: FLW_SECRET_KEY is not configured on the server.';
         }
       } else {
         // Paystack payout
-        try {
-          const recResp = await createTransferRecipient(targetAccName, targetAccNumber, targetBankCode, cleanCurrency);
-          const recipientCode = recResp?.data?.recipient_code;
-          if (!recipientCode) {
-            throw new Error('Could not register transfer recipient on Paystack.');
-          }
-          const trResp = await initiateTransfer(numAmount, recipientCode, ref, `EFADO Wallet Payout`);
-          const trStatus = String(trResp?.data?.status || '').toLowerCase();
-          finalStatus = trStatus === 'success' ? 'completed' : 'pending';
-        } catch (e: any) {
+        if (!hasPaystackSecret()) {
           finalStatus = 'failed';
-          gatewayError = e?.message || 'Paystack transfer could not be processed.';
+          gatewayError = 'Key missing: PAYSTACK_SECRET_KEY is not configured on the server.';
+        } else {
+          try {
+            const recResp = await createTransferRecipient(targetAccName, targetAccNumber, targetBankCode, cleanCurrency);
+            const recipientCode = recResp?.data?.recipient_code;
+            if (!recipientCode) {
+              throw new Error('Could not register transfer recipient on Paystack.');
+            }
+            const trResp = await initiateTransfer(numAmount, recipientCode, ref, `EFADO Wallet Payout`);
+            const trStatus = String(trResp?.data?.status || '').toLowerCase();
+            finalStatus = trStatus === 'success' ? 'completed' : 'pending';
+          } catch (e: any) {
+            finalStatus = 'failed';
+            gatewayError = e?.message || 'Paystack transfer could not be processed.';
+          }
         }
       }
 
