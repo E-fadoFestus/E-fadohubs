@@ -44,6 +44,12 @@ const SERVICE_CHARGE_RATE = 0.013; // 1.3%
 const HIGH_VALUE_OTP_THRESHOLD_KOBO = 100000 * 100; // ₦100,000
 
 const SEED_SELLER_ID = 'efado_verified_official_store';
+const CEO_OFFICIAL_SELLER_ID = 'efado_official_store_bonny';
+let ceoStoreVerifiedThisBoot = false;
+
+function isOfficialSeedSeller(sellerId?: string): boolean {
+  return sellerId === SEED_SELLER_ID || sellerId === CEO_OFFICIAL_SELLER_ID;
+}
 
 function formatNairaPlain(n: number): string {
   return `₦${Number(n || 0).toLocaleString('en-NG', {
@@ -131,7 +137,7 @@ function sanitizeProductForPublic(docData: any, uid?: string) {
 
 async function createMarketAlert(params: {
   userId: string;
-  type: 'ORDER' | 'ESCROW' | 'WAITLIST' | 'CHAT' | 'DISPUTE' | 'SECURITY' | 'SELLER_SALE';
+  type: 'ORDER' | 'ESCROW' | 'WAITLIST' | 'CHAT' | 'DISPUTE' | 'SECURITY' | 'SELLER_SALE' | 'VENDOR';
   title: string;
   message: string;
   orderId?: string;
@@ -189,8 +195,85 @@ async function isAdminUser(uid: string, email?: string): Promise<boolean> {
   return false;
 }
 
+async function ensureCeoOfficialStoreSeed(db: any) {
+  if (ceoStoreVerifiedThisBoot) return;
+  ceoStoreVerifiedThisBoot = true;
+  try {
+    const nowIso = new Date().toISOString();
+    const ceoSellerRef = db.doc(`modern_market_sellers/${CEO_OFFICIAL_SELLER_ID}`);
+    const ceoSellerSnap = await ceoSellerRef.get();
+    if (!ceoSellerSnap.exists) {
+      await ceoSellerRef.set({
+        sellerId: CEO_OFFICIAL_SELLER_ID,
+        storeName: 'EFADO Official Store',
+        verified: true,
+        rating: 5.0,
+        salesCount: 615,
+        location: 'Bonny, Rivers State',
+        storeAddress: 'EFADO Official Flagship Store, Hospital Road, Bonny Island, Rivers State',
+        joinedAt: '2024-01-01T00:00:00.000Z',
+        payoutPreference: 'wallet',
+        updatedAt: nowIso
+      });
+    }
+
+    const ceoProdId = 'prod_efado_official_watch_ultra2';
+    const ceoProdRef = db.doc(`modern_market_products/${ceoProdId}`);
+    const ceoProdSnap = await ceoProdRef.get();
+    if (!ceoProdSnap.exists) {
+      await ceoProdRef.set({
+        id: ceoProdId,
+        sellerId: CEO_OFFICIAL_SELLER_ID,
+        sellerName: 'EFADO Official Store',
+        sellerVerified: true,
+        sellerRating: 5.0,
+        sellerSalesCount: 615,
+        sellerLocation: 'Bonny, Rivers State',
+        sellerJoinedAt: '2024-01-01T00:00:00.000Z',
+        name: 'Apple Watch Ultra 2 Titanium 49mm (Official Sealed)',
+        brand: 'Apple',
+        price: 1150000,
+        priceKobo: 115000000,
+        stock: 7,
+        category: 'Accessories',
+        condition: 'BRAND_NEW',
+        warrantyMonths: 12,
+        photos: ['/assets/market/smartwatch_ultra.jpg'],
+        description:
+          'Direct from EFADO Official Store (Bonny, Rivers State). Factory sealed Brand New Apple Watch Ultra 2 (49mm Titanium, Slate Ocean Band, S9 SiP, 12-month official warranty & Escrow protected).',
+        specs: {
+          ram: 'S9 Dual-Core SiP',
+          storage: '64GB Internal',
+          color: 'Natural Titanium / Slate',
+          battery: 'Up to 72 Hours',
+          model: 'MREG3LL/A',
+          colorsAvailable: ['Natural Titanium'],
+          sizesAvailable: ['49mm']
+        },
+        freeDelivery: true,
+        deliveryFee: 0,
+        deliveryFeeKobo: 0,
+        estimatedDelivery: 'Arrives in 1-2 Days',
+        returnDays: 7,
+        rating: 5.0,
+        reviewsCount: 39,
+        salesCount: 92,
+        status: 'ACTIVE',
+        soldAt: null,
+        waitlist: [],
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+    }
+  } catch (err) {
+    ceoStoreVerifiedThisBoot = false;
+    console.warn('[CEO Official Store Seed Notice]:', err);
+  }
+}
+
 async function ensureSeedCatalog() {
   const db = getServerDb();
+  await ensureCeoOfficialStoreSeed(db);
   const existing = await db.collection('modern_market_products').limit(1).get();
   if (!existing.empty) return;
 
@@ -846,6 +929,12 @@ async function releaseOrderEscrowToSeller(
   }
 }
 
+function sanitizeOrderForViewer(ord: any) {
+  if (!ord) return ord;
+  const { authTokenHash, authTokenExpiresAt, idempotencyKey, ...safe } = ord;
+  return safe;
+}
+
 /**
  * Idempotently verifies and finalizes a pending external gateway order (Paystack / Flutterwave / OPay).
  */
@@ -854,8 +943,9 @@ async function finalizeExternalOrderPayment(params: {
   gateway: 'paystack' | 'flutterwave' | 'opay';
   paidAmountKobo: number;
   currency: string;
+  gatewayTransactionId?: string;
 }): Promise<{ order: any; soldOutRefunded: boolean }> {
-  const { reference, gateway, paidAmountKobo, currency } = params;
+  const { reference, gateway, paidAmountKobo, currency, gatewayTransactionId } = params;
   const db = getServerDb();
   const serverTime = getServerTimestamp();
   const nowIso = new Date().toISOString();
@@ -1022,6 +1112,7 @@ async function finalizeExternalOrderPayment(params: {
           pickupCode,
           paymentGateway: gateway,
           paymentReference: reference,
+          ...(gatewayTransactionId ? { gatewayTransactionId: String(gatewayTransactionId) } : {}),
           trackingHistory: history,
           updatedAt: nowIso
         },
@@ -1161,6 +1252,20 @@ export function registerMarketplaceRoutes(app: Express) {
     }
   });
 
+  // Hourly Cron Sweep Endpoint (SOLD >24h -> Sold Archive, DELIVERED >48h -> Auto-Release Escrow)
+  app.get('/api/marketplace/cron', async (_req: Request, res: Response) => {
+    try {
+      const result = await runMarketplaceLifecycleMaintenance();
+      return res.json({
+        success: true,
+        ...result,
+        ranAt: new Date().toISOString()
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Lifecycle cron sweep failed.' });
+    }
+  });
+
   // =========================================================================
   // 1. PRODUCT CATALOG, SEARCH, FILTERS, SOLD ARCHIVE, WAITLIST & RELIST
   // =========================================================================
@@ -1194,7 +1299,7 @@ export function registerMarketplaceRoutes(app: Express) {
         if (raw.condition !== 'BRAND_NEW') return;
 
         if (includeArchivedMine && optionalUser) {
-          if (raw.sellerId === optionalUser.uid || (optionalUser.email && ADMIN_EMAILS.has(optionalUser.email.toLowerCase()) && raw.sellerId === SEED_SELLER_ID)) {
+          if (raw.sellerId === optionalUser.uid || (optionalUser.email && ADMIN_EMAILS.has(optionalUser.email.toLowerCase()) && isOfficialSeedSeller(raw.sellerId))) {
             list.push(sanitizeProductForPublic(raw, optionalUser.uid));
           }
           return;
@@ -1319,7 +1424,10 @@ export function registerMarketplaceRoutes(app: Express) {
       const description = String(body.description || '').trim();
       const freeDelivery = Boolean(body.freeDelivery);
       const deliveryFee = freeDelivery ? 0 : Math.max(0, Number(body.deliveryFee || 0));
-      const photos = Array.isArray(body.photos) ? body.photos.filter((p: any) => typeof p === 'string' && p.trim()) : [];
+      const rawPhotos = Array.isArray(body.photos)
+        ? body.photos.filter((p: any) => typeof p === 'string' && p.trim()).map((p: string) => p.trim())
+        : [];
+      const photos = rawPhotos.slice(0, 5);
 
       if (!name || !category || !Number.isFinite(price) || price <= 0 || stock < 1) {
         return res.status(400).json({
@@ -1328,38 +1436,84 @@ export function registerMarketplaceRoutes(app: Express) {
         });
       }
 
+      const totalPhotoBytes = photos.reduce((sum: number, p: string) => sum + Buffer.byteLength(p, 'utf8'), 0);
+      if (totalPhotoBytes > 850 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: 'Uploaded product photos are too large combined. Please use smaller images (up to 5 photos).'
+        });
+      }
+
       const db = getServerDb();
       const nowIso = new Date().toISOString();
-      const sellerSnap = await db.doc(`modern_market_sellers/${user.uid}`).get();
-      const userSnap = await db.doc(`users/${user.uid}`).get();
+      const [sellerSnap, userSnap, isAdmin] = await Promise.all([
+        db.doc(`modern_market_sellers/${user.uid}`).get(),
+        db.doc(`users/${user.uid}`).get(),
+        isAdminUser(user.uid, user.email)
+      ]);
       const uData = userSnap.exists ? userSnap.data() || {} : {};
-      const sellerData = sellerSnap.exists
-        ? sellerSnap.data() || {}
+      const sellerExisting = sellerSnap.exists ? sellerSnap.data() || {} : null;
+
+      const isSellerVerified =
+        isAdmin ||
+        Boolean(
+          sellerExisting &&
+            (sellerExisting.verified === true || sellerExisting.applicationStatus === 'APPROVED')
+        );
+
+      if (!isSellerVerified) {
+        const statusMsg =
+          sellerExisting?.applicationStatus === 'PENDING_APPROVAL'
+            ? 'Your Vendor Registration is Pending Approval. You can list products once Admin approves your store.'
+            : 'Only Verified Vendors can list products. Complete Vendor Registration first.';
+        return res.status(403).json({
+          success: false,
+          code: 'VENDOR_NOT_VERIFIED',
+          message: statusMsg
+        });
+      }
+
+      const sellerData = sellerExisting
+        ? sellerExisting
         : {
             sellerId: user.uid,
-            storeName: body.storeName || uData.displayName || user.name || 'EFADO Verified Merchant',
+            storeName: body.storeName || uData.displayName || user.name || 'EFADO Official Merchant',
             verified: true,
-            rating: 4.9,
+            applicationStatus: 'APPROVED',
+            rating: 5.0,
             salesCount: 0,
             location: body.location || 'Lagos, Nigeria',
-            storeAddress: body.storeAddress || 'Lagos Retail Hub',
+            storeAddress: body.storeAddress || 'EFADO Official Hub',
             joinedAt: nowIso,
             payoutPreference: 'wallet'
           };
 
-      if (!sellerSnap.exists) {
+      if (!sellerExisting && isAdmin) {
         await db.doc(`modern_market_sellers/${user.uid}`).set(sellerData, { merge: true });
       }
+
+      const parseList = (v: any): string[] => {
+        if (Array.isArray(v)) return v.map((x) => String(x || '').trim()).filter(Boolean);
+        if (typeof v === 'string') return v.split(',').map((x) => x.trim()).filter(Boolean);
+        return [];
+      };
+
+      const specColor = String(body.specs?.color || '').trim();
+      const colorsAvailable = parseList(body.specs?.colorsAvailable);
+      if (colorsAvailable.length === 0 && specColor) {
+        colorsAvailable.push(specColor);
+      }
+      const sizesAvailable = parseList(body.specs?.sizesAvailable);
 
       const id = `prod_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
       const productDoc = {
         id,
         sellerId: user.uid,
         sellerName: sellerData.storeName,
-        sellerVerified: Boolean(sellerData.verified ?? true),
+        sellerVerified: true,
         sellerRating: Number(sellerData.rating ?? 4.9),
         sellerSalesCount: Number(sellerData.salesCount ?? 0),
-        sellerLocation: body.location || sellerData.location || 'Lagos, Nigeria',
+        sellerLocation: String(body.location || sellerData.location || 'Lagos, Nigeria').trim(),
         sellerJoinedAt: sellerData.joinedAt || nowIso,
         name,
         brand,
@@ -1367,20 +1521,20 @@ export function registerMarketplaceRoutes(app: Express) {
         priceKobo: toMinorUnits(price),
         stock,
         category,
-        condition: 'BRAND_NEW',
+        condition: 'BRAND_NEW', // Locked: Modern Market accepts Brand New - Sealed only
         warrantyMonths,
         photos: photos.length > 0 ? photos : ['/assets/market/iphone_13_pro_max.jpg'],
         description:
           description ||
           `Brand New factory sealed ${name} with ${warrantyMonths} months manufacturer warranty and 7-day return protection.`,
         specs: {
-          ram: body.specs?.ram || 'Standard',
-          storage: body.specs?.storage || 'Factory Sealed',
-          color: body.specs?.color || 'Original',
-          battery: body.specs?.battery || 'Full Capacity',
-          model: body.specs?.model || brand,
-          colorsAvailable: Array.isArray(body.specs?.colorsAvailable) ? body.specs.colorsAvailable : [body.specs?.color || 'Original'],
-          sizesAvailable: Array.isArray(body.specs?.sizesAvailable) ? body.specs.sizesAvailable : ['Standard']
+          ram: String(body.specs?.ram || '').trim() || 'Standard',
+          storage: String(body.specs?.storage || '').trim() || 'Factory Sealed',
+          color: specColor || colorsAvailable[0] || 'Original',
+          battery: String(body.specs?.battery || '').trim() || 'Full Capacity',
+          model: String(body.specs?.model || '').trim() || brand,
+          colorsAvailable,
+          sizesAvailable
         },
         freeDelivery,
         deliveryFee,
@@ -1420,7 +1574,7 @@ export function registerMarketplaceRoutes(app: Express) {
 
       const prod = snap.data() || {};
       const isAdmin = await isAdminUser(user.uid, user.email);
-      if (prod.sellerId !== user.uid && !(isAdmin && prod.sellerId === SEED_SELLER_ID)) {
+      if (prod.sellerId !== user.uid && !(isAdmin && isOfficialSeedSeller(prod.sellerId))) {
         return res.status(403).json({ success: false, message: 'Only the product seller can relist this item.' });
       }
 
@@ -1640,8 +1794,89 @@ export function registerMarketplaceRoutes(app: Express) {
   });
 
   // =========================================================================
-  // 3. ORDER CREATION, AUTHORIZATION (PIN + >₦100K OTP), PAYMENT & VERIFY
+  // 3. CART STOCK CHECK, ORDER CREATION, AUTHORIZATION (PIN + >₦100K OTP), PAYMENT & VERIFY
   // =========================================================================
+  app.post('/api/marketplace/cart/check-stock', async (req: Request, res: Response) => {
+    try {
+      const { items } = req.body || {};
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.json({ success: true, allAvailable: true, blockedMessage: null, items: [] });
+      }
+
+      const db = getServerDb();
+      const results: any[] = [];
+      let allAvailable = true;
+      let blockedMessage: string | null = null;
+
+      for (const reqItem of items.slice(0, 40)) {
+        const productId = String(reqItem?.productId || '').trim();
+        const requestedQty = Math.max(1, Math.floor(Number(reqItem?.quantity || 1)));
+        if (!productId) continue;
+
+        const pSnap = await db.doc(`modern_market_products/${productId}`).get();
+        if (!pSnap.exists) {
+          allAvailable = false;
+          blockedMessage = blockedMessage || 'Sorry, this item just sold out';
+          results.push({
+            productId,
+            exists: false,
+            available: false,
+            soldOut: true,
+            availableStock: 0,
+            requestedQty,
+            reason: 'Sorry, this item just sold out',
+            product: null
+          });
+          continue;
+        }
+
+        const pd = { id: pSnap.id, ...(pSnap.data() || {}) };
+        const cleanProduct = sanitizeProductForPublic(pd);
+        const liveStock = Number(cleanProduct.stock || 0);
+        const isActiveBrandNew = pd.status === 'ACTIVE' && pd.condition === 'BRAND_NEW';
+        const isSoldOut = !isActiveBrandNew || liveStock < 1;
+        const available = isActiveBrandNew && liveStock >= requestedQty;
+
+        let reason: string | null = null;
+        if (isSoldOut) {
+          reason = 'Sorry, this item just sold out';
+        } else if (!available) {
+          reason = `Only ${liveStock} left in stock for ${cleanProduct.name}`;
+        }
+
+        if (!available) {
+          allAvailable = false;
+          if (!blockedMessage) {
+            blockedMessage = isSoldOut ? 'Sorry, this item just sold out' : reason;
+          }
+        }
+
+        results.push({
+          productId,
+          exists: true,
+          available,
+          soldOut: isSoldOut,
+          availableStock: liveStock,
+          requestedQty,
+          reason,
+          product: cleanProduct
+        });
+      }
+
+      return res.json({
+        success: true,
+        allAvailable,
+        blockedMessage,
+        items: results
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        message: err?.message || 'Could not verify live product stock.'
+      });
+    }
+  });
+
   app.post('/api/marketplace/order/create', async (req: Request, res: Response) => {
     try {
       const user = await verifyBearerUser(req);
@@ -1785,7 +2020,14 @@ export function registerMarketplaceRoutes(app: Express) {
       };
 
       await db.doc(`modern_market_orders/${orderId}`).set(orderDoc);
-      return res.json({ success: true, order: orderDoc });
+      await writeAuditLog('ORDER_CREATED', user.uid, {
+        orderId,
+        sellerId: primary.sellerId,
+        productName: orderDoc.productName,
+        amountNgn: orderDoc.grandTotal,
+        deliveryMethod
+      });
+      return res.json({ success: true, order: sanitizeOrderForViewer(orderDoc) });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err?.message || 'Failed to create order.' });
     }
@@ -2220,16 +2462,25 @@ export function registerMarketplaceRoutes(app: Express) {
         }
       }
 
+      const opayMerchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
+      const opaySecret = (process.env.OPAY_SECRET_KEY || '').trim();
+      const effectiveGateway: 'paystack' | 'flutterwave' | 'opay' =
+        cleanGateway === 'flutterwave'
+          ? 'flutterwave'
+          : cleanGateway === 'opay' && opayMerchantId && opaySecret
+            ? 'opay'
+            : 'paystack';
+
       const paymentRef = `MKT-${cleanOrderId}-${Date.now()}`;
       const baseOrigin = String(returnOrigin || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-      const callbackUrl = `${baseOrigin}/?marketplace_order=${encodeURIComponent(cleanOrderId)}&reference=${encodeURIComponent(paymentRef)}&gateway=${encodeURIComponent(cleanGateway)}`;
+      const callbackUrl = `${baseOrigin}/?marketplace_order=${encodeURIComponent(cleanOrderId)}&reference=${encodeURIComponent(paymentRef)}&gateway=${encodeURIComponent(effectiveGateway)}`;
 
       await db.doc(`pendingMarketplacePayments/${paymentRef}`).set({
         reference: paymentRef,
         orderId: cleanOrderId,
         buyerId: user.uid,
         amountKobo: order.grandTotalKobo,
-        gateway: cleanGateway,
+        gateway: effectiveGateway,
         paymentMethod: cleanMethod,
         status: 'pending',
         createdAt: nowIso
@@ -2238,7 +2489,7 @@ export function registerMarketplaceRoutes(app: Express) {
       await orderRef.set(
         {
           paymentMethod: cleanMethod,
-          paymentGateway: cleanGateway,
+          paymentGateway: effectiveGateway,
           paymentReference: paymentRef,
           idempotencyKey,
           updatedAt: nowIso
@@ -2246,7 +2497,7 @@ export function registerMarketplaceRoutes(app: Express) {
         { merge: true }
       );
 
-      if (cleanGateway === 'flutterwave') {
+      if (effectiveGateway === 'flutterwave') {
         const flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || '').trim();
         if (!flwSecret) {
           return res.status(400).json({
@@ -2297,15 +2548,7 @@ export function registerMarketplaceRoutes(app: Express) {
         });
       }
 
-      if (cleanGateway === 'opay') {
-        const merchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
-        const opaySecret = (process.env.OPAY_SECRET_KEY || '').trim();
-        if (!merchantId || !opaySecret) {
-          return res.status(400).json({
-            success: false,
-            message: 'OPay merchant gateway keys are not configured on this server. Please choose Card/Bank via Paystack or EFADO Wallet.'
-          });
-        }
+      if (effectiveGateway === 'opay') {
         const opayEnv = (process.env.OPAY_ENV || 'TEST').toUpperCase();
         const opayUrl =
           opayEnv === 'LIVE'
@@ -2316,7 +2559,7 @@ export function registerMarketplaceRoutes(app: Express) {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${opaySecret}`,
-            MerchantId: merchantId
+            MerchantId: opayMerchantId
           },
           body: JSON.stringify({
             amount: { total: order.grandTotalKobo, currency: 'NGN' },
@@ -2447,9 +2690,10 @@ export function registerMarketplaceRoutes(app: Express) {
           reference: resolvedRef,
           gateway: 'flutterwave',
           paidAmountKobo: toMinorUnits(Number(flwData.data.amount || 0)),
-          currency: String(flwData.data.currency || 'NGN')
+          currency: String(flwData.data.currency || 'NGN'),
+          gatewayTransactionId: flwData?.data?.id ? String(flwData.data.id) : transactionId ? String(transactionId) : undefined
         });
-        return res.json({ success: true, ...finalized });
+        return res.json({ success: true, order: sanitizeOrderForViewer(finalized.order), soldOutRefunded: finalized.soldOutRefunded });
       }
 
       if (resolvedGateway === 'opay') {
@@ -2481,9 +2725,10 @@ export function registerMarketplaceRoutes(app: Express) {
           reference: resolvedRef,
           gateway: 'opay',
           paidAmountKobo: Number(opayJson?.data?.amount?.total || pend.amountKobo),
-          currency: 'NGN'
+          currency: 'NGN',
+          gatewayTransactionId: opayJson?.data?.orderNo ? String(opayJson.data.orderNo) : undefined
         });
-        return res.json({ success: true, ...finalized });
+        return res.json({ success: true, order: sanitizeOrderForViewer(finalized.order), soldOutRefunded: finalized.soldOutRefunded });
       }
 
       // Paystack Verification
@@ -2499,9 +2744,10 @@ export function registerMarketplaceRoutes(app: Express) {
         reference: resolvedRef,
         gateway: 'paystack',
         paidAmountKobo: Number(psVerify.data.amount || 0),
-        currency: String(psVerify.data.currency || 'NGN')
+        currency: String(psVerify.data.currency || 'NGN'),
+        gatewayTransactionId: psVerify?.data?.id ? String(psVerify.data.id) : undefined
       });
-      return res.json({ success: true, ...finalized });
+      return res.json({ success: true, order: sanitizeOrderForViewer(finalized.order), soldOutRefunded: finalized.soldOutRefunded });
     } catch (err: any) {
       return res.status(err?.status || 500).json({
         success: false,
@@ -2521,7 +2767,7 @@ export function registerMarketplaceRoutes(app: Express) {
       const db = getServerDb();
       const snap = await db.collection('modern_market_orders').where('buyerId', '==', user.uid).get();
       const orders: any[] = [];
-      snap.forEach((d: any) => orders.push({ id: d.id, ...d.data() }));
+      snap.forEach((d: any) => orders.push(sanitizeOrderForViewer({ id: d.id, ...d.data() })));
       orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
       return res.json({ success: true, orders });
@@ -2541,8 +2787,10 @@ export function registerMarketplaceRoutes(app: Express) {
       const orders: any[] = [];
       snap.forEach((d: any) => {
         const od = d.data() || {};
-        if (od.sellerId === user.uid || (isAdmin && od.sellerId === SEED_SELLER_ID)) {
-          orders.push({ id: d.id, ...od });
+        if (od.sellerId === user.uid || (isAdmin && isOfficialSeedSeller(od.sellerId))) {
+          const safe = sanitizeOrderForViewer({ id: d.id, ...od });
+          delete safe.buyerEmail;
+          orders.push(safe);
         }
       });
       orders.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
@@ -2567,7 +2815,7 @@ export function registerMarketplaceRoutes(app: Express) {
       if (od.buyerId !== user.uid && od.sellerId !== user.uid && !isAdmin) {
         return res.status(403).json({ success: false, message: 'Access denied.' });
       }
-      return res.json({ success: true, order: { id: snap.id, ...od } });
+      return res.json({ success: true, order: sanitizeOrderForViewer({ id: snap.id, ...od }) });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err?.message || 'Failed to fetch tracking.' });
     }
@@ -2592,7 +2840,7 @@ export function registerMarketplaceRoutes(app: Express) {
 
       const ord = snap.data() || {};
       const isAdmin = await isAdminUser(user.uid, user.email);
-      if (ord.sellerId !== user.uid && !(isAdmin && ord.sellerId === SEED_SELLER_ID)) {
+      if (ord.sellerId !== user.uid && !(isAdmin && isOfficialSeedSeller(ord.sellerId))) {
         return res.status(403).json({ success: false, message: 'Only the seller can update shipping status.' });
       }
       if (!['PAID_ESCROW_HELD', 'SHIPPED', 'OUT_FOR_DELIVERY'].includes(ord.status)) {
@@ -2629,16 +2877,23 @@ export function registerMarketplaceRoutes(app: Express) {
         { merge: true }
       );
 
-      await createMarketAlert({
-        userId: ord.buyerId,
-        type: 'ORDER',
-        title: `Order Update: ${labelMap[targetStage]}`,
-        message: `${ord.productName} (${cleanOrderId}) is now ${labelMap[targetStage]}. Confirm receipt when in your hands.`,
-        orderId: cleanOrderId
-      });
+      await Promise.all([
+        createMarketAlert({
+          userId: ord.buyerId,
+          type: 'ORDER',
+          title: `Order Update: ${labelMap[targetStage]}`,
+          message: `${ord.productName} (${cleanOrderId}) is now ${labelMap[targetStage]}. Confirm receipt when in your hands.`,
+          orderId: cleanOrderId
+        }),
+        writeAuditLog('ORDER_SHIPPING_UPDATED', user.uid, {
+          orderId: cleanOrderId,
+          stage: targetStage,
+          buyerId: ord.buyerId
+        })
+      ]);
 
       const updated = await orderRef.get();
-      return res.json({ success: true, order: updated.data() });
+      return res.json({ success: true, order: sanitizeOrderForViewer(updated.data()) });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err?.message || 'Failed to update shipping.' });
     }
@@ -2810,7 +3065,124 @@ export function registerMarketplaceRoutes(app: Express) {
         return res.status(400).json({ success: false, message: 'Order escrow cannot be refunded in current state.' });
       }
 
+      const payGateway = String(ord.paymentGateway || 'wallet').toLowerCase();
+      const payMethod = String(ord.paymentMethod || 'wallet').toLowerCase();
+      const paymentRef = String(ord.paymentReference || '').trim();
       const refundRef = `MKT-REF-${cleanOrderId}-${Date.now()}`;
+
+      let refundChannelLabel = 'EFADO Wallet (Original Method)';
+      let externalRefundId: string | null = null;
+
+      // Refund MUST go back to ORIGINAL payment method:
+      // Card -> Card, Bank Transfer -> Bank Account, OPay -> OPay, Wallet -> Wallet
+      if (payGateway === 'paystack') {
+        const psSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+        if (!psSecret || !paymentRef) {
+          return res.status(400).json({
+            success: false,
+            message: 'Paystack refund key or payment reference missing.'
+          });
+        }
+        const psRefundRes = await fetch('https://api.paystack.co/refund', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${psSecret}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            transaction: paymentRef,
+            amount: Number(ord.grandTotalKobo || toMinorUnits(Number(ord.grandTotal || 0))),
+            merchant_note: `EFADO Escrow Refund (${cleanOrderId})`,
+            customer_note: `Refund returned to your original ${payMethod === 'bank' ? 'Bank Account' : payMethod === 'opay' ? 'OPay / Transfer Method' : 'Card'} for ${cleanOrderId}`
+          })
+        });
+        const psRefundJson: any = await psRefundRes.json().catch(() => ({}));
+        if (!psRefundRes.ok || !psRefundJson?.status) {
+          return res.status(502).json({
+            success: false,
+            message: psRefundJson?.message || 'Paystack original-method refund could not be processed.'
+          });
+        }
+        externalRefundId = String(psRefundJson?.data?.id || paymentRef);
+        refundChannelLabel =
+          payMethod === 'bank'
+            ? 'Original Bank Account (Paystack)'
+            : payMethod === 'opay'
+              ? 'Original OPay / Mobile Money (Paystack)'
+              : 'Original Card (Paystack)';
+      } else if (payGateway === 'flutterwave') {
+        const flwSecret = (process.env.FLUTTERWAVE_CLIENT_SECRET || process.env.FLUTTERWAVE_SECRET_KEY || '').trim();
+        if (!flwSecret || !paymentRef) {
+          return res.status(400).json({
+            success: false,
+            message: 'Flutterwave refund key or payment reference missing.'
+          });
+        }
+        let flwTxId = String(ord.gatewayTransactionId || '').trim();
+        if (!flwTxId) {
+          const lookup = await fetch(
+            `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${encodeURIComponent(paymentRef)}`,
+            { headers: { Authorization: `Bearer ${flwSecret}` } }
+          );
+          const lookupJson: any = await lookup.json().catch(() => ({}));
+          flwTxId = String(lookupJson?.data?.id || '').trim();
+        }
+        if (!flwTxId) {
+          return res.status(400).json({ success: false, message: 'Original Flutterwave transaction ID not found.' });
+        }
+        const flwRefRes = await fetch(`https://api.flutterwave.com/v3/transactions/${encodeURIComponent(flwTxId)}/refund`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${flwSecret}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ amount: Number(ord.grandTotal || 0) })
+        });
+        const flwRefJson: any = await flwRefRes.json().catch(() => ({}));
+        if (!flwRefRes.ok || flwRefJson?.status !== 'success') {
+          return res.status(502).json({
+            success: false,
+            message: flwRefJson?.message || 'Flutterwave card refund failed.'
+          });
+        }
+        externalRefundId = String(flwRefJson?.data?.id || flwTxId);
+        refundChannelLabel = 'Original Card (Flutterwave)';
+      } else if (payGateway === 'opay') {
+        const opayMerchantId = (process.env.OPAY_MERCHANT_ID || '').trim();
+        const opaySecret = (process.env.OPAY_SECRET_KEY || '').trim();
+        if (!opayMerchantId || !opaySecret || !paymentRef) {
+          return res.status(400).json({ success: false, message: 'OPay merchant credentials missing for refund.' });
+        }
+        const opayEnv = (process.env.OPAY_ENV || 'TEST').toUpperCase();
+        const opayRefundUrl =
+          opayEnv === 'LIVE'
+            ? 'https://api.opaycheckout.com/api/v1/international/cashier/refund'
+            : 'https://testapi.opaycheckout.com/api/v1/international/cashier/refund';
+        const opayRefRes = await fetch(opayRefundUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${opaySecret}`,
+            MerchantId: opayMerchantId
+          },
+          body: JSON.stringify({
+            reference: paymentRef,
+            orderNo: ord.gatewayTransactionId || paymentRef,
+            refundOriginalAmount: { total: Number(ord.grandTotalKobo || 0), currency: 'NGN' },
+            refundType: 'REFUND2ORIGINAL'
+          })
+        });
+        const opayRefJson: any = await opayRefRes.json().catch(() => ({}));
+        if (opayRefJson?.code !== '00000') {
+          return res.status(502).json({
+            success: false,
+            message: opayRefJson?.message || 'OPay original-account refund failed.'
+          });
+        }
+        externalRefundId = String(opayRefJson?.data?.orderNo || paymentRef);
+        refundChannelLabel = 'Original OPay Account';
+      }
+
       await db.runTransaction(async (tx: any) => {
         const fresh = await tx.get(orderRef);
         const cur = fresh.data() || {};
@@ -2818,31 +3190,34 @@ export function registerMarketplaceRoutes(app: Express) {
           throw Object.assign(new Error('Order already settled.'), { status: 409 });
         }
 
-        const buyerWalletRef = db.doc(`wallets/${cur.buyerId}/NGN/depositWallet`);
-        const buyerUserRef = db.doc(`users/${cur.buyerId}`);
-        const bwSnap = await tx.get(buyerWalletRef);
-        const oldBal = bwSnap.exists ? Number(bwSnap.data()?.balance ?? bwSnap.data()?.depositWallet ?? 0) : 0;
-        const newBal = fromMinorUnits(toMinorUnits(oldBal) + Number(cur.grandTotalKobo || 0));
+        if (payGateway === 'wallet') {
+          const buyerWalletRef = db.doc(`wallets/${cur.buyerId}/NGN/depositWallet`);
+          const buyerUserRef = db.doc(`users/${cur.buyerId}`);
+          const bwSnap = await tx.get(buyerWalletRef);
+          const oldBal = bwSnap.exists ? Number(bwSnap.data()?.balance ?? bwSnap.data()?.depositWallet ?? 0) : 0;
+          const newBal = fromMinorUnits(toMinorUnits(oldBal) + Number(cur.grandTotalKobo || 0));
 
-        tx.set(
-          buyerWalletRef,
-          { balance: newBal, depositWallet: newBal, currency: 'NGN', userId: cur.buyerId, updatedAt: serverTime },
-          { merge: true }
-        );
-        tx.set(buyerUserRef, { depositWallet: newBal, updatedAt: serverTime }, { merge: true });
+          tx.set(
+            buyerWalletRef,
+            { balance: newBal, depositWallet: newBal, currency: 'NGN', userId: cur.buyerId, updatedAt: serverTime },
+            { merge: true }
+          );
+          tx.set(buyerUserRef, { depositWallet: newBal, updatedAt: serverTime }, { merge: true });
+        }
 
         const txRec = {
-          type: 'deposit',
+          type: 'refund',
           status: 'completed',
-          credited: true,
+          credited: payGateway === 'wallet',
           amount: cur.grandTotal,
           currency: 'NGN',
           reference: refundRef,
+          externalRefundId,
           userId: cur.buyerId,
           hub: 'MODERN_MARKET',
-          gateway: 'efado_escrow',
-          method: 'Escrow Refund',
-          purpose: `Marketplace Escrow Refund +${formatNairaPlain(cur.grandTotal)} (${cur.orderId})`,
+          gateway: payGateway,
+          method: refundChannelLabel,
+          purpose: `Marketplace Escrow Refund to ${refundChannelLabel} (${cur.orderId})`,
           orderId: cleanOrderId,
           createdAtIso: nowIso,
           timestamp: serverTime,
@@ -2855,7 +3230,7 @@ export function registerMarketplaceRoutes(app: Express) {
         history.push({
           step: 'REFUNDED',
           label: 'Full Escrow Refund Issued',
-          description: `${formatNairaPlain(cur.grandTotal)} refunded to buyer EFADO Wallet.`,
+          description: `${formatNairaPlain(cur.grandTotal)} refunded to ${refundChannelLabel}.`,
           at: nowIso
         });
 
@@ -2865,6 +3240,9 @@ export function registerMarketplaceRoutes(app: Express) {
             status: 'REFUNDED',
             escrowStatus: 'REFUNDED',
             refundReference: refundRef,
+            refundChannel: refundChannelLabel,
+            externalRefundId,
+            refundedAt: nowIso,
             trackingHistory: history,
             updatedAt: nowIso
           },
@@ -2876,22 +3254,35 @@ export function registerMarketplaceRoutes(app: Express) {
         createMarketAlert({
           userId: ord.buyerId,
           type: 'ESCROW',
-          title: 'Escrow Refund Credited',
-          message: `${formatNairaPlain(ord.grandTotal)} has been refunded to your EFADO Wallet for ${cleanOrderId}.`,
+          title: 'Escrow Refund Issued',
+          message: `${formatNairaPlain(ord.grandTotal)} has been refunded to your ${refundChannelLabel} for ${cleanOrderId}.`,
+          orderId: cleanOrderId
+        }),
+        createMarketAlert({
+          userId: ord.sellerId,
+          type: 'ESCROW',
+          title: 'Order Refunded to Buyer',
+          message: `${formatNairaPlain(ord.grandTotal)} for ${cleanOrderId} was refunded to the buyer's ${refundChannelLabel}.`,
           orderId: cleanOrderId
         }),
         createWalletAlert(
           ord.buyerId,
           'deposit',
-          'Escrow Refund Credited',
-          `+${formatNairaPlain(ord.grandTotal)} refunded for Order ${cleanOrderId}.`,
-          { orderId: cleanOrderId, refundRef }
+          'Escrow Refund Issued',
+          `+${formatNairaPlain(ord.grandTotal)} refunded to ${refundChannelLabel} for Order ${cleanOrderId}.`,
+          { orderId: cleanOrderId, refundRef, refundChannel: refundChannelLabel }
         ),
-        writeAuditLog('ORDER_REFUNDED', user.uid, { orderId: cleanOrderId, refundRef, amountNgn: ord.grandTotal })
+        writeAuditLog('ORDER_REFUNDED', user.uid, {
+          orderId: cleanOrderId,
+          refundRef,
+          refundChannel: refundChannelLabel,
+          externalRefundId,
+          amountNgn: ord.grandTotal
+        })
       ]);
 
       const updated = await orderRef.get();
-      return res.json({ success: true, order: updated.data() });
+      return res.json({ success: true, order: sanitizeOrderForViewer(updated.data()) });
     } catch (err: any) {
       return res.status(err?.status || 500).json({ success: false, message: err?.message || 'Refund failed.' });
     } finally {
@@ -2940,7 +3331,7 @@ export function registerMarketplaceRoutes(app: Express) {
       const threads: any[] = [];
       snap.forEach((d: any) => {
         const t = d.data() || {};
-        if (t.buyerId === user.uid || t.sellerId === user.uid || (isAdmin && t.sellerId === SEED_SELLER_ID)) {
+        if (t.buyerId === user.uid || t.sellerId === user.uid || (isAdmin && isOfficialSeedSeller(t.sellerId))) {
           threads.push({ id: d.id, ...t });
         }
       });
@@ -2978,7 +3369,7 @@ export function registerMarketplaceRoutes(app: Express) {
       const senderName = uData.displayName || user.name || user.email.split('@')[0];
 
       const isAdmin = await isAdminUser(user.uid, user.email);
-      const isSellerActing = user.uid === cleanSellerId || (isAdmin && cleanSellerId === SEED_SELLER_ID);
+      const isSellerActing = user.uid === cleanSellerId || (isAdmin && isOfficialSeedSeller(cleanSellerId));
       const resolvedBuyerId = isSellerActing && targetBuyerId ? String(targetBuyerId).trim() : user.uid;
       const receiverId = isSellerActing ? resolvedBuyerId : cleanSellerId;
       const threadId = `${cleanProductId}__${resolvedBuyerId}__${cleanSellerId}`;
@@ -3085,7 +3476,7 @@ export function registerMarketplaceRoutes(app: Express) {
       const alerts: any[] = [];
       snap.forEach((d: any) => {
         const a = d.data() || {};
-        if (a.userId === user.uid || (isAdmin && a.userId === SEED_SELLER_ID)) {
+        if (a.userId === user.uid || (isAdmin && isOfficialSeedSeller(a.userId))) {
           alerts.push({ id: d.id, ...a });
         }
       });
@@ -3096,54 +3487,383 @@ export function registerMarketplaceRoutes(app: Express) {
     }
   });
 
+  function buildSellerProfileResponse(d: any, uid: string, fallbackEmail: string, fallbackName: string, isAdmin: boolean) {
+    if (!d) {
+      return {
+        sellerId: uid,
+        storeName: isAdmin ? fallbackName || 'EFADO Official Admin Store' : '',
+        ownerFullName: fallbackName || '',
+        phone: '',
+        email: fallbackEmail || '',
+        state: '',
+        city: '',
+        verified: isAdmin,
+        applicationStatus: isAdmin ? 'APPROVED' : 'NOT_APPLIED',
+        rejectionReason: '',
+        idType: undefined,
+        idPhotoUploaded: false,
+        rulesAccepted: isAdmin,
+        submittedAt: '',
+        approvedAt: '',
+        isAdmin,
+        rating: 4.9,
+        salesCount: 0,
+        location: isAdmin ? 'Bonny, Rivers State' : 'Lagos, Nigeria',
+        storeAddress: '',
+        joinedAt: new Date().toISOString(),
+        payoutPreference: 'wallet',
+        bankCode: '',
+        bankName: '',
+        accountName: '',
+        accountNumberMasked: ''
+      };
+    }
+
+    const derivedStatus = d.applicationStatus
+      ? d.applicationStatus
+      : d.verified === true
+        ? 'APPROVED'
+        : 'NOT_APPLIED';
+    const isVerified = derivedStatus === 'APPROVED' || Boolean(d.verified === true);
+
+    return {
+      sellerId: d.sellerId || uid,
+      storeName: d.storeName || '',
+      ownerFullName: d.ownerFullName || '',
+      phone: d.phone || '',
+      email: d.email || fallbackEmail || '',
+      state: d.state || '',
+      city: d.city || '',
+      verified: isVerified,
+      applicationStatus: derivedStatus,
+      rejectionReason: d.rejectionReason || '',
+      idType: d.idType || undefined,
+      idPhotoUploaded: Boolean(d.idPhotoUploaded),
+      rulesAccepted: Boolean(d.rulesAccepted),
+      submittedAt: d.submittedAt || '',
+      approvedAt: d.approvedAt || '',
+      isAdmin,
+      rating: Number(d.rating ?? 4.9),
+      salesCount: Number(d.salesCount ?? 0),
+      location: d.location || (d.city && d.state ? `${d.city}, ${d.state}` : 'Lagos, Nigeria'),
+      storeAddress: d.storeAddress || '',
+      joinedAt: d.joinedAt || new Date().toISOString(),
+      payoutPreference: d.payoutPreference === 'bank' ? 'bank' : 'wallet',
+      bankCode: d.bankCode || '',
+      bankName: d.bankName || '',
+      accountName: d.accountName || '',
+      accountNumberMasked: d.accountNumberMasked || ''
+    };
+  }
+
   app.get('/api/marketplace/seller/profile', async (req: Request, res: Response) => {
     try {
       const user = await verifyBearerUser(req);
       if (!user) return res.status(401).json({ success: false, message: 'Authentication required.' });
 
       const db = getServerDb();
-      const snap = await db.doc(`modern_market_sellers/${user.uid}`).get();
-      if (!snap.exists) {
-        return res.json({
-          success: true,
-          profile: {
-            sellerId: user.uid,
-            storeName: user.name || user.email.split('@')[0],
-            verified: true,
-            rating: 4.9,
-            salesCount: 0,
-            location: 'Lagos, Nigeria',
-            storeAddress: '',
-            joinedAt: new Date().toISOString(),
-            payoutPreference: 'wallet',
-            bankCode: '',
-            bankName: '',
-            accountName: '',
-            accountNumberMasked: ''
-          }
-        });
-      }
-      const d = snap.data() || {};
+      const [snap, isAdmin] = await Promise.all([
+        db.doc(`modern_market_sellers/${user.uid}`).get(),
+        isAdminUser(user.uid, user.email)
+      ]);
+      const d = snap.exists ? snap.data() || {} : null;
       return res.json({
         success: true,
-        profile: {
-          sellerId: d.sellerId || user.uid,
-          storeName: d.storeName || '',
-          verified: Boolean(d.verified ?? true),
-          rating: Number(d.rating ?? 4.9),
-          salesCount: Number(d.salesCount ?? 0),
-          location: d.location || 'Lagos, Nigeria',
-          storeAddress: d.storeAddress || '',
-          joinedAt: d.joinedAt || new Date().toISOString(),
-          payoutPreference: d.payoutPreference === 'bank' ? 'bank' : 'wallet',
-          bankCode: d.bankCode || '',
-          bankName: d.bankName || '',
-          accountName: d.accountName || '',
-          accountNumberMasked: d.accountNumberMasked || ''
-        }
+        profile: buildSellerProfileResponse(d, user.uid, user.email, user.name || '', isAdmin)
       });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err?.message || 'Failed to load seller profile.' });
+    }
+  });
+
+  app.post('/api/marketplace/seller/register', async (req: Request, res: Response) => {
+    try {
+      const user = await verifyBearerUser(req);
+      if (!user) return res.status(401).json({ success: false, message: 'Authentication required.' });
+
+      const body = req.body || {};
+      const storeName = String(body.storeName || '').trim();
+      const ownerFullName = String(body.ownerFullName || '').trim();
+      const phone = String(body.phone || '').trim();
+      const email = String(body.email || user.email || '').trim();
+      const state = String(body.state || '').trim();
+      const city = String(body.city || '').trim();
+      const storeAddress = String(body.storeAddress || '').trim();
+      const idType = String(body.idType || '').trim();
+      const idPhoto = String(body.idPhoto || '').trim();
+      const bankName = String(body.bankName || '').trim();
+      const bankCode = String(body.bankCode || '').trim();
+      const accountNumber = String(body.accountNumber || '').replace(/\D/g, '');
+      const accountName = String(body.accountName || '').trim();
+      const payoutPreference = body.payoutPreference === 'bank' ? 'bank' : 'wallet';
+      const rulesAccepted = Boolean(body.rulesAccepted);
+
+      if (!storeName || storeName.length < 2) {
+        return res.status(400).json({ success: false, message: 'Store Name is required.' });
+      }
+      if (!ownerFullName || ownerFullName.length < 2) {
+        return res.status(400).json({ success: false, message: 'Owner Full Name is required.' });
+      }
+      if (!phone || phone.length < 8) {
+        return res.status(400).json({ success: false, message: 'Valid Phone Number is required.' });
+      }
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ success: false, message: 'Valid Email Address is required.' });
+      }
+      if (!state || !city || !storeAddress || storeAddress.length < 5) {
+        return res.status(400).json({ success: false, message: 'State, City, and full Store Address are required.' });
+      }
+      if (!['NIN', "Driver's License", "Voter's Card"].includes(idType)) {
+        return res.status(400).json({ success: false, message: 'Select ID Type (NIN, Driver\'s License, or Voter\'s Card).' });
+      }
+      if (!rulesAccepted) {
+        return res.status(400).json({ success: false, message: 'You must agree to EFADO Seller Rules to submit.' });
+      }
+
+      const db = getServerDb();
+      const sellerRef = db.doc(`modern_market_sellers/${user.uid}`);
+      const kycRef = db.doc(`modern_market_seller_kyc/${user.uid}`);
+      const [existingSnap, kycSnap, isAdmin] = await Promise.all([
+        sellerRef.get(),
+        kycRef.get(),
+        isAdminUser(user.uid, user.email)
+      ]);
+      const prev = existingSnap.exists ? existingSnap.data() || {} : {};
+
+      if (!idPhoto && !kycSnap.exists) {
+        return res.status(400).json({ success: false, message: 'Please upload a clear photo of your Government ID.' });
+      }
+      if (idPhoto && Buffer.byteLength(idPhoto, 'utf8') > 800 * 1024) {
+        return res.status(400).json({ success: false, message: 'ID photo is too large. Please upload a smaller image.' });
+      }
+
+      const hasAccountNum = accountNumber.length === 10 || Boolean(prev.accountNumberEncrypted);
+      if (!bankName || !hasAccountNum || !accountName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank Name, 10-digit Account Number, and Account Name are required.'
+        });
+      }
+
+      const nowIso = new Date().toISOString();
+      const locationStr = `${city}, ${state}`;
+
+      if (idPhoto) {
+        await kycRef.set(
+          {
+            sellerId: user.uid,
+            idType,
+            idPhoto,
+            updatedAt: nowIso
+          },
+          { merge: true }
+        );
+      }
+
+      const docData: any = {
+        sellerId: user.uid,
+        storeName,
+        ownerFullName,
+        phone,
+        email,
+        state,
+        city,
+        location: locationStr,
+        storeAddress,
+        idType,
+        idPhotoUploaded: true,
+        payoutPreference,
+        bankName,
+        bankCode: bankCode || prev.bankCode || '',
+        accountName,
+        rulesAccepted: true,
+        rulesAcceptedAt: nowIso,
+        applicationStatus: 'PENDING_APPROVAL',
+        verified: false,
+        rejectionReason: '',
+        submittedAt: nowIso,
+        rating: prev.rating ?? 4.9,
+        salesCount: prev.salesCount ?? 0,
+        joinedAt: prev.joinedAt || nowIso,
+        updatedAt: nowIso
+      };
+
+      if (accountNumber.length === 10) {
+        docData.accountNumberEncrypted = encryptSensitive(accountNumber);
+        docData.accountNumberMasked = maskAccountNumber(accountNumber);
+        docData.recipientCode = '';
+      } else if (prev.accountNumberEncrypted) {
+        docData.accountNumberEncrypted = prev.accountNumberEncrypted;
+        docData.accountNumberMasked = prev.accountNumberMasked || '';
+      }
+
+      await sellerRef.set(docData, { merge: true });
+
+      // Alert Admin + Applicant
+      const adminSnap = await db.collection('users').where('email', 'in', Array.from(ADMIN_EMAILS)).get().catch(() => null);
+      const adminAlertPromises: Promise<any>[] = [
+        createMarketAlert({
+          userId: CEO_OFFICIAL_SELLER_ID,
+          type: 'VENDOR',
+          title: `New Vendor Application: ${storeName}`,
+          message: `${ownerFullName} (${locationStr}) applied to sell Brand New products with ${idType}. Review in Seller Hub -> Vendor Approvals.`
+        }),
+        createMarketAlert({
+          userId: user.uid,
+          type: 'VENDOR',
+          title: 'Vendor Application Pending Approval',
+          message: `Your application for "${storeName}" has been submitted and Admin has been alerted.`
+        }),
+        writeAuditLog('SELLER_REGISTRATION_SUBMITTED', user.uid, {
+          storeName,
+          ownerFullName,
+          location: locationStr,
+          idType,
+          payoutPreference
+        })
+      ];
+      if (adminSnap && !adminSnap.empty) {
+        adminSnap.forEach((ad: any) => {
+          adminAlertPromises.push(
+            createWalletAlert(
+              ad.id,
+              'security',
+              `New Vendor Application: ${storeName}`,
+              `${ownerFullName} (${phone}, ${locationStr}) submitted KYC (${idType}) for Modern Market Vendor Approval.`,
+              { sellerId: user.uid, storeName }
+            )
+          );
+        });
+      }
+      await Promise.all(adminAlertPromises);
+
+      return res.json({
+        success: true,
+        message: 'Application submitted! Pending Approval — Admin has been notified.',
+        profile: buildSellerProfileResponse(docData, user.uid, email, ownerFullName, isAdmin)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Could not submit vendor registration.' });
+    }
+  });
+
+  app.get('/api/marketplace/admin/sellers', async (req: Request, res: Response) => {
+    try {
+      const user = await verifyBearerUser(req);
+      if (!user) return res.status(401).json({ success: false, message: 'Authentication required.' });
+      const isAdmin = await isAdminUser(user.uid, user.email);
+      if (!isAdmin) {
+        return res.status(403).json({ success: false, message: 'Admin access required.' });
+      }
+
+      const db = getServerDb();
+      const [sellersSnap, kycSnap] = await Promise.all([
+        db.collection('modern_market_sellers').get(),
+        db.collection('modern_market_seller_kyc').get()
+      ]);
+
+      const kycMap = new Map<string, string>();
+      kycSnap.forEach((k: any) => {
+        const kd = k.data() || {};
+        if (kd.idPhoto) kycMap.set(k.id, kd.idPhoto);
+      });
+
+      const vendors: any[] = [];
+      sellersSnap.forEach((s: any) => {
+        const d = s.data() || {};
+        if (isOfficialSeedSeller(s.id)) return;
+        const prof = buildSellerProfileResponse(d, s.id, d.email || '', d.ownerFullName || '', false);
+        vendors.push({
+          ...prof,
+          idPhotoPreview: kycMap.get(s.id) || ''
+        });
+      });
+
+      vendors.sort((a, b) => {
+        const rank = (st?: string) => (st === 'PENDING_APPROVAL' ? 0 : st === 'REJECTED' ? 1 : 2);
+        if (rank(a.applicationStatus) !== rank(b.applicationStatus)) {
+          return rank(a.applicationStatus) - rank(b.applicationStatus);
+        }
+        return new Date(b.submittedAt || b.joinedAt || 0).getTime() - new Date(a.submittedAt || a.joinedAt || 0).getTime();
+      });
+
+      return res.json({ success: true, vendors });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Failed to load vendor applications.' });
+    }
+  });
+
+  app.post('/api/marketplace/admin/sellers/:sellerId/review', async (req: Request, res: Response) => {
+    try {
+      const user = await verifyBearerUser(req);
+      if (!user) return res.status(401).json({ success: false, message: 'Authentication required.' });
+      const isAdmin = await isAdminUser(user.uid, user.email);
+      if (!isAdmin) {
+        return res.status(403).json({ success: false, message: 'Admin access required.' });
+      }
+
+      const targetSellerId = String(req.params.sellerId || '').trim();
+      const decision = String(req.body?.decision || '').trim().toLowerCase();
+      const reason = String(req.body?.reason || '').trim();
+      if (!targetSellerId || !['approve', 'reject'].includes(decision)) {
+        return res.status(400).json({ success: false, message: 'Valid sellerId and decision (approve/reject) required.' });
+      }
+
+      const db = getServerDb();
+      const sellerRef = db.doc(`modern_market_sellers/${targetSellerId}`);
+      const snap = await sellerRef.get();
+      if (!snap.exists) {
+        return res.status(404).json({ success: false, message: 'Vendor application not found.' });
+      }
+      const prev = snap.data() || {};
+      const nowIso = new Date().toISOString();
+      const approved = decision === 'approve';
+
+      const patch = {
+        applicationStatus: approved ? 'APPROVED' : 'REJECTED',
+        verified: approved,
+        approvedAt: approved ? nowIso : prev.approvedAt || '',
+        approvedBy: user.email,
+        rejectionReason: approved ? '' : reason || 'Application declined. Please verify your ID photo and bank details.',
+        updatedAt: nowIso
+      };
+      await sellerRef.set(patch, { merge: true });
+
+      const updated = { ...prev, ...patch };
+      await Promise.all([
+        createMarketAlert({
+          userId: targetSellerId,
+          type: 'VENDOR',
+          title: approved ? 'Vendor Approved - You can now list products' : 'Vendor Application Update',
+          message: approved
+            ? `Congratulations! "${updated.storeName}" is now a Verified EFADO Seller. Open Seller Hub to list Brand New Sealed products.`
+            : `Your vendor application was not approved: ${patch.rejectionReason}`
+        }),
+        createWalletAlert(
+          targetSellerId,
+          approved ? 'reward' : 'security',
+          approved ? 'Vendor Approved - You can now list products' : 'Vendor Application Declined',
+          approved
+            ? `Your store "${updated.storeName}" is verified on EFADO Modern Market!`
+            : patch.rejectionReason,
+          { sellerId: targetSellerId }
+        ),
+        writeAuditLog(approved ? 'VENDOR_APPROVED' : 'VENDOR_REJECTED', user.uid, {
+          targetSellerId,
+          storeName: updated.storeName,
+          reason: patch.rejectionReason
+        })
+      ]);
+
+      return res.json({
+        success: true,
+        message: approved
+          ? `Vendor Approved — ${updated.storeName} can now list products!`
+          : `Application declined for ${updated.storeName}.`,
+        profile: buildSellerProfileResponse(updated, targetSellerId, updated.email || '', updated.ownerFullName || '', false)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err?.message || 'Failed to review vendor application.' });
     }
   });
 
@@ -3157,7 +3877,10 @@ export function registerMarketplaceRoutes(app: Express) {
 
       const db = getServerDb();
       const ref = db.doc(`modern_market_sellers/${user.uid}`);
-      const existing = await ref.get();
+      const [existing, isAdmin] = await Promise.all([
+        ref.get(),
+        isAdminUser(user.uid, user.email)
+      ]);
       const prev = existing.exists ? existing.data() || {} : {};
 
       const cleanPref = payoutPreference === 'bank' ? 'bank' : 'wallet';
@@ -3165,7 +3888,8 @@ export function registerMarketplaceRoutes(app: Express) {
       const patch: any = {
         sellerId: user.uid,
         storeName: String(storeName || prev.storeName || user.name || 'EFADO Merchant').trim(),
-        verified: prev.verified ?? true,
+        verified: prev.verified ?? isAdmin,
+        applicationStatus: prev.applicationStatus || (prev.verified || isAdmin ? 'APPROVED' : 'NOT_APPLIED'),
         rating: prev.rating ?? 4.9,
         salesCount: prev.salesCount ?? 0,
         location: String(location || prev.location || 'Lagos, Nigeria').trim(),
@@ -3185,23 +3909,10 @@ export function registerMarketplaceRoutes(app: Express) {
       }
 
       await ref.set(patch, { merge: true });
+      const merged = { ...prev, ...patch };
       return res.json({
         success: true,
-        profile: {
-          sellerId: patch.sellerId,
-          storeName: patch.storeName,
-          verified: patch.verified,
-          rating: patch.rating,
-          salesCount: patch.salesCount,
-          location: patch.location,
-          storeAddress: patch.storeAddress,
-          joinedAt: patch.joinedAt,
-          payoutPreference: patch.payoutPreference,
-          bankCode: patch.bankCode || prev.bankCode || '',
-          bankName: patch.bankName || prev.bankName || '',
-          accountName: patch.accountName || prev.accountName || '',
-          accountNumberMasked: patch.accountNumberMasked || prev.accountNumberMasked || ''
-        }
+        profile: buildSellerProfileResponse(merged, user.uid, user.email, user.name || '', isAdmin)
       });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err?.message || 'Failed to save seller profile.' });

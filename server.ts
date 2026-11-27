@@ -30,6 +30,7 @@ import {
 } from './src/app/api/adverts/service';
 import { registerWalletRoutes } from './src/lib/wallet-routes';
 import { registerMarketplaceRoutes } from './src/lib/marketplace-routes';
+import { registerFairlyUsedRoutes } from './src/lib/fairly-used-routes';
 
 async function handleVercelHandler(handler: (req: any, res: any) => Promise<any>, req: express.Request, res: express.Response) {
   try {
@@ -424,6 +425,11 @@ app.all(['/api/bank/resolve', '/api/verify-bank'], (req: express.Request, res: e
 // MODERN DAY MARKET ENDPOINTS (Must register before wallet webhooks to handle MKT- refs)
 // ============================================================================
 registerMarketplaceRoutes(app);
+
+// ============================================================================
+// FAIRLY USED MARKET ENDPOINTS (Must register before wallet webhooks to handle FU- refs)
+// ============================================================================
+registerFairlyUsedRoutes(app);
 
 // ============================================================================
 // UNIFIED WALLET ENDPOINTS

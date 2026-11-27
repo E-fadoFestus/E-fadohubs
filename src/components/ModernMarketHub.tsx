@@ -13,6 +13,7 @@ import {
   MapPin,
   MessageCircle,
   Package,
+  Plus,
   RotateCcw,
   Search,
   Share2,
@@ -23,6 +24,7 @@ import {
   Store,
   Truck,
   User as UserIcon,
+  UserPlus,
   Wallet,
   X,
   ZoomIn
@@ -46,6 +48,7 @@ import {
   fetchPinAndWalletStatus,
   formatNaira,
   subscribeNotifyMe,
+  validateCartStock,
   verifyMarketplacePayment
 } from './market/marketApi';
 import {
@@ -58,7 +61,8 @@ import {
 import {
   ActivityPage,
   ProfileSellerHubPage,
-  SellerChatPage
+  SellerChatPage,
+  VendorRegistrationPage
 } from './market/MarketActivityProfilePages';
 
 export interface ModernMarketHubProps {
@@ -80,7 +84,8 @@ type PageStep =
   | 'SUCCESS'
   | 'CHAT'
   | 'ACTIVITY'
-  | 'PROFILE';
+  | 'PROFILE'
+  | 'VENDOR_REGISTRATION';
 
 const CATEGORY_LIST: ModernMarketCategory[] = [
   'All',
@@ -131,6 +136,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
   // Bottom sheets ONLY for Color and Size selection
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+  const [detailQty, setDetailQty] = useState(1);
   const [sheetMode, setSheetMode] = useState<'color' | 'size' | null>(null);
 
   // Cart & Checkout State (Steps 3 - 7)
@@ -143,6 +149,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
     }
   });
   const [cartError, setCartError] = useState<string | null>(null);
+  const [checkingCartStock, setCheckingCartStock] = useState(false);
   const [activeOrder, setActiveOrder] = useState<ModernMarketOrder | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('card');
   const [paymentGateway, setPaymentGateway] = useState<PaymentGatewayId>('paystack');
@@ -215,6 +222,46 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
     refreshWalletAndSecurity();
   }, [refreshWalletAndSecurity]);
 
+  const syncCartWithLiveStock = useCallback(async (itemsSnapshot: ModernCartItem[]): Promise<boolean> => {
+    if (itemsSnapshot.length === 0) {
+      setCartError(null);
+      return true;
+    }
+    setCheckingCartStock(true);
+    try {
+      const res = await validateCartStock(
+        itemsSnapshot.map((i) => ({ productId: i.product.id, quantity: i.quantity }))
+      );
+      const map = new Map(res.items.map((r) => [r.productId, r]));
+      setCart((prev) =>
+        prev.map((item) => {
+          const check = map.get(item.product.id);
+          if (!check) return item;
+          if (!check.exists || !check.product) {
+            return { ...item, product: { ...item.product, stock: 0, status: 'SOLD' } };
+          }
+          return { ...item, product: check.product };
+        })
+      );
+      if (!res.allAvailable) {
+        setCartError(res.blockedMessage || 'Sorry, this item just sold out');
+        return false;
+      }
+      setCartError(null);
+      return true;
+    } catch {
+      return true;
+    } finally {
+      setCheckingCartStock(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step === 'CART' && cart.length > 0) {
+      syncCartWithLiveStock(cart);
+    }
+  }, [step]);
+
   // Handle initialItemId deep-link
   useEffect(() => {
     if (initialItemId) {
@@ -272,6 +319,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
     if (previewObj) {
       setSelectedProduct(previewObj);
       setActivePhotoIdx(0);
+      setDetailQty(1);
       setSelectedColor(previewObj.specs?.color || previewObj.specs?.colorsAvailable?.[0] || '');
       setSelectedSize(previewObj.specs?.sizesAvailable?.[0] || '');
       setStep('PRODUCT_DETAIL');
@@ -284,6 +332,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
       setSelectedSeller(res.seller);
       setProductReviews(res.reviews || []);
       setActivePhotoIdx(0);
+      setDetailQty(1);
       setSelectedColor(res.product.specs?.color || res.product.specs?.colorsAvailable?.[0] || '');
       setSelectedSize(res.product.specs?.sizesAvailable?.[0] || '');
       setStep('PRODUCT_DETAIL');
@@ -313,21 +362,30 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
     }
   };
 
-  const handleAddToCart = (prod: ModernProduct, goCart: boolean = false) => {
+  const handleAddToCart = (prod: ModernProduct, goCart: boolean = false, qty: number = 1) => {
     if (prod.status === 'SOLD' || prod.stock <= 0) {
       showToast('Sorry, this item just sold out');
       return;
     }
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    const isDetailMatch = selectedProduct?.id === prod.id;
+    const chosenColor = (isDetailMatch ? selectedColor : '') || prod.specs?.color || '';
+    const chosenSize = (isDetailMatch ? selectedSize : '') || prod.specs?.sizesAvailable?.[0] || '';
     setCartError(null);
     setCart((prev) => {
-      const idx = prev.findIndex((i) => i.product.id === prod.id);
+      const idx = prev.findIndex(
+        (i) =>
+          i.product.id === prod.id &&
+          (i.selectedColor || '') === chosenColor &&
+          (i.selectedSize || '') === chosenSize
+      );
       if (idx >= 0) {
         const next = [...prev];
-        const nextQty = Math.min(prod.stock, next[idx].quantity + 1);
-        next[idx] = { ...next[idx], quantity: nextQty, selectedColor, selectedSize };
+        const nextQty = Math.min(prod.stock, next[idx].quantity + safeQty);
+        next[idx] = { ...next[idx], product: prod, quantity: nextQty };
         return next;
       }
-      return [...prev, { product: prod, quantity: 1, selectedColor, selectedSize }];
+      return [...prev, { product: prod, quantity: safeQty, selectedColor: chosenColor, selectedSize: chosenSize }];
     });
     if (goCart) {
       setStep('CART');
@@ -337,37 +395,86 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
     }
   };
 
-  const handleBuyNow = (prod: ModernProduct) => {
+  const handleBuyNow = (prod: ModernProduct, qty: number = 1) => {
     if (prod.status === 'SOLD' || prod.stock <= 0) {
       showToast('Sorry, this item just sold out');
       return;
     }
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    const isDetailMatch = selectedProduct?.id === prod.id;
+    const chosenColor = (isDetailMatch ? selectedColor : '') || prod.specs?.color || '';
+    const chosenSize = (isDetailMatch ? selectedSize : '') || prod.specs?.sizesAvailable?.[0] || '';
     setCartError(null);
-    setCart([{ product: prod, quantity: 1, selectedColor, selectedSize }]);
+    setCart([{ product: prod, quantity: safeQty, selectedColor: chosenColor, selectedSize: chosenSize }]);
     setStep('CART');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleUpdateCartQty = (productId: string, delta: number) => {
+  const handleShareProduct = (prod: ModernProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/market/${prod.id}`;
+    if (navigator.share) {
+      navigator
+        .share({
+          title: `${prod.name} — EFADO Modern Market`,
+          text: `Brand New, Sealed with ${prod.warrantyMonths}-Month Warranty (${formatNaira(prod.price)})`,
+          url: shareUrl
+        })
+        .catch(() => {
+          navigator.clipboard?.writeText(shareUrl).then(() => showToast('Product link copied!'));
+        });
+      return;
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => showToast('Product link copied!'))
+        .catch(() => showToast(`Share link: ${shareUrl}`));
+    } else {
+      showToast(`Share link: ${shareUrl}`);
+    }
+  };
+
+  const handleChatWithSeller = (prod: ModernProduct, sellerNameOverride?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setChatTarget({
+      productId: prod.id,
+      productName: prod.name,
+      productPhoto: prod.photos[0] || '/assets/market/iphone_13_pro_max.jpg',
+      sellerId: prod.sellerId,
+      sellerName: sellerNameOverride || prod.sellerName
+    });
+    setStep('CHAT');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const matchesCartVariant = (item: ModernCartItem, productId: string, selectedColor?: string, selectedSize?: string) =>
+    item.product.id === productId &&
+    (selectedColor === undefined || (item.selectedColor || '') === (selectedColor || '')) &&
+    (selectedSize === undefined || (item.selectedSize || '') === (selectedSize || ''));
+
+  const handleUpdateCartQty = (productId: string, delta: number, colorFilter?: string, sizeFilter?: string) => {
     setCartError(null);
     setCart((prev) =>
       prev
         .map((item) => {
-          if (item.product.id !== productId) return item;
+          if (!matchesCartVariant(item, productId, colorFilter, sizeFilter)) return item;
           const nextQty = item.quantity + delta;
           if (nextQty <= 0) return null;
-          return { ...item, quantity: Math.min(item.product.stock, nextQty) };
+          return { ...item, quantity: Math.min(Math.max(1, item.product.stock), nextQty) };
         })
         .filter(Boolean) as ModernCartItem[]
     );
   };
 
-  const handleRemoveCartItem = (productId: string) => {
+  const handleRemoveCartItem = (productId: string, colorFilter?: string, sizeFilter?: string) => {
     setCartError(null);
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    setCart((prev) => prev.filter((item) => !matchesCartVariant(item, productId, colorFilter, sizeFilter)));
   };
 
-  const handleProceedToDelivery = () => {
+  const handleProceedToDelivery = async () => {
+    const ok = await syncCartWithLiveStock(cart);
+    if (!ok) return;
     const soldOutItem = cart.find((c) => c.product.status === 'SOLD' || c.product.stock < c.quantity);
     if (soldOutItem) {
       setCartError(`Sorry, this item just sold out: ${soldOutItem.product.name}`);
@@ -379,14 +486,26 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
 
+  const coreFlowSteps = [
+    { key: 'HOME', label: '1 Market' },
+    { key: 'PRODUCT_DETAIL', label: '2 Item' },
+    { key: 'CART', label: '3 Cart' },
+    { key: 'DELIVERY', label: '4 Delivery' },
+    { key: 'PAYMENT', label: '5 Payment' },
+    { key: 'AUTHORIZE', label: '6 PIN' },
+    { key: 'SUCCESS', label: '7 Track' }
+  ] as const;
+
+  const activeFlowIndex = coreFlowSteps.findIndex((s) => s.key === step);
+
   return (
     <div
-      className="modern-market-root min-h-screen bg-gradient-to-b from-[#F5F3FF] via-white to-[#FAF5FF] text-slate-900 pb-20"
+      className="modern-market-root min-h-screen overflow-x-hidden bg-gradient-to-b from-[#F5F3FF] via-white to-[#FAF5FF] text-slate-900 pb-24"
       style={{ fontFamily: "'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
-      {/* FANCIFUL PURPLE GRADIENT HEADER */}
+      {/* LIGHT MODE HEADER WITH #7C3AED PURPLE ACCENT + BECOME A SELLER */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[#6D28D9] via-[#7C3AED] to-[#9333EA] text-white shadow-md">
-        <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-3 flex items-center justify-between gap-2">
+        <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
@@ -409,16 +528,28 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                 EFADO MODERN MARKET
               </h1>
               <p className="text-[10px] sm:text-xs text-purple-100 font-semibold truncate mb-0 leading-tight">
-                Brand New • Sealed • Warranty
+                Brand New • Sealed • Warranty • Secured by EFADO Shield
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setStep('VENDOR_REGISTRATION');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white text-[#7C3AED] hover:bg-purple-50 font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5 shrink-0" />
+              <span>Become a Seller</span>
+            </button>
+
             <button
               type="button"
               onClick={() => (onNavigate ? onNavigate('wallet') : onClose())}
-              className="px-2.5 py-1.5 rounded-xl bg-white text-[#7C3AED] font-extrabold text-xs tabular-nums flex items-center gap-1 shadow-sm"
+              className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs tabular-nums flex items-center gap-1 border border-white/25"
               title="EFADO Wallet Balance"
             >
               <Wallet className="w-3.5 h-3.5" />
@@ -449,7 +580,76 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Light Mode Sub-Navigation Tabs */}
+        <div className="bg-white border-b border-purple-100 text-slate-700">
+          <div className="max-w-[1200px] mx-auto px-3 sm:px-6 flex items-center gap-5 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'HOME' || step === 'FILTER' || step === 'PRODUCT_DETAIL'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Browse Brand New
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('ACTIVITY')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'ACTIVITY' || step === 'SUCCESS' || step === 'CHAT'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Activity &amp; Tracking
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('PROFILE')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'PROFILE' || step === 'VENDOR_REGISTRATION'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Seller Hub
+            </button>
+          </div>
+        </div>
       </header>
+
+      {/* 7-Page Left-to-Right Progress Strip */}
+      {activeFlowIndex !== -1 && (
+        <div className="bg-white/95 border-b border-purple-100">
+          <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {coreFlowSteps.map((st, idx) => {
+              const isCurrent = idx === activeFlowIndex;
+              const isDone = idx < activeFlowIndex;
+              return (
+                <React.Fragment key={st.key}>
+                  <span
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap shrink-0 ${
+                      isCurrent
+                        ? 'bg-[#7C3AED] text-white'
+                        : isDone
+                          ? 'bg-green-50 text-[#16A34A] border border-[#16A34A]/25'
+                          : 'bg-purple-50/70 text-slate-400'
+                    }`}
+                  >
+                    {st.label}
+                  </span>
+                  {idx < coreFlowSteps.length - 1 && (
+                    <span className="text-slate-300 text-xs font-bold shrink-0">→</span>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Gateway Return Verification Overlay */}
       {verifyingReturn && (
@@ -541,11 +741,21 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
             </div>
           )}
 
+          {/* Section Title Bar */}
+          <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+              {filters.category === 'All' ? 'Brand New Sealed Items' : `${filters.category} — Brand New`}
+            </h2>
+            <span className="bg-purple-50 text-[#7C3AED] px-3 py-1 rounded-lg text-xs font-extrabold border border-purple-200 tabular-nums">
+              {products.length} {products.length === 1 ? 'Item' : 'Items'}
+            </span>
+          </div>
+
           {/* Product Grid */}
           {loadingCatalog ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="bg-white rounded-2xl border border-purple-100 p-3 h-72 animate-pulse" />
+                <div key={n} className="bg-white rounded-2xl border border-purple-100 p-3 h-80 animate-pulse" />
               ))}
             </div>
           ) : products.length === 0 ? (
@@ -574,23 +784,25 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {products.map((prod) => {
                 const isSold = prod.status === 'SOLD' || prod.stock <= 0;
                 return (
                   <div
                     key={prod.id}
                     onClick={() => openProductDetail(prod.id, prod)}
-                    className="bg-white rounded-2xl border border-purple-100 p-2.5 sm:p-3.5 shadow-sm hover:shadow-md hover:border-[#7C3AED]/40 transition-all cursor-pointer flex flex-col justify-between"
+                    className="bg-white rounded-2xl border border-purple-100 overflow-hidden shadow-sm hover:shadow-md hover:border-[#7C3AED]/50 transition-all cursor-pointer flex flex-col justify-between h-full"
                   >
                     <div>
-                      <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-50 border border-slate-100 mb-2.5">
+                      <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden border-b border-purple-50">
                         <img
                           src={prod.photos[0]}
                           alt={prod.name}
-                          className={`w-full h-full object-cover ${isSold ? 'grayscale opacity-60' : ''}`}
+                          className={`w-full h-full object-cover transition-transform duration-300 ${
+                            isSold ? 'grayscale opacity-60' : 'hover:scale-105'
+                          }`}
                         />
-                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#16A34A] text-white text-[10px] font-extrabold shadow-sm">
+                        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-[#16A34A] text-white text-[10px] font-extrabold shadow-sm">
                           Brand New - Sealed
                         </span>
                         {isSold && (
@@ -602,56 +814,115 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                         )}
                       </div>
 
-                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug mb-1">
-                        {prod.name}
-                      </h3>
+                      <div className="p-3.5 pb-2 space-y-2">
+                        <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug">
+                          {prod.name}
+                        </h3>
 
-                      <p className="text-base sm:text-lg font-black text-[#7C3AED] tabular-nums mb-1.5">
-                        {formatNaira(prod.price)}
-                      </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-lg font-black text-[#7C3AED] tabular-nums mb-0">
+                            {formatNaira(prod.price)}
+                          </p>
+                          <span className="text-[11px] font-bold text-[#16A34A] tabular-nums">
+                            {isSold ? 'Out of Stock' : prod.stock <= 3 ? `Only ${prod.stock} left` : `In Stock: ${prod.stock}`}
+                          </span>
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-600 mb-1.5">
-                        <span className="inline-flex items-center gap-0.5 font-semibold text-slate-800 truncate">
-                          <BadgeCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
-                          {prod.sellerName}
-                        </span>
-                        <span className="inline-flex items-center gap-0.5 font-bold text-slate-700">
-                          <Star className="w-3 h-3 fill-[#7C3AED] text-[#7C3AED]" />
-                          {prod.rating} ({prod.salesCount} sold)
-                        </span>
-                      </div>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                          <span className="inline-flex items-center gap-1 font-bold text-slate-800 truncate">
+                            <BadgeCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                            <span className="truncate">{prod.sellerName}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 font-bold text-slate-700 shrink-0">
+                            <Star className="w-3 h-3 fill-[#7C3AED] text-[#7C3AED]" />
+                            {prod.rating} ({prod.salesCount})
+                          </span>
+                        </div>
 
-                      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500 mb-2.5">
-                        <span className="inline-flex items-center gap-0.5 truncate">
-                          <MapPin className="w-3 h-3 text-[#7C3AED] shrink-0" />
-                          {prod.sellerLocation.split(',')[0]}
-                        </span>
-                        {prod.freeDelivery && (
-                          <span className="text-[#16A34A] font-extrabold">Free Delivery</span>
-                        )}
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                          <span className="inline-flex items-center gap-1 truncate">
+                            <MapPin className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                            <span className="truncate">{prod.sellerLocation}</span>
+                          </span>
+                          {prod.freeDelivery && (
+                            <span className="text-[#16A34A] font-extrabold shrink-0">Free Delivery</span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-50 text-[#16A34A] border border-[#16A34A]/20 text-[10px] font-bold">
+                            Warranty: {prod.warrantyMonths}m
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-[#7C3AED] border border-purple-200 text-[10px] font-bold">
+                            <ShieldCheck className="w-3 h-3 shrink-0" />
+                            Escrow Protected
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {isSold ? (
-                      <button
-                        type="button"
-                        onClick={(e) => handleNotifyMe(prod.id, e)}
-                        className={`w-full py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all ${
-                          prod.isOnWaitlist
-                            ? 'bg-purple-100 text-[#7C3AED]'
-                            : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                        }`}
-                      >
-                        {prod.isOnWaitlist ? 'Waitlisted - We Will Notify' : 'SOLD - Notify Me When Back'}
-                      </button>
-                    ) : (
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-purple-50">
-                        <span className="text-[11px] font-bold text-[#16A34A] tabular-nums">
-                          {prod.stock <= 3 ? `Only ${prod.stock} left` : `In Stock: ${prod.stock}`}
-                        </span>
-                        <span className="text-[11px] font-extrabold text-[#7C3AED]">View Item →</span>
-                      </div>
-                    )}
+                    <div className="p-3.5 pt-2">
+                      {isSold ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleNotifyMe(prod.id, e)}
+                          className={`w-full py-2.5 px-3 rounded-xl text-xs font-extrabold transition-colors ${
+                            prod.isOnWaitlist
+                              ? 'bg-purple-100 text-[#7C3AED]'
+                              : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                          }`}
+                        >
+                          {prod.isOnWaitlist ? 'Waitlisted - We Will Notify' : 'SOLD - Notify Me When Back'}
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(prod, false);
+                              }}
+                              className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] rounded-xl font-bold text-xs flex items-center justify-center gap-1 border border-purple-200 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBuyNow(prod);
+                              }}
+                              className="py-2 px-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-colors"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Buy Now</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-50">
+                            <button
+                              type="button"
+                              onClick={(e) => handleShareProduct(prod, e)}
+                              className="py-1.5 px-2 bg-white hover:bg-purple-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border border-purple-100 transition-colors"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-[#7C3AED]" />
+                              <span>Share</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleChatWithSeller(prod, prod.sellerName, e)}
+                              title="Ask Question Only (Fixed Price)"
+                              className="py-1.5 px-2 bg-green-50 hover:bg-green-100 text-[#16A34A] rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border border-[#16A34A]/25 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-[#16A34A]" />
+                              <span>Chat</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -758,6 +1029,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                   className="w-full px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-900"
                 >
                   <option value="all">All Nigeria Locations</option>
+                  <option value="Bonny, Rivers State">Bonny, Rivers State</option>
                   <option value="Lagos">Lagos</option>
                   <option value="Abuja">Abuja</option>
                   <option value="Port Harcourt">Port Harcourt</option>
@@ -829,11 +1101,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                const url = `${window.location.origin}/?item=${selectedProduct.id}`;
-                navigator.clipboard?.writeText(url);
-                showToast('Product link copied!');
-              }}
+              onClick={() => handleShareProduct(selectedProduct)}
               className="p-2.5 rounded-xl bg-white border border-purple-200 text-[#7C3AED] shadow-sm"
               aria-label="Share product"
             >
@@ -859,6 +1127,9 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                   selectedProduct.status === 'SOLD' || selectedProduct.stock <= 0 ? 'grayscale opacity-70' : ''
                 }`}
               />
+              <span className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-[#16A34A] text-white text-xs font-extrabold shadow-sm">
+                Brand New - Sealed
+              </span>
               <button
                 type="button"
                 onClick={() => setZoomLightboxOpen(true)}
@@ -945,8 +1216,8 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
               {formatNaira(selectedProduct.price)}
             </p>
 
-            {/* Color & Size Variant Buttons (Open Bottom Sheet ONLY for Color/Size) */}
-            {(selectedProduct.specs?.colorsAvailable?.length || selectedProduct.specs?.sizesAvailable?.length) && (
+            {/* Color & Size Variant Buttons + Quantity Selector */}
+            {Boolean(selectedProduct.specs?.colorsAvailable?.length || selectedProduct.specs?.sizesAvailable?.length) && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {selectedProduct.specs?.colorsAvailable && selectedProduct.specs.colorsAvailable.length > 0 && (
                   <button
@@ -966,6 +1237,34 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                     Variant: <span className="text-[#7C3AED]">{selectedSize || 'Choose Size'}</span>
                   </button>
                 )}
+              </div>
+            )}
+
+            {selectedProduct.status !== 'SOLD' && selectedProduct.stock > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-purple-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700">Quantity:</span>
+                  <div className="inline-flex items-center border border-purple-200 rounded-xl bg-purple-50/50">
+                    <button
+                      type="button"
+                      onClick={() => setDetailQty((q) => Math.max(1, q - 1))}
+                      className="px-3 py-1.5 text-sm font-black text-[#7C3AED]"
+                    >
+                      -
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-black text-slate-900 tabular-nums">{detailQty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDetailQty((q) => Math.min(selectedProduct.stock, q + 1))}
+                      className="px-3 py-1.5 text-sm font-black text-[#7C3AED]"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[11px] font-extrabold text-[#16A34A]">
+                  Fixed Price • No Negotiation
+                </span>
               </div>
             )}
           </div>
@@ -1103,17 +1402,17 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => handleAddToCart(selectedProduct, false)}
+                    onClick={() => handleAddToCart(selectedProduct, false, detailQty)}
                     className="py-3.5 px-3 bg-purple-50 border-2 border-[#7C3AED] text-[#7C3AED] hover:bg-purple-100 font-extrabold text-xs sm:text-sm rounded-xl"
                   >
                     ADD TO CART
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleBuyNow(selectedProduct)}
+                    onClick={() => handleBuyNow(selectedProduct, detailQty)}
                     className="py-3.5 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md tabular-nums"
                   >
-                    BUY NOW - {formatNaira(selectedProduct.price)}
+                    BUY NOW - {formatNaira(selectedProduct.price * detailQty)}
                   </button>
                 </div>
               )}
@@ -1200,6 +1499,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
           onRemoveItem={handleRemoveCartItem}
           onProceedToDelivery={handleProceedToDelivery}
           errorMsg={cartError}
+          checkingStock={checkingCartStock}
         />
       )}
 
@@ -1228,6 +1528,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
             setPaymentGateway(gw);
           }}
           onBack={() => setStep('DELIVERY')}
+          onBackToCart={() => setStep('CART')}
           onProceedToAuthorize={() => {
             refreshWalletAndSecurity();
             setStep('AUTHORIZE');
@@ -1319,6 +1620,19 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
         />
       )}
 
+      {!verifyingReturn && step === 'VENDOR_REGISTRATION' && (
+        <VendorRegistrationPage
+          userEmail={user.email}
+          userName={user.displayName || ''}
+          userPhone={(user as any)?.phoneNumber || ''}
+          onBack={() => setStep('HOME')}
+          onGoSellerHub={() => {
+            setStep('PROFILE');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
       {!verifyingReturn && step === 'PROFILE' && (
         <ProfileSellerHubPage
           userEmail={user.email}
@@ -1326,6 +1640,10 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
           walletBalanceNgn={walletBalanceNgn}
           onProductChanged={() => loadCatalog()}
           onOpenWallet={() => (onNavigate ? onNavigate('wallet') : onClose())}
+          onOpenVendorRegistration={() => {
+            setStep('VENDOR_REGISTRATION');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       )}
 
@@ -1345,7 +1663,7 @@ export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
             { id: 'HOME', label: 'Market', icon: LayoutGrid, active: step === 'HOME' || step === 'PRODUCT_DETAIL' || step === 'FILTER' },
             { id: 'CART', label: 'Cart', icon: ShoppingBag, active: step === 'CART' || step === 'DELIVERY' || step === 'PAYMENT' || step === 'AUTHORIZE', badge: cartCount },
             { id: 'ACTIVITY', label: 'Activity', icon: Clock, active: step === 'ACTIVITY' || step === 'SUCCESS' || step === 'CHAT' },
-            { id: 'PROFILE', label: 'Profile', icon: UserIcon, active: step === 'PROFILE' }
+            { id: 'PROFILE', label: 'Profile', icon: UserIcon, active: step === 'PROFILE' || step === 'VENDOR_REGISTRATION' }
           ].map((nav) => {
             const Icon = nav.icon;
             return (

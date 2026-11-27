@@ -1,0 +1,1597 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Bell,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Home,
+  LayoutGrid,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Package,
+  Plus,
+  RotateCcw,
+  Search,
+  Share2,
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
+  Star,
+  Store,
+  Truck,
+  User as UserIcon,
+  UserPlus,
+  Wallet,
+  X,
+  ZoomIn
+} from 'lucide-react';
+import type { UserProfile } from '../types';
+import type {
+  MarketFilterState,
+  ModernCartItem,
+  ModernMarketCategory,
+  ModernMarketChatThread,
+  ModernMarketOrder,
+  ModernProduct,
+  ModernProductReview,
+  ModernSellerPublicInfo,
+  PaymentGatewayId,
+  PaymentMethodId
+} from '../types/modernMarket';
+import {
+  fetchMarketplaceProductDetail,
+  fetchMarketplaceProducts,
+  fetchPinAndWalletStatus,
+  formatNaira,
+  subscribeNotifyMe,
+  verifyMarketplacePayment
+} from './market/marketApi';
+import {
+  AuthorizePage,
+  CartPage,
+  DeliveryPage,
+  PaymentPage,
+  SuccessPage
+} from './market/MarketCheckoutPages';
+import {
+  ActivityPage,
+  ProfileSellerHubPage,
+  SellerChatPage,
+  VendorRegistrationPage
+} from './market/MarketActivityProfilePages';
+
+export interface ModernMarketHubProps {
+  user: UserProfile;
+  onClose: () => void;
+  onOpenMining?: () => void;
+  onNavigate?: (hub: any, subview?: any, extraProps?: any) => void;
+  initialItemId?: string;
+}
+
+type PageStep =
+  | 'HOME'
+  | 'FILTER'
+  | 'PRODUCT_DETAIL'
+  | 'CART'
+  | 'DELIVERY'
+  | 'PAYMENT'
+  | 'AUTHORIZE'
+  | 'SUCCESS'
+  | 'CHAT'
+  | 'ACTIVITY'
+  | 'PROFILE'
+  | 'VENDOR_REGISTRATION';
+
+const CATEGORY_LIST: ModernMarketCategory[] = [
+  'All',
+  'Phones',
+  'Laptops',
+  'Audio',
+  'Home Appliances',
+  'Fashion New',
+  'Beauty New',
+  'Gaming',
+  'Accessories'
+];
+
+const CART_STORAGE_KEY = 'efado_modern_market_cart_v2';
+
+export const ModernMarketHub: React.FC<ModernMarketHubProps> = ({
+  user,
+  onClose,
+  onNavigate,
+  initialItemId
+}) => {
+  const [step, setStep] = useState<PageStep>('HOME');
+  const [products, setProducts] = useState<ModernProduct[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const [filters, setFilters] = useState<MarketFilterState>({
+    category: 'All',
+    search: '',
+    brand: 'all',
+    location: 'all',
+    freeDeliveryOnly: false,
+    brandNewOnly: true,
+    priceMin: '',
+    priceMax: '',
+    sort: 'newest'
+  });
+  const [draftFilters, setDraftFilters] = useState<MarketFilterState>(filters);
+
+  // Selected product detail state (Step 2)
+  const [selectedProduct, setSelectedProduct] = useState<ModernProduct | null>(null);
+  const [selectedSeller, setSelectedSeller] = useState<ModernSellerPublicInfo | null>(null);
+  const [productReviews, setProductReviews] = useState<ModernProductReview[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [zoomLightboxOpen, setZoomLightboxOpen] = useState(false);
+
+  // Bottom sheets ONLY for Color and Size selection
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
+  const [detailQty, setDetailQty] = useState(1);
+  const [sheetMode, setSheetMode] = useState<'color' | 'size' | null>(null);
+
+  // Cart & Checkout State (Steps 3 - 7)
+  const [cart, setCart] = useState<ModernCartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [activeOrder, setActiveOrder] = useState<ModernMarketOrder | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('card');
+  const [paymentGateway, setPaymentGateway] = useState<PaymentGatewayId>('paystack');
+
+  // Security & Wallet Status
+  const [walletBalanceNgn, setWalletBalanceNgn] = useState<number>(Number(user?.depositWallet || 0));
+  const [hasPin, setHasPin] = useState<boolean>(true);
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false);
+
+  // Chat State
+  const [chatTarget, setChatTarget] = useState<{
+    productId: string;
+    productName: string;
+    productPhoto: string;
+    sellerId: string;
+    sellerName: string;
+    buyerId?: string;
+  } | null>(null);
+
+  // Toast / Gateway Return Verification
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [verifyingReturn, setVerifyingReturn] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg((prev) => (prev === msg ? null : prev)), 3200);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch {
+      // ignore storage quota
+    }
+  }, [cart]);
+
+  const refreshWalletAndSecurity = useCallback(async () => {
+    try {
+      const st = await fetchPinAndWalletStatus();
+      setWalletBalanceNgn(st.ngnBalance);
+      setHasPin(st.hasPin);
+      setBiometricEnabled(st.biometricEnabled);
+    } catch {
+      setWalletBalanceNgn(Number(user?.depositWallet || 0));
+    }
+  }, [user?.depositWallet]);
+
+  const loadCatalog = useCallback(
+    async (activeFilters: MarketFilterState = filters) => {
+      setLoadingCatalog(true);
+      setCatalogError(null);
+      try {
+        const res = await fetchMarketplaceProducts(activeFilters);
+        setProducts(res.products || []);
+      } catch (err: any) {
+        setCatalogError(err?.message || 'Could not load Modern Market products.');
+      } finally {
+        setLoadingCatalog(false);
+      }
+    },
+    [filters]
+  );
+
+  useEffect(() => {
+    loadCatalog(filters);
+  }, [filters, loadCatalog]);
+
+  useEffect(() => {
+    refreshWalletAndSecurity();
+  }, [refreshWalletAndSecurity]);
+
+  // Handle initialItemId deep-link
+  useEffect(() => {
+    if (initialItemId) {
+      openProductDetail(initialItemId);
+    }
+  }, [initialItemId]);
+
+  // Handle Paystack / Flutterwave / OPay redirect return -> Verify & Land on Step 7 SUCCESS
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mktOrder = params.get('marketplace_order');
+    const ref = params.get('reference') || params.get('trxref') || params.get('tx_ref');
+    const gw = params.get('gateway') || 'paystack';
+    const txId = params.get('transaction_id') || undefined;
+
+    if (!mktOrder && !ref) return;
+    if (ref && !ref.startsWith('MKT-') && !mktOrder) return;
+
+    let active = true;
+    (async () => {
+      setVerifyingReturn(true);
+      setReturnError(null);
+      try {
+        const res = await verifyMarketplacePayment({
+          reference: ref || undefined,
+          orderId: mktOrder || undefined,
+          gateway: gw,
+          transactionId: txId
+        });
+        if (!active) return;
+        setActiveOrder(res.order);
+        setCart([]);
+        setStep('SUCCESS');
+        sessionStorage.removeItem('efado_pending_market_order');
+        if (res.soldOutRefunded) {
+          showToast('Item sold out concurrently — full NGN refund sent to your EFADO Wallet.');
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+        refreshWalletAndSecurity();
+        loadCatalog();
+      } catch (err: any) {
+        if (!active) return;
+        setReturnError(err?.message || 'Payment verification failed. Your money was NOT taken.');
+      } finally {
+        if (active) setVerifyingReturn(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const openProductDetail = async (productId: string, previewObj?: ModernProduct) => {
+    if (previewObj) {
+      setSelectedProduct(previewObj);
+      setActivePhotoIdx(0);
+      setDetailQty(1);
+      setSelectedColor(previewObj.specs?.color || previewObj.specs?.colorsAvailable?.[0] || '');
+      setSelectedSize(previewObj.specs?.sizesAvailable?.[0] || '');
+      setStep('PRODUCT_DETAIL');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    setDetailLoading(true);
+    try {
+      const res = await fetchMarketplaceProductDetail(productId);
+      setSelectedProduct(res.product);
+      setSelectedSeller(res.seller);
+      setProductReviews(res.reviews || []);
+      setActivePhotoIdx(0);
+      setDetailQty(1);
+      setSelectedColor(res.product.specs?.color || res.product.specs?.colorsAvailable?.[0] || '');
+      setSelectedSize(res.product.specs?.sizesAvailable?.[0] || '');
+      setStep('PRODUCT_DETAIL');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      showToast(err?.message || 'Could not open product.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleNotifyMe = async (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const res = await subscribeNotifyMe(productId);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId ? { ...p, isOnWaitlist: true, waitlistCount: res.waitlistCount } : p
+        )
+      );
+      if (selectedProduct?.id === productId) {
+        setSelectedProduct({ ...selectedProduct, isOnWaitlist: true, waitlistCount: res.waitlistCount });
+      }
+      showToast(res.message);
+    } catch (err: any) {
+      showToast(err?.message || 'Sign in to join the waitlist.');
+    }
+  };
+
+  const handleAddToCart = (prod: ModernProduct, goCart: boolean = false, qty: number = 1) => {
+    if (prod.status === 'SOLD' || prod.stock <= 0) {
+      showToast('Sorry, this item just sold out');
+      return;
+    }
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    setCartError(null);
+    setCart((prev) => {
+      const idx = prev.findIndex((i) => i.product.id === prod.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        const nextQty = Math.min(prod.stock, next[idx].quantity + safeQty);
+        next[idx] = { ...next[idx], quantity: nextQty, selectedColor, selectedSize };
+        return next;
+      }
+      return [...prev, { product: prod, quantity: safeQty, selectedColor, selectedSize }];
+    });
+    if (goCart) {
+      setStep('CART');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      showToast(`Added "${prod.name}" to cart`);
+    }
+  };
+
+  const handleBuyNow = (prod: ModernProduct, qty: number = 1) => {
+    if (prod.status === 'SOLD' || prod.stock <= 0) {
+      showToast('Sorry, this item just sold out');
+      return;
+    }
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    setCartError(null);
+    setCart([{ product: prod, quantity: safeQty, selectedColor, selectedSize }]);
+    setStep('CART');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleShareProduct = (prod: ModernProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const shareUrl = `${window.location.origin}/hub/market/${prod.id}`;
+    if (navigator.share) {
+      navigator
+        .share({
+          title: `${prod.name} — EFADO Modern Market`,
+          text: `Brand New, Sealed with ${prod.warrantyMonths}-Month Warranty (${formatNaira(prod.price)})`,
+          url: shareUrl
+        })
+        .catch(() => {
+          navigator.clipboard?.writeText(shareUrl).then(() => showToast('Product link copied!'));
+        });
+      return;
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => showToast('Product link copied!'))
+        .catch(() => showToast(`Share link: ${shareUrl}`));
+    } else {
+      showToast(`Share link: ${shareUrl}`);
+    }
+  };
+
+  const handleChatWithSeller = (prod: ModernProduct, sellerNameOverride?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setChatTarget({
+      productId: prod.id,
+      productName: prod.name,
+      productPhoto: prod.photos[0] || '/assets/market/iphone_13_pro_max.jpg',
+      sellerId: prod.sellerId,
+      sellerName: sellerNameOverride || prod.sellerName
+    });
+    setStep('CHAT');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleUpdateCartQty = (productId: string, delta: number) => {
+    setCartError(null);
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id !== productId) return item;
+          const nextQty = item.quantity + delta;
+          if (nextQty <= 0) return null;
+          return { ...item, quantity: Math.min(item.product.stock, nextQty) };
+        })
+        .filter(Boolean) as ModernCartItem[]
+    );
+  };
+
+  const handleRemoveCartItem = (productId: string) => {
+    setCartError(null);
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+  };
+
+  const handleProceedToDelivery = () => {
+    const soldOutItem = cart.find((c) => c.product.status === 'SOLD' || c.product.stock < c.quantity);
+    if (soldOutItem) {
+      setCartError(`Sorry, this item just sold out: ${soldOutItem.product.name}`);
+      return;
+    }
+    setStep('DELIVERY');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  return (
+    <div
+      className="modern-market-root min-h-screen bg-gradient-to-b from-[#F5F3FF] via-white to-[#FAF5FF] text-slate-900 pb-20"
+      style={{ fontFamily: "'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif" }}
+    >
+      {/* LIGHT MODE HEADER WITH #7C3AED PURPLE ACCENT + BECOME A SELLER */}
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#6D28D9] via-[#7C3AED] to-[#9333EA] text-white shadow-md">
+        <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (step === 'HOME') onClose();
+                else setStep('HOME');
+              }}
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white shrink-0"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <img
+              src="/efado_logo_192.jpg"
+              alt="EFADO"
+              className="w-8 h-8 rounded-xl object-cover border border-white/30 shrink-0"
+            />
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate mb-0 leading-tight">
+                EFADO MODERN MARKET
+              </h1>
+              <p className="text-[10px] sm:text-xs text-purple-100 font-semibold truncate mb-0 leading-tight">
+                Brand New • Sealed • Warranty • Escrow Protected
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setStep('VENDOR_REGISTRATION');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white text-[#7C3AED] hover:bg-purple-50 font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5 shrink-0" />
+              <span>Become a Seller</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => (onNavigate ? onNavigate('wallet') : onClose())}
+              className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs tabular-nums flex items-center gap-1 border border-white/25"
+              title="EFADO Wallet Balance"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              <span>{formatNaira(walletBalanceNgn)}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('ACTIVITY')}
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white"
+              aria-label="Notifications & Orders"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('CART')}
+              className="relative p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white"
+              aria-label="Cart"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#16A34A] text-white text-[10px] font-black flex items-center justify-center tabular-nums">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Light Mode Sub-Navigation Tabs (Template Alignment with FairlyUsedMarket) */}
+        <div className="bg-white border-b border-purple-100 text-slate-700">
+          <div className="max-w-[1200px] mx-auto px-3 sm:px-6 flex items-center gap-5 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'HOME' || step === 'FILTER' || step === 'PRODUCT_DETAIL'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Browse Brand New
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('ACTIVITY')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'ACTIVITY' || step === 'SUCCESS' || step === 'CHAT'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              My Orders &amp; Tracking
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('PROFILE')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'PROFILE' || step === 'VENDOR_REGISTRATION'
+                  ? 'border-[#7C3AED] text-[#7C3AED]'
+                  : 'border-transparent text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Seller Hub
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Gateway Return Verification Overlay */}
+      {verifyingReturn && (
+        <div className="max-w-[700px] mx-auto px-4 py-12 text-center space-y-3">
+          <Loader2 className="w-10 h-10 text-[#7C3AED] animate-spin mx-auto" />
+          <h3 className="text-lg font-extrabold text-slate-900">Confirming Your Payment...</h3>
+          <p className="text-xs text-slate-500">Verifying with payment gateway and securing your Escrow protection.</p>
+        </div>
+      )}
+
+      {returnError && (
+        <div className="max-w-[900px] mx-auto px-3 sm:px-6 pt-4">
+          <div className="bg-red-50 border border-[#DC2626]/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <p className="text-xs font-bold text-[#DC2626] mb-0">{returnError}</p>
+            <button
+              type="button"
+              onClick={() => setReturnError(null)}
+              className="text-xs font-bold text-slate-700 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 1: MODERN MARKET HOME                                          */}
+      {/* =================================================================== */}
+      {!verifyingReturn && step === 'HOME' && (
+        <main className="max-w-[1200px] mx-auto px-3 sm:px-6 pt-4 pb-10 space-y-4">
+          {/* Search Bar + Filter Button */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-[#7C3AED] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                placeholder="Search for brand new iPhone, Samsung, Laptop..."
+                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white border border-purple-200 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#7C3AED] outline-none shadow-sm"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDraftFilters(filters);
+                setStep('FILTER');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-4 py-3 rounded-2xl bg-white border border-purple-200 text-[#7C3AED] hover:bg-purple-50 font-bold text-xs flex items-center gap-1.5 shadow-sm shrink-0"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>Filter &amp; Sort</span>
+            </button>
+          </div>
+
+          {/* Categories Horizontal Row */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {CATEGORY_LIST.map((cat) => {
+              const active = filters.category === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setFilters({ ...filters, category: cat })}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap border transition-all ${
+                    active
+                      ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-sm'
+                      : 'bg-white text-slate-700 border-purple-100 hover:border-[#7C3AED]/40'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Green Trust Banner */}
+          <div className="bg-green-50 border border-[#16A34A]/30 rounded-2xl px-4 py-3 flex items-center gap-2.5 shadow-sm">
+            <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0" />
+            <p className="text-xs font-extrabold text-[#16A34A] mb-0">
+              100% BRAND NEW - Sealed - Warranty - Escrow Protected
+            </p>
+          </div>
+
+          {catalogError && (
+            <div className="bg-red-50 border border-[#DC2626]/30 rounded-2xl p-4 text-xs font-bold text-[#DC2626]">
+              {catalogError}
+            </div>
+          )}
+
+          {/* Section Title Bar */}
+          <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900">
+              {filters.category === 'All' ? 'Brand New Sealed Items' : `${filters.category} — Brand New`}
+            </h2>
+            <span className="bg-purple-50 text-[#7C3AED] px-3 py-1 rounded-lg text-xs font-extrabold border border-purple-200 tabular-nums">
+              {products.length} {products.length === 1 ? 'Item' : 'Items'}
+            </span>
+          </div>
+
+          {/* Product Grid */}
+          {loadingCatalog ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="bg-white rounded-2xl border border-purple-100 p-3 h-80 animate-pulse" />
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-purple-100 p-10 text-center space-y-3 shadow-sm">
+              <Package className="w-10 h-10 text-purple-300 mx-auto" />
+              <h3 className="text-base font-bold text-slate-900">No Matching Brand New Products</h3>
+              <p className="text-xs text-slate-500">Try clearing your search or adjusting filter options.</p>
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({
+                    category: 'All',
+                    search: '',
+                    brand: 'all',
+                    location: 'all',
+                    freeDeliveryOnly: false,
+                    brandNewOnly: true,
+                    priceMin: '',
+                    priceMax: '',
+                    sort: 'newest'
+                  })
+                }
+                className="px-5 py-2.5 bg-[#7C3AED] text-white rounded-xl text-xs font-bold"
+              >
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {products.map((prod) => {
+                const isSold = prod.status === 'SOLD' || prod.stock <= 0;
+                return (
+                  <div
+                    key={prod.id}
+                    onClick={() => openProductDetail(prod.id, prod)}
+                    className="bg-white rounded-2xl border border-purple-100 overflow-hidden shadow-sm hover:shadow-md hover:border-[#7C3AED]/50 transition-all cursor-pointer flex flex-col justify-between h-full"
+                  >
+                    <div>
+                      <div className="relative aspect-[4/3] bg-slate-50 overflow-hidden border-b border-purple-50">
+                        <img
+                          src={prod.photos[0]}
+                          alt={prod.name}
+                          className={`w-full h-full object-cover transition-transform duration-300 ${
+                            isSold ? 'grayscale opacity-60' : 'hover:scale-105'
+                          }`}
+                        />
+                        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-[#16A34A] text-white text-[10px] font-extrabold shadow-sm">
+                          Brand New - Sealed
+                        </span>
+                        {isSold && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/35">
+                            <span className="px-4 py-1.5 rounded-lg bg-[#DC2626] text-white font-black text-sm tracking-widest uppercase shadow-lg -rotate-12 border-2 border-white">
+                              SOLD
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3.5 pb-2 space-y-2">
+                        <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug">
+                          {prod.name}
+                        </h3>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-lg font-black text-[#7C3AED] tabular-nums mb-0">
+                            {formatNaira(prod.price)}
+                          </p>
+                          <span className="text-[11px] font-bold text-[#16A34A] tabular-nums">
+                            {isSold ? 'Out of Stock' : prod.stock <= 3 ? `Only ${prod.stock} left` : `In Stock: ${prod.stock}`}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                          <span className="inline-flex items-center gap-1 font-bold text-slate-800 truncate">
+                            <BadgeCheck className="w-3.5 h-3.5 text-[#16A34A] shrink-0" />
+                            <span className="truncate">{prod.sellerName}</span>
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 font-bold text-slate-700 shrink-0">
+                            <Star className="w-3 h-3 fill-[#7C3AED] text-[#7C3AED]" />
+                            {prod.rating} ({prod.salesCount})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                          <span className="inline-flex items-center gap-1 truncate">
+                            <MapPin className="w-3 h-3 text-[#7C3AED] shrink-0" />
+                            <span className="truncate">{prod.sellerLocation}</span>
+                          </span>
+                          {prod.freeDelivery && (
+                            <span className="text-[#16A34A] font-extrabold shrink-0">Free Delivery</span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-50 text-[#16A34A] border border-[#16A34A]/20 text-[10px] font-bold">
+                            Warranty: {prod.warrantyMonths}m
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-[#7C3AED] border border-purple-200 text-[10px] font-bold">
+                            <ShieldCheck className="w-3 h-3 shrink-0" />
+                            Escrow Protected
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 pt-2">
+                      {isSold ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleNotifyMe(prod.id, e)}
+                          className={`w-full py-2.5 px-3 rounded-xl text-xs font-extrabold transition-colors ${
+                            prod.isOnWaitlist
+                              ? 'bg-purple-100 text-[#7C3AED]'
+                              : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                          }`}
+                        >
+                          {prod.isOnWaitlist ? 'Waitlisted - We Will Notify' : 'SOLD - Notify Me When Back'}
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(prod, false);
+                              }}
+                              className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-[#7C3AED] rounded-xl font-bold text-xs flex items-center justify-center gap-1 border border-purple-200 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBuyNow(prod);
+                              }}
+                              className="py-2 px-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-colors"
+                            >
+                              <ShoppingBag className="w-3.5 h-3.5" />
+                              <span>Buy Now</span>
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-50">
+                            <button
+                              type="button"
+                              onClick={(e) => handleShareProduct(prod, e)}
+                              className="py-1.5 px-2 bg-white hover:bg-purple-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border border-purple-100 transition-colors"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-[#7C3AED]" />
+                              <span>Share</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleChatWithSeller(prod, prod.sellerName, e)}
+                              title="Ask Question Only (Fixed Price)"
+                              className="py-1.5 px-2 bg-green-50 hover:bg-green-100 text-[#16A34A] rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border border-[#16A34A]/25 transition-colors"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-[#16A34A]" />
+                              <span>Chat</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* =================================================================== */}
+      {/* FULL-PAGE FILTER & SORT                                             */}
+      {/* =================================================================== */}
+      {!verifyingReturn && step === 'FILTER' && (
+        <div className="max-w-[780px] mx-auto px-3 sm:px-6 pt-4 pb-28 space-y-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className="p-2.5 rounded-xl bg-white border border-purple-200 text-slate-800 shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900">Filter &amp; Sort</h2>
+              <p className="text-xs text-slate-500">Find Brand New, Sealed items within your budget</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm space-y-5">
+            <div className="flex items-center justify-between bg-green-50 border border-[#16A34A]/30 rounded-xl p-3">
+              <span className="text-xs font-extrabold text-[#16A34A]">Brand New &amp; Sealed Only</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-[#16A34A] text-white text-xs font-bold">Active</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold text-slate-800 mb-2">Sort Order</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'newest' as const, label: 'Newest' },
+                  { id: 'price_asc' as const, label: 'Price: Low - High' },
+                  { id: 'price_desc' as const, label: 'Price: High - Low' },
+                  { id: 'popular' as const, label: 'Most Popular' }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setDraftFilters({ ...draftFilters, sort: opt.id })}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border ${
+                      draftFilters.sort === opt.id
+                        ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                        : 'bg-white text-slate-700 border-purple-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-800 mb-1">Min Price (₦)</label>
+                <input
+                  type="number"
+                  value={draftFilters.priceMin}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, priceMin: e.target.value })}
+                  placeholder="e.g. 50000"
+                  className="w-full px-3 py-2.5 rounded-xl border border-purple-200 text-sm text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-slate-800 mb-1">Max Price (₦)</label>
+                <input
+                  type="number"
+                  value={draftFilters.priceMax}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, priceMax: e.target.value })}
+                  placeholder="e.g. 2500000"
+                  className="w-full px-3 py-2.5 rounded-xl border border-purple-200 text-sm text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-800 mb-1">Brand</label>
+                <select
+                  value={draftFilters.brand}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, brand: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-900"
+                >
+                  <option value="all">All Brands</option>
+                  <option value="Apple">Apple</option>
+                  <option value="Sony">Sony</option>
+                  <option value="Samsung">Samsung</option>
+                  <option value="Breville">Breville</option>
+                  <option value="Luna Atelier">Luna Atelier</option>
+                  <option value="Elixir Botanica">Elixir Botanica</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-slate-800 mb-1">Location</label>
+                <select
+                  value={draftFilters.location}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, location: e.target.value })}
+                  className="w-full px-3 py-2.5 rounded-xl border border-purple-200 bg-white text-sm text-slate-900"
+                >
+                  <option value="all">All Nigeria Locations</option>
+                  <option value="Bonny, Rivers State">Bonny, Rivers State</option>
+                  <option value="Lagos">Lagos</option>
+                  <option value="Abuja">Abuja</option>
+                  <option value="Port Harcourt">Port Harcourt</option>
+                </select>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draftFilters.freeDeliveryOnly}
+                onChange={(e) => setDraftFilters({ ...draftFilters, freeDeliveryOnly: e.target.checked })}
+                className="w-4 h-4 accent-[#7C3AED]"
+              />
+              <span>Free Delivery Only</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const reset: MarketFilterState = {
+                    category: 'All',
+                    search: '',
+                    brand: 'all',
+                    location: 'all',
+                    freeDeliveryOnly: false,
+                    brandNewOnly: true,
+                    priceMin: '',
+                    priceMax: '',
+                    sort: 'newest'
+                  };
+                  setDraftFilters(reset);
+                  setFilters(reset);
+                  setStep('HOME');
+                }}
+                className="py-3 bg-slate-100 text-slate-800 rounded-xl text-xs font-bold"
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters(draftFilters);
+                  setStep('HOME');
+                }}
+                className="py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-xl text-xs font-extrabold shadow-sm"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 2: PRODUCT DETAIL (FRESH FULL PAGE)                            */}
+      {/* =================================================================== */}
+      {!verifyingReturn && step === 'PRODUCT_DETAIL' && selectedProduct && (
+        <div className="max-w-[960px] mx-auto px-3 sm:px-6 pt-4 pb-36 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className="px-3.5 py-2 rounded-xl bg-white border border-purple-200 text-slate-800 font-bold text-xs flex items-center gap-1.5 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Market</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleShareProduct(selectedProduct)}
+              className="p-2.5 rounded-xl bg-white border border-purple-200 text-[#7C3AED] shadow-sm"
+              aria-label="Share product"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {detailLoading && (
+            <div className="text-xs text-[#7C3AED] font-bold flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Refreshing live stock &amp; seller details...</span>
+            </div>
+          )}
+
+          {/* Big Photo Gallery */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm space-y-3">
+            <div className="relative aspect-[4/3] max-h-[420px] rounded-xl overflow-hidden bg-slate-50 flex items-center justify-center">
+              <img
+                src={selectedProduct.photos[activePhotoIdx] || selectedProduct.photos[0]}
+                alt={selectedProduct.name}
+                onClick={() => setZoomLightboxOpen(true)}
+                className={`w-full h-full object-contain cursor-zoom-in ${
+                  selectedProduct.status === 'SOLD' || selectedProduct.stock <= 0 ? 'grayscale opacity-70' : ''
+                }`}
+              />
+              <span className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-[#16A34A] text-white text-xs font-extrabold shadow-sm">
+                Brand New - Sealed
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomLightboxOpen(true)}
+                className="absolute bottom-3 right-3 p-2 rounded-xl bg-white/90 text-slate-800 shadow-sm"
+                aria-label="Zoom image"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              {selectedProduct.photos.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActivePhotoIdx((i) => (i - 1 + selectedProduct.photos.length) % selectedProduct.photos.length)
+                    }
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/90 text-slate-800 shadow"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePhotoIdx((i) => (i + 1) % selectedProduct.photos.length)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/90 text-slate-800 shadow"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              {(selectedProduct.status === 'SOLD' || selectedProduct.stock <= 0) && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/30 pointer-events-none">
+                  <span className="px-6 py-2 rounded-xl bg-[#DC2626] text-white font-black text-xl tracking-widest -rotate-12 border-2 border-white shadow-lg">
+                    SOLD
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {selectedProduct.photos.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto">
+                {selectedProduct.photos.map((img, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActivePhotoIdx(i)}
+                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 shrink-0 ${
+                      activePhotoIdx === i ? 'border-[#7C3AED]' : 'border-purple-100'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Core Info & Variant Bottom Sheet Triggers */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-1 rounded-md bg-[#16A34A] text-white text-xs font-extrabold">
+                Brand New - Sealed
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-purple-50 text-[#7C3AED] text-xs font-bold">
+                Warranty: {selectedProduct.warrantyMonths} Months
+              </span>
+              <span
+                className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                  selectedProduct.stock <= 0
+                    ? 'bg-red-50 text-[#DC2626]'
+                    : selectedProduct.stock <= 3
+                      ? 'bg-red-50 text-[#DC2626]'
+                      : 'bg-green-50 text-[#16A34A]'
+                }`}
+              >
+                {selectedProduct.stock <= 0
+                  ? 'SOLD'
+                  : selectedProduct.stock <= 3
+                    ? `Only ${selectedProduct.stock} Left`
+                    : `In Stock: ${selectedProduct.stock}`}
+              </span>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">{selectedProduct.name}</h2>
+            <p className="text-2xl sm:text-3xl font-black text-[#7C3AED] tabular-nums mb-0">
+              {formatNaira(selectedProduct.price)}
+            </p>
+
+            {/* Color & Size Variant Buttons + Quantity Selector */}
+            {Boolean(selectedProduct.specs?.colorsAvailable?.length || selectedProduct.specs?.sizesAvailable?.length) && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {selectedProduct.specs?.colorsAvailable && selectedProduct.specs.colorsAvailable.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSheetMode('color')}
+                    className="px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-200 text-xs font-bold text-slate-900"
+                  >
+                    Color: <span className="text-[#7C3AED]">{selectedColor || 'Choose Color'}</span>
+                  </button>
+                )}
+                {selectedProduct.specs?.sizesAvailable && selectedProduct.specs.sizesAvailable.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSheetMode('size')}
+                    className="px-3.5 py-2 rounded-xl bg-purple-50 border border-purple-200 text-xs font-bold text-slate-900"
+                  >
+                    Variant: <span className="text-[#7C3AED]">{selectedSize || 'Choose Size'}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {selectedProduct.status !== 'SOLD' && selectedProduct.stock > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-purple-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700">Quantity:</span>
+                  <div className="inline-flex items-center border border-purple-200 rounded-xl bg-purple-50/50">
+                    <button
+                      type="button"
+                      onClick={() => setDetailQty((q) => Math.max(1, q - 1))}
+                      className="px-3 py-1.5 text-sm font-black text-[#7C3AED]"
+                    >
+                      -
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-black text-slate-900 tabular-nums">{detailQty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDetailQty((q) => Math.min(selectedProduct.stock, q + 1))}
+                      className="px-3 py-1.5 text-sm font-black text-[#7C3AED]"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[11px] font-extrabold text-[#16A34A]">
+                  Fixed Price • No Negotiation
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Seller Card (NEVER shows bank details) */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-purple-100 text-[#7C3AED] flex items-center justify-center shrink-0">
+                <Store className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    {selectedSeller?.storeName || selectedProduct.sellerName}
+                  </h3>
+                  <BadgeCheck className="w-4 h-4 text-[#16A34A]" />
+                </div>
+                <p className="text-xs text-slate-600 mb-0">
+                  ★ {selectedSeller?.rating ?? selectedProduct.sellerRating} •{' '}
+                  {selectedSeller?.salesCount ?? selectedProduct.sellerSalesCount} sales •{' '}
+                  {selectedSeller?.location || selectedProduct.sellerLocation}
+                </p>
+                <p className="text-[11px] text-slate-400 mb-0">
+                  Joined {new Date(selectedSeller?.joinedAt || selectedProduct.sellerJoinedAt).getFullYear()}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setChatTarget({
+                  productId: selectedProduct.id,
+                  productName: selectedProduct.name,
+                  productPhoto: selectedProduct.photos[0],
+                  sellerId: selectedProduct.sellerId,
+                  sellerName: selectedSeller?.storeName || selectedProduct.sellerName
+                });
+                setStep('CHAT');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-4 py-2.5 rounded-xl bg-purple-50 border border-[#7C3AED] text-[#7C3AED] hover:bg-purple-100 text-xs font-extrabold flex items-center justify-center gap-1.5"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Chat With Seller</span>
+            </button>
+          </div>
+
+          {/* Description & Specifications */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 mb-1.5">Description</h3>
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed mb-0">{selectedProduct.description}</p>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 mb-2">Specifications</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                {[
+                  { label: 'RAM / Engine', val: selectedProduct.specs?.ram },
+                  { label: 'Storage / Capacity', val: selectedProduct.specs?.storage },
+                  { label: 'Color', val: selectedColor || selectedProduct.specs?.color },
+                  { label: 'Battery / Power', val: selectedProduct.specs?.battery },
+                  { label: 'Model', val: selectedProduct.specs?.model }
+                ]
+                  .filter((r) => r.val)
+                  .map((r) => (
+                    <div key={r.label} className="bg-purple-50/70 rounded-xl p-2.5 border border-purple-100">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase mb-0.5">{r.label}</p>
+                      <p className="font-bold text-slate-900 mb-0">{r.val}</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Delivery & Protection Info */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <Truck className="w-5 h-5 text-[#7C3AED] shrink-0" />
+              <div>
+                <p className="font-extrabold text-slate-900 mb-0">{selectedProduct.estimatedDelivery}</p>
+                <p className="text-[#16A34A] font-bold mb-0">
+                  {selectedProduct.freeDelivery ? 'FREE Delivery' : formatNaira(selectedProduct.deliveryFee)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <RotateCcw className="w-5 h-5 text-[#7C3AED] shrink-0" />
+              <div>
+                <p className="font-extrabold text-slate-900 mb-0">Return {selectedProduct.returnDays} Days</p>
+                <p className="text-slate-500 mb-0">If unopened or wrong item</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0" />
+              <div>
+                <p className="font-extrabold text-[#16A34A] mb-0">EFADO Escrow Protected</p>
+                <p className="text-slate-500 mb-0">Pay safely until confirmed</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Buyer Reviews */}
+          <div className="bg-white rounded-2xl border border-purple-100 p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-extrabold text-slate-900">
+              Verified Buyer Reviews ({productReviews.length})
+            </h3>
+            {productReviews.length === 0 ? (
+              <p className="text-xs text-slate-500 mb-0">No reviews yet. Be the first verified buyer to review!</p>
+            ) : (
+              productReviews.map((rev) => (
+                <div key={rev.id} className="border-t border-purple-50 pt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-900">{rev.buyerName}</span>
+                    <span className="text-[#7C3AED] font-extrabold">{'★'.repeat(rev.rating)}</span>
+                  </div>
+                  <p className="text-xs text-slate-700 mb-0">{rev.comment}</p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Sticky Bottom Action Bar */}
+          <div className="fixed bottom-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-purple-100 px-3 sm:px-6 py-3 shadow-lg">
+            <div className="max-w-[960px] mx-auto">
+              {selectedProduct.status === 'SOLD' || selectedProduct.stock <= 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handleNotifyMe(selectedProduct.id)}
+                  className="w-full py-3.5 px-4 bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold text-sm rounded-xl"
+                >
+                  {selectedProduct.isOnWaitlist ? 'Waitlisted - We Will Notify You' : 'SOLD - Notify Me When Back'}
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(selectedProduct, false, detailQty)}
+                    className="py-3.5 px-3 bg-purple-50 border-2 border-[#7C3AED] text-[#7C3AED] hover:bg-purple-100 font-extrabold text-xs sm:text-sm rounded-xl"
+                  >
+                    ADD TO CART
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBuyNow(selectedProduct, detailQty)}
+                    className="py-3.5 px-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md tabular-nums"
+                  >
+                    BUY NOW - {formatNaira(selectedProduct.price * detailQty)}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Click-to-Zoom Lightbox */}
+          {zoomLightboxOpen && (
+            <div
+              onClick={() => setZoomLightboxOpen(false)}
+              className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <button
+                type="button"
+                onClick={() => setZoomLightboxOpen(false)}
+                className="absolute top-5 right-5 p-3 rounded-full bg-purple-100 text-[#7C3AED]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={selectedProduct.photos[activePhotoIdx] || selectedProduct.photos[0]}
+                alt={selectedProduct.name}
+                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-lg"
+              />
+            </div>
+          )}
+
+          {/* Bottom Sheet ONLY for Choose Color / Choose Size */}
+          {sheetMode && (
+            <div
+              onClick={() => setSheetMode(null)}
+              className="fixed inset-0 z-50 bg-slate-900/40 flex items-end justify-center"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg bg-white rounded-t-3xl p-5 space-y-4 shadow-2xl"
+              >
+                <div className="flex items-center justify-between">
+                  <h4 className="text-base font-extrabold text-slate-900">
+                    {sheetMode === 'color' ? 'Choose Color' : 'Choose Size / Variant'}
+                  </h4>
+                  <button type="button" onClick={() => setSheetMode(null)} className="p-1.5 rounded-lg bg-purple-50">
+                    <X className="w-4 h-4 text-slate-700" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(sheetMode === 'color'
+                    ? selectedProduct.specs?.colorsAvailable || []
+                    : selectedProduct.specs?.sizesAvailable || []
+                  ).map((choice) => {
+                    const active = sheetMode === 'color' ? selectedColor === choice : selectedSize === choice;
+                    return (
+                      <button
+                        key={choice}
+                        type="button"
+                        onClick={() => {
+                          if (sheetMode === 'color') setSelectedColor(choice);
+                          else setSelectedSize(choice);
+                          setSheetMode(null);
+                        }}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold border ${
+                          active ? 'bg-[#7C3AED] text-white border-[#7C3AED]' : 'bg-white text-slate-800 border-purple-200'
+                        }`}
+                      >
+                        {choice}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEPS 3 TO 7: FRESH FULL PAGES                                      */}
+      {/* =================================================================== */}
+      {!verifyingReturn && step === 'CART' && (
+        <CartPage
+          cart={cart}
+          onBack={() => setStep('HOME')}
+          onUpdateQty={handleUpdateCartQty}
+          onRemoveItem={handleRemoveCartItem}
+          onProceedToDelivery={handleProceedToDelivery}
+          errorMsg={cartError}
+        />
+      )}
+
+      {!verifyingReturn && step === 'DELIVERY' && (
+        <DeliveryPage
+          cart={cart}
+          defaultName={user?.displayName || ''}
+          defaultPhone={(user as any)?.phoneNumber || ''}
+          onBack={() => setStep('CART')}
+          onOrderCreated={(ord) => {
+            setActiveOrder(ord);
+            setStep('PAYMENT');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {!verifyingReturn && step === 'PAYMENT' && activeOrder && (
+        <PaymentPage
+          order={activeOrder}
+          walletBalanceNgn={walletBalanceNgn}
+          selectedMethod={paymentMethod}
+          selectedGateway={paymentGateway}
+          onSelectPayment={(m, gw) => {
+            setPaymentMethod(m);
+            setPaymentGateway(gw);
+          }}
+          onBack={() => setStep('DELIVERY')}
+          onProceedToAuthorize={() => {
+            refreshWalletAndSecurity();
+            setStep('AUTHORIZE');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onFundWallet={() => {
+            if (onNavigate) onNavigate('wallet');
+            else onClose();
+          }}
+        />
+      )}
+
+      {!verifyingReturn && step === 'AUTHORIZE' && activeOrder && (
+        <AuthorizePage
+          order={activeOrder}
+          paymentMethod={paymentMethod}
+          paymentGateway={paymentGateway}
+          hasPin={hasPin}
+          biometricEnabled={biometricEnabled}
+          onBackToPayment={() => setStep('PAYMENT')}
+          onCancelToMarket={() => setStep('HOME')}
+          onPinUpdated={() => setHasPin(true)}
+          onSuccessWallet={(paidOrder) => {
+            setActiveOrder(paidOrder);
+            setCart([]);
+            setStep('SUCCESS');
+            refreshWalletAndSecurity();
+            loadCatalog();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {!verifyingReturn && step === 'SUCCESS' && activeOrder && (
+        <SuccessPage
+          order={activeOrder}
+          onOrderUpdated={(updated) => {
+            setActiveOrder(updated);
+            refreshWalletAndSecurity();
+          }}
+          onViewOrders={() => {
+            setStep('ACTIVITY');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onContinueShopping={() => {
+            setStep('HOME');
+            loadCatalog();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* CHAT, ACTIVITY, PROFILE                                             */}
+      {/* =================================================================== */}
+      {!verifyingReturn && step === 'CHAT' && chatTarget && (
+        <SellerChatPage
+          currentUserId={user.uid}
+          productId={chatTarget.productId}
+          productName={chatTarget.productName}
+          productPhoto={chatTarget.productPhoto}
+          sellerId={chatTarget.sellerId}
+          sellerName={chatTarget.sellerName}
+          buyerId={chatTarget.buyerId}
+          onBack={() => setStep(selectedProduct ? 'PRODUCT_DETAIL' : 'ACTIVITY')}
+        />
+      )}
+
+      {!verifyingReturn && step === 'ACTIVITY' && (
+        <ActivityPage
+          onOpenOrderTracking={(ord) => {
+            setActiveOrder(ord);
+            setStep('SUCCESS');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenChat={(th: ModernMarketChatThread) => {
+            setChatTarget({
+              productId: th.productId,
+              productName: th.productName,
+              productPhoto: th.productPhoto,
+              sellerId: th.sellerId,
+              sellerName: th.sellerName,
+              buyerId: th.buyerId
+            });
+            setStep('CHAT');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToMarket={() => setStep('HOME')}
+        />
+      )}
+
+      {!verifyingReturn && step === 'VENDOR_REGISTRATION' && (
+        <VendorRegistrationPage
+          userEmail={user.email}
+          userName={user.displayName || ''}
+          userPhone={(user as any)?.phoneNumber || ''}
+          onBack={() => setStep('HOME')}
+          onGoSellerHub={() => {
+            setStep('PROFILE');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {!verifyingReturn && step === 'PROFILE' && (
+        <ProfileSellerHubPage
+          userEmail={user.email}
+          userName={user.displayName || ''}
+          walletBalanceNgn={walletBalanceNgn}
+          onProductChanged={() => loadCatalog()}
+          onOpenWallet={() => (onNavigate ? onNavigate('wallet') : onClose())}
+          onOpenVendorRegistration={() => {
+            setStep('VENDOR_REGISTRATION');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toastMsg && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[92%] bg-[#16A34A] text-white px-4 py-3 rounded-2xl shadow-xl text-xs font-extrabold flex items-center gap-2">
+          <Check className="w-4 h-4 shrink-0" />
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* PERSISTENT BOTTOM NAVIGATION: Home / Market / Cart / Activity / Profile */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-purple-100 shadow-[0_-2px_12px_rgba(124,58,237,0.08)]">
+        <div className="max-w-[1200px] mx-auto grid grid-cols-5 h-16">
+          {[
+            { id: 'exit_home', label: 'Home', icon: Home, active: false },
+            { id: 'HOME', label: 'Market', icon: LayoutGrid, active: step === 'HOME' || step === 'PRODUCT_DETAIL' || step === 'FILTER' },
+            { id: 'CART', label: 'Cart', icon: ShoppingBag, active: step === 'CART' || step === 'DELIVERY' || step === 'PAYMENT' || step === 'AUTHORIZE', badge: cartCount },
+            { id: 'ACTIVITY', label: 'Activity', icon: Clock, active: step === 'ACTIVITY' || step === 'SUCCESS' || step === 'CHAT' },
+            { id: 'PROFILE', label: 'Profile', icon: UserIcon, active: step === 'PROFILE' || step === 'VENDOR_REGISTRATION' }
+          ].map((nav) => {
+            const Icon = nav.icon;
+            return (
+              <button
+                key={nav.id}
+                type="button"
+                onClick={() => {
+                  if (nav.id === 'exit_home') {
+                    onClose();
+                  } else {
+                    setStep(nav.id as PageStep);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                className={`relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-colors ${
+                  nav.active ? 'text-[#7C3AED]' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {nav.badge && nav.badge > 0 ? (
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#7C3AED] text-white text-[9px] font-black flex items-center justify-center tabular-nums">
+                      {nav.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <span>{nav.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+};

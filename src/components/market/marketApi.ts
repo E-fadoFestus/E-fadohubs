@@ -1,5 +1,6 @@
 import { auth } from '../../firebase';
 import type {
+  AdminVendorApplication,
   DeliveryMethod,
   MarketFilterState,
   ModernMarketAlert,
@@ -11,7 +12,8 @@ import type {
   ModernSellerPublicInfo,
   PaymentGatewayId,
   PaymentMethodId,
-  SellerProfilePrivate
+  SellerProfilePrivate,
+  VendorRegistrationPayload
 } from '../../types/modernMarket';
 
 export function formatNaira(amount: number, showDecimals: boolean = false): string {
@@ -153,6 +155,31 @@ export async function confirmPinResetWithOtp(otp: string, newPin: string) {
   });
 }
 
+export async function validateCartStock(items: Array<{ productId: string; quantity: number }>) {
+  return apiJson<{
+    success: boolean;
+    allAvailable: boolean;
+    blockedMessage: string | null;
+    items: Array<{
+      productId: string;
+      exists: boolean;
+      available: boolean;
+      soldOut: boolean;
+      availableStock: number;
+      requestedQty: number;
+      reason: string | null;
+      product: ModernProduct | null;
+    }>;
+  }>(
+    '/api/marketplace/cart/check-stock',
+    {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    },
+    false
+  );
+}
+
 export async function createMarketplaceOrder(payload: {
   items: Array<{ productId: string; quantity: number; selectedColor?: string; selectedSize?: string }>;
   deliveryMethod: DeliveryMethod;
@@ -228,6 +255,13 @@ export async function fetchSellerOrders() {
   });
 }
 
+export async function fetchOrderTracking(orderId: string) {
+  return apiJson<{ success: boolean; order: ModernMarketOrder }>(
+    `/api/marketplace/orders/${encodeURIComponent(orderId)}/tracking`,
+    { method: 'GET' }
+  );
+}
+
 export async function updateSellerOrderShipping(orderId: string, stage: 'SHIPPED' | 'OUT_FOR_DELIVERY' | 'DELIVERED') {
   return apiJson<{ success: boolean; order: ModernMarketOrder }>('/api/marketplace/order/ship', {
     method: 'POST',
@@ -295,6 +329,52 @@ export async function saveSellerProfile(payload: Partial<SellerProfilePrivate> &
     method: 'POST',
     body: JSON.stringify(payload)
   });
+}
+
+export async function registerVendorApplication(payload: VendorRegistrationPayload) {
+  return apiJson<{ success: boolean; profile: SellerProfilePrivate; message: string }>(
+    '/api/marketplace/seller/register',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }
+  );
+}
+
+export async function resolveVendorBankAccount(accountNumber: string, bankCode: string, bankName?: string) {
+  return apiJson<{
+    success: boolean;
+    account_name?: string;
+    accountName?: string;
+    message?: string;
+  }>('/api/bank/resolve', {
+    method: 'POST',
+    body: JSON.stringify({
+      account_number: accountNumber,
+      bank_code: bankCode,
+      bank_name: bankName
+    })
+  });
+}
+
+export async function fetchAdminVendorApplications() {
+  return apiJson<{ success: boolean; vendors: AdminVendorApplication[] }>('/api/marketplace/admin/sellers', {
+    method: 'GET'
+  });
+}
+
+export async function reviewAdminVendorApplication(
+  sellerId: string,
+  decision: 'approve' | 'reject',
+  reason?: string
+) {
+  return apiJson<{ success: boolean; profile: SellerProfilePrivate; message: string }>(
+    `/api/marketplace/admin/sellers/${encodeURIComponent(sellerId)}/review`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ decision, reason })
+    }
+  );
 }
 
 export async function submitProductReview(payload: {

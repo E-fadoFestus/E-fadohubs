@@ -175,6 +175,8 @@ export interface ModernMarketOrder {
   deliveredAt?: string | null;
   disputeReason?: string | null;
   disputePhotos?: string[] | null;
+  refundChannel?: string | null;
+  refundedAt?: string | null;
   trackingHistory: OrderTrackingEvent[];
   createdAt: string;
   updatedAt: string;
@@ -208,7 +210,7 @@ export interface ModernMarketChatThread {
 export interface ModernMarketAlert {
   id: string;
   userId: string;
-  type: 'ORDER' | 'ESCROW' | 'WAITLIST' | 'CHAT' | 'DISPUTE' | 'SECURITY' | 'SELLER_SALE';
+  type: 'ORDER' | 'ESCROW' | 'WAITLIST' | 'CHAT' | 'DISPUTE' | 'SECURITY' | 'SELLER_SALE' | 'VENDOR';
   title: string;
   message: string;
   orderId?: string;
@@ -217,10 +219,27 @@ export interface ModernMarketAlert {
   createdAt: string;
 }
 
+export type VendorApplicationStatus = 'NOT_APPLIED' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+
+export type VendorIdType = 'NIN' | "Driver's License" | "Voter's Card";
+
 export interface SellerProfilePrivate {
   sellerId: string;
   storeName: string;
+  ownerFullName?: string;
+  phone?: string;
+  email?: string;
+  state?: string;
+  city?: string;
   verified: boolean;
+  applicationStatus?: VendorApplicationStatus;
+  rejectionReason?: string;
+  idType?: VendorIdType;
+  idPhotoUploaded?: boolean;
+  rulesAccepted?: boolean;
+  submittedAt?: string;
+  approvedAt?: string;
+  isAdmin?: boolean;
   rating: number;
   salesCount: number;
   location: string;
@@ -231,6 +250,28 @@ export interface SellerProfilePrivate {
   bankName?: string;
   accountName?: string;
   accountNumberMasked?: string;
+}
+
+export interface VendorRegistrationPayload {
+  storeName: string;
+  ownerFullName: string;
+  phone: string;
+  email: string;
+  state: string;
+  city: string;
+  storeAddress: string;
+  idType: VendorIdType;
+  idPhoto: string;
+  bankName: string;
+  bankCode: string;
+  accountNumber: string;
+  accountName: string;
+  payoutPreference: 'wallet' | 'bank';
+  rulesAccepted: boolean;
+}
+
+export interface AdminVendorApplication extends SellerProfilePrivate {
+  idPhotoPreview?: string;
 }
 
 export interface MarketFilterState {

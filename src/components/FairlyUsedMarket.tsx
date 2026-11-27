@@ -1,2266 +1,2421 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { getFlutterwavePublicKey, createFlutterwavePaymentLink } from '../utils/flutterwave';
-import { VendorRegistrationFlow } from './VendorRegistrationFlow';
-import { 
-  ShoppingBag, 
-  ChevronRight, 
-  UserPlus, 
-  Package, 
-  Search, 
-  X, 
-  CheckCircle2, 
-  Info,
-  MapPin,
-  Trash2,
-  Plus,
-  Minus,
-  Truck,
-  Store,
-  ShieldCheck,
-  Clock,
-  ExternalLink,
-  History,
-  ClipboardList,
-  CreditCard,
-  Wallet,
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BadgeCheck,
+  Bell,
   Building2,
-  Bitcoin,
-  QrCode,
-  Ticket,
-  Smartphone,
-  CheckCircle,
-  ArrowRight,
-  Zap,
-  ShoppingBasket,
-  Globe,
-  SearchCode,
-  Copy,
-  ChevronDown,
-  ArrowRightLeft,
-  Hash,
-  Fingerprint,
-  User,
-  AlertCircle,
-  FileText,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   Film,
-  Video,
+  Handshake,
+  Home,
+  LayoutGrid,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  Package,
+  Plus,
+  RotateCcw,
+  Search,
   Share2,
-  MessageCircle
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
+  Star,
+  Store,
+  ThumbsUp,
+  Truck,
+  User as UserIcon,
+  UserPlus,
+  Video,
+  Wallet,
+  X,
+  ZoomIn
 } from 'lucide-react';
-import { StrategicReceipt } from './StrategicReceipt';
-import { SAMPLE_PRODUCTS } from '../sampleData';
-import { AdSenseBanner } from './AdSenseBanner';
-import { MarketProduct, UserProfile, MarketOrder } from '../types';
-import { useCurrency } from '../lib/CurrencyContext';
-import { CurrencySelector } from './CurrencySelector';
-import { SecurityGuard, TransactionPinModal } from './SecurityGuard';
-import { db, collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc } from '../firebase';
-import { MiningMiniCard, AdvertisingMiniCard } from './EfadoMining';
-import { OFFICE_ADDRESSES } from '../constants/businessProfile';
-import bokehBg from '../assets/images/marketplace_bokeh_bg_1783758466790.jpg';
-import { HubGuideNote } from './HubGuideNote';
+import type { UserProfile } from '../types';
+import type {
+  ConditionGrade,
+  FairlyUsedCartItem,
+  FairlyUsedCategory,
+  FairlyUsedChatThread,
+  FairlyUsedFilterState,
+  FairlyUsedOrder,
+  FairlyUsedProduct,
+  FairlyUsedProductReview,
+  FairlyUsedReel,
+  FairlyUsedSellerPublicInfo,
+  PaymentGatewayId,
+  PaymentMethodId
+} from '../types/fairlyUsedMarket';
+import {
+  fetchFairlyUsedProductDetail,
+  fetchFairlyUsedProducts,
+  fetchPinAndWalletStatus,
+  formatNaira,
+  likeProductVideo,
+  sendSellerPresenceHeartbeat,
+  submitOffer,
+  subscribeNotifyMe,
+  validateCartStock,
+  verifyFairlyUsedPayment
+} from './fairly-used/fairlyUsedApi';
+import {
+  AuthorizePage,
+  CartPage,
+  DeliveryPage,
+  PaymentPage,
+  SuccessPage
+} from './fairly-used/FairlyUsedCheckoutPages';
+import {
+  ActivityPage,
+  ProfileSellerHubPage,
+  SellerChatPage,
+  VendorRegistrationPage
+} from './fairly-used/FairlyUsedActivityProfilePages';
+import { FairlyUsedReelsView } from './fairly-used/FairlyUsedReelsView';
 
-// Category Dataset (4-level taxonomy)
-const CATEGORIES: Record<string, Record<string, Record<string, string[]>>> = {
-  "Electronics & Gadgets": {
-    "Computing": {
-      "Laptops": ["MacBooks", "Windows Laptops", "Chromebooks"],
-      "Desktops": ["PC Towers", "All-in-Ones", "Workstations"],
-      "Peripherals": ["Monitors", "Keyboards", "Mice", "Printers"]
-    },
-    "Mobile Devices": {
-      "Smartphones": ["iPhones", "Android Phones", "Feature Phones"],
-      "Tablets": ["iPads", "Android Tablets", "E-readers"],
-      "Accessories": ["Cases", "Chargers", "Power Banks"]
-    },
-    "Audio & Sound": {
-      "Personal Audio": ["Headphones", "Earbuds", "MP3 Players"],
-      "Home Audio": ["Speakers", "Soundbars", "Home Theater"],
-      "Professional": ["Microphones", "Mixers", "Studio Monitors"]
-    }
-  },
-  "Fashion & Accessories": {
-    "Apparel": {
-      "Men's Clothing": ["Shirts", "Trousers", "Suits", "Jackets"],
-      "Women's Clothing": ["Dresses", "Tops", "Skirts", "Outerwear"],
-      "Kids' Clothing": ["Infant", "Toddler", "Teens"]
-    },
-    "Footwear": {
-      "Casual": ["Sneakers", "Sandals", "Slides"],
-      "Formal": ["Oxford Shoes", "Heels", "Loafers"],
-      "Sport": ["Running Shoes", "Cleats", "Hiking Boots"]
-    },
-    "Accessories": {
-      "Timepieces": ["Luxury Watches", "Smartwatches", "Vintage"],
-      "Jewelry": ["Rings", "Necklaces", "Bracelets"],
-      "Bags": ["Handbags", "Backpacks", "Suitcases"]
-    }
-  },
-  "Home & Kitchen": {
-    "Appliances": {
-      "Kitchen": ["Refrigerators", "Microwaves", "Blenders", "Ovens"],
-      "Laundry": ["Washing Machines", "Dryers", "Irons"],
-      "Cleaning": ["Vacuum Cleaners", "Steam Cleaners", "Air Purifiers"]
-    },
-    "Living Space": {
-      "Furniture": ["Sofas", "Dining Sets", "Beds", "Wardrobes"],
-      "Decor": ["Wall Art", "Lighting", "Rugs", "Vases"],
-      "Textiles": ["Bedding", "Curtains", "Towels"]
-    }
-  },
-  "Vehicles & Parts": {
-    "Automobiles": {
-      "Cars": ["Sedans", "SUVs", "Trucks", "Coupes"],
-      "Bikes": ["Motorcycles", "Scooters", "Bicycles"],
-      "Heavy Duty": ["Tractors", "Vans", "Buses"]
-    },
-    "Spare Parts": {
-      "Engine": ["Pistons", "Belts", "Filters"],
-      "Exterior": ["Tires", "Lights", "Mirrors"],
-      "Interior": ["Seat Covers", "Dash Cams", "Audio Systems"]
-    }
-  },
-  "Real Estate & Properties": {
-    "Landed Properties": {
-      "Land Plots": ["Residential Plots", "Commercial Land", "Industrial Land"],
-      "Acreage": ["Farmland", "Plantations", "Estate Land"],
-      "Specialty": ["Corner Pieces", "Waterfront", "Hillside"]
-    },
-    "Buildings & Houses": {
-      "Residential": ["Duplexes", "Bungalows", "Apartments", "Mansions"],
-      "Commercial": ["Office Blocks", "Shopping Complexes", "Warehouses"],
-      "Industrial": ["Factories", "Plants", "Logistics Hubs"]
-    },
-    "Rentals & Vacancies": {
-      "Accommodation": ["Self-Contains", "Flats", "Duplex Rents"],
-      "Business": ["Store Rent", "Office Rent", "Warehouse Lease"],
-      "Short Stay": ["Guest Houses", "Service Apartments", "Vacation Homes"]
-    }
-  }
-};
-
-const FormField: React.FC<{
-  label: string,
-  icon?: React.ReactNode,
-  error?: string,
-  hint?: string,
-  required?: boolean,
-  children: React.ReactNode
-}> = ({ label, icon, error, hint, required = true, children }) => (
-  <div className="space-y-2">
-    <div className="flex items-center justify-between">
-      <label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${error ? 'text-rose-500' : 'text-slate-400'}`}>
-        {icon} {label} {!required && <span className="text-[8px] opacity-60">(Optional)</span>}
-      </label>
-      {required && <div className={`w-1 h-1 rounded-full ${error ? 'bg-rose-500 animate-ping' : 'bg-indigo-400'}`} />}
-    </div>
-    <div className={`transition-all duration-300 ${error ? 'ring-2 ring-rose-500/20' : ''}`}>
-      {children}
-    </div>
-    {error ? (
-      <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-[9px] font-bold text-rose-500 flex items-center gap-1">
-        <AlertCircle className="w-3 h-3" /> {error}
-      </motion.p>
-    ) : hint && (
-      <p className="text-[8px] font-medium text-slate-500 leading-tight">{hint}</p>
-    )}
-  </div>
-);
-
-interface FairlyUsedMarketProps {
+export interface FairlyUsedMarketProps {
   user: UserProfile;
   onClose: () => void;
   onOpenMining?: () => void;
-  onNavigate?: (hub: any, subview?: any) => void;
+  onNavigate?: (hub: any, subview?: any, extraProps?: any) => void;
   initialItemId?: string;
 }
 
-export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({ user, onClose, onOpenMining, onNavigate, initialItemId }) => {
-  const { formatPrice } = useCurrency();
-  const [activeView, setActiveView] = useState<'browse' | 'orders'>('browse');
-  const [selectedL1, setSelectedL1] = useState<string | null>(null);
-  const [selectedL2, setSelectedL2] = useState<string | null>(null);
-  const [selectedL3, setSelectedL3] = useState<string | null>(null);
-  const [selectedL4, setSelectedL4] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [adListings, setAdListings] = useState<any[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<MarketProduct[]>(SAMPLE_PRODUCTS);
-  const [previewProduct, setPreviewProduct] = useState<MarketProduct | null>(null);
-  const [shareToast, setShareToast] = useState<string | null>(null);
-  const [showRegModal, setShowRegModal] = useState(false);
-  
-  const [cart, setCart] = useState<{product: MarketProduct, quantity: number}[]>([]);
-  const [showCart, setShowCart] = useState(false);
-  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'address' | 'payment' | 'processing' | 'success'>('cart');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatusText, setPaymentStatusText] = useState('');
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    fullName: user.displayName || '',
-    phone: '',
-    street: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    landmark: '',
-    instructions: ''
-  });
-  const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
-  const [pickupLocationType, setPickupLocationType] = useState<'OFFICE' | 'VENDOR'>('OFFICE');
-  const [addressError, setAddressError] = useState('');
-  const [shippingMethod, setShippingMethod] = useState<'Standard' | 'Expedited' | 'Instant'>('Standard');
-  const [paymentMethod, setPaymentMethod] = useState<string>('wallet');
-  const [couponCode, setCouponCode] = useState('');
-  const [isCouponApplied, setIsCouponApplied] = useState(false);
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [orders, setOrders] = useState<MarketOrder[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<MarketOrder | null>(null);
-  const [generatedOrderCode, setGeneratedOrderCode] = useState<string>('');
-  const [showSuccessReceipt, setShowSuccessReceipt] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [bankSearch, setBankSearch] = useState('');
-  const [showBankDropdown, setShowBankDropdown] = useState(false);
-  const [manualBankMode, setManualBankMode] = useState(false);
-  const [accountDetails, setAccountDetails] = useState({
-    bankName: '',
-    accountNumber: '',
-    accountName: '',
-    routingNumber: ''
-  });
-  const [paymentStrategy, setPaymentStrategy] = useState<'escrow_flutterwave' | 'direct_bank'>('escrow_flutterwave');
-  const [senderBankName, setSenderBankName] = useState('');
-  const [senderAccountNumber, setSenderAccountNumber] = useState('');
-  const [senderAccountName, setSenderAccountName] = useState('');
-  const [senderTransferRef, setSenderTransferRef] = useState('');
-  const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
+type PageStep =
+  | 'HOME'
+  | 'FILTER'
+  | 'REELS'
+  | 'PRODUCT_DETAIL'
+  | 'CART'
+  | 'DELIVERY'
+  | 'PAYMENT'
+  | 'AUTHORIZE'
+  | 'SUCCESS'
+  | 'CHAT'
+  | 'ACTIVITY'
+  | 'PROFILE'
+  | 'VENDOR_REGISTRATION';
 
-  // Auto-search and verified bank states for Option A Secured Bank Transfer
-  const [selectedBankCode, setSelectedBankCode] = useState<string>('');
-  const [customBankName, setCustomBankName] = useState<string>('');
-  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
-  const [resolvedRecipientName, setResolvedRecipientName] = useState<string>('');
-  const [recipientSearchLoading, setRecipientSearchLoading] = useState<boolean>(false);
+const CATEGORY_LIST: FairlyUsedCategory[] = [
+  'All',
+  'Phones',
+  'Laptops',
+  'Electronics & TV',
+  'Home Appliances',
+  'Furniture',
+  'Vehicles',
+  'Houses & Land',
+  'Fashion & Luxury',
+  'Business Bulk',
+  'Gaming'
+];
 
-  const nigerianBanks = [
-    { code: '044', name: 'Access Bank' },
-    { code: '011', name: 'First Bank of Nigeria' },
-    { code: '058', name: 'GTBank' },
-    { code: '232', name: 'Zenith Bank' },
-    { code: '033', name: 'United Bank for Africa (UBA)' },
-    { code: '070', name: 'Fidelity Bank' },
-    { code: '214', name: 'First City Monument Bank (FCMB)' },
-    { code: '032', name: 'Union Bank of Nigeria' },
-    { code: '215', name: 'Unity Bank' },
-    { code: '035', name: 'Wema Bank' },
-    { code: '030', name: 'Heritage Bank' },
-    { code: '082', name: 'Keystone Bank' },
-    { code: '076', name: 'Polaris Bank' },
-    { code: '221', name: 'Stanbic IBTC Bank' },
-    { code: '068', name: 'Standard Chartered Bank' },
-    { code: '090267', name: 'Kuda Bank' },
-    { code: '999992', name: 'OPay Digital Services' },
-    { code: '50515', name: 'Moniepoint MFB' },
-    { code: 'intl_chase', name: 'Chase Bank (USA)' },
-    { code: 'intl_bofa', name: 'Bank of America (USA)' },
-    { code: 'intl_barclays', name: 'Barclays Bank (UK)' },
-    { code: 'intl_hsbc', name: 'HSBC (International)' },
-    { code: 'intl_revolut', name: 'Revolut' },
-    { code: 'others', name: 'Others (Not in list)' }
-  ].sort((a, b) => {
-    if (a.code === 'others') return 1;
-    if (b.code === 'others') return -1;
-    return a.name.localeCompare(b.name);
+const GRADE_LABELS: Record<ConditionGrade, string> = {
+  A: 'A - Like New',
+  B: 'B - Neatly Used',
+  C: 'C - Used With Small Scratch',
+  D: 'D - Needs Repair'
+};
+
+const CART_STORAGE_KEY = 'efado_fairly_used_cart_v2';
+
+export const FairlyUsedMarket: React.FC<FairlyUsedMarketProps> = ({
+  user,
+  onClose,
+  onNavigate,
+  initialItemId
+}) => {
+  const [step, setStep] = useState<PageStep>('HOME');
+  const [products, setProducts] = useState<FairlyUsedProduct[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const [filters, setFilters] = useState<FairlyUsedFilterState>({
+    category: 'All',
+    search: '',
+    brand: 'all',
+    location: 'all',
+    conditionGrade: 'all',
+    relocationOnly: false,
+    negotiableOnly: false,
+    inStoreVerifiedOnly: false,
+    freeDeliveryOnly: false,
+    priceMin: '',
+    priceMax: '',
+    sort: 'newest'
   });
+  const [draftFilters, setDraftFilters] = useState<FairlyUsedFilterState>(filters);
 
-  const paymentCategories = [
-    {
-      id: 'mobile_money',
-      title: 'Mobile Money',
-      icon: <Smartphone className="w-5 h-5 text-emerald-400" />,
-      options: [
-        { id: 'opay', name: 'OPay' },
-        { id: 'palmpay', name: 'PalmPay' },
-        { id: 'kuda', name: 'Kuda' }
-      ]
-    },
-    {
-      id: 'bank_transfer',
-      title: 'Bank Transfer',
-      icon: <Building2 className="w-5 h-5 text-blue-400" />,
-      options: [
-        { id: 'bank_transfer_opt', name: 'Secure Bank Transfer' }
-      ]
-    },
-    {
-      id: 'cards',
-      title: 'Cards',
-      icon: <CreditCard className="w-5 h-5 text-purple-400" />,
-      options: [
-        { id: 'visa', name: 'Visa' },
-        { id: 'mastercard', name: 'Mastercard' },
-        { id: 'verve', name: 'Verve' }
-      ]
-    },
-    {
-      id: 'ussd',
-      title: 'USSD Code',
-      icon: <Hash className="w-5 h-5 text-orange-400" />,
-      options: [
-        { id: 'efado_pay', name: '*EFADO*PAY#' },
-        { id: 'ussd_894', name: '*894#' },
-        { id: 'ussd_737', name: '*737#' },
-        { id: 'ussd_901', name: '*901#' }
-      ]
-    },
-    {
-      id: 'qr_pay',
-      title: 'QR Pay',
-      icon: <Fingerprint className="w-5 h-5 text-pink-400" />,
-      options: [
-        { id: 'scan_pay', name: 'Scan & Pay' },
-        { id: 'efado_qr', name: 'EFADO QR' }
-      ]
-    },
-    {
-      id: 'crypto',
-      title: 'Crypto',
-      icon: <Bitcoin className="w-5 h-5 text-yellow-400" />,
-      options: [
-        { id: 'btc', name: 'BTC' },
-        { id: 'eth', name: 'ETH' },
-        { id: 'usdt', name: 'USDT (TRC20)' }
-      ]
-    },
-    {
-      id: 'global',
-      title: 'Global Payments',
-      icon: <Globe className="w-5 h-5 text-indigo-400" />,
-      options: [
-        { id: 'paypal', name: 'PayPal' },
-        { id: 'stripe', name: 'Stripe' },
-        { id: 'flutterwave', name: 'Flutterwave' }
-      ]
+  // Step 2: Product Detail State
+  const [selectedProduct, setSelectedProduct] = useState<FairlyUsedProduct | null>(null);
+  const [selectedSeller, setSelectedSeller] = useState<FairlyUsedSellerPublicInfo | null>(null);
+  const [productReviews, setProductReviews] = useState<FairlyUsedProductReview[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [zoomLightboxOpen, setZoomLightboxOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'photos' | 'video'>('photos');
+  const [likingVideo, setLikingVideo] = useState(false);
+  const [detailQty, setDetailQty] = useState(1);
+
+  // Quick Make Offer Modal
+  const [offerModalProduct, setOfferModalProduct] = useState<FairlyUsedProduct | null>(null);
+  const [offerModalAmount, setOfferModalAmount] = useState('');
+  const [offerModalBusy, setOfferModalBusy] = useState(false);
+
+  // Cart & Checkout State (Steps 3 - 7)
+  const [cart, setCart] = useState<FairlyUsedCartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
-  ];
+  });
+  const [cartError, setCartError] = useState<string | null>(null);
+  const [checkingCartStock, setCheckingCartStock] = useState(false);
+  const [activeOrder, setActiveOrder] = useState<FairlyUsedOrder | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('card');
+  const [paymentGateway, setPaymentGateway] = useState<PaymentGatewayId>('paystack');
 
-  const filteredBanks = nigerianBanks.filter(b => 
-    b.name.toLowerCase().includes(bankSearch.toLowerCase()) || 
-    b.code.includes(bankSearch)
+  // Security & Wallet Status
+  const [walletBalanceNgn, setWalletBalanceNgn] = useState<number>(Number(user?.depositWallet || 0));
+  const [hasPin, setHasPin] = useState<boolean>(true);
+  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(false);
+
+  // EFADO Chat Target
+  const [chatTarget, setChatTarget] = useState<{
+    productId: string;
+    productName: string;
+    productPhoto: string;
+    sellerId: string;
+    sellerName: string;
+    sellerEfadoId?: string;
+    buyerId?: string;
+    initialOfferAmount?: string;
+  } | null>(null);
+
+  // Toast & Return Verification
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [verifyingReturn, setVerifyingReturn] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg((prev) => (prev === msg ? null : prev)), 3600);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch {
+      // ignore storage quota
+    }
+  }, [cart]);
+
+  const refreshWalletAndSecurity = useCallback(async () => {
+    try {
+      const st = await fetchPinAndWalletStatus();
+      setWalletBalanceNgn(st.ngnBalance);
+      setHasPin(st.hasPin);
+      setBiometricEnabled(st.biometricEnabled);
+    } catch {
+      setWalletBalanceNgn(Number(user?.depositWallet || 0));
+    }
+  }, [user?.depositWallet]);
+
+  const loadCatalog = useCallback(
+    async (activeFilters: FairlyUsedFilterState = filters) => {
+      setLoadingCatalog(true);
+      setCatalogError(null);
+      try {
+        const res = await fetchFairlyUsedProducts(activeFilters);
+        setProducts(res.products || []);
+      } catch (err: any) {
+        setCatalogError(err?.message || 'Could not load Fairly Used Market products.');
+      } finally {
+        setLoadingCatalog(false);
+      }
+    },
+    [filters]
   );
 
   useEffect(() => {
-    const q = query(collection(db, 'market_orders'), where('userId', '==', user.uid));
-    const unsub = onSnapshot(q, (snap) => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() } as MarketOrder)));
-    });
+    loadCatalog(filters);
+  }, [filters, loadCatalog]);
 
-    const unsubAds = onSnapshot(collection(db, 'ad_listings'), (snap) => {
-      setAdListings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (e) => console.error("Error loading ad_listings in FairlyUsedMarket:", e));
+  useEffect(() => {
+    refreshWalletAndSecurity();
+  }, [refreshWalletAndSecurity]);
+
+  // Seller / User Online Presence Heartbeat (Green Dot: Online Now - Chat Now)
+  useEffect(() => {
+    if (!user?.uid) return;
+    sendSellerPresenceHeartbeat().catch(() => {});
+    const id = window.setInterval(() => {
+      sendSellerPresenceHeartbeat().catch(() => {});
+    }, 90_000);
+    return () => window.clearInterval(id);
+  }, [user?.uid]);
+
+  const syncCartWithLiveStock = useCallback(async (itemsSnapshot: FairlyUsedCartItem[]): Promise<boolean> => {
+    if (itemsSnapshot.length === 0) {
+      setCartError(null);
+      return true;
+    }
+    setCheckingCartStock(true);
+    try {
+      const res = await validateCartStock(
+        itemsSnapshot.map((i) => ({ productId: i.product.id, quantity: i.quantity }))
+      );
+      const map = new Map(res.items.map((r) => [r.productId, r]));
+      setCart((prev) =>
+        prev.map((item) => {
+          const check = map.get(item.product.id);
+          if (!check) return item;
+          if (!check.exists || !check.product) {
+            return { ...item, product: { ...item.product, stock: 0, status: 'SOLD' } };
+          }
+          return {
+            ...item,
+            product: check.product,
+            agreedPriceNgn: check.agreedPriceNgn ?? item.agreedPriceNgn,
+            agreedPriceKobo: check.agreedPriceKobo ?? item.agreedPriceKobo
+          };
+        })
+      );
+      if (!res.allAvailable) {
+        setCartError(res.blockedMessage || 'Sorry, this item just sold out');
+        return false;
+      }
+      setCartError(null);
+      return true;
+    } catch {
+      return true;
+    } finally {
+      setCheckingCartStock(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (step === 'CART' && cart.length > 0) {
+      syncCartWithLiveStock(cart);
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (initialItemId) {
+      openProductDetail(initialItemId);
+    }
+  }, [initialItemId]);
+
+  // Gateway Return Verification -> Step 7 SUCCESS
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fuOrder = params.get('fairly_used_order');
+    const ref = params.get('reference') || params.get('trxref') || params.get('tx_ref');
+    const gw = params.get('gateway') || 'paystack';
+    const txId = params.get('transaction_id') || undefined;
+
+    if (!fuOrder && !ref) return;
+    if (ref && !ref.startsWith('FU-') && !fuOrder) return;
+
+    let active = true;
+    (async () => {
+      setVerifyingReturn(true);
+      setReturnError(null);
+      try {
+        const res = await verifyFairlyUsedPayment({
+          reference: ref || undefined,
+          orderId: fuOrder || undefined,
+          gateway: gw,
+          transactionId: txId
+        });
+        if (!active) return;
+        setActiveOrder(res.order);
+        setCart([]);
+        setStep('SUCCESS');
+        sessionStorage.removeItem('efado_pending_fu_order');
+        if (res.soldOutRefunded) {
+          showToast('Item sold out concurrently — full refund sent to your EFADO Wallet.');
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+        refreshWalletAndSecurity();
+        loadCatalog();
+      } catch (err: any) {
+        if (!active) return;
+        setReturnError(err?.message || 'Payment verification failed. Your money was NOT taken.');
+      } finally {
+        if (active) setVerifyingReturn(false);
+      }
+    })();
 
     return () => {
-      unsub();
-      unsubAds();
+      active = false;
     };
-  }, [user.uid]);
+  }, []);
 
-  useEffect(() => {
-    const userProducts: MarketProduct[] = adListings.map((ad: any) => ({
-      id: ad.id,
-      title: ad.title || 'Pre-Owned Asset',
-      price: Number(ad.price) || 0,
-      currency: 'NGN',
-      images: (ad.photos && ad.photos.length > 0) ? ad.photos : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'],
-      rating: 5.0,
-      reviewsCount: 12,
-      vendor: {
-        id: ad.vendorId || 'user',
-        name: ad.contact?.email ? ad.contact.email.split('@')[0] : 'Community Seller',
-        verified: true,
-        rating: 5.0
-      },
-      delivery: {
-        methods: ['Direct Pickup', 'Verified Delivery'],
-        estimatedDays: '1-2 Days'
-      },
-      stock: ad.status === 'sold_out' ? 0 : 1,
-      description: ad.description || '',
-      categoryPath: {
-        level1: ad.category || 'Pre-Owned Gadgets',
-        level2: 'User Pre-Owned',
-        level3: 'Certified Used'
-      },
-      attributes: {
-        condition: 'Pre-Owned / Certified',
-        location: ad.location ? `${ad.location.city || ''}, ${ad.location.state || ''}` : 'Nigeria',
-        phone: ad.contact?.phone || ad.contact?.whatsapp || ''
+  const syncSingleProductIntoState = (updated: FairlyUsedProduct) => {
+    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    if (selectedProduct?.id === updated.id) {
+      setSelectedProduct(updated);
+    }
+    setCart((prev) =>
+      prev.map((item) =>
+        item.product.id === updated.id
+          ? {
+              ...item,
+              product: updated,
+              agreedPriceNgn: updated.activeNegotiation?.agreedPriceNgn ?? item.agreedPriceNgn,
+              agreedPriceKobo: updated.activeNegotiation?.agreedPriceKobo ?? item.agreedPriceKobo
+            }
+          : item
+      )
+    );
+  };
+
+  const openProductDetail = async (productId: string, previewObj?: FairlyUsedProduct) => {
+    setDetailTab('photos');
+    if (previewObj) {
+      setSelectedProduct(previewObj);
+      setActivePhotoIdx(0);
+      setDetailQty(1);
+      setStep('PRODUCT_DETAIL');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    setDetailLoading(true);
+    try {
+      const res = await fetchFairlyUsedProductDetail(productId);
+      setSelectedProduct(res.product);
+      setSelectedSeller(res.seller);
+      setProductReviews(res.reviews || []);
+      setActivePhotoIdx(0);
+      setDetailQty(1);
+      setStep('PRODUCT_DETAIL');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      showToast(err?.message || 'Could not open item details.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleLikeVideo = async (prod: FairlyUsedProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setLikingVideo(true);
+    try {
+      const res = await likeProductVideo(prod.id);
+      syncSingleProductIntoState(res.product);
+      showToast(res.message);
+    } catch (err: any) {
+      showToast(err?.message || 'Sign in to like and confirm this working video.');
+    } finally {
+      setLikingVideo(false);
+    }
+  };
+
+  const handleNotifyMe = async (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const res = await subscribeNotifyMe(productId);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === productId ? { ...p, isOnWaitlist: true, waitlistCount: res.waitlistCount } : p
+        )
+      );
+      if (selectedProduct?.id === productId) {
+        setSelectedProduct({ ...selectedProduct, isOnWaitlist: true, waitlistCount: res.waitlistCount });
       }
-    }));
+      showToast(res.message);
+    } catch (err: any) {
+      showToast(err?.message || 'Sign in to join alerts.');
+    }
+  };
 
-    let filtered = [...userProducts, ...SAMPLE_PRODUCTS];
-    if (selectedL1) filtered = filtered.filter(p => p.categoryPath.level1 === selectedL1);
-    if (selectedL2) filtered = filtered.filter(p => p.categoryPath.level2 === selectedL2);
-    if (selectedL3) filtered = filtered.filter(p => p.categoryPath.level3 === selectedL3);
-    if (selectedL4) filtered = filtered.filter(p => p.categoryPath.level4 === selectedL4);
-    if (searchQuery) {
-      filtered = filtered.filter(p => 
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const handleChatWithSeller = (
+    prod: FairlyUsedProduct,
+    sellerNameOverride?: string,
+    e?: React.MouseEvent,
+    initialOfferAmount?: string
+  ) => {
+    if (e) e.stopPropagation();
+    const neg = prod.activeNegotiation;
+    if (neg && neg.buyerId !== user.uid && prod.sellerId !== user.uid && prod.negotiable) {
+      showToast('In Negotiation - Please Wait');
+      return;
+    }
+    setChatTarget({
+      productId: prod.id,
+      productName: prod.name,
+      productPhoto: prod.photos[0] || '/assets/market/iphone_13_pro_max.jpg',
+      sellerId: prod.sellerId,
+      sellerName: sellerNameOverride || prod.sellerName,
+      sellerEfadoId: prod.sellerEfadoId,
+      initialOfferAmount
+    });
+    setStep('CHAT');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenMakeOffer = (prod: FairlyUsedProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (prod.status === 'SOLD' || prod.stock <= 0) {
+      showToast('This item is SOLD. Nobody can negotiate again.');
+      return;
+    }
+    const neg = prod.activeNegotiation;
+    if (neg && neg.buyerId !== user.uid) {
+      showToast('In Negotiation - Please Wait');
+      return;
+    }
+    setOfferModalProduct(prod);
+    setOfferModalAmount(String(Math.round(prod.price * 0.9)));
+  };
+
+  const handleSubmitQuickOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerModalProduct) return;
+    const amt = Number(offerModalAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      showToast('Enter a valid offer amount in Naira.');
+      return;
+    }
+    setOfferModalBusy(true);
+    try {
+      const res = await submitOffer({
+        productId: offerModalProduct.id,
+        action: 'offer',
+        amountNgn: amt
+      });
+      if (res.product) {
+        syncSingleProductIntoState(res.product);
+      }
+      const targetProd = res.product || offerModalProduct;
+      setOfferModalProduct(null);
+      showToast(res.message);
+      setChatTarget({
+        productId: targetProd.id,
+        productName: targetProd.name,
+        productPhoto: targetProd.photos[0] || '/assets/market/iphone_13_pro_max.jpg',
+        sellerId: targetProd.sellerId,
+        sellerName: targetProd.sellerName,
+        sellerEfadoId: targetProd.sellerEfadoId
+      });
+      setStep('CHAT');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      showToast(err?.message || 'Could not submit offer.');
+    } finally {
+      setOfferModalBusy(false);
+    }
+  };
+
+  const handleAddToCart = (prod: FairlyUsedProduct, goCart: boolean = false, qty: number = 1) => {
+    if (prod.status === 'SOLD' || prod.stock <= 0) {
+      showToast('Sorry, this item just sold out');
+      return;
+    }
+    const neg = prod.activeNegotiation;
+    if (prod.negotiable) {
+      if (neg && neg.buyerId !== user.uid) {
+        showToast('In Negotiation - Please Wait');
+        return;
+      }
+      if (!neg || neg.status !== 'AGREED') {
+        showToast('Please negotiate and agree price first');
+        if (goCart) {
+          handleOpenMakeOffer(prod);
+          return;
+        }
+      }
+    }
+
+    const agreedNgn =
+      prod.negotiable && neg?.status === 'AGREED' && neg.buyerId === user.uid ? neg.agreedPriceNgn : undefined;
+    const agreedKobo =
+      prod.negotiable && neg?.status === 'AGREED' && neg.buyerId === user.uid ? neg.agreedPriceKobo : undefined;
+
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    setCartError(null);
+    setCart((prev) => {
+      const idx = prev.findIndex((i) => i.product.id === prod.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        const nextQty = Math.min(prod.stock, next[idx].quantity + safeQty);
+        next[idx] = {
+          ...next[idx],
+          product: prod,
+          quantity: nextQty,
+          agreedPriceNgn: agreedNgn,
+          agreedPriceKobo: agreedKobo
+        };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          product: prod,
+          quantity: safeQty,
+          agreedPriceNgn: agreedNgn,
+          agreedPriceKobo: agreedKobo
+        }
+      ];
+    });
+    if (goCart) {
+      setStep('CART');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      showToast(
+        agreedNgn
+          ? `Added "${prod.name}" at Agreed Price ${formatNaira(agreedNgn)}`
+          : `Added "${prod.name}" to cart`
       );
     }
-    setFilteredProducts(filtered);
-  }, [adListings, selectedL1, selectedL2, selectedL3, selectedL4, searchQuery]);
+  };
 
-  useEffect(() => {
-    if (!initialItemId) return;
-    const cleanId = String(initialItemId).toLowerCase().trim();
-    const match = filteredProducts.find(p => String(p.id).toLowerCase() === cleanId) 
-      || SAMPLE_PRODUCTS.find(p => String(p.id).toLowerCase() === cleanId);
-    if (match) {
-      setPreviewProduct(match);
-      setTimeout(() => {
-        const el = document.getElementById(`used-product-${match.id}`);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 400);
+  const handleBuyAtAgreedOrFixed = (prod: FairlyUsedProduct, qty: number = 1) => {
+    if (prod.status === 'SOLD' || prod.stock <= 0) {
+      showToast('Sorry, this item just sold out');
+      return;
     }
-  }, [initialItemId, filteredProducts]);
+    const neg = prod.activeNegotiation;
+    if (prod.negotiable) {
+      if (neg && neg.buyerId !== user.uid) {
+        showToast('In Negotiation - Please Wait');
+        return;
+      }
+      if (!neg || neg.status !== 'AGREED') {
+        showToast('Please negotiate and agree price first');
+        handleChatWithSeller(prod);
+        return;
+      }
+    }
+    const agreedNgn =
+      prod.negotiable && neg?.status === 'AGREED' && neg.buyerId === user.uid ? neg.agreedPriceNgn : undefined;
+    const agreedKobo =
+      prod.negotiable && neg?.status === 'AGREED' && neg.buyerId === user.uid ? neg.agreedPriceKobo : undefined;
 
-  const handleShareProduct = (product: MarketProduct, e?: React.MouseEvent) => {
+    const safeQty = Math.max(1, Math.min(prod.stock, qty));
+    setCartError(null);
+    setCart([
+      {
+        product: prod,
+        quantity: safeQty,
+        agreedPriceNgn: agreedNgn,
+        agreedPriceKobo: agreedKobo
+      }
+    ]);
+    setStep('CART');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleShareProduct = (prod: FairlyUsedProduct, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl).then(() => {
-        setShareToast(`Link copied: ${shareUrl}`);
-        setTimeout(() => setShareToast(null), 3000);
-      }).catch(() => {
-        prompt('Copy product link:', shareUrl);
-      });
-    } else {
-      prompt('Copy product link:', shareUrl);
-    }
-  };
-
-  const handleWhatsAppShare = (product: MarketProduct, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const shareUrl = `${window.location.origin}/hub/marketplace/${product.id}`;
-    const text = `Check out "${product.title}" (${formatPrice(product.price, true)}) on EFADO Marketplace:\n${shareUrl}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-  };
-
-  const addToCart = (product: MarketProduct) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.product.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 } 
-            : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-  };
-
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
-  };
-
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.product.id === productId) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
-  };
-
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-
-  const [flwInited, setFlwInited] = useState(false);
-
-  const handleFlutterwaveCheckout = async () => {
-    const usdAmount = (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50));
-    // Exchange rate conversion: 1450 NGN per 1 USD
-    const ngnAmount = usdAmount * 1450;
-    const reference = `EFD_MARK_USED_${Math.floor(100 + Math.random() * 900)}_${Date.now()}`;
-
-    try {
-      const result = await createFlutterwavePaymentLink({
-        amount: Math.round(ngnAmount),
-        currency: 'NGN',
-        email: user.email || 'customer@efado.com',
-        name: user.displayName || 'EFADO Valued Customer',
-        phone: '08072456836',
-        tx_ref: reference,
-        purpose: 'EFADO Marketplace (Used) Escrow Order',
-        meta: {
-          userId: user.uid,
-          orderRef: reference
-        },
-        customizations: {
-          title: 'EFADO Marketplace (Used)',
-          description: 'Protected EFADO Escrow Order',
-          logo: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=100&q=80'
-        }
-      });
-
-      if (result.status && result.link) {
-        window.location.href = result.link;
-        return;
-      }
-
-      throw new Error(result.message || 'Payment link could not be established');
-    } catch (err: any) {
-      console.error("Flutterwave launch error:", err);
-      // Fallback completion for offline preview
-      finalizePurchase(undefined, reference);
-    }
-  };
-
-  const handleCheckout = () => {
-    setValidationErrors({});
-    
-    if (checkoutStep === 'cart') {
-      if (cart.length === 0) {
-        alert("Integrity Error: Your cart is empty. Please add items to proceed.");
-        return;
-      }
-      setCheckoutStep('address');
-    }
-    else if (checkoutStep === 'address') {
-      const errors: Record<string, string> = {};
-      if (fulfillmentType === 'DELIVERY') {
-        if (!deliveryAddress.fullName) errors.fullName = "Full name is required for delivery logistics.";
-        if (!deliveryAddress.phone) errors.phone = "Active phone is critical for dispatch coordination.";
-        if (!deliveryAddress.street) errors.street = "Detailed street info is required for mapping.";
-        if (!deliveryAddress.city) errors.city = "City deployment node must be specified.";
-        if (!deliveryAddress.state) errors.state = "State jurisdiction is required.";
-      } else {
-        if (!deliveryAddress.fullName) errors.fullName = "Full name of recipient authorized for pickup is required.";
-        if (!deliveryAddress.phone) errors.phone = "Liaison phone contact for coordination is required.";
-      }
-
-      if (Object.keys(errors).length > 0) {
-        setValidationErrors(errors);
-        return;
-      }
-      setCheckoutStep('payment');
-    }
-    else if (checkoutStep === 'payment') {
-      if (paymentStrategy === 'escrow_flutterwave') {
-        handleFlutterwaveCheckout();
-        return;
-      } else if (paymentStrategy === 'direct_bank') {
-        const errors: Record<string, string> = {};
-        if (!senderBankName) errors.senderBankName = "Your sending bank name is crucial.";
-        if (senderAccountNumber.length !== 10) errors.senderAccountNumber = "A valid 10-digit account number must be entered.";
-        if (!senderAccountName) errors.senderAccountName = "Your sender account holder name is required.";
-
-        if (Object.keys(errors).length > 0) {
-          setValidationErrors(errors);
-          alert(Object.values(errors).join("\n"));
-          return;
-        }
-
-        finalizePurchase(undefined, undefined, {
-          senderBankName,
-          senderAccountNumber,
-          senderAccountName,
-          senderTransferRef,
-          paymentStrategy
+    const shareUrl = `${window.location.origin}/hub/fairly-used/${prod.id}`;
+    if (navigator.share) {
+      navigator
+        .share({
+          title: `${prod.name} — EFADO Fairly Used Market`,
+          text: `Grade ${prod.conditionGrade} (${formatNaira(prod.price)}) • Chat ID: ${prod.sellerEfadoId} • Secured by EFADO Shield`,
+          url: shareUrl
+        })
+        .catch(() => {
+          navigator.clipboard?.writeText(shareUrl).then(() => showToast('Fairly Used item link copied!'));
         });
-        return;
-      }
-
-      const flutterwaveSupportedMethods = ['flutterwave', 'paystack', 'visa', 'mastercard', 'verve', 'opay', 'palmpay', 'kuda', 'zenith', 'gtbank', 'access', 'uba'];
-      if (flutterwaveSupportedMethods.includes(paymentMethod)) {
-        handleFlutterwaveCheckout();
-        return;
-      }
-
-      if (['bank', 'opay', 'ussd'].includes(paymentMethod)) {
-        const errors: Record<string, string> = {};
-        if (!accountDetails.bankName) errors.bankName = "Source bank identification required.";
-        if (paymentMethod !== 'ussd' && accountDetails.accountNumber.length !== 10) {
-          errors.accountNumber = "A valid 10-digit NUBAN identifier is required.";
-        }
-
-        if (Object.keys(errors).length > 0) {
-          setValidationErrors(errors);
-          return;
-        }
-      }
-
-      if (paymentMethod === 'pod') {
-        finalizePurchase();
-      } else {
-        setShowPinModal(true);
-      }
+      return;
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard
+        .writeText(shareUrl)
+        .then(() => showToast('Fairly Used item link copied!'))
+        .catch(() => showToast(`Share link: ${shareUrl}`));
+    } else {
+      showToast(`Share link: ${shareUrl}`);
     }
   };
 
-  const generateOrderCode = () => {
-    const random = Math.floor(100000 + Math.random() * 900000);
-    return `EDADO${random}`;
+  const handleUpdateCartQty = (productId: string, delta: number) => {
+    setCartError(null);
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.id !== productId) return item;
+          const nextQty = item.quantity + delta;
+          if (nextQty <= 0) return null;
+          return { ...item, quantity: Math.min(Math.max(1, item.product.stock), nextQty) };
+        })
+        .filter(Boolean) as FairlyUsedCartItem[]
+    );
   };
 
-  const finalizePurchase = async (pin?: string, paymentRef?: string, directProof?: any) => {
-    setIsProcessing(true);
-    setPaymentStatusText('Initiating Secure Transaction...');
-    setCheckoutStep('processing');
-    setShowPinModal(false);
-
-    // Simulated steps consistent with Modern Market Hub
-    const steps = [
-      'Verifying Fairly Used Item Condition...',
-      paymentRef ? 'Confirming Flutterwave Instant Reference...' : directProof ? 'Registering Direct Proof Details...' : 'Securing Escrow Payment...',
-      'Generating Digital Tracking Code...',
-      'Finalizing Global Delivery Path...'
-    ];
-
-    for(const step of steps) {
-      await new Promise(r => setTimeout(r, 800));
-      setPaymentStatusText(step);
-    }
-
-    const code = generateOrderCode();
-    setGeneratedOrderCode(code);
-    
-    const newOrder: MarketOrder = {
-      orderCode: code,
-      userId: user.uid,
-      items: cart.map(item => ({
-        productId: item.product.id!,
-        productTitle: item.product.title,
-        price: item.product.price,
-        quantity: item.quantity,
-        photo: item.product.photos[0]
-      })),
-      totalAmount: (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)),
-      currency: 'USD',
-      deliveryDetails: {
-        ...deliveryAddress,
-        method: shippingMethod,
-        fulfillmentType: fulfillmentType,
-        pickupLocationType: fulfillmentType === 'PICKUP' ? pickupLocationType : undefined,
-        street: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp' : deliveryAddress.street,
-        city: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Warri' : deliveryAddress.city,
-        state: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Delta State' : deliveryAddress.state,
-        landmark: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? 'Opposite Selta Steel Company Permanent Camp, Before Tivo Super Market' : deliveryAddress.landmark,
-        instructions: (fulfillmentType === 'PICKUP' && pickupLocationType === 'OFFICE') ? `Dispatched to OFFICE_ADDRESSES_STATION:\n${OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}` : deliveryAddress.instructions
-      },
-      paymentMethod: directProof ? 'direct_bank_transfer' : paymentMethod,
-      paystackRef: paymentRef || null,
-      flwRef: paymentRef || null,
-      status: directProof ? 'pending_manual_verification' : 'processing',
-      trackingNumber: `TRK-FU-${Math.random().toString(36).substring(7).toUpperCase()}`,
-      trackingHistory: [
-        {
-          status: 'Order Placed',
-          location: 'EFADO Digital System',
-          timestamp: new Date(),
-          description: paymentRef 
-            ? `Your order has been paid via Flutterwave (Ref: ${paymentRef}) & received.` 
-            : directProof
-              ? `Order placed with Direct Bank Transfer Proof. Sender: ${directProof.senderAccountName} (${directProof.senderBankName} - ${directProof.senderAccountNumber}). Bank confirmation pending.`
-              : 'Your fairly used item order has been received.'
-        }
-      ],
-      createdAt: serverTimestamp()
-    };
-
-    try {
-      await addDoc(collection(db, 'market_orders'), newOrder);
-      setShowPinModal(false);
-      setCheckoutStep('success');
-      setCart([]);
-      setIsProcessing(false);
-    } catch (error) {
-      console.error('Error creating order:', error);
-      setIsProcessing(false);
-      setCheckoutStep('payment');
-    }
+  const handleRemoveCartItem = (productId: string) => {
+    setCartError(null);
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
   };
+
+  const handleProceedToDelivery = async () => {
+    const ok = await syncCartWithLiveStock(cart);
+    if (!ok) return;
+    const unagreed = cart.find(
+      (c) =>
+        c.product.negotiable &&
+        (!c.product.activeNegotiation ||
+          c.product.activeNegotiation.status !== 'AGREED' ||
+          c.product.activeNegotiation.buyerId !== user.uid)
+    );
+    if (unagreed) {
+      setCartError('Please negotiate and agree price first');
+      return;
+    }
+    const soldOutItem = cart.find((c) => c.product.status === 'SOLD' || c.product.stock < c.quantity);
+    if (soldOutItem) {
+      setCartError(`Sorry, this item just sold out: ${soldOutItem.product.name}`);
+      return;
+    }
+    setStep('DELIVERY');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  const coreFlowSteps = [
+    { key: 'HOME', label: '1 Market' },
+    { key: 'PRODUCT_DETAIL', label: '2 Item' },
+    { key: 'CART', label: '3 Cart' },
+    { key: 'DELIVERY', label: '4 Delivery' },
+    { key: 'PAYMENT', label: '5 Payment' },
+    { key: 'AUTHORIZE', label: '6 PIN' },
+    { key: 'SUCCESS', label: '7 Track' }
+  ] as const;
+
+  const activeFlowIndex = coreFlowSteps.findIndex((s) => s.key === step);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex flex-col bg-slate-950 overflow-hidden"
+    <div
+      className="fairly-used-root min-h-screen overflow-x-hidden bg-gradient-to-b from-[#FDF2F8] via-[#FAF5FF] to-[#FDF2F8] text-black pb-24"
+      style={{ fontFamily: "'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
-      <div 
-        className="relative w-full h-full flex flex-col bg-slate-950 overflow-hidden"
-      >
-        {/* Header */}
-        <div className="px-4 sm:px-6 md:px-10 py-4 border-b border-slate-800 bg-slate-900 z-20 shadow-md">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shrink-0">
-                <ShoppingBag className="w-5 h-5 text-white" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight truncate">
-                  EFADO <span className="text-indigo-400">Fairly Used Market</span>
-                </h2>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  Quality pre-owned items from verified sellers
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCart(true)}
-                className="relative flex items-center gap-2 px-3.5 py-2 text-slate-100 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700 text-xs font-semibold"
-              >
-                <div className="relative">
-                  <ShoppingBag className="w-4 h-4 text-indigo-400" />
-                  {cart.length > 0 && (
-                    <span className="absolute -top-2 -right-2 w-4 h-4 bg-indigo-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center tabular-nums">
-                      {cart.reduce((sum, item) => sum + item.quantity, 0)}
-                    </span>
-                  )}
-                </div>
-                <span className="hidden sm:inline">Cart</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRegModal(true)}
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Become a Seller</span>
-              </button>
-              <CurrencySelector />
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 text-slate-300 hover:text-white transition-colors bg-slate-800 rounded-xl hover:bg-slate-700 border border-slate-700"
-                title="Close Hub"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* BLUE HEADER OVER LIGHT PURPLE-PINK MARKET + GOLD ACCENTS */}
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#3B82F6] text-white shadow-md">
+        <div className="max-w-[1200px] mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (step === 'HOME') onClose();
+                else setStep('HOME');
+              }}
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white shrink-0"
+              aria-label="Back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <img
+              src="/efado_logo_192.jpg"
+              alt="EFADO"
+              className="w-8 h-8 rounded-xl object-cover border border-white/30 shrink-0"
+            />
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate mb-0 leading-tight">
+                EFADO FAIRLY USED MARKET
+              </h1>
+              <p className="text-[10px] sm:text-xs text-blue-100 font-semibold truncate mb-0 leading-tight">
+                Video Proof • EFADO ID Chat • Agreed Price • Secured by EFADO Shield
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-5 mt-3 pt-3 border-t border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setActiveView('browse')}
-              className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
-                activeView === 'browse'
-                  ? 'border-indigo-400 text-indigo-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
+              onClick={() => {
+                setStep('VENDOR_REGISTRATION');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-xs flex items-center gap-1.5 shadow-sm transition-colors"
             >
-              Browse Items
+              <UserPlus className="w-3.5 h-3.5 shrink-0" />
+              <span>Become a Seller</span>
             </button>
+
             <button
               type="button"
-              onClick={() => setActiveView('orders')}
-              className={`pb-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
-                activeView === 'orders'
-                  ? 'border-indigo-400 text-indigo-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
+              onClick={() => (onNavigate ? onNavigate('wallet') : onClose())}
+              className="px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-extrabold text-xs tabular-nums flex items-center gap-1 border border-white/25"
+              title="EFADO Wallet Balance"
             >
-              My Orders &amp; Tracking
+              <Wallet className="w-3.5 h-3.5" />
+              <span>{formatNaira(walletBalanceNgn)}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('ACTIVITY')}
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white"
+              aria-label="Notifications & Orders"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep('CART')}
+              className="relative p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white"
+              aria-label="Cart"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F59E0B] text-black text-[10px] font-black flex items-center justify-center tabular-nums">
+                  {cartCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-grow overflow-hidden relative">
-          <AnimatePresence mode="wait">
-            {activeView === 'browse' ? (
-              <motion.div
-                key="browse"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="h-full overflow-y-auto custom-scrollbar"
-              >
-                <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6">
-                  <HubGuideNote guideId="marketplace" variant="dark" />
+        {/* Light Sub-Navigation Tabs */}
+        <div className="bg-white border-b border-pink-200 text-black">
+          <div className="max-w-[1200px] mx-auto px-3 sm:px-6 flex items-center gap-5 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'HOME' || step === 'FILTER' || step === 'PRODUCT_DETAIL'
+                  ? 'border-[#2563EB] text-[#2563EB]'
+                  : 'border-transparent text-black/60 hover:text-black'
+              }`}
+            >
+              Browse Fairly Used
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStep('REELS');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors flex items-center gap-1 ${
+                step === 'REELS'
+                  ? 'border-[#2563EB] text-[#2563EB]'
+                  : 'border-transparent text-black/60 hover:text-black'
+              }`}
+            >
+              <Film className="w-3.5 h-3.5 text-[#F59E0B]" />
+              <span>E-FADO Reels</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('ACTIVITY')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'ACTIVITY' || step === 'CHAT'
+                  ? 'border-[#2563EB] text-[#2563EB]'
+                  : 'border-transparent text-black/60 hover:text-black'
+              }`}
+            >
+              Activity &amp; Tracking
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep('PROFILE')}
+              className={`py-2.5 text-xs sm:text-sm font-bold border-b-2 whitespace-nowrap transition-colors ${
+                step === 'PROFILE' || step === 'VENDOR_REGISTRATION'
+                  ? 'border-[#2563EB] text-[#2563EB]'
+                  : 'border-transparent text-black/60 hover:text-black'
+              }`}
+            >
+              Seller Hub
+            </button>
+          </div>
+        </div>
 
-                  {/* Breadcrumbs */}
-                  <div className="flex flex-wrap items-center gap-2 bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-800 text-xs">
-                    <ShoppingBag className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className={selectedL1 ? 'text-white font-semibold' : 'text-slate-400'}>
-                      {selectedL1 || 'All Categories'}
-                    </span>
-                    {selectedL2 && (
-                      <>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="text-white font-semibold">{selectedL2}</span>
-                      </>
-                    )}
-                    {selectedL3 && (
-                      <>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="text-white font-semibold">{selectedL3}</span>
-                      </>
-                    )}
-                    {selectedL4 && (
-                      <>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        <span className="text-indigo-300 font-semibold">{selectedL4}</span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* 4-Step Category Filter Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Level 1 */}
-                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">1</span>
-                        <span>Category</span>
-                      </h3>
-                      <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-                        {Object.keys(CATEGORIES).map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => {
-                              setSelectedL1(cat);
-                              setSelectedL2(null);
-                              setSelectedL3(null);
-                              setSelectedL4(null);
-                            }}
-                            className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
-                              selectedL1 === cat
-                                ? 'bg-indigo-600 border-indigo-400 text-white'
-                                : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
-                            }`}
-                          >
-                            <span className="truncate">{cat}</span>
-                            <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Level 2 */}
-                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-purple-600 text-white text-[11px] font-bold flex items-center justify-center">2</span>
-                        <span>Section</span>
-                      </h3>
-                      {selectedL1 ? (
-                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-                          {Object.keys(CATEGORIES[selectedL1]).map((sub) => (
-                            <button
-                              key={sub}
-                              type="button"
-                              onClick={() => {
-                                setSelectedL2(sub);
-                                setSelectedL3(null);
-                                setSelectedL4(null);
-                              }}
-                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
-                                selectedL2 === sub
-                                  ? 'bg-purple-600 border-purple-400 text-white'
-                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
-                              }`}
-                            >
-                              <span className="truncate">{sub}</span>
-                              <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
-                          Choose a category first
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Level 3 */}
-                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center">3</span>
-                        <span>Subcategory</span>
-                      </h3>
-                      {selectedL2 ? (
-                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-                          {Object.keys(CATEGORIES[selectedL1!][selectedL2]).map((subSub) => (
-                            <button
-                              key={subSub}
-                              type="button"
-                              onClick={() => {
-                                setSelectedL3(subSub);
-                                setSelectedL4(null);
-                              }}
-                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
-                                selectedL3 === subSub
-                                  ? 'bg-blue-600 border-blue-400 text-white'
-                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
-                              }`}
-                            >
-                              <span className="truncate">{subSub}</span>
-                              <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
-                          Choose a section first
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Level 4 */}
-                    <div className="space-y-2 bg-slate-900/90 p-3 rounded-2xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-white pb-2 border-b border-slate-800 flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-md bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center">4</span>
-                        <span>Item Type</span>
-                      </h3>
-                      {selectedL3 ? (
-                        <div className="grid grid-cols-1 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-                          {CATEGORIES[selectedL1!][selectedL2!][selectedL3].map((group, idx) => (
-                            <button
-                              key={`group-${group}-${idx}`}
-                              type="button"
-                              onClick={() => setSelectedL4(group)}
-                              className={`flex items-center justify-between px-3 py-2 rounded-xl border text-left text-xs font-semibold transition-colors ${
-                                selectedL4 === group
-                                  ? 'bg-emerald-600 border-emerald-400 text-white'
-                                  : 'bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700'
-                              }`}
-                            >
-                              <span className="truncate">{group}</span>
-                              {selectedL4 === group && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="h-28 flex items-center justify-center text-center text-xs text-slate-400">
-                          Choose a subcategory first
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Product Grid */}
-                  <section className="space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                      <h3 className="text-base sm:text-lg font-bold text-white">Pre-Owned Items</h3>
-                      <span className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-lg text-xs font-semibold border border-indigo-500/30 tabular-nums">
-                        {filteredProducts.length} Items
-                      </span>
-                    </div>
-
-                    {filteredProducts.length === 0 ? (
-                      <div className="py-16 text-center bg-slate-900/50 rounded-2xl border border-dashed border-slate-800">
-                        <Package className="w-10 h-10 text-slate-500 mx-auto mb-3" />
-                        <p className="text-sm font-semibold text-slate-300">No items in this category yet</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredProducts.map((product) => (
-                          <div
-                            key={product.id}
-                            id={`used-product-${product.id}`}
-                            onClick={() => setPreviewProduct(product)}
-                            className="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-2xl overflow-hidden group transition-colors cursor-pointer flex flex-col justify-between h-full"
-                          >
-                            <div>
-                              <div className="relative aspect-[4/3] bg-slate-800 overflow-hidden">
-                                <img
-                                  src={product.photos?.[0] || ''}
-                                  alt={product.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  referrerPolicy="no-referrer"
-                                />
-                                <div className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 bg-indigo-600/95 rounded-lg text-xs font-semibold text-white">
-                                  {product.condition}
-                                </div>
-                              </div>
-                              <div className="p-4 pb-2 space-y-2">
-                                <h4 className="text-sm sm:text-base font-bold text-white line-clamp-1">
-                                  {product.title}
-                                </h4>
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-1 text-xs text-slate-400 truncate">
-                                    <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                                    <span className="truncate">{product.location || 'Nigeria'}</span>
-                                  </div>
-                                  <span className="text-sm font-bold text-indigo-400 tabular-nums shrink-0">
-                                    {formatPrice(product.price, true)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="p-4 pt-2 space-y-2">
-                              {product.video && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onNavigate?.('GIST', 'REELS');
-                                    onClose();
-                                  }}
-                                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                                >
-                                  <Film className="w-3.5 h-3.5" />
-                                  <span>Watch Video</span>
-                                </button>
-                              )}
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    addToCart(product);
-                                  }}
-                                  className="py-2 px-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 border border-slate-700 transition-colors"
-                                >
-                                  <Plus className="w-3.5 h-3.5 text-indigo-400" />
-                                  <span>Add</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    addToCart(product);
-                                    setShowCart(true);
-                                  }}
-                                  className="py-2 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-colors"
-                                >
-                                  <ShoppingBag className="w-3.5 h-3.5" />
-                                  <span>Buy Now</span>
-                                </button>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleShareProduct(product, e)}
-                                  className="flex-1 py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-slate-700 transition-colors"
-                                >
-                                  <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-                                  <span>Share</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleWhatsAppShare(product, e)}
-                                  className="flex-1 py-1.5 px-2 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-300 rounded-xl text-xs font-medium flex items-center justify-center gap-1 border border-emerald-500/30 transition-colors"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                                  <span>WhatsApp</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Google AdSense Sponsored Marketplace Placement */}
-                    <div className="pt-2">
-                      <AdSenseBanner label="Marketplace Featured Commercial Ads" />
-                    </div>
-                  </section>
-                </div>
-              </motion.div>
-      ) : (
-        <motion.div 
-          key="orders"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="h-full flex flex-col md:flex-row p-10 gap-10 overflow-hidden"
-        >
-          {/* Orders List */}
-          <div className="md:w-1/2 flex flex-col h-full">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">My Orders</h3>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Track your secure transactions</p>
-              </div>
-              <div className="px-4 py-2 bg-slate-100 rounded-xl border border-slate-200">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">{orders.length} Total Orders</span>
-              </div>
+        {/* 7-Step Flow Progress Indicator (Left to Right) */}
+        {activeFlowIndex >= 0 && (
+          <div className="bg-purple-50/90 border-b border-pink-200 px-3 sm:px-6 py-2">
+            <div className="max-w-[1200px] mx-auto flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
+              {coreFlowSteps.map((st, idx) => {
+                const isDone = idx < activeFlowIndex;
+                const isCurrent = idx === activeFlowIndex;
+                return (
+                  <React.Fragment key={st.key}>
+                    <button
+                      type="button"
+                      disabled={idx > activeFlowIndex}
+                      onClick={() => {
+                        if (idx <= activeFlowIndex) setStep(st.key);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-extrabold whitespace-nowrap transition-colors ${
+                        isCurrent
+                          ? 'bg-[#F59E0B] text-black shadow-sm'
+                          : isDone
+                            ? 'bg-green-100 text-[#16A34A] hover:bg-green-200'
+                            : 'bg-white text-black/40 border border-pink-100'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                    {idx < coreFlowSteps.length - 1 && <span className="text-pink-300 font-bold">→</span>}
+                  </React.Fragment>
+                );
+              })}
             </div>
+          </div>
+        )}
+      </header>
 
-            <div className="flex-grow overflow-y-auto space-y-4 pr-4 custom-scrollbar">
-              {orders.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm opacity-60">
-                  <History className="w-16 h-16 mb-4 text-slate-400" />
-                  <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">No orders yet</p>
-                </div>
-              ) : (
-                orders.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds).map(order => (
-                  <button
-                    key={order.id}
-                    onClick={() => setSelectedOrder(order)}
-                    className={`w-full p-6 rounded-[2rem] border transition-all text-left flex items-center justify-between group ${
-                      selectedOrder?.id === order.id 
-                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-xl shadow-indigo-500/20' 
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:shadow-md shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center p-1 overflow-hidden">
-                        <img src={order.items[0].photo} className="w-full h-full object-cover rounded-xl" referrerPolicy="no-referrer" />
-                      </div>
-                      <div>
-                        <p className={`text-xs font-black uppercase tracking-widest mb-1 ${selectedOrder?.id === order.id ? 'text-indigo-100' : 'text-indigo-600'}`}>
-                          {order.orderCode}
-                        </p>
-                        <h4 className={`text-sm font-black uppercase tracking-tight ${selectedOrder?.id === order.id ? 'text-white' : 'text-slate-800'}`}>
-                          {order.items.length} {order.items.length === 1 ? 'Item' : 'Items'}
-                        </h4>
-                        <p className="text-[10px] font-bold opacity-60">
-                          {new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black mb-1">{formatPrice(order.totalAmount, true)}</p>
-                      <span className={`text-[8px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-600 font-bold' : 'bg-indigo-500/20 text-indigo-600 font-bold'}`}>
-                        {order.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </button>
-                ))
-              )}
+      {/* Gateway Return Verification Banner */}
+      {verifyingReturn && (
+        <div className="max-w-[900px] mx-auto px-4 pt-6">
+          <div className="bg-white rounded-2xl border border-pink-200 p-8 text-center shadow-sm space-y-3">
+            <Loader2 className="w-8 h-8 animate-spin text-[#2563EB] mx-auto" />
+            <h3 className="text-base font-extrabold text-black">Verifying Payment With EFADO Shield...</h3>
+            <p className="text-xs text-black/70">Please wait while we secure your funds in Escrow.</p>
+          </div>
+        </div>
+      )}
+
+      {returnError && (
+        <div className="max-w-[900px] mx-auto px-4 pt-4">
+          <div className="bg-red-50 border border-[#DC2626]/30 rounded-2xl p-4 text-xs font-bold text-[#DC2626] flex items-center justify-between gap-3">
+            <span>{returnError}</span>
+            <button
+              type="button"
+              onClick={() => setReturnError(null)}
+              className="px-3 py-1 bg-white rounded-lg border border-red-200 text-black"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 1: HOME — PURPLE + PINK GRADIENT CARDS + BLACK TEXT + GOLD     */}
+      {/* =================================================================== */}
+      {step === 'HOME' && !verifyingReturn && (
+        <main className="max-w-[1200px] mx-auto px-3 sm:px-6 pt-4 space-y-4">
+          {/* Search Bar + Filter Toggle */}
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-[#2563EB] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                placeholder="Search used iPhone, HP Laptop, House, Grade A..."
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-pink-200 text-sm text-black placeholder:text-black/45 shadow-sm focus:border-[#2563EB] outline-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftFilters(filters);
+                  setStep('FILTER');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-4 py-3 rounded-xl bg-white border border-pink-200 hover:border-[#2563EB] text-black text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 shadow-sm shrink-0"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-[#2563EB]" />
+                <span>Filter &amp; Sort</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('REELS');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-4 py-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+              >
+                <Film className="w-4 h-4" />
+                <span>Watch Reels</span>
+              </button>
             </div>
           </div>
 
-          {/* Tracking Detail */}
-          <div className="md:w-1/2 flex flex-col h-full">
-            {selectedOrder ? (
-              <motion.div 
-                key={selectedOrder.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-white border border-slate-200 rounded-[2.5rem] p-8 h-full flex flex-col overflow-hidden shadow-md"
-              >
-                <div className="flex items-center justify-between mb-8 pb-8 border-b border-slate-200">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                      <Package className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID / Tracking</p>
-                      <h4 className="text-xl font-black text-slate-800">{selectedOrder.orderCode}</h4>
-                      <p className="text-[10px] font-bold text-indigo-600 mt-1">{selectedOrder.trackingNumber}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</p>
-                    <span className="text-sm font-black text-emerald-600 uppercase tracking-tighter">{selectedOrder.status.replace('_', ' ')}</span>
-                  </div>
+          {/* Horizontal Category Strip */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            {CATEGORY_LIST.map((cat) => {
+              const active = filters.category === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setFilters((prev) => ({ ...prev, category: cat }))}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap border transition-all ${
+                    active
+                      ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-sm'
+                      : 'bg-white text-black border-pink-200 hover:border-[#2563EB]'
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Quick Traffic Chips: Relocation Sale / Verified In Store / Negotiable */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFilters((p) => ({ ...p, relocationOnly: !p.relocationOnly }))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border ${
+                filters.relocationOnly
+                  ? 'bg-[#DC2626] text-white border-[#DC2626]'
+                  : 'bg-white text-black border-pink-200'
+              }`}
+            >
+              RELOCATION SALE - Must Go Fast
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilters((p) => ({ ...p, inStoreVerifiedOnly: !p.inStoreVerifiedOnly }))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border ${
+                filters.inStoreVerifiedOnly
+                  ? 'bg-[#2563EB] text-white border-[#2563EB]'
+                  : 'bg-white text-black border-pink-200'
+              }`}
+            >
+              Verified By EFADO - In Store
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilters((p) => ({ ...p, negotiableOnly: !p.negotiableOnly }))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border ${
+                filters.negotiableOnly
+                  ? 'bg-[#F59E0B] text-black border-[#F59E0B]'
+                  : 'bg-white text-black border-pink-200'
+              }`}
+            >
+              Negotiable Only
+            </button>
+          </div>
+
+          {/* EFADO Shield Escrow + Warri Safe Meeting Point Strip */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-green-50 border border-[#16A34A]/35 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+              <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0" />
+              <p className="text-xs font-extrabold text-black mb-0">
+                EFADO Protects Your Money • Your money is held safely until you confirm delivery.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-purple-100 via-white to-pink-100 border border-pink-200 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+              <MapPin className="w-5 h-5 text-[#2563EB] shrink-0" />
+              <p className="text-xs font-extrabold text-black mb-0">
+                Meet At EFADO Office - Delta State, Warri For Safe Exchange
+              </p>
+            </div>
+          </div>
+
+          {catalogError && (
+            <div className="bg-red-50 border border-[#DC2626]/30 rounded-2xl p-4 text-xs font-bold text-[#DC2626]">
+              {catalogError}
+            </div>
+          )}
+
+          {/* Fairly Used Product Grid */}
+          {loadingCatalog ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-2xl border border-pink-200 p-4 space-y-3 animate-pulse shadow-sm"
+                >
+                  <div className="w-full h-44 bg-purple-100 rounded-xl" />
+                  <div className="h-4 bg-purple-100 rounded w-3/4" />
+                  <div className="h-4 bg-pink-100 rounded w-1/2" />
+                  <div className="h-9 bg-purple-100 rounded-xl" />
                 </div>
+              ))}
+            </div>
+          ) : products.length === 0 ? (
+            <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 p-10 text-center space-y-3 shadow-sm">
+              <Package className="w-10 h-10 text-purple-300 mx-auto" />
+              <h3 className="text-base font-bold text-black">No Fairly Used Items Match That Filter</h3>
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({
+                    category: 'All',
+                    search: '',
+                    brand: 'all',
+                    location: 'all',
+                    conditionGrade: 'all',
+                    relocationOnly: false,
+                    negotiableOnly: false,
+                    inStoreVerifiedOnly: false,
+                    freeDeliveryOnly: false,
+                    priceMin: '',
+                    priceMax: '',
+                    sort: 'newest'
+                  })
+                }
+                className="px-5 py-2.5 bg-[#F59E0B] text-black text-xs font-black rounded-xl"
+              >
+                Show All Fairly Used Items
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {products.map((prod) => {
+                const isSoldOut = prod.status === 'SOLD' || prod.stock <= 0;
+                const neg = prod.activeNegotiation;
+                const lockedByOther = Boolean(neg && neg.buyerId !== user.uid && prod.negotiable && !isSoldOut);
+                const agreedWithMe = Boolean(
+                  neg && neg.status === 'AGREED' && neg.buyerId === user.uid && !isSoldOut
+                );
 
-                <div className="flex-grow overflow-y-auto pr-4 custom-scrollbar space-y-8">
-                  {/* Package Contents summary */}
-                  <div>
-                    <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Package Contents</h5>
-                    <div className="space-y-3">
-                      {selectedOrder.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
-                          <div className="flex items-center gap-3">
-                             <img src={item.photo} className="w-10 h-10 object-cover rounded-lg" referrerPolicy="no-referrer" />
-                             <div>
-                               <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate max-w-[150px]">{item.productTitle}</p>
-                               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Qty: {item.quantity}</p>
-                             </div>
+                return (
+                  <div
+                    key={prod.id}
+                    onClick={() => openProductDetail(prod.id, prod)}
+                    className={`bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between ${
+                      isSoldOut ? 'border-pink-200 opacity-95' : 'border-pink-200 hover:border-[#2563EB]'
+                    }`}
+                  >
+                    <div>
+                      <div className="relative h-48 bg-white overflow-hidden">
+                        <img
+                          src={prod.photos[0]}
+                          alt={prod.name}
+                          className={`w-full h-full object-cover ${isSoldOut ? 'grayscale opacity-65' : ''}`}
+                        />
+
+                        {/* Grade Badge */}
+                        <span className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-[#F59E0B] text-black text-[10px] font-black shadow">
+                          Grade {prod.conditionGrade}
+                        </span>
+
+                        {/* Relocation Sale Tag */}
+                        {prod.reasonForSelling === 'Relocating Abroad' && !isSoldOut && (
+                          <span className="absolute top-2.5 right-2.5 px-2 py-1 rounded-lg bg-[#DC2626] text-white text-[10px] font-black shadow">
+                            RELOCATION SALE - Must Go Fast
+                          </span>
+                        )}
+
+                        {isSoldOut && (
+                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                            <span className="px-4 py-1.5 rounded-xl bg-[#DC2626] text-white text-xs font-black tracking-widest -rotate-6 shadow-md">
+                              SOLD OUT
+                            </span>
                           </div>
-                          <p className="text-xs font-black text-indigo-600">{formatPrice(item.price * item.quantity, true)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                        )}
 
-                  {/* Delivery/Pickup Coordinates Summary Box */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                    <div className="flex items-center gap-2">
-                      {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
-                        (selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION') ? (
-                          <>
-                            <Building2 className="w-4 h-4 text-indigo-600" />
-                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">eFADO Corporate Pick-Up Station</span>
-                          </>
-                        ) : (
-                          <>
-                            <Store className="w-4 h-4 text-indigo-600" />
-                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Independent Vendor Pick-Up Order</span>
-                          </>
-                        )
+                        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1">
+                          <span className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] font-bold flex items-center gap-1">
+                            <Video className="w-3 h-3 text-[#F59E0B]" />
+                            Video Proof
+                          </span>
+                          {prod.listingMode === 'bulk' && (
+                            <span className="px-2 py-0.5 rounded-md bg-[#2563EB] text-white text-[10px] font-black">
+                              BULK ({prod.stock} units)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 space-y-2">
+                        {/* Clickable EFADO ID + Online Status */}
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleChatWithSeller(prod, prod.sellerName, e)}
+                            className="px-2 py-0.5 rounded-md bg-[#2563EB] hover:bg-blue-700 text-white text-[10px] font-black flex items-center gap-1"
+                            title="Open EFADO Chat directly"
+                          >
+                            <MessageCircle className="w-2.5 h-2.5" />
+                            <span>{prod.sellerEfadoId}</span>
+                          </button>
+
+                          {prod.sellerOnline ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#16A34A]">
+                              <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
+                              Online Now - Chat Now
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-black/55">
+                              <span className="w-2 h-2 rounded-full bg-slate-400" />
+                              Offline - Leave Message
+                            </span>
+                          )}
+                        </div>
+
+                        <h3 className="text-sm font-extrabold text-black leading-snug line-clamp-2 min-h-[2.5rem] mb-0">
+                          {prod.name}
+                        </h3>
+
+                        {/* Verification / Video Like / Lock Badges */}
+                        <div className="flex flex-wrap gap-1">
+                          {prod.videoLikesCount > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-green-100 text-[#16A34A] text-[10px] font-extrabold">
+                              <ThumbsUp className="w-2.5 h-2.5" />
+                              Liked / Buyer Confirmed Video
+                            </span>
+                          )}
+                          {prod.keptInEfadoStore && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-[#2563EB] text-[10px] font-extrabold">
+                              <BadgeCheck className="w-2.5 h-2.5" />
+                              Verified By EFADO - In Store
+                            </span>
+                          )}
+                          {lockedByOther && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 border border-[#F59E0B] text-black text-[10px] font-black">
+                              In Negotiation - Please Wait
+                            </span>
+                          )}
+                          {agreedWithMe && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F59E0B] text-black text-[10px] font-black">
+                              Agreed: {formatNaira(neg?.agreedPriceNgn || prod.price)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-baseline justify-between gap-2 pt-0.5">
+                          <div>
+                            <p className="text-base font-black text-[#2563EB] tabular-nums mb-0">
+                              {formatNaira(agreedWithMe ? neg?.agreedPriceNgn || prod.price : prod.price)}
+                            </p>
+                            {prod.originalPrice && prod.originalPrice > prod.price && (
+                              <span className="text-[11px] line-through text-black/45 tabular-nums">
+                                {formatNaira(prod.originalPrice)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-bold text-black/65 truncate">{prod.sellerLocation}</span>
+                        </div>
+
+                        <p className="text-[11px] font-medium text-black/75 line-clamp-1 mb-0">
+                          Fault: {prod.faultDescription || 'None — Working Perfectly'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card Action Buttons */}
+                    <div className="px-3.5 pb-3.5 pt-1 space-y-1.5">
+                      {isSoldOut ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleNotifyMe(prod.id, e)}
+                          className={`w-full py-2.5 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 ${
+                            prod.isOnWaitlist
+                              ? 'bg-purple-100 text-[#2563EB] border border-pink-200'
+                              : 'bg-amber-50 text-black border border-[#F59E0B]'
+                          }`}
+                        >
+                          <Bell className="w-3.5 h-3.5" />
+                          <span>{prod.isOnWaitlist ? 'Subscribed To Alerts' : 'Notify Me When Back'}</span>
+                        </button>
                       ) : (
                         <>
-                          <Truck className="w-4 h-4 text-blue-600" />
-                          <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Direct Home/Office Delivery</span>
+                          {agreedWithMe && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleBuyAtAgreedOrFixed(prod, 1);
+                              }}
+                              className="w-full py-2 px-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-xs shadow-sm"
+                            >
+                              Buy At Agreed Price - {formatNaira(neg?.agreedPriceNgn || prod.price)}
+                            </button>
+                          )}
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              disabled={lockedByOther}
+                              onClick={(e) => handleChatWithSeller(prod, prod.sellerName, e)}
+                              className="py-2 px-2 rounded-xl bg-[#2563EB] hover:bg-blue-700 disabled:bg-amber-100 disabled:text-black text-white font-extrabold text-[11px] flex items-center justify-center gap-1 truncate"
+                            >
+                              <MessageCircle className="w-3 h-3 shrink-0" />
+                              <span className="truncate">
+                                {lockedByOther ? 'In Negotiation - Please Wait' : 'Chat - Negotiate Price'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={lockedByOther}
+                              onClick={(e) => handleOpenMakeOffer(prod, e)}
+                              className="py-2 px-2 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-50 text-black font-black text-[11px] flex items-center justify-center gap-1"
+                            >
+                              <Handshake className="w-3 h-3 shrink-0" />
+                              <span>Make Offer</span>
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => handleShareProduct(prod, e)}
+                              className="py-2 px-2 rounded-xl bg-white border border-pink-200 hover:bg-purple-50 text-black font-bold text-[11px] flex items-center justify-center gap-1"
+                            >
+                              <Share2 className="w-3 h-3 text-[#2563EB]" />
+                              <span>Share</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(prod, false, 1);
+                              }}
+                              className="py-2 px-2 rounded-xl bg-white border border-pink-200 hover:bg-purple-50 text-black font-extrabold text-[11px] flex items-center justify-center gap-1"
+                            >
+                              <Plus className="w-3 h-3 text-[#2563EB]" />
+                              <span>Add</span>
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
-                    <div className="text-[11px] leading-relaxed text-slate-700 font-bold uppercase">
-                      {selectedOrder.deliveryDetails?.fulfillmentType === 'PICKUP' ? (
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-indigo-600">Authorized Recipient: {selectedOrder.deliveryDetails.fullName}</p>
-                          <p className="text-[10px] text-slate-400">Verification Liaison Number: {selectedOrder.deliveryDetails.phone}</p>
-                          {((selectedOrder.deliveryDetails as any).pickupLocationType === 'OFFICE' || selectedOrder.deliveryDetails.instructions?.includes('OFFICE_ADDRESSES_STATION')) ? (
-                            <div className="mt-2 text-[9.5px] text-slate-300 normal-case bg-slate-950 p-3 rounded-xl border border-white/5 font-mono">
-                              <span className="text-[9px] font-black text-indigo-400 block mb-1 uppercase">🏢 eFADO Pickup Coordinate:</span>
-                              {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
-                            </div>
-                          ) : (
-                            <p className="text-[8.5px] text-slate-500 mt-2 lowercase italic">
-                              *All products in this order must be collected manually from their respective vendor's stores. Bring matching ID credentials or security verification key.*
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-white">{selectedOrder.deliveryDetails?.fullName} ({selectedOrder.deliveryDetails?.phone})</p>
-                          <p className="text-slate-400">
-                            {selectedOrder.deliveryDetails?.street}, {selectedOrder.deliveryDetails?.city}, {selectedOrder.deliveryDetails?.state} {selectedOrder.deliveryDetails?.zipCode || ''}
-                          </p>
-                          {selectedOrder.deliveryDetails?.landmark && (
-                            <p className="text-[9.5px] text-amber-400">Landmark Focus: {selectedOrder.deliveryDetails.landmark}</p>
-                          )}
-                          {selectedOrder.deliveryDetails?.instructions && (
-                            <p className="text-[9px] text-slate-500 lowercase italic">Instructions: "{selectedOrder.deliveryDetails.instructions}"</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      )}
 
-                  {/* Tracking Timeline */}
-                  <div className="space-y-6">
-                    {selectedOrder.trackingHistory?.map((event, idx) => (
-                      <div key={idx} className="flex gap-4 group">
-                        <div className="flex flex-col items-center">
-                          <div className={`w-3 h-3 rounded-full ${idx === 0 ? 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-slate-700'}`} />
-                          {idx !== selectedOrder.trackingHistory!.length - 1 && (
-                            <div className="w-0.5 flex-grow bg-slate-800 my-1 group-hover:bg-slate-700 transition-colors" />
-                          )}
-                        </div>
-                        <div className="pb-6">
-                          <p className={`text-xs font-black uppercase tracking-widest ${idx === 0 ? 'text-indigo-400' : 'text-slate-400'}`}>
-                            {event.status}
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-500 mt-0.5">{event.description}</p>
-                          <div className="flex items-center gap-3 mt-2">
-                            <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-600 uppercase tracking-widest bg-slate-800/50 px-2 py-0.5 rounded-md">
-                              <MapPin className="w-2.5 h-2.5" />
-                              {event.location}
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[8px] font-black text-slate-600 uppercase tracking-widest bg-slate-800/50 px-2 py-0.5 rounded-md">
-                              <Clock className="w-2.5 h-2.5" />
-                              {new Date(event.timestamp?.seconds * 1000).toLocaleString()}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+      {/* =================================================================== */}
+      {/* FILTER FULL PAGE                                                    */}
+      {/* =================================================================== */}
+      {step === 'FILTER' && (
+        <div className="max-w-[780px] mx-auto px-3 sm:px-6 pt-4 pb-28 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setStep('HOME')}
+                className="p-2.5 rounded-xl bg-white border border-pink-200 text-black shadow-sm"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h2 className="text-xl font-extrabold text-black mb-0">Filter &amp; Sort Fairly Used</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setDraftFilters({
+                  category: 'All',
+                  search: '',
+                  brand: 'all',
+                  location: 'all',
+                  conditionGrade: 'all',
+                  relocationOnly: false,
+                  negotiableOnly: false,
+                  inStoreVerifiedOnly: false,
+                  freeDeliveryOnly: false,
+                  priceMin: '',
+                  priceMax: '',
+                  sort: 'newest'
+                })
+              }
+              className="text-xs font-extrabold text-[#2563EB] flex items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset All</span>
+            </button>
+          </div>
+
+          <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 p-5 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Category</label>
+                <select
+                  value={draftFilters.category}
+                  onChange={(e) =>
+                    setDraftFilters((p) => ({ ...p, category: e.target.value as FairlyUsedCategory }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm font-bold text-black"
+                >
+                  {CATEGORY_LIST.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Condition Grade</label>
+                <select
+                  value={draftFilters.conditionGrade}
+                  onChange={(e) =>
+                    setDraftFilters((p) => ({ ...p, conditionGrade: e.target.value as 'all' | ConditionGrade }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm font-bold text-black"
+                >
+                  <option value="all">All Grades (A, B, C, D)</option>
+                  <option value="A">A - Like New</option>
+                  <option value="B">B - Neatly Used</option>
+                  <option value="C">C - Used With Small Scratch</option>
+                  <option value="D">D - Needs Repair</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Min Price (₦)</label>
+                <input
+                  type="number"
+                  value={draftFilters.priceMin}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, priceMin: e.target.value }))}
+                  placeholder="e.g. 50000"
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm text-black"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Max Price (₦)</label>
+                <input
+                  type="number"
+                  value={draftFilters.priceMax}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, priceMax: e.target.value }))}
+                  placeholder="e.g. 900000"
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm text-black"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Location</label>
+                <input
+                  type="text"
+                  value={draftFilters.location === 'all' ? '' : draftFilters.location}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, location: e.target.value || 'all' }))}
+                  placeholder="e.g. Warri, Delta, Lagos"
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm text-black"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-black mb-1">Sort By</label>
+                <select
+                  value={draftFilters.sort}
+                  onChange={(e) =>
+                    setDraftFilters((p) => ({
+                      ...p,
+                      sort: e.target.value as FairlyUsedFilterState['sort']
+                    }))
+                  }
+                  className="w-full px-3 py-2.5 rounded-xl border border-pink-200 bg-white text-sm font-bold text-black"
+                >
+                  <option value="newest">Newest Listed</option>
+                  <option value="price_asc">Lowest Price</option>
+                  <option value="price_desc">Highest Price</option>
+                  <option value="popular">Most Popular</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs text-black font-bold">
+              <label className="flex items-center gap-2 bg-white p-3 rounded-xl border border-pink-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draftFilters.relocationOnly}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, relocationOnly: e.target.checked }))}
+                  className="w-4 h-4 accent-[#2563EB]"
+                />
+                <span>Relocation Sale Only (Must Go Fast)</span>
+              </label>
+              <label className="flex items-center gap-2 bg-white p-3 rounded-xl border border-pink-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draftFilters.inStoreVerifiedOnly}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, inStoreVerifiedOnly: e.target.checked }))}
+                  className="w-4 h-4 accent-[#2563EB]"
+                />
+                <span>Verified By EFADO - In Store Only</span>
+              </label>
+              <label className="flex items-center gap-2 bg-white p-3 rounded-xl border border-pink-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draftFilters.negotiableOnly}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, negotiableOnly: e.target.checked }))}
+                  className="w-4 h-4 accent-[#2563EB]"
+                />
+                <span>Negotiable Items Only</span>
+              </label>
+              <label className="flex items-center gap-2 bg-white p-3 rounded-xl border border-pink-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={draftFilters.freeDeliveryOnly}
+                  onChange={(e) => setDraftFilters((p) => ({ ...p, freeDeliveryOnly: e.target.checked }))}
+                  className="w-4 h-4 accent-[#2563EB]"
+                />
+                <span>Free Delivery Only</span>
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setFilters(draftFilters);
+                setStep('HOME');
+              }}
+              className="w-full py-3.5 bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-sm rounded-xl shadow-sm"
+            >
+              Apply Filters &amp; View Results
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* E-FADO REELS FEED                                                   */}
+      {/* =================================================================== */}
+      {step === 'REELS' && (
+        <FairlyUsedReelsView
+          onBack={() => setStep('HOME')}
+          onBuyThis={(productId) => openProductDetail(productId)}
+          onChatSeller={(reel: FairlyUsedReel) => {
+            setChatTarget({
+              productId: reel.productId,
+              productName: reel.productName,
+              productPhoto: reel.posterUrl,
+              sellerId: reel.sellerId,
+              sellerName: reel.sellerName,
+              sellerEfadoId: reel.sellerEfadoId
+            });
+            setStep('CHAT');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onShowToast={showToast}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 2: PRODUCT DETAIL (5 PHOTOS + WORKING VIDEO + LIKE + DETAILS)  */}
+      {/* =================================================================== */}
+      {step === 'PRODUCT_DETAIL' && selectedProduct && (
+        <div className="max-w-[960px] mx-auto px-3 sm:px-6 pt-4 pb-36 space-y-5">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setStep('HOME')}
+              className="px-3.5 py-2 rounded-xl bg-white border border-pink-200 text-black text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Market</span>
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleShareProduct(selectedProduct)}
+                className="px-3 py-2 rounded-xl bg-white border border-pink-200 text-[#2563EB] text-xs font-extrabold flex items-center gap-1 shadow-sm"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share</span>
+              </button>
+            </div>
+          </div>
+
+          {detailLoading && (
+            <div className="bg-white rounded-xl border border-pink-200 px-4 py-2 text-xs font-bold text-[#2563EB] flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Refreshing live item status &amp; negotiation lock...</span>
+            </div>
+          )}
+
+          {/* Media Card: Switch between 5 Real Photos and 1 Real Working Video */}
+          <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between gap-2 p-3 border-b border-pink-100 bg-white">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('photos')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold ${
+                    detailTab === 'photos' ? 'bg-[#2563EB] text-white' : 'bg-purple-50 text-black'
+                  }`}
+                >
+                  5 Real Photos ({selectedProduct.photos.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDetailTab('video')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 ${
+                    detailTab === 'video' ? 'bg-[#2563EB] text-white' : 'bg-[#F59E0B] text-black'
+                  }`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Watch Working Video</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={likingVideo}
+                onClick={() => handleLikeVideo(selectedProduct)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold flex items-center gap-1 border ${
+                  selectedProduct.likedVideoByMe
+                    ? 'bg-green-100 text-[#16A34A] border-[#16A34A]/40'
+                    : 'bg-white text-black border-pink-200 hover:bg-green-50'
+                }`}
+              >
+                <ThumbsUp className="w-3.5 h-3.5" />
+                <span>LIKE Video ({selectedProduct.videoLikesCount})</span>
+              </button>
+            </div>
+
+            {detailTab === 'photos' ? (
+              <div className="p-3 sm:p-4 space-y-3">
+                <div className="relative rounded-xl overflow-hidden bg-white border border-pink-100 h-72 sm:h-96">
+                  <img
+                    src={selectedProduct.photos[activePhotoIdx] || selectedProduct.photos[0]}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-contain bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setZoomLightboxOpen(true)}
+                    className="absolute top-3 right-3 p-2 rounded-xl bg-black/65 text-white hover:bg-black"
+                    aria-label="Zoom photo"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                  {selectedProduct.photos.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActivePhotoIdx(
+                            (i) => (i - 1 + selectedProduct.photos.length) % selectedProduct.photos.length
+                          )
+                        }
+                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/90 text-black shadow"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActivePhotoIdx((i) => (i + 1) % selectedProduct.photos.length)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/90 text-black shadow"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-2 gap-4">
-                   <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Payment Method</p>
-                      <div className="flex items-center gap-2">
-                         <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                            {selectedOrder.paymentMethod === 'wallet' && <Wallet className="w-3 h-3 text-indigo-400" />}
-                            {selectedOrder.paymentMethod === 'card' && <CreditCard className="w-3 h-3 text-indigo-400" />}
-                            {selectedOrder.paymentMethod === 'bank' && <Building2 className="w-3 h-3 text-indigo-400" />}
-                            {selectedOrder.paymentMethod === 'crypto' && <Bitcoin className="w-3 h-3 text-indigo-400" />}
-                            {selectedOrder.paymentMethod === 'pod' && <Truck className="w-3 h-3 text-indigo-400" />}
-                            {(!['wallet', 'card', 'bank', 'crypto', 'pod'].includes(selectedOrder.paymentMethod)) && <Smartphone className="w-3 h-3 text-indigo-400" />}
-                         </div>
-                         <p className="text-[10px] font-black text-white uppercase tracking-widest">
-                            {selectedOrder.paymentMethod.replace('_', ' ')}
-                         </p>
-                      </div>
-                   </div>
-                   <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Security</p>
-                      <div className="flex items-center gap-2 text-indigo-400">
-                         <ShieldCheck className="w-4 h-4" />
-                         <span className="text-[10px] font-black uppercase tracking-widest">EFADO Guard Active</span>
-                      </div>
-                   </div>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {selectedProduct.photos.map((src, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setActivePhotoIdx(idx)}
+                      className={`w-16 h-16 rounded-xl overflow-hidden border-2 shrink-0 ${
+                        activePhotoIdx === idx ? 'border-[#2563EB]' : 'border-pink-200'
+                      }`}
+                    >
+                      <img src={src} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
-              </motion.div>
+              </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white/5 rounded-[3rem] border border-dashed border-white/10 opacity-30">
-                <ClipboardList className="w-20 h-20 mb-6" />
-                <h4 className="text-xl font-black text-white uppercase tracking-tighter">Order Intelligence</h4>
-                <p className="text-xs font-bold text-slate-500 mt-2 uppercase tracking-[0.2em] max-w-[250px]">Select an order to view real-time tracking and delivery diagnostics</p>
+              <div className="p-4 space-y-3 bg-slate-900">
+                <video
+                  src={selectedProduct.videoUrl}
+                  poster={selectedProduct.photos[0]}
+                  controls
+                  playsInline
+                  className="w-full max-h-[380px] rounded-xl bg-black"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white">
+                  <span>Watch item working live (power ON / booting). Click LIKE if working!</span>
+                  <button
+                    type="button"
+                    disabled={likingVideo}
+                    onClick={() => handleLikeVideo(selectedProduct)}
+                    className="px-4 py-2 rounded-xl bg-[#16A34A] hover:bg-green-700 text-white font-extrabold flex items-center gap-1.5"
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                    <span>LIKE — Confirm Video Working ({selectedProduct.videoLikesCount})</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  </div>
 
-      {/* Cart & Checkout Drawer */}
-      <AnimatePresence>
-        {showCart && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-slate-950/90 backdrop-blur-md flex justify-end"
-          >
-            <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              className="w-full max-w-xl bg-slate-900 border-l border-white/5 h-full flex flex-col relative"
-            >
-              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-slate-900/50 backdrop-blur-xl">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                      <ShoppingBag className="w-5 h-5 text-indigo-400" />
-                   </div>
-                   <div>
-                     <h3 className="text-xl font-black text-white uppercase tracking-tighter">Market Cart</h3>
-                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                       {checkoutStep === 'cart' && 'Step 1: Review Items'}
-                       {checkoutStep === 'address' && 'Step 2: Delivery Destination'}
-                       {checkoutStep === 'payment' && 'Step 3: Secure Payment'}
-                       {checkoutStep === 'processing' && 'Step 4: Holisitic Security Processing'}
-                       {checkoutStep === 'success' && 'Order Confirmed!'}
-                     </p>
-                   </div>
-                </div>
-                <button onClick={() => { setShowCart(false); setCheckoutStep('cart'); }} className="p-2 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl">
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="flex-grow overflow-y-auto p-8 custom-scrollbar">
-                {checkoutStep === 'cart' && (
-                  <div className="space-y-6">
-                    {cart.length === 0 ? (
-                      <div className="h-64 flex flex-col items-center justify-center text-slate-600 opacity-30">
-                        <ShoppingBasket className="w-16 h-16 mb-4" />
-                        <p className="text-sm font-black uppercase tracking-widest">Your cart is empty</p>
-                      </div>
-                    ) : (
-                      cart.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-5 bg-white/5 p-4 rounded-2xl border border-white/5 relative group">
-                          <button 
-                            onClick={() => removeFromCart(item.product.id!)}
-                            className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-slate-500 hover:text-red-400 rounded-full border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 border border-white/5">
-                             <img src={item.product.photos[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          </div>
-                          <div className="flex-grow min-w-0">
-                            <h4 className="text-sm font-black text-white uppercase tracking-tight truncate mb-1">{item.product.title}</h4>
-                            <p className="text-xs font-bold text-indigo-400 mb-3">{formatPrice(item.product.price, true)}</p>
-                            <div className="flex items-center gap-4">
-                               <button 
-                                 onClick={() => updateQuantity(item.product.id!, -1)}
-                                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition-all"
-                               >
-                                 <Minus className="w-3 h-3" />
-                               </button>
-                               <span className="text-sm font-black text-white w-4 text-center">{item.quantity}</span>
-                               <button 
-                                 onClick={() => updateQuantity(item.product.id!, 1)}
-                                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center transition-all"
-                               >
-                                 <Plus className="w-3 h-3" />
-                               </button>
-                            </div>
-                          </div>
-                          <div className="text-right whitespace-nowrap">
-                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Subtotal</p>
-                             <p className="text-sm font-black text-white">{formatPrice(item.product.price * item.quantity, true)}</p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {checkoutStep === 'address' && (
-                  <div className="space-y-6">
-                    {/* Segmented fulfillment protocol selector */}
-                    <div className="bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 flex gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFulfillmentType('DELIVERY');
-                        }}
-                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                          fulfillmentType === 'DELIVERY'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
-                            : 'bg-transparent text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <Truck className="w-4 h-4" />
-                        🚚 Delivery Address
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFulfillmentType('PICKUP');
-                        }}
-                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
-                          fulfillmentType === 'PICKUP'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
-                            : 'bg-transparent text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <Store className="w-4 h-4" />
-                        🏪 Vendor Store Pickup
-                      </button>
-                    </div>
-
-                    {fulfillmentType === 'DELIVERY' ? (
-                      <div className="space-y-6">
-                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
-                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                            <Truck className="w-4 h-4" /> Recipient Identification
-                          </h4>
-                          <FormField label="Full Legal Name" error={validationErrors.fullName} hint="Official name as shown on national identity documents.">
-                            <input 
-                              type="text" 
-                              placeholder="Full Legal Name" 
-                              value={deliveryAddress.fullName}
-                              onChange={(e) => {
-                                setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
-                                if (validationErrors.fullName) setValidationErrors({...validationErrors, fullName: ''});
-                              }}
-                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.fullName ? 'border-rose-500' : 'border-white/5'}`}
-                            />
-                          </FormField>
-                          <FormField label="Strategic Liaison Phone" error={validationErrors.phone} hint="Active mobile number for delivery verification.">
-                            <input 
-                              type="tel" 
-                              placeholder="080********" 
-                              value={deliveryAddress.phone}
-                              onChange={(e) => {
-                                setDeliveryAddress({...deliveryAddress, phone: e.target.value});
-                                if (validationErrors.phone) setValidationErrors({...validationErrors, phone: ''});
-                              }}
-                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
-                            />
-                          </FormField>
-                        </div>
-                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6">
-                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                            <MapPin className="w-4 h-4" /> Destination Node
-                          </h4>
-                          <FormField label="Street Deployment Point" error={validationErrors.street} hint="Specific street name and nearest landmark.">
-                            <input 
-                              type="text" 
-                              placeholder="N0 24. Strategic Avenue..." 
-                              value={deliveryAddress.street}
-                              onChange={(e) => {
-                                setDeliveryAddress({...deliveryAddress, street: e.target.value});
-                                if (validationErrors.street) setValidationErrors({...validationErrors, street: ''});
-                              }}
-                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.street ? 'border-rose-500' : 'border-white/5'}`}
-                            />
-                          </FormField>
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField label="City Core" error={validationErrors.city}>
-                              <input 
-                                type="text" 
-                                placeholder="City Name" 
-                                value={deliveryAddress.city}
-                                onChange={(e) => {
-                                  setDeliveryAddress({...deliveryAddress, city: e.target.value});
-                                  if (validationErrors.city) setValidationErrors({...validationErrors, city: ''});
-                                }}
-                                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.city ? 'border-rose-500' : 'border-white/5'}`}
-                              />
-                            </FormField>
-                            <FormField label="Region/State" error={validationErrors.state}>
-                              <input 
-                                type="text" 
-                                placeholder="State" 
-                                value={deliveryAddress.state}
-                                onChange={(e) => {
-                                  setDeliveryAddress({...deliveryAddress, state: e.target.value});
-                                  if (validationErrors.state) setValidationErrors({...validationErrors, state: ''});
-                                }}
-                                className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.state ? 'border-rose-500' : 'border-white/5'}`}
-                              />
-                            </FormField>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField label="Postal Code / Zip" error="">
-                              <input 
-                                type="text" 
-                                placeholder="Postal Code" 
-                                value={deliveryAddress.zipCode}
-                                onChange={(e) => setDeliveryAddress({...deliveryAddress, zipCode: e.target.value})}
-                                className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
-                              />
-                            </FormField>
-                            <FormField label="Nearby Landmark / Focal Point" error="">
-                              <input 
-                                type="text" 
-                                placeholder="Nearby Focal Point (School, Port, etc)" 
-                                value={deliveryAddress.landmark || ''}
-                                onChange={(e) => setDeliveryAddress({...deliveryAddress, landmark: e.target.value})}
-                                className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
-                              />
-                            </FormField>
-                          </div>
-                          <FormField label="Additional Delivery Coordinates Instruction" error="">
-                            <textarea 
-                              placeholder="Any specific delivery landmark, gate/flat number, instructions..." 
-                              value={deliveryAddress.instructions || ''}
-                              onChange={(e) => setDeliveryAddress({...deliveryAddress, instructions: e.target.value})}
-                              rows={2}
-                              className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500 font-bold"
-                            />
-                          </FormField>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {/* Selector for Pickup Location Type */}
-                        <div className="grid grid-cols-2 gap-4 bg-slate-900/60 p-2 rounded-[2rem] border border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPickupLocationType('OFFICE');
-                            }}
-                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
-                              pickupLocationType === 'OFFICE'
-                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
-                                : 'bg-transparent text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <Building2 className="w-4 h-4" />
-                            <span>🏫 eFADO Delivery Office</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPickupLocationType('VENDOR');
-                            }}
-                            className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1.5 ${
-                              pickupLocationType === 'VENDOR'
-                                ? 'bg-indigo-600/90 text-white shadow-lg shadow-indigo-500/10'
-                                : 'bg-transparent text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            <Store className="w-4 h-4" />
-                            <span>🏪 Vendor Direct Store</span>
-                          </button>
-                        </div>
-
-                        {pickupLocationType === 'OFFICE' ? (
-                          <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-[2rem] space-y-3">
-                            <div className="flex items-center gap-2 text-indigo-400">
-                              <Building2 className="w-4 h-4" />
-                              <span className="text-[10px] font-black uppercase tracking-wider">OFFICIAL CORPORATE PICK-UP STATION</span>
-                            </div>
-                            <div className="text-[11px] font-bold text-slate-200 mt-1 space-y-2 whitespace-pre-line bg-slate-1050 p-4 rounded-xl border border-white/5 font-mono">
-                              {OFFICE_ADDRESSES.DELIVERY_PICKUP_STATION}
-                            </div>
-                            <p className="text-[9.5px] text-indigo-300 font-bold uppercase leading-relaxed">
-                              Your products will be centrally delivered to this eFADO Head Office / Delivery Pick-Up Station in Warri, Delta State. Bring matching ID or verification liaison details for secured collection.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-[2rem] space-y-2">
-                            <div className="flex items-center gap-2 text-amber-500">
-                              <Info className="w-4 h-4" />
-                              <span className="text-xs font-bold">Direct Seller Pickup</span>
-                            </div>
-                            <p className="text-[9.5px] text-slate-300 font-bold uppercase leading-relaxed">
-                              eFADO operates as a decentralized network. All pickup orders must be processed directly at the vendor's declared private point-of-sale coordinates listed below.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* List coordinates for all items in cart */}
-                        {pickupLocationType === 'VENDOR' && (
-                          <div className="space-y-4">
-                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block px-1">Selected Location coordinates for Items:</label>
-                            {cart.map((item, idx) => {
-                              const p = item.product;
-                              const mainStr = p.vendorPickupLocation || 
-                                             `${p.location || 'Unknown location'}${p.village ? ', ' + p.village : ''}${p.landmark ? ' (Landmark: ' + p.landmark + ')' : ''}`;
-                              return (
-                                <div key={idx} className="p-4 bg-slate-950/80 border border-white/5 rounded-[2rem] flex flex-col gap-2">
-                                  <span className="text-xs font-black text-white uppercase tracking-tight">{p.title}</span>
-                                  <div className="flex items-start gap-2 bg-slate-900/60 p-3 rounded-xl border border-white/5">
-                                    <MapPin className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
-                                    <div>
-                                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Vendor Pickup Station:</p>
-                                      <p className="text-[10.5px] font-bold text-slate-200 mt-1 whitespace-pre-line leading-relaxed">{mainStr}</p>
-                                      {(p.phone || p.whatsapp) && (
-                                        <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest mt-2">
-                                          Liaisons: {p.phone && `📞 ${p.phone}`} {p.whatsapp && `💬 ${p.whatsapp}`}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5 space-y-6 animate-fadeIn">
-                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-                            <UserPlus className="w-4 h-4" /> Authorized Liaison Credentials
-                          </h4>
-                          <FormField label="Full Name of Authorized Recipient" error={validationErrors.fullName} hint="The full name of the authorized individual arriving to pick up the item.">
-                            <input 
-                              type="text" 
-                              placeholder="Recipient Full Name" 
-                              value={deliveryAddress.fullName}
-                              onChange={(e) => {
-                                setDeliveryAddress({...deliveryAddress, fullName: e.target.value});
-                                if (validationErrors.fullName) setValidationErrors({...validationErrors, fullName: ''});
-                              }}
-                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.fullName ? 'border-rose-500' : 'border-white/5'}`}
-                            />
-                          </FormField>
-                          <FormField label="Liaison Verification Contact Number" error={validationErrors.phone} hint="Phone number to submit secure pin and dispatch messages.">
-                            <input 
-                              type="tel" 
-                              placeholder="080********" 
-                              value={deliveryAddress.phone}
-                              onChange={(e) => {
-                                setDeliveryAddress({...deliveryAddress, phone: e.target.value});
-                                if (validationErrors.phone) setValidationErrors({...validationErrors, phone: ''});
-                              }}
-                              className={`w-full bg-slate-950 border rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 transition-all font-bold ${validationErrors.phone ? 'border-rose-500' : 'border-white/5'}`}
-                            />
-                          </FormField>
-                          <p className="text-[8.5px] text-slate-400 uppercase font-bold tracking-widest">
-                            {pickupLocationType === 'OFFICE'
-                              ? '⚠️ Bring a valid ID or verification code to the eFADO Delivery Head Office matching the credentials above.'
-                              : '⚠️ Present dynamic matching passport ID or matching confirmation code to ensure item handshaking security.'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {checkoutStep === 'payment' && (
-                  <div className="space-y-6 overflow-y-auto no-scrollbar max-h-[50vh]">
-                    {/* Navigation Tab selection for Options */}
-                    <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5 mb-4 font-sans">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentStrategy('escrow_flutterwave')}
-                        className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
-                          paymentStrategy === 'escrow_flutterwave'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 border-t border-white/10'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5 shrink-0 animate-pulse" />
-                        Option A: Escrow Flutterwave
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentStrategy('direct_bank')}
-                        className={`py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex flex-col items-center justify-center gap-1 text-center ${
-                          paymentStrategy === 'direct_bank'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 border-t border-white/10'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
-                        }`}
-                      >
-                        <Building2 className="w-3.5 h-3.5 shrink-0" />
-                        Option B: Direct Transfer
-                      </button>
-                    </div>
-
-                    {paymentStrategy === 'escrow_flutterwave' ? (
-                      <div className="space-y-4">
-                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-1.5 text-left mb-4">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-emerald-400 font-bold" />
-                            <h5 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Secured Intermediary Split Escrow</h5>
-                          </div>
-                          <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
-                            Buyer pays securely via Flutterwave on behalf of <strong>Efado Hubs</strong>. Flutterwave splits the money automatically — commission goes to Efado, and the rest goes directly to the vendor's secure subaccount. Best for **escrow and absolute buyer protection**.
-                          </p>
-                        </div>
-                        <div className="bg-slate-800/20 p-6 rounded-[2rem] border border-white/5 mb-6 text-left">
-                           <h4 className="text-xs font-black text-indigo-400 uppercase tracking-[0.2em] mb-4">Choose Payment Strategy</h4>
-                       <div className="grid grid-cols-1 gap-4 max-h-[300px] overflow-y-auto no-scrollbar pr-2">
-                         {paymentCategories.map((cat) => (
-                           <div 
-                             key={cat.id}
-                             className="bg-slate-950/50 border border-white/5 rounded-[2rem] p-5 hover:border-indigo-500/30 hover:bg-slate-900 transition-all group"
-                           >
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-slate-900 rounded-2xl border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                  {cat.icon}
-                                </div>
-                                <h4 className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{cat.title}</h4>
-                              </div>
-
-                              <div className="flex flex-wrap gap-2">
-                                {cat.options.map(opt => (
-                                  <button
-                                    key={opt.id}
-                                    onClick={() => setPaymentMethod(opt.id)}
-                                    className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${
-                                      paymentMethod === opt.id
-                                        ? 'bg-indigo-600 text-white border-indigo-400 shadow-lg shadow-indigo-500/20'
-                                        : 'bg-slate-950/50 border-white/5 text-slate-400 hover:bg-slate-800'
-                                    }`}
-                                  >
-                                    {opt.name}
-                                  </button>
-                                ))}
-                              </div>
-                           </div>
-                         ))}
-                       </div>
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                      {paymentMethod === 'bank_transfer_opt' && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="space-y-4 pt-4 border-t border-slate-200/20"
-                        >
-                          <div className="flex flex-col gap-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">1. Select Sending Bank Institution</label>
-                            <select
-                              value={selectedBankCode}
-                              onChange={(e) => {
-                                setSelectedBankCode(e.target.value);
-                                if (e.target.value !== 'others') {
-                                  const b = nigerianBanks.find(nb => nb.code === e.target.value);
-                                  setCustomBankName(b ? b.name : '');
-                                } else {
-                                  setCustomBankName('');
-                                }
-                              }}
-                              className="w-full px-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-blue-500 transition-all cursor-pointer"
-                            >
-                              <option value="">-- Choose Bank (Nigeria & International) --</option>
-                              {nigerianBanks.map(b => (
-                                <option key={`bank-select-${b.code}`} value={b.code}>
-                                  {b.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {selectedBankCode === 'others' && (
-                            <div className="flex flex-col gap-2">
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Specify Other Bank Name</label>
-                              <div className="relative">
-                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                                <input 
-                                  placeholder="Type Custom Bank Name (e.g. Lotus Bank, Signature Bank)..."
-                                  className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                                  value={customBankName}
-                                  onChange={e => setCustomBankName(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="flex flex-col gap-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">2. Enter Bank Account Number / Bank Number</label>
-                            <div className="relative">
-                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Enter Your 10-Digit Account Number"
-                                maxLength={10}
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all"
-                                value={bankAccountNumber}
-                                onChange={e => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Recipient Automatic Search Results */}
-                          {recipientSearchLoading && (
-                            <div className="flex items-center justify-center p-4 bg-blue-500/10 rounded-2xl border border-blue-500/20 gap-3">
-                              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                              <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Searching Recipient Bank Details...</span>
-                            </div>
-                          )}
-
-                          {!recipientSearchLoading && resolvedRecipientName && (
-                            <div className="p-5 bg-emerald-500/10 rounded-[2rem] border border-emerald-500/20 space-y-4 text-left shadow-sm">
-                              <div className="flex items-center gap-2">
-                                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">System Recipient Verified Match</span>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">BENEFICIARY HOLDER (ESCROW PROTOCOL)</span>
-                                <h4 className="text-xs font-black text-white">{resolvedRecipientName}</h4>
-                                <p className="text-[9px] text-emerald-400 font-bold">✔ Destination is fully secured. Funds will be deposited in trust.</p>
-                              </div>
-
-                              {/* Instantly Click Pay */}
-                              <button
-                                type="button"
-                                onClick={handleFlutterwaveCheckout}
-                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
-                              >
-                                <ShieldCheck className="w-4.5 h-4.5 animate-bounce" />
-                                <span className="uppercase tracking-[0.15em] text-[10px]">PAY SECURELY NOW VIA FLUTTERWAVE</span>
-                              </button>
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    </div>
-                    ) : (
-                      /* Option B: Direct to Vendor */
-                      <div className="space-y-4 text-left">
-                        <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-2xl p-4 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-indigo-400 animate-pulse" />
-                            <h5 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Manual Direct Wire Transfer</h5>
-                          </div>
-                          <p className="text-[9px] text-slate-400 leading-normal font-medium font-sans">
-                            Choose an official collection account below, execute the manual bank transfer from your banking app, then type your payment execution proof details below to finalize order.
-                          </p>
-                        </div>
-
-                        {/* STEP 1: Verified Checkout Gateway Notice */}
-                        <div className="space-y-3 font-sans">
-                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 1: AUTOMATED SETTLEMENT GATEWAY</label>
-                          <div className="p-4 bg-slate-900/60 border border-emerald-500/20 rounded-2xl text-left space-y-1.5">
-                            <span className="text-[9.5px] font-black text-emerald-400 uppercase tracking-wide block">
-                              Paystack Settlement Gateway Active
-                            </span>
-                            <p className="text-[10px] text-slate-300 leading-relaxed">
-                              Direct personal and corporate bank accounts have been removed. Please use <strong>Escrow Wallet / Paystack &amp; Flutterwave Checkout</strong> above for instant automated settlement.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* STEP 2: Submit details */}
-                        <div className="space-y-3 pt-3 border-t border-white/5">
-                          <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">STEP 2: TYPE YOUR SENDER & AMOUNT PROOF DETAILS</label>
-                          <div className="space-y-3 font-sans">
-                            {/* NGN Grand Total Lock field */}
-                            <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-400">₦</span>
-                              <input 
-                                type="text"
-                                disabled
-                                className="w-full pl-10 pr-4 py-3 bg-slate-955/20 border border-white/5 rounded-xl text-xs font-mono font-bold text-slate-300 cursor-not-allowed select-none bg-slate-950"
-                                value={`${((((cartTotal * (isCouponApplied ? 0.8 : 1)) * 1.013) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50))) * 1450).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} NGN`}
-                              />
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[7px] font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase tracking-widest">PRE-CHECKED NGN TOTAL</span>
-                            </div>
-
-                            <div className="relative">
-                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Your Sending Bank Name (e.g. Zenith Bank, Access Bank)*"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
-                                value={senderBankName}
-                                onChange={e => setSenderBankName(e.target.value)}
-                              />
-                            </div>
-
-                            <div className="relative">
-                              <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Your Sending 10-Digit Account Number*"
-                                maxLength={10}
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
-                                value={senderAccountNumber}
-                                onChange={e => setSenderAccountNumber(e.target.value)}
-                              />
-                            </div>
-
-                            <div className="relative">
-                              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Your Sender Account Holder Name*"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
-                                value={senderAccountName}
-                                onChange={e => setSenderAccountName(e.target.value)}
-                              />
-                            </div>
-
-                            <div className="relative">
-                              <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-                              <input 
-                                placeholder="Transfer Reference / Transaction note (Optional)"
-                                className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-white/10 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-indigo-500 transition-all font-sans"
-                                value={senderTransferRef}
-                                onChange={e => setSenderTransferRef(e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="bg-emerald-500/10 p-6 rounded-[2rem] border border-emerald-500/20">
-                      <div className="flex items-center gap-3 text-emerald-400 mb-2">
-                         <ShieldCheck className="w-5 h-5" />
-                         <span className="text-[10px] font-black uppercase tracking-widest">Fairly Used Escrow Protection</span>
-                      </div>
-                      <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-tight">
-                        Your payment is held securely by Efado until you confirm delivery of your fairly used product.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {checkoutStep === 'processing' && (
-                  <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-24 h-24 mb-8 relative">
-                       <div className="absolute inset-0 border-4 border-indigo-500/20 rounded-full" />
-                       <div className="absolute inset-0 border-4 border-t-indigo-500 rounded-full animate-spin" />
-                       <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                          <Zap className="w-8 h-8 text-indigo-400 animate-pulse" />
-                       </div>
-                    </div>
-                    <h4 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Holisitic Transaction Sec</h4>
-                    <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest animate-pulse">{paymentStatusText}</p>
-                    <div className="mt-12 bg-white/5 p-6 rounded-3xl border border-white/5 w-full">
-                       <p className="text-xs font-semibold text-slate-400 mb-4">Security Verification Checks</p>
-                       <div className="space-y-3">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                             <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Identity Logic Check</span>
-                             <span className="text-emerald-400">VERIFIED</span>
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                             <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> Currency Consistency</span>
-                             <span className="text-emerald-400">STABLE</span>
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                             <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-indigo-400 animate-pulse" /> Escrow Hash Generation</span>
-                             <span className="text-indigo-400">ACTIVE</span>
-                          </div>
-                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {checkoutStep === 'success' && (
-                  <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center text-white mb-6 shadow-xl shadow-emerald-500/20 animate-bounce">
-                       <CheckCircle className="w-10 h-10" />
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-2">Order Confirmed!</h3>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6 leading-relaxed max-w-sm">
-                      Your fairly used product order has been successfully placed under the EFADO Guard escrow system.
-                    </p>
-                    <div className="bg-slate-100 p-6 rounded-[2rem] border border-slate-200/80 w-full mb-8 shadow-inner">
-                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Your Order Code</p>
-                       <p className="text-3xl font-black text-slate-800 tracking-widest font-mono">{generatedOrderCode}</p>
-                    </div>
-                    <div className="flex flex-col gap-3 w-full">
-                       <button 
-                         onClick={() => setShowSuccessReceipt(true)}
-                         className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg hover:bg-indigo-500 active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-3"
-                       >
-                         <FileText className="w-4 h-4 text-emerald-400" /> Download & Print Receipt
-                       </button>
-                       <button 
-                         onClick={() => {
-                           setActiveView('orders');
-                           setShowCart(false);
-                           setCheckoutStep('cart');
-                         }}
-                         className="w-full py-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-black rounded-2xl active:scale-95 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-3 border border-slate-200"
-                       >
-                         <Truck className="w-4 h-4" /> Track My Order
-                       </button>
-                       <button 
-                         onClick={() => { setShowCart(false); setCheckoutStep('cart'); }}
-                         className="w-full py-3 text-slate-500 hover:text-slate-700 font-bold hover:underline transition-all uppercase tracking-widest text-[10px]"
-                       >
-                         Continue Shopping
-                       </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {checkoutStep !== 'processing' && checkoutStep !== 'success' && cart.length > 0 && (
-                <div className="p-8 border-t border-white/5 bg-slate-900/50 backdrop-blur-xl">
-                  {checkoutStep === 'cart' && (
-                     <div className="flex items-center gap-2 mb-6">
-                        <input 
-                           type="text" 
-                           placeholder="PROMO CODE (e.g. EFADO20)" 
-                           value={couponCode}
-                           onChange={(e) => setCouponCode(e.target.value)}
-                           className="flex-grow bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-xs text-white focus:border-indigo-500 transition-all uppercase tracking-widest font-bold"
-                        />
-                        <button 
-                           onClick={() => { if(couponCode === 'EFADO20') setIsCouponApplied(true); }}
-                           className="px-6 py-3 bg-white/10 text-white font-black rounded-xl hover:bg-white/20 transition-all text-xs uppercase tracking-widest"
-                        >
-                           Apply
-                        </button>
-                     </div>
-                  )}
-
-                  <div className="space-y-3 mb-8 px-2">
-                    <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                      <span>Subtotal</span>
-                      <span>{formatPrice(cartTotal, true)}</span>
-                    </div>
-                    {isCouponApplied && (
-                       <div className="flex justify-between text-xs font-bold text-indigo-400 uppercase tracking-widest">
-                          <span>Discount (EFADO20)</span>
-                          <span>-{formatPrice(cartTotal * 0.2, true)}</span>
-                       </div>
-                    )}
-                    <div className="flex justify-between text-xs font-bold text-slate-500 uppercase tracking-widest">
-                      <span>Shipping ({shippingMethod})</span>
-                      <span>{shippingMethod === 'Standard' ? 'FREE' : formatPrice(shippingMethod === 'Expedited' ? 15 : 50, true)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-black text-white uppercase tracking-tighter pt-2 border-t border-white/10">
-                      <span>Total Amount</span>
-                      <span>{formatPrice((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)), true)}</span>
-                    </div>
-                  </div>
-
-                  {checkoutStep === 'address' && Object.keys(validationErrors).length > 0 && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-xl text-xs font-bold mb-4 space-y-1">
-                      <p className="font-black uppercase tracking-widest flex items-center gap-1.5 text-rose-300">
-                        <AlertCircle className="w-4 h-4 text-rose-400" /> Missing Required Coordinates:
-                      </p>
-                      <ul className="list-disc pl-5 space-y-0.5 text-[10px] opacity-90">
-                        {Object.entries(validationErrors).map(([field, err]) => err && (
-                          <li key={field}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {checkoutStep === 'payment' && paymentStrategy === 'escrow_flutterwave' ? (
-                    <button 
-                      onClick={handleFlutterwaveCheckout}
-                      className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl shadow-2xl shadow-emerald-500/20 transition-all flex items-center justify-center gap-3 animate-pulse"
-                    >
-                      <CreditCard className="w-5 h-5" />
-                      <span className="uppercase tracking-[0.2em] text-xs">
-                        Complete Secure Order (Flutterwave)
-                      </span>
-                      <ArrowRight className="w-5 h-5 animate-bounce" />
-                    </button>
-                  ) : (
-                    <button 
-                      disabled={cart.length === 0}
-                      onClick={handleCheckout}
-                      className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black rounded-2xl shadow-2xl shadow-indigo-500/20 transition-all flex items-center justify-center gap-3 animate-shimmer"
-                    >
-                      {checkoutStep === 'payment' ? <ShieldCheck className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
-                      <span className="uppercase tracking-[0.2em] text-xs">
-                        {checkoutStep === 'cart' && 'Proceed to Checkout'}
-                        {checkoutStep === 'address' && 'Confirm Delivery Address'}
-                        {checkoutStep === 'payment' && paymentStrategy === 'direct_bank' && 'Submit Bank Transfer Proof'}
-                        {checkoutStep === 'payment' && paymentStrategy !== 'direct_bank' && `Pay ${formatPrice((cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)), true)} Now`}
-                      </span>
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
+          {/* Core Price + Badges + Tags */}
+          <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 p-5 shadow-sm space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              <span className="px-2.5 py-1 rounded-lg bg-[#F59E0B] text-black text-xs font-black">
+                Grade {GRADE_LABELS[selectedProduct.conditionGrade]}
+              </span>
+              {selectedProduct.reasonForSelling === 'Relocating Abroad' && (
+                <span className="px-2.5 py-1 rounded-lg bg-[#DC2626] text-white text-xs font-black">
+                  RELOCATION SALE - Must Go Fast
+                </span>
               )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              {selectedProduct.videoLikesCount > 0 && (
+                <span className="px-2.5 py-1 rounded-lg bg-green-100 text-[#16A34A] text-xs font-extrabold flex items-center gap-1">
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                  Liked / Buyer Confirmed Video ({selectedProduct.videoLikesCount})
+                </span>
+              )}
+              {selectedProduct.keptInEfadoStore && (
+                <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-[#2563EB] text-xs font-extrabold flex items-center gap-1">
+                  <BadgeCheck className="w-3.5 h-3.5" />
+                  Verified By EFADO - In Store
+                </span>
+              )}
+            </div>
 
-      <TransactionPinModal 
-        isOpen={showPinModal}
-        onClose={() => setShowPinModal(false)}
-        onConfirm={finalizePurchase}
-        amount={(cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50))}
-        action="Fairly Used Purchase"
-      />
+            <h2 className="text-xl sm:text-2xl font-black text-black leading-tight mb-0">{selectedProduct.name}</h2>
 
-      {/* Registration Modal */}
-      <AnimatePresence>
-        {showRegModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl"
-          >
-            <VendorRegistrationFlow 
-              onClose={() => setShowRegModal(false)}
-              categories={CATEGORIES}
-              hubName="Fairly Used Market"
-              accentColor="indigo"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Success Receipt Modal */}
-      <AnimatePresence>
-        {showSuccessReceipt && (
-          <StrategicReceipt 
-            transaction={{
-              id: generatedOrderCode,
-              userId: user.uid,
-              type: 'payment',
-              amount: (cartTotal * (isCouponApplied ? 0.8 : 1)) + (shippingMethod === 'Standard' ? 0 : (shippingMethod === 'Expedited' ? 15 : 50)),
-              currency: 'USD',
-              status: paymentMethod === 'direct_bank_transfer' ? 'pending' : 'completed',
-              method: paymentMethod === 'direct_bank_transfer' ? 'Direct Bank' : 'Secured Escrow Wallet',
-              purpose: `Escrow Hub Purchase - Code: ${generatedOrderCode}`,
-              reference: generatedOrderCode,
-              timestamp: { seconds: Math.floor(Date.now() / 1000) },
-              description: `Fairly Used Market Escrow Order. Total includes shipping via ${shippingMethod} to ${deliveryAddress.city}, ${deliveryAddress.state || ''}.`
-            }}
-            userEmail={user.email}
-            onClose={() => setShowSuccessReceipt(false)}
-          />
-        )}
-      </AnimatePresence>
-      {/* Direct Item Showcase Modal (from Deep Link / Sharing / WhatsApp or Card Click) */}
-      <AnimatePresence>
-        {previewProduct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md"
-            onClick={() => setPreviewProduct(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-slate-900 border border-indigo-500/30 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-            >
-              {/* Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30 uppercase font-bold">
-                    {previewProduct.categoryPath?.level1 || 'Fairly Used'}
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <div className="flex items-baseline gap-2.5">
+                <span className="text-2xl font-black text-[#2563EB] tabular-nums">
+                  {formatNaira(
+                    selectedProduct.activeNegotiation?.status === 'AGREED' &&
+                      selectedProduct.activeNegotiation.buyerId === user.uid
+                      ? selectedProduct.activeNegotiation.agreedPriceNgn || selectedProduct.price
+                      : selectedProduct.price
+                  )}
+                </span>
+                {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && (
+                  <span className="text-sm line-through text-black/45 tabular-nums">
+                    {formatNaira(selectedProduct.originalPrice)}
                   </span>
-                  <span className="text-xs text-slate-400">ID: {previewProduct.id}</span>
-                </div>
-                <button
-                  onClick={() => setPreviewProduct(null)}
-                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                )}
               </div>
+              <span className="text-xs font-bold text-black/75">
+                Stock: {selectedProduct.stock} unit(s) • {selectedProduct.negotiable ? 'Negotiable' : 'Fixed Price'}
+              </span>
+            </div>
 
-              {/* Body */}
-              <div className="p-5 sm:p-6 overflow-y-auto space-y-5">
-                <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800">
-                  <img
-                    src={previewProduct.photos[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80'}
-                    alt={previewProduct.title}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute top-3 right-3 px-3 py-1 bg-slate-950/90 backdrop-blur-md rounded-xl border border-indigo-500/40 shadow-lg">
-                    <span className="text-sm font-black text-indigo-400">{formatPrice(previewProduct.price, true)}</span>
-                  </div>
-                  <div className="absolute bottom-3 left-3 px-2.5 py-1 bg-indigo-600 rounded-lg text-[9px] font-black text-white uppercase tracking-widest">
-                    {previewProduct.condition || 'Verified Used'}
-                  </div>
-                </div>
+            {/* Active Lock / Agreed Banner */}
+            {selectedProduct.negotiable && selectedProduct.activeNegotiation && (
+              <div
+                className={`rounded-xl p-3 border text-xs font-extrabold flex flex-wrap items-center justify-between gap-2 ${
+                  selectedProduct.activeNegotiation.buyerId !== user.uid
+                    ? 'bg-amber-100 border-[#F59E0B] text-black'
+                    : selectedProduct.activeNegotiation.status === 'AGREED'
+                      ? 'bg-green-100 border-[#16A34A]/40 text-[#16A34A]'
+                      : 'bg-blue-50 border-[#2563EB]/30 text-[#2563EB]'
+                }`}
+              >
+                {selectedProduct.activeNegotiation.buyerId !== user.uid ? (
+                  <span>In Negotiation - Please Wait (Another buyer is currently negotiating this item)</span>
+                ) : selectedProduct.activeNegotiation.status === 'AGREED' ? (
+                  <span>
+                    Deal Agreed! Your Agreed Price is{' '}
+                    {formatNaira(selectedProduct.activeNegotiation.agreedPriceNgn || selectedProduct.price)}
+                  </span>
+                ) : (
+                  <span>
+                    Your Offer Active:{' '}
+                    {formatNaira(
+                      selectedProduct.activeNegotiation.counterAmountNgn ||
+                        selectedProduct.activeNegotiation.offerAmountNgn
+                    )}{' '}
+                    — Open EFADO Chat to finalize
+                  </span>
+                )}
+              </div>
+            )}
 
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight mb-2">
-                    {previewProduct.title}
+            {/* 4 Detail Action Buttons */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <button
+                type="button"
+                disabled={
+                  selectedProduct.status === 'SOLD' ||
+                  Boolean(
+                    selectedProduct.activeNegotiation &&
+                      selectedProduct.activeNegotiation.buyerId !== user.uid &&
+                      selectedProduct.negotiable
+                  )
+                }
+                onClick={() => handleChatWithSeller(selectedProduct)}
+                className="py-2.5 px-3 rounded-xl bg-[#2563EB] hover:bg-blue-700 disabled:bg-amber-100 disabled:text-black text-white font-extrabold text-xs flex items-center justify-center gap-1.5"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>
+                  {selectedProduct.activeNegotiation &&
+                  selectedProduct.activeNegotiation.buyerId !== user.uid &&
+                  selectedProduct.negotiable
+                    ? 'In Negotiation - Please Wait'
+                    : 'Chat - Negotiate Price'}
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={
+                  selectedProduct.status === 'SOLD' ||
+                  Boolean(
+                    selectedProduct.activeNegotiation &&
+                      selectedProduct.activeNegotiation.buyerId !== user.uid &&
+                      selectedProduct.negotiable
+                  )
+                }
+                onClick={() => handleOpenMakeOffer(selectedProduct)}
+                className="py-2.5 px-3 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] disabled:opacity-50 text-black font-black text-xs flex items-center justify-center gap-1.5"
+              >
+                <Handshake className="w-3.5 h-3.5" />
+                <span>Make Offer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShareProduct(selectedProduct)}
+                className="py-2.5 px-3 rounded-xl bg-white border border-pink-200 text-black font-bold text-xs flex items-center justify-center gap-1.5"
+              >
+                <Share2 className="w-3.5 h-3.5 text-[#2563EB]" />
+                <span>Share</span>
+              </button>
+              <button
+                type="button"
+                disabled={selectedProduct.status === 'SOLD'}
+                onClick={() => handleAddToCart(selectedProduct, false, detailQty)}
+                className="py-2.5 px-3 rounded-xl bg-white border border-pink-200 text-black font-extrabold text-xs flex items-center justify-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#2563EB]" />
+                <span>Add</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Condition Report & Fault Disclosure Box */}
+          <div className="bg-white rounded-2xl border border-pink-200 p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-black text-black border-b border-pink-100 pb-2 mb-0">
+              Honest Inspection Report &amp; Faults
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-black">
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">Condition Grade</span>
+                <strong>{GRADE_LABELS[selectedProduct.conditionGrade]}</strong>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">Reason For Selling</span>
+                <strong>{selectedProduct.reasonForSelling}</strong>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">How Long Used</span>
+                <strong>{selectedProduct.howLongUsed}</strong>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">Working Perfectly?</span>
+                <strong className={selectedProduct.workingPerfectly ? 'text-[#16A34A]' : 'text-[#DC2626]'}>
+                  {selectedProduct.workingPerfectly ? 'Yes — Tested Working' : 'Has Issue (See Fault Below)'}
+                </strong>
+              </div>
+              <div className="bg-amber-50 border border-[#F59E0B]/40 rounded-xl p-3 sm:col-span-2">
+                <span className="text-black/70 font-bold block">What Is Fault? (Seller Disclosure)</span>
+                <strong className="text-black">{selectedProduct.faultDescription}</strong>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">Location &amp; Buyer Inspection</span>
+                <strong>
+                  {selectedProduct.sellerLocation} • Can Buyer Inspect? {selectedProduct.canInspect ? 'Yes' : 'No'}
+                </strong>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <span className="text-black/60 font-bold block">Delivery or Pickup Only</span>
+                <strong>
+                  {selectedProduct.deliveryOption === 'PICKUP_ONLY'
+                    ? 'Pickup / Inspection Only'
+                    : selectedProduct.deliveryOption === 'DELIVERY'
+                      ? 'Delivery Only'
+                      : 'Delivery OR Pickup Available'}
+                </strong>
+              </div>
+            </div>
+
+            {selectedProduct.description && (
+              <p className="text-xs text-black/80 leading-relaxed pt-1 mb-0">{selectedProduct.description}</p>
+            )}
+          </div>
+
+          {/* Bulk Business Closing Items Table */}
+          {selectedProduct.listingMode === 'bulk' &&
+            Array.isArray(selectedProduct.bulkItems) &&
+            selectedProduct.bulkItems.length > 0 && (
+              <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 p-5 shadow-sm space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-black text-black mb-0">
+                    Bulk / Business Closing Clearance List ({selectedProduct.stock} Units Total)
                   </h3>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mb-3">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{previewProduct.location}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
-                    {previewProduct.description}
-                  </p>
+                  {selectedProduct.bulkTotalPrice && (
+                    <span className="px-3 py-1 rounded-lg bg-[#F59E0B] text-black text-xs font-black tabular-nums">
+                      Total For All: {formatNaira(selectedProduct.bulkTotalPrice)}
+                    </span>
+                  )}
                 </div>
-
-                {/* Actions & Sharing */}
-                <div className="space-y-3 pt-2">
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => {
-                        addToCart(previewProduct);
-                        setPreviewProduct(null);
-                      }}
-                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
-                    >
-                      <Plus className="w-4 h-4 text-indigo-400" /> Add to Cart
-                    </button>
-                    <button
-                      onClick={() => {
-                        addToCart(previewProduct);
-                        setPreviewProduct(null);
-                        setShowCart(true);
-                      }}
-                      className="py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40"
-                    >
-                      <ShoppingBag className="w-4 h-4" /> Buy Now
-                    </button>
-                  </div>
-
-                  {/* Share on WhatsApp & Copy Link */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleWhatsAppShare(previewProduct)}
-                      className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/50"
-                    >
-                      <MessageCircle className="w-4 h-4" /> Share on WhatsApp
-                    </button>
-                    <button
-                      onClick={() => handleShareProduct(previewProduct)}
-                      className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-slate-700 transition-all"
-                    >
-                      <Share2 className="w-4 h-4 text-indigo-400" /> Copy Link
-                    </button>
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-pink-200 text-black/70">
+                        <th className="py-2 pr-3">Item Name</th>
+                        <th className="py-2 pr-3">Qty</th>
+                        <th className="py-2 pr-3">Price / Item</th>
+                        <th className="py-2">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedProduct.bulkItems.map((bi, idx) => (
+                        <tr key={idx} className="border-b border-pink-100 text-black">
+                          <td className="py-2 pr-3 font-bold">{bi.name}</td>
+                          <td className="py-2 pr-3 tabular-nums">{bi.quantity}</td>
+                          <td className="py-2 pr-3 font-extrabold text-[#2563EB] tabular-nums">
+                            {formatNaira(bi.unitPrice)}
+                          </td>
+                          <td className="py-2 text-black/70">{bi.notes || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            )}
 
-      {/* Share Toast */}
-      <AnimatePresence>
-        {shareToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl bg-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-2xl flex items-center gap-2"
+          {/* House / Land Details Card */}
+          {selectedProduct.houseDetails && (
+            <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border border-pink-200 p-5 shadow-sm space-y-3">
+              <h3 className="text-sm font-black text-black flex items-center gap-2 mb-0">
+                <Building2 className="w-4 h-4 text-[#2563EB]" />
+                <span>House / Land Details &amp; Documents</span>
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-black">
+                <div className="bg-white rounded-xl p-3 border border-pink-100">
+                  <span className="text-black/60 block font-bold">Rooms</span>
+                  <strong>{selectedProduct.houseDetails.rooms || 'N/A'}</strong>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-pink-100">
+                  <span className="text-black/60 block font-bold">Bathrooms</span>
+                  <strong>{selectedProduct.houseDetails.bathrooms || 'N/A'}</strong>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-pink-100">
+                  <span className="text-black/60 block font-bold">Land Size</span>
+                  <strong>{selectedProduct.houseDetails.landSize || 'N/A'}</strong>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-pink-100">
+                  <span className="text-black/60 block font-bold">Occupied?</span>
+                  <strong>{selectedProduct.houseDetails.occupied || 'No'}</strong>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-pink-100 col-span-2">
+                  <span className="text-black/60 block font-bold">Documents</span>
+                  <strong>{selectedProduct.houseDetails.documents.join(', ')}</strong>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-pink-100 col-span-2 sm:col-span-3">
+                  <span className="text-black/60 block font-bold">Full Address</span>
+                  <strong>{selectedProduct.houseDetails.fullAddress}</strong>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Seller Card (EFADO Chat ID + Online Status — NO Bank / NO WhatsApp) */}
+          <div className="bg-white rounded-2xl border border-pink-200 p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleChatWithSeller(selectedProduct)}
+                  className="px-2.5 py-1 rounded-lg bg-[#2563EB] text-white text-xs font-black"
+                >
+                  {selectedSeller?.efadoId || selectedProduct.sellerEfadoId}
+                </button>
+                <span className="text-sm font-black text-black">
+                  {selectedSeller?.storeName || selectedProduct.sellerName}
+                </span>
+                {selectedSeller?.online || selectedProduct.sellerOnline ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-extrabold text-[#16A34A]">
+                    <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
+                    Online Now - Chat Now
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-black/55">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    Offline - Leave Message
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-black/70 mb-0">
+                Location: {selectedProduct.sellerLocation} • Sales: {selectedSeller?.salesCount ?? selectedProduct.sellerSalesCount}
+              </p>
+              <p className="text-[11px] font-bold text-[#2563EB] mb-0">
+                Meet At EFADO Office - Delta State, Warri For Safe Exchange
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleChatWithSeller(selectedProduct)}
+              className="px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-extrabold flex items-center gap-1.5"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>Open EFADO Chat</span>
+            </button>
+          </div>
+
+          {/* Reviews */}
+          <div className="bg-white rounded-2xl border border-pink-200 p-5 shadow-sm space-y-3">
+            <h3 className="text-sm font-black text-black mb-0">Verified Buyer Reviews ({productReviews.length})</h3>
+            {productReviews.length === 0 ? (
+              <p className="text-xs text-black/60 mb-0">No reviews yet. Be the first verified buyer to review!</p>
+            ) : (
+              <div className="space-y-2.5">
+                {productReviews.map((rv) => (
+                  <div key={rv.id} className="bg-purple-50/60 rounded-xl p-3 border border-pink-100 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-extrabold text-black">{rv.buyerName}</span>
+                      <span className="text-[#F59E0B] font-black flex items-center gap-0.5">
+                        <Star className="w-3.5 h-3.5 fill-current" />
+                        {rv.rating}/5
+                      </span>
+                    </div>
+                    <p className="text-xs text-black/85 mb-0">{rv.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Bottom Purchase Bar */}
+          <div className="fixed bottom-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-pink-200 px-3 sm:px-6 py-3 shadow-lg">
+            <div className="max-w-[960px] mx-auto flex flex-wrap items-center gap-2.5">
+              {selectedProduct.status === 'SOLD' || selectedProduct.stock <= 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handleNotifyMe(selectedProduct.id)}
+                  className="w-full py-3.5 px-6 bg-amber-100 border border-[#F59E0B] text-black font-black text-sm rounded-xl"
+                >
+                  SOLD OUT — Notify Me When Relisted
+                </button>
+              ) : selectedProduct.negotiable &&
+                selectedProduct.activeNegotiation &&
+                selectedProduct.activeNegotiation.buyerId !== user.uid ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full py-3.5 px-6 bg-amber-100 border border-[#F59E0B] text-black font-black text-sm rounded-xl"
+                >
+                  In Negotiation - Please Wait
+                </button>
+              ) : selectedProduct.negotiable &&
+                selectedProduct.activeNegotiation?.status === 'AGREED' &&
+                selectedProduct.activeNegotiation.buyerId === user.uid ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(selectedProduct, false, detailQty)}
+                    className="px-4 py-3.5 rounded-xl bg-white border-2 border-pink-200 text-black font-extrabold text-xs sm:text-sm"
+                  >
+                    Add To Cart
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBuyAtAgreedOrFixed(selectedProduct, detailQty)}
+                    className="flex-1 py-3.5 px-5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-xs sm:text-sm shadow-md"
+                  >
+                    Buy At Agreed Price -{' '}
+                    {formatNaira(selectedProduct.activeNegotiation.agreedPriceNgn || selectedProduct.price)}
+                  </button>
+                </>
+              ) : selectedProduct.negotiable ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleChatWithSeller(selectedProduct)}
+                    className="flex-1 py-3.5 px-4 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Chat - Negotiate Price</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMakeOffer(selectedProduct)}
+                    className="flex-1 py-3.5 px-4 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-xs sm:text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <Handshake className="w-4 h-4" />
+                    <span>Make Offer</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(selectedProduct, false, detailQty)}
+                    className="flex-1 py-3.5 px-4 rounded-xl bg-white border-2 border-[#2563EB] text-[#2563EB] font-extrabold text-xs sm:text-sm"
+                  >
+                    ADD TO CART
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBuyAtAgreedOrFixed(selectedProduct, detailQty)}
+                    className="flex-1 py-3.5 px-5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-xs sm:text-sm shadow-md"
+                  >
+                    BUY NOW - {formatNaira(selectedProduct.price * detailQty)}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Photo Zoom Lightbox */}
+          {zoomLightboxOpen && (
+            <div
+              onClick={() => setZoomLightboxOpen(false)}
+              className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            >
+              <button
+                type="button"
+                onClick={() => setZoomLightboxOpen(false)}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white text-black"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <img
+                src={selectedProduct.photos[activePhotoIdx] || selectedProduct.photos[0]}
+                alt={selectedProduct.name}
+                className="max-w-full max-h-[85vh] object-contain rounded-xl"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 3: CART                                                        */}
+      {/* =================================================================== */}
+      {step === 'CART' && (
+        <CartPage
+          cart={cart}
+          currentUserId={user.uid}
+          onBack={() => setStep('HOME')}
+          onUpdateQty={(pid, delta) => handleUpdateCartQty(pid, delta)}
+          onRemoveItem={(pid) => handleRemoveCartItem(pid)}
+          onNegotiateItem={(prod) => handleChatWithSeller(prod)}
+          onProceedToDelivery={handleProceedToDelivery}
+          errorMsg={cartError}
+          checkingStock={checkingCartStock}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 4: DELIVERY & PICKUP                                           */}
+      {/* =================================================================== */}
+      {step === 'DELIVERY' && (
+        <DeliveryPage
+          cart={cart}
+          currentUserId={user.uid}
+          defaultName={user?.displayName || user?.fullName || ''}
+          defaultPhone={user?.phoneNumber || ''}
+          onBack={() => setStep('CART')}
+          onOrderCreated={(order) => {
+            setActiveOrder(order);
+            setStep('PAYMENT');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 5: PAYMENT METHOD SELECTION                                    */}
+      {/* =================================================================== */}
+      {step === 'PAYMENT' && activeOrder && (
+        <PaymentPage
+          order={activeOrder}
+          walletBalanceNgn={walletBalanceNgn}
+          selectedMethod={paymentMethod}
+          selectedGateway={paymentGateway}
+          onSelectPayment={(m, gw) => {
+            setPaymentMethod(m);
+            setPaymentGateway(gw);
+          }}
+          onBack={() => setStep('DELIVERY')}
+          onBackToCart={() => setStep('CART')}
+          onProceedToAuthorize={() => {
+            setStep('AUTHORIZE');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onFundWallet={() => {
+            if (onNavigate) onNavigate('wallet');
+            else showToast('Open your EFADO Wallet to top up balance.');
+          }}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 6: AUTHORIZE TRANSACTION (PIN + >100k OTP)                     */}
+      {/* =================================================================== */}
+      {step === 'AUTHORIZE' && activeOrder && (
+        <AuthorizePage
+          order={activeOrder}
+          paymentMethod={paymentMethod}
+          paymentGateway={paymentGateway}
+          hasPin={hasPin}
+          biometricEnabled={biometricEnabled}
+          onBackToPayment={() => setStep('PAYMENT')}
+          onCancelToMarket={() => setStep('HOME')}
+          onPinUpdated={refreshWalletAndSecurity}
+          onSuccessWallet={(paidOrder) => {
+            setActiveOrder(paidOrder);
+            setCart([]);
+            setStep('SUCCESS');
+            refreshWalletAndSecurity();
+            loadCatalog();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* STEP 7: SUCCESS + TRACKING + RELEASE + DISPUTE                      */}
+      {/* =================================================================== */}
+      {step === 'SUCCESS' && activeOrder && (
+        <SuccessPage
+          order={activeOrder}
+          onOrderUpdated={(updated) => setActiveOrder(updated)}
+          onViewOrders={() => {
+            setStep('ACTIVITY');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onContinueShopping={() => {
+            setStep('HOME');
+            loadCatalog();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* IN-APP EFADO CHAT                                                   */}
+      {/* =================================================================== */}
+      {step === 'CHAT' && chatTarget && (
+        <SellerChatPage
+          currentUserId={user.uid}
+          productId={chatTarget.productId}
+          productName={chatTarget.productName}
+          productPhoto={chatTarget.productPhoto}
+          sellerId={chatTarget.sellerId}
+          sellerName={chatTarget.sellerName}
+          sellerEfadoId={chatTarget.sellerEfadoId}
+          buyerId={chatTarget.buyerId}
+          initialOfferAmount={chatTarget.initialOfferAmount}
+          onBack={() => setStep('HOME')}
+          onBuyAtAgreedPrice={(prod) => handleBuyAtAgreedOrFixed(prod, 1)}
+          onProductUpdated={syncSingleProductIntoState}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* ACTIVITY (MY ORDERS, CHATS, ALERTS, SELLER ORDERS)                  */}
+      {/* =================================================================== */}
+      {step === 'ACTIVITY' && (
+        <ActivityPage
+          onOpenOrderTracking={(ord) => {
+            setActiveOrder(ord);
+            setStep('SUCCESS');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenChat={(th: FairlyUsedChatThread) => {
+            setChatTarget({
+              productId: th.productId,
+              productName: th.productName,
+              productPhoto: th.productPhoto,
+              sellerId: th.sellerId,
+              sellerName: th.sellerName,
+              sellerEfadoId: th.sellerEfadoId,
+              buyerId: th.buyerId
+            });
+            setStep('CHAT');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onBackToMarket={() => setStep('HOME')}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* BECOME A SELLER / VENDOR KYC                                        */}
+      {/* =================================================================== */}
+      {step === 'VENDOR_REGISTRATION' && (
+        <VendorRegistrationPage
+          userEmail={user?.email || ''}
+          userName={user?.displayName || user?.fullName || ''}
+          userPhone={user?.phoneNumber || ''}
+          onBack={() => setStep('HOME')}
+          onGoSellerHub={() => setStep('PROFILE')}
+        />
+      )}
+
+      {/* =================================================================== */}
+      {/* SELLER HUB PROFILE                                                  */}
+      {/* =================================================================== */}
+      {step === 'PROFILE' && (
+        <ProfileSellerHubPage
+          userEmail={user?.email || ''}
+          userName={user?.displayName || user?.fullName || ''}
+          walletBalanceNgn={walletBalanceNgn}
+          onProductChanged={() => loadCatalog()}
+          onOpenWallet={() => (onNavigate ? onNavigate('wallet') : onClose())}
+          onOpenVendorRegistration={() => {
+            setStep('VENDOR_REGISTRATION');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {/* QUICK MAKE OFFER MODAL */}
+      {offerModalProduct && (
+        <div
+          onClick={() => setOfferModalProduct(null)}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <form
+            onSubmit={handleSubmitQuickOffer}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md bg-gradient-to-br from-purple-50 via-white to-pink-50 rounded-2xl border-2 border-pink-200 p-5 shadow-xl space-y-4"
           >
-            <CheckCircle2 className="w-4 h-4 text-white" />
-            <span>{shareToast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      </div>
-    </motion.div>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-black text-black flex items-center gap-2 mb-0">
+                <Handshake className="w-5 h-5 text-[#2563EB]" />
+                <span>Make Price Offer</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOfferModalProduct(null)}
+                className="p-1.5 rounded-lg bg-white border border-pink-200 text-black"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white rounded-xl p-3 border border-pink-100">
+              <img
+                src={offerModalProduct.photos[0]}
+                alt={offerModalProduct.name}
+                className="w-14 h-14 rounded-lg object-cover shrink-0"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-black truncate mb-0.5">{offerModalProduct.name}</p>
+                <p className="text-xs font-bold text-[#2563EB] mb-0">
+                  Asking Price: {formatNaira(offerModalProduct.price)} • {offerModalProduct.sellerEfadoId}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold text-black mb-1">Your Offer: &quot;I offer ₦&quot; *</label>
+              <input
+                type="number"
+                required
+                min={100}
+                value={offerModalAmount}
+                onChange={(e) => setOfferModalAmount(e.target.value)}
+                placeholder="Enter amount in Naira"
+                className="w-full px-4 py-3 rounded-xl border-2 border-pink-200 bg-white text-base font-black text-black tabular-nums focus:border-[#2563EB] outline-none"
+              />
+              <p className="text-[11px] text-black/65 mt-1 mb-0">
+                One Product = One Negotiation At A Time. Your offer locks negotiation while seller responds.
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setOfferModalProduct(null)}
+                className="px-4 py-3 rounded-xl bg-white border border-pink-200 text-black text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={offerModalBusy}
+                className="flex-1 py-3 px-5 rounded-xl bg-[#F59E0B] hover:bg-[#D97706] text-black text-xs font-black shadow-sm flex items-center justify-center gap-1.5"
+              >
+                {offerModalBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>Send Offer ({offerModalAmount ? formatNaira(Number(offerModalAmount)) : '₦0'})</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-xl bg-black text-white text-xs font-extrabold shadow-lg max-w-[90vw] text-center">
+          {toastMsg}
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* FIXED BOTTOM NAVIGATION BAR (HOME / MARKET / REELS / CART / ACT / P)*/}
+      {/* =================================================================== */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-pink-200 shadow-lg">
+        <div className="max-w-[960px] mx-auto grid grid-cols-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold text-black/65 hover:text-[#2563EB]"
+          >
+            <Home className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Home</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep('HOME')}
+            className={`py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold ${
+              step === 'HOME' || step === 'FILTER' || step === 'PRODUCT_DETAIL'
+                ? 'text-[#2563EB]'
+                : 'text-black/65 hover:text-[#2563EB]'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Market</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep('REELS')}
+            className={`py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold ${
+              step === 'REELS' ? 'text-[#2563EB]' : 'text-black/65 hover:text-[#2563EB]'
+            }`}
+          >
+            <Film className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Reels</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep('CART')}
+            className={`relative py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold ${
+              step === 'CART' || step === 'DELIVERY' || step === 'PAYMENT' || step === 'AUTHORIZE'
+                ? 'text-[#2563EB]'
+                : 'text-black/65 hover:text-[#2563EB]'
+            }`}
+          >
+            <div className="relative">
+              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-[#F59E0B] text-black text-[9px] font-black flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </div>
+            <span>Cart</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep('ACTIVITY')}
+            className={`py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold ${
+              step === 'ACTIVITY' || step === 'CHAT' || step === 'SUCCESS'
+                ? 'text-[#2563EB]'
+                : 'text-black/65 hover:text-[#2563EB]'
+            }`}
+          >
+            <Package className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Activity</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStep('PROFILE')}
+            className={`py-2 flex flex-col items-center justify-center gap-0.5 text-[10px] sm:text-[11px] font-bold ${
+              step === 'PROFILE' || step === 'VENDOR_REGISTRATION'
+                ? 'text-[#2563EB]'
+                : 'text-black/65 hover:text-[#2563EB]'
+            }`}
+          >
+            <UserIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Profile</span>
+          </button>
+        </div>
+      </nav>
+    </div>
   );
 };
+
+export default FairlyUsedMarket;

@@ -85,6 +85,10 @@
       "destination": "/api/wallet-router?__route=/api/marketplace/:path*"
     },
     {
+      "source": "/api/fairly-used/:path*",
+      "destination": "/api/fairly-used-router?__route=/api/fairly-used/:path*"
+    },
+    {
       "source": "/((?!api/|assets/|.*\\..*).*)",
       "destination": "/index.html"
     }
