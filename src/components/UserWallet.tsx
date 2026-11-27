@@ -187,7 +187,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({
   const [swapFromCurrency, setSwapFromCurrency] = useState('NGN');
   const [swapToCurrency, setSwapToCurrency] = useState('USD');
   const [swapAmount, setSwapAmount] = useState('10000');
-  const [swapQuote, setSwapQuote] = useState<{ rate: number; feeAmount: number; receiveAmount: number } | null>(null);
+  const [swapQuote, setSwapQuote] = useState<{ rate: number; feeAmount: number; feePercent?: number; receiveAmount: number } | null>(null);
   const [isLoadingSwapRate, setIsLoadingSwapRate] = useState(false);
   const [isExecutingSwap, setIsExecutingSwap] = useState(false);
   const [swapError, setSwapError] = useState<string | null>(null);
@@ -3112,7 +3112,7 @@ export const UserWallet: React.FC<UserWalletProps> = ({
                         </span>
                       </div>
                       <div className="flex justify-between text-xs font-semibold text-slate-600">
-                        <span>Conversion Fee (0.5%)</span>
+                        <span>Conversion Fee ({swapQuote.feePercent ?? 5}%)</span>
                         <span className="tabular-nums">
                           {formatCurrencyAmount(swapQuote.feeAmount, swapFromCurrency)}
                         </span>

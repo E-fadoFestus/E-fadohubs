@@ -367,18 +367,24 @@ export async function calculateSwapQuote(fromCur: string, toCur: string, amount:
   const marketRate = toRate / fromRate;
 
   const cleanAmount = Math.max(0, Number(amount) || 0);
-  const feeRate = 0.005; // 0.5% transparent swap fee
+  const feeRate = 0.05; // 5% CEO benefit swap fee
   const feeAmount = fromMinorUnits(Math.round(toMinorUnits(cleanAmount) * feeRate));
   const netInput = fromMinorUnits(toMinorUnits(cleanAmount) - toMinorUnits(feeAmount));
   const convertedMinor = Math.round(toMinorUnits(netInput) * marketRate);
   const receiveAmount = fromMinorUnits(convertedMinor);
+  const ngnRate = rates.NGN || 1550;
+  const feeInNgn =
+    from === 'NGN'
+      ? feeAmount
+      : fromMinorUnits(Math.round((toMinorUnits(feeAmount) / fromRate) * ngnRate));
 
   return {
     from,
     to,
     inputAmount: cleanAmount,
     feeAmount,
-    feePercent: 0.5,
+    feePercent: 5,
+    feeInNgn,
     rate: Number(marketRate.toFixed(6)),
     receiveAmount,
     source,

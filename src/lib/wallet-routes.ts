@@ -1885,53 +1885,65 @@ export function registerWalletRoutes(app: Express) {
       const idemRef = db.doc(`wallets/${user.uid}/idempotency/${refBase}`);
 
       await db.runTransaction(async (tx: any) => {
-        const idemSnap = await tx.get(idemRef);
-        const existingOut = await tx.get(db.doc(`transactions/${refBase}-OUT`));
+        const uRef = db.doc(`users/${user.uid}`);
+        const isUserFieldSource =
+          sourceWallet === 'cashOutWallet' || sourceWallet === 'playerWallet' || sourceWallet === 'promoWallet';
+        const fromPocketRef = db.doc(`wallets/${user.uid}/${fromCur}/depositWallet`);
+        const toPocketRef = db.doc(`wallets/${user.uid}/${toCur}/depositWallet`);
+        const outTxRef = db.doc(`transactions/${refBase}-OUT`);
+        const userOutTxRef = db.doc(`wallets/${user.uid}/transactions/${refBase}-OUT`);
+        const inTxRef = db.doc(`transactions/${refBase}-IN`);
+        const userInTxRef = db.doc(`wallets/${user.uid}/transactions/${refBase}-IN`);
+
+        // PHASE 1: ALL FIRESTORE READS MUST EXECUTE BEFORE ANY WRITES
+        const [idemSnap, existingOut, sourceSnap, toSnap] = await Promise.all([
+          tx.get(idemRef),
+          tx.get(outTxRef),
+          isUserFieldSource ? tx.get(uRef) : tx.get(fromPocketRef),
+          tx.get(toPocketRef)
+        ]);
+
         if (idemSnap.exists || existingOut.exists) {
           throw new Error('DUPLICATE_SWAP_REQUEST');
         }
 
-        let nextSourceBal = 0;
-        // Debit source
-        if (sourceWallet === 'cashOutWallet' || sourceWallet === 'playerWallet' || sourceWallet === 'promoWallet') {
-          const uRef = db.doc(`users/${user.uid}`);
-          const uSnap = await tx.get(uRef);
-          const curBal = uSnap.exists ? Number(uSnap.data()?.[sourceWallet] || 0) : 0;
-          if (toMinorUnits(curBal) < toMinorUnits(numAmount)) {
-            throw new Error(`INSUFFICIENT_FUNDS`);
-          }
-          nextSourceBal = fromMinorUnits(toMinorUnits(curBal) - toMinorUnits(numAmount));
-          tx.set(uRef, { [sourceWallet]: nextSourceBal, updatedAt: serverTime }, { merge: true });
+        const curSourceBal = isUserFieldSource
+          ? (sourceSnap.exists ? Number(sourceSnap.data()?.[sourceWallet] || 0) : 0)
+          : (sourceSnap.exists ? Number(sourceSnap.data()?.balance ?? sourceSnap.data()?.depositWallet ?? 0) : 0);
+
+        if (toMinorUnits(curSourceBal) < toMinorUnits(numAmount)) {
+          throw new Error('INSUFFICIENT_FUNDS');
+        }
+
+        const nextSourceBal = fromMinorUnits(toMinorUnits(curSourceBal) - toMinorUnits(numAmount));
+        const oldToBal = toSnap.exists ? Number(toSnap.data()?.balance ?? toSnap.data()?.depositWallet ?? 0) : 0;
+        const nextTo = fromMinorUnits(toMinorUnits(oldToBal) + toMinorUnits(quote.receiveAmount));
+
+        // PHASE 2: ALL FIRESTORE WRITES EXECUTE AFTER ALL READS
+        const userDocPatch: Record<string, any> = { updatedAt: serverTime };
+        if (isUserFieldSource) {
+          userDocPatch[sourceWallet] = nextSourceBal;
         } else {
-          const fromPocketRef = db.doc(`wallets/${user.uid}/${fromCur}/depositWallet`);
-          const fromSnap = await tx.get(fromPocketRef);
-          const curBal = fromSnap.exists ? Number(fromSnap.data()?.balance ?? fromSnap.data()?.depositWallet ?? 0) : 0;
-          if (toMinorUnits(curBal) < toMinorUnits(numAmount)) {
-            throw new Error(`INSUFFICIENT_FUNDS`);
-          }
-          nextSourceBal = fromMinorUnits(toMinorUnits(curBal) - toMinorUnits(numAmount));
           tx.set(
             fromPocketRef,
             { balance: nextSourceBal, depositWallet: nextSourceBal, currency: fromCur, userId: user.uid, updatedAt: serverTime },
             { merge: true }
           );
           if (fromCur === 'NGN') {
-            tx.set(db.doc(`users/${user.uid}`), { depositWallet: nextSourceBal }, { merge: true });
+            userDocPatch.depositWallet = nextSourceBal;
           }
         }
 
-        // Credit destination currency pocket
-        const toPocketRef = db.doc(`wallets/${user.uid}/${toCur}/depositWallet`);
-        const toSnap = await tx.get(toPocketRef);
-        const oldToBal = toSnap.exists ? Number(toSnap.data()?.balance ?? toSnap.data()?.depositWallet ?? 0) : 0;
-        const nextTo = fromMinorUnits(toMinorUnits(oldToBal) + toMinorUnits(quote.receiveAmount));
         tx.set(
           toPocketRef,
           { balance: nextTo, depositWallet: nextTo, currency: toCur, userId: user.uid, updatedAt: serverTime },
           { merge: true }
         );
         if (toCur === 'NGN') {
-          tx.set(db.doc(`users/${user.uid}`), { depositWallet: nextTo }, { merge: true });
+          userDocPatch.depositWallet = nextTo;
+        }
+        if (Object.keys(userDocPatch).length > 1) {
+          tx.set(uRef, userDocPatch, { merge: true });
         }
 
         const outTx = {
@@ -1940,12 +1952,15 @@ export function registerWalletRoutes(app: Express) {
           status: 'completed',
           amount: numAmount,
           fee: quote.feeAmount,
+          ceoBenefitPercent: 5,
+          ceoBenefitAmount: quote.feeAmount,
+          ceoBenefitCurrency: fromCur,
           balanceAfter: nextSourceBal,
           sourceWallet,
           currency: fromCur,
           method: 'Currency Swap',
           purpose: `Swap ${fromCur} to ${toCur}`,
-          description: `Converted ${numAmount} ${fromCur} -> ${quote.receiveAmount} ${toCur} (Rate: ${quote.rate})`,
+          description: `Converted ${numAmount} ${fromCur} -> ${quote.receiveAmount} ${toCur} (5% CEO Benefit Fee: ${quote.feeAmount} ${fromCur}, Rate: ${quote.rate})`,
           reference: `${refBase}-OUT`,
           createdAtIso: new Date().toISOString(),
           timestamp: serverTime,
@@ -1970,11 +1985,44 @@ export function registerWalletRoutes(app: Express) {
         };
 
         tx.set(idemRef, { reference: refBase, createdAtIso: outTx.createdAtIso });
-        tx.set(db.doc(`transactions/${refBase}-OUT`), outTx, { merge: true });
-        tx.set(db.doc(`wallets/${user.uid}/transactions/${refBase}-OUT`), outTx, { merge: true });
-        tx.set(db.doc(`transactions/${refBase}-IN`), inTx, { merge: true });
-        tx.set(db.doc(`wallets/${user.uid}/transactions/${refBase}-IN`), inTx, { merge: true });
+        tx.set(outTxRef, outTx, { merge: true });
+        tx.set(userOutTxRef, outTx, { merge: true });
+        tx.set(inTxRef, inTx, { merge: true });
+        tx.set(userInTxRef, inTx, { merge: true });
       });
+
+      // Route 5% CEO Benefit Fee into adminStats/global (reads before writes, non-fatal if client rules deny adminStats)
+      if (quote.feeAmount > 0) {
+        try {
+          const adminRef = db.doc('adminStats/global');
+          await db.runTransaction(async (adminTx: any) => {
+            const adminSnap = await adminTx.get(adminRef);
+            const cur = adminSnap.exists ? (adminSnap.data() || {}) : {};
+            const patch: Record<string, any> = { lastUpdated: serverTime };
+
+            if (fromCur === 'USD') {
+              patch.adminWalletUSD = fromMinorUnits(toMinorUnits(Number(cur.adminWalletUSD || 0)) + toMinorUnits(quote.feeAmount));
+              patch.totalHouseGainUSD = fromMinorUnits(toMinorUnits(Number(cur.totalHouseGainUSD || 0)) + toMinorUnits(quote.feeAmount));
+            } else if (fromCur === 'EUR') {
+              patch.adminWalletEUR = fromMinorUnits(toMinorUnits(Number(cur.adminWalletEUR || 0)) + toMinorUnits(quote.feeAmount));
+              patch.totalHouseGainEUR = fromMinorUnits(toMinorUnits(Number(cur.totalHouseGainEUR || 0)) + toMinorUnits(quote.feeAmount));
+            } else if (fromCur === 'GBP') {
+              patch.adminWalletGBP = fromMinorUnits(toMinorUnits(Number(cur.adminWalletGBP || 0)) + toMinorUnits(quote.feeAmount));
+              patch.totalHouseGainGBP = fromMinorUnits(toMinorUnits(Number(cur.totalHouseGainGBP || 0)) + toMinorUnits(quote.feeAmount));
+            } else {
+              const ngnFee = fromCur === 'NGN' ? quote.feeAmount : Number(quote.feeInNgn || 0);
+              if (ngnFee > 0) {
+                patch.adminWallet = fromMinorUnits(toMinorUnits(Number(cur.adminWallet || 0)) + toMinorUnits(ngnFee));
+                patch.totalHouseGain = fromMinorUnits(toMinorUnits(Number(cur.totalHouseGain || 0)) + toMinorUnits(ngnFee));
+              }
+            }
+
+            adminTx.set(adminRef, patch, { merge: true });
+          });
+        } catch (ceoErr: any) {
+          console.warn('[Swap CEO Benefit Ledger Note]:', ceoErr?.message || ceoErr);
+        }
+      }
 
       await createWalletAlert(
         user.uid,
